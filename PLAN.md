@@ -41,6 +41,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - CI workflow added
 - SQLite data layer decided and documented
 - Initial EF Core migration created and applied
+- Controller-based API architecture (refactored from Minimal APIs)
+- Shared UserService for user resolution and membership checks
 - Read-only API endpoints for servers/channels/messages
 - Authenticated message posting endpoint
 - Web UI wired to API data

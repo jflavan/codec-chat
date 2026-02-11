@@ -38,7 +38,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### API Infrastructure
 - ✅ Health check endpoint (`/health`)
-- ✅ RESTful API design with Minimal APIs
+- ✅ Controller-based RESTful API design (`[ApiController]`)
+- ✅ Shared `UserService` for user resolution and membership checks
 - ✅ CORS configuration for local development
 - ✅ SQLite database with EF Core
 - ✅ Automatic database migrations in dev

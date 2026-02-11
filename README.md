@@ -69,6 +69,6 @@ The web app runs at `http://localhost:5174` by default.
 
 ## Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
-- **Backend:** ASP.NET Core 9, Minimal APIs
+- **Backend:** ASP.NET Core 9, Controller-based APIs
 - **Database:** SQLite with Entity Framework Core
 - **Authentication:** Google Identity Services (ID tokens)

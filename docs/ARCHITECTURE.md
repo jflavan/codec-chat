@@ -5,7 +5,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 
 ### Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
-- **Backend:** ASP.NET Core 9 Web API (Minimal APIs)
+- **Backend:** ASP.NET Core 9 Web API (Controller-based APIs)
 - **Database:** SQLite with Entity Framework Core 9
 - **Authentication:** Google Identity Services (ID token validation)
 - **Deployment:** Containerized (Docker support)
@@ -25,12 +25,13 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 
 ### API Server (ASP.NET Core)
 - **Location:** `apps/api/Codec.Api/`
-- **Framework:** ASP.NET Core 9 with Minimal APIs
+- **Framework:** ASP.NET Core 9 with Controller-based APIs
 - **Language:** C# 14 (.NET 9)
 - **Database:** SQLite via Entity Framework Core
 - **Key Features:**
   - Stateless JWT validation
-  - RESTful API design
+  - RESTful controller-based API design (`[ApiController]`)
+  - Shared `UserService` for cross-cutting user resolution
   - Automatic migrations (development)
   - CORS support for local development
 
@@ -254,6 +255,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 - ✅ Token expiration checking
 - ✅ CORS restrictions
 - ✅ User identity isolation (membership checks)
+- ✅ Controller-level `[Authorize]` attribute enforcement
 
 ### Production Requirements
 - 🔒 HTTPS enforcement
