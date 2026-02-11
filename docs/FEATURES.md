@@ -1,25 +1,129 @@
 # Features
 
-## MVP
-- Google Sign-In
-- Personal profile (basic claims)
-- User identity mapping (Google subject)
-- Server membership and roles
-- Server list (placeholder)
-- Channel list (placeholder)
-- Text message feed (placeholder)
-- App shell layout (servers, channels, messages)
-- Health endpoint for API
-- Read and post messages (dev)
-- Server member list (basic)
+This document tracks implemented, in-progress, and planned features for Codec.
 
-## Near-term
-- Direct messages
-- Message history (persistence)
-- Presence and typing indicators
-- File uploads
+## ✅ Implemented (MVP)
 
-## Later
-- Voice channels
-- Roles and permissions
-- Notifications
+### Authentication & User Management
+- ✅ Google Sign-In integration
+- ✅ JWT ID token validation by API
+- ✅ User profile display (name, email, avatar)
+- ✅ User identity mapping (Google subject to internal User ID)
+- ✅ Auto user creation on first sign-in
+
+### Server Management
+- ✅ Server discovery (browse all servers)
+- ✅ Server joining flow
+- ✅ Server membership tracking
+- ✅ Server member list display
+- ✅ Role-based membership (Owner, Admin, Member)
+- ✅ Member display with avatar and role
+
+### Channel & Messaging
+- ✅ Channel list per server
+- ✅ Text message feed with persistence
+- ✅ Post new messages
+- ✅ Message history retrieval
+- ✅ Author attribution (name, user ID)
+- ✅ Timestamp display
+
+### UI/UX
+- ✅ App shell layout (servers sidebar, channels list, message panel)
+- ✅ Loading states for async operations
+- ✅ Error handling and display
+- ✅ Responsive layout
+- ✅ Member list sidebar
+
+### API Infrastructure
+- ✅ Health check endpoint (`/health`)
+- ✅ RESTful API design with Minimal APIs
+- ✅ CORS configuration for local development
+- ✅ SQLite database with EF Core
+- ✅ Automatic database migrations in dev
+- ✅ Seed data for development
+
+## 🚧 In Progress
+
+### Authorization
+- 🔄 Role-based permissions (Owner/Admin privileges)
+- 🔄 Authorization policies for endpoints
+- 🔄 Admin-only operations (channel creation, member management)
+
+### Data Validation
+- 🔄 Enhanced input validation
+- 🔄 Error response standardization
+- 🔄 Client-side form validation
+
+## 📋 Planned (Near-term)
+
+### Messaging Features
+- Direct messages (1-on-1 chat)
+- Message editing and deletion
+- Message reactions/emojis
+- Rich text formatting (markdown)
+- @mentions
+- Message search
+
+### Real-time Features
+- SignalR/WebSocket integration
+- Live message updates
+- Presence indicators (online/offline/away)
+- Typing indicators
+- Real-time member list updates
+
+### Server Management
+- Server creation
+- Server settings/configuration
+- Server invites (invite codes)
+- Server icons/avatars
+- Channel creation and management
+- Channel categories/organization
+
+### File & Media
+- File uploads (images, documents)
+- Image preview and gallery
+- File size limits and validation
+- Drag-and-drop upload
+
+## 🔮 Future (Later)
+
+### Advanced Features
+- Voice channels (WebRTC)
+- Video chat
+- Screen sharing
+- Threads/replies
+- Message pinning
+- Notification system (push, email)
+
+### Moderation & Administration
+- User banning/kicking
+- Message moderation
+- Audit logs
+- Report system
+- Custom role creation
+- Granular permissions
+
+### Customization
+- User preferences/settings
+- Server themes
+- Custom emojis
+- Profile customization
+- Status messages
+
+### Enterprise Features
+- OAuth integrations (GitHub, Discord, etc.)
+- SAML/SSO support
+- Analytics dashboard
+- Export/backup tools
+- API rate limiting
+- Webhooks
+
+## Technical Debt & Improvements
+- [ ] Add comprehensive unit tests
+- [ ] Add integration tests
+- [ ] Implement proper logging (Serilog)
+- [ ] Add API documentation (Swagger/OpenAPI)
+- [ ] Performance monitoring and metrics
+- [ ] Production database migration strategy
+- [ ] Container deployment (Docker)
+- [ ] CI/CD pipeline enhancements

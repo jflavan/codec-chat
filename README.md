@@ -1,44 +1,70 @@
 # Codec
 
-Codec is a Discord-like app built with SvelteKit and ASP.NET Core Web API. Authentication uses Google Sign-In; the web client obtains an ID token and the API validates it on each request.
+Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core Web API. Users authenticate via Google Sign-In; the web client obtains an ID token and the API validates it on each request.
 
-## Repo layout
-- apps/web: SvelteKit web front-end
-- apps/api: ASP.NET Core Web API
-- docs: Project documentation
-- .github: Copilot agent guidance and workflows
+## Repository Structure
+```
+codec/
+├── apps/
+│   ├── api/          # ASP.NET Core 9 Web API
+│   │   └── Codec.Api/
+│   └── web/          # SvelteKit web front-end
+├── docs/             # Project documentation
+├── .github/          # Copilot agent guidance and CI workflows
+└── scripts/          # Build and utility scripts
+```
 
 ## Prerequisites
-- Node.js 20+ and npm
-- .NET SDK 9.x
+- **Node.js** 20+ and npm
+- **.NET SDK** 9.x
+- **Google Cloud Console** project with OAuth 2.0 credentials
 
-## Quick start
-### API
-1. Set Google Client ID in apps/api/appsettings.Development.json
-   - The API will fail fast if Google:ClientId is missing.
-   - SQLite database path is configured in ConnectionStrings:Default.
-2. Run the API:
-   - cd apps/api/Codec.Api
-   - dotnet run
+## Quick Start
 
-### Web
-1. Create apps/web/.env with values based on apps/web/.env.example
-2. Run the web app:
-   - cd apps/web
-   - npm install
-   - npm run dev
+### 1. Configure Google Sign-In
+1. Create an OAuth 2.0 Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Add authorized JavaScript origins:
+   - `http://localhost:5173` (for development)
+3. Copy your Client ID for the next steps
 
-## Google Sign-In setup (dev)
-1. Create an OAuth 2.0 Client ID in Google Cloud Console.
-2. Add authorized JavaScript origins (for dev):
-   - http://localhost:5173
-3. Copy the Client ID into:
-   - apps/web/.env (PUBLIC_GOOGLE_CLIENT_ID)
-   - apps/api/appsettings.Development.json (Google:ClientId)
+### 2. Start the API
+```bash
+cd apps/api/Codec.Api
+# Edit appsettings.Development.json and set Google:ClientId
+dotnet run
+```
+The API runs at `http://localhost:5000` by default.
+
+**Note:** The API will fail fast if `Google:ClientId` is missing. SQLite database migrations run automatically in development.
+
+### 3. Start the Web App
+```bash
+cd apps/web
+cp .env.example .env
+# Edit .env and set PUBLIC_GOOGLE_CLIENT_ID and PUBLIC_API_BASE_URL
+npm install
+npm run dev
+```
+The web app runs at `http://localhost:5173` by default.
+
+## Features
+- ✅ Google Sign-In authentication
+- ✅ Server discovery and joining
+- ✅ Server membership and roles (Owner, Admin, Member)
+- ✅ Channel browsing within servers
+- ✅ Real-time message posting and viewing
+- ✅ User profile display
+- ✅ Member lists for servers
 
 ## Documentation
-Start with:
-- docs/DEV_SETUP.md
-- docs/AUTH.md
-- docs/ARCHITECTURE.md
-- docs/FEATURES.md
+- [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
+- [Authentication](docs/AUTH.md) - How Google ID token validation works
+- [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints
+- [Features](docs/FEATURES.md) - Current and planned features
+- [Data Layer](docs/DATA.md) - Database schema and migrations
+
+## Technology Stack
+- **Frontend:** SvelteKit 2.x, TypeScript, Vite
+- **Backend:** ASP.NET Core 9, Minimal APIs
+- **Database:** SQLite with Entity Framework Core
+- **Authentication:** Google Identity Services (ID tokens)
