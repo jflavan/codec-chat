@@ -20,7 +20,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Key Features:**
   - Server-side rendering (SSR) capable
   - Client-side Google Sign-In integration
-  - Reactive state management with Svelte stores
+  - Reactive state management with Svelte 5 runes (`$state`, `$derived`)
   - Type-safe API client
 
 ### API Server (ASP.NET Core)
@@ -103,9 +103,11 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 #### Server Management
 - `GET /servers` - List servers user is a member of
 - `GET /servers/discover` - Browse all available servers
+- `POST /servers` - Create a new server (authenticated user becomes Owner)
 - `POST /servers/{serverId}/join` - Join a server
 - `GET /servers/{serverId}/members` - List server members (requires membership)
 - `GET /servers/{serverId}/channels` - List channels in a server (requires membership)
+- `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner or Admin role)
 
 #### Messaging
 - `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership)
@@ -114,7 +116,53 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
 
-**Example Request:**
+**Example Request (Create Server):**
+```http
+POST /servers HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "name": "My New Server"
+}
+```
+
+**Example Response (Create Server):**
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "id": "d3b07384-d113-4ec6-a3e6-9f6d2a3c5b1e",
+  "name": "My New Server",
+  "role": "Owner"
+}
+```
+
+**Example Request (Create Channel):**
+```http
+POST /servers/d3b07384-d113-4ec6-a3e6-9f6d2a3c5b1e/channels HTTP/1.1
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "name": "design"
+}
+```
+
+**Example Response (Create Channel):**
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "design",
+  "serverId": "d3b07384-d113-4ec6-a3e6-9f6d2a3c5b1e"
+}
+```
+
+**Example Request (Post Message):**
 ```http
 POST /channels/550e8400-e29b-41d4-a716-446655440000/messages HTTP/1.1
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -178,7 +226,7 @@ User ────┬──── ServerMember ──── Server
 
 ### Web Client (`.env`)
 ```env
-PUBLIC_API_BASE_URL=http://localhost:5000
+PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
@@ -192,7 +240,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
     "Default": "Data Source=codec-dev.db"
   },
   "Cors": {
-    "AllowedOrigins": ["http://localhost:5173"]
+    "AllowedOrigins": ["http://localhost:5174"]
   }
 }
 ```
@@ -225,11 +273,11 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 │   Machine        │
 │                  │
 │  ┌────────────┐  │
-│  │  Vite Dev  │  │ :5173
+│  │  Vite Dev  │  │ :5174
 │  └────────────┘  │
 │                  │
 │  ┌────────────┐  │
-│  │ ASP.NET    │  │ :5000
+│  │ ASP.NET    │  │ :5050
 │  │ API        │  │
 │  └────────────┘  │
 │                  │

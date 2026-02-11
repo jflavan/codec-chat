@@ -48,8 +48,22 @@
 	let isJoining = $state(false);
 	let isLoadingMe = $state(false);
 	let isLoadingMembers = $state(false);
+	let isCreatingServer = $state(false);
+	let showCreateServer = $state(false);
+	let newServerName = $state('');
+	let isCreatingChannel = $state(false);
+	let showCreateChannel = $state(false);
+	let newChannelName = $state('');
 
-	const isSignedIn = $derived(() => Boolean(idToken));
+	const isSignedIn = $derived.by(() => Boolean(idToken));
+
+	// Derives the current user's role in the selected server.
+	const currentServerRole = $derived(
+		servers.find((s) => s.serverId === selectedServerId)?.role ?? null
+	);
+	const canManageChannels = $derived(
+		currentServerRole === 'Owner' || currentServerRole === 'Admin'
+	);
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL;
 
@@ -311,6 +325,85 @@
 		}
 	}
 
+	async function createServer() {
+		const name = newServerName.trim();
+		if (!name) {
+			setError('Server name is required.');
+			return;
+		}
+
+		if (!idToken || !apiBaseUrl) {
+			setError('Sign in first.');
+			return;
+		}
+
+		isCreatingServer = true;
+		try {
+			const response = await fetch(`${apiBaseUrl}/servers`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${idToken}`
+				},
+				body: JSON.stringify({ name })
+			});
+
+			if (!response.ok) {
+				const data = await response.json().catch(() => null);
+				setError(data?.error ?? `API error: ${response.status}`);
+				return;
+			}
+
+			const created = await response.json();
+			newServerName = '';
+			showCreateServer = false;
+			await loadServers();
+			await loadDiscoverServers();
+			await selectServer(created.id);
+		} finally {
+			isCreatingServer = false;
+		}
+	}
+
+	async function createChannel() {
+		const name = newChannelName.trim();
+		if (!name) {
+			setError('Channel name is required.');
+			return;
+		}
+
+		if (!idToken || !apiBaseUrl || !selectedServerId) {
+			setError('Select a server first.');
+			return;
+		}
+
+		isCreatingChannel = true;
+		try {
+			const response = await fetch(`${apiBaseUrl}/servers/${selectedServerId}/channels`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${idToken}`
+				},
+				body: JSON.stringify({ name })
+			});
+
+			if (!response.ok) {
+				const data = await response.json().catch(() => null);
+				setError(data?.error ?? `API error: ${response.status}`);
+				return;
+			}
+
+			const created = await response.json();
+			newChannelName = '';
+			showCreateChannel = false;
+			await loadChannels(selectedServerId);
+			await selectChannel(created.id);
+		} finally {
+			isCreatingChannel = false;
+		}
+	}
+
 	async function loadMembers(serverId: string) {
 		isLoadingMembers = true;
 		if (!apiBaseUrl) {
@@ -422,6 +515,29 @@
 					{/each}
 				{/if}
 			</ul>
+			{#if isSignedIn}
+				<div class="create-form-toggle">
+					{#if showCreateServer}
+						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); createServer(); }}>
+							<input
+								type="text"
+								placeholder="Server name"
+								maxlength="100"
+								bind:value={newServerName}
+								disabled={isCreatingServer}
+							/>
+							<div class="inline-form-actions">
+								<button type="submit" disabled={isCreatingServer || !newServerName.trim()}>
+									{isCreatingServer ? 'Creating...' : 'Create'}
+								</button>
+								<button type="button" class="cancel-button" onclick={() => { showCreateServer = false; newServerName = ''; }}>Cancel</button>
+							</div>
+						</form>
+					{:else}
+						<button class="list-button secondary" onclick={() => { showCreateServer = true; }}>+ Create Server</button>
+					{/if}
+				</div>
+			{/if}
 			{#if isSignedIn && discoverServers.some((server) => !server.isMember)}
 				<div class="discover">
 					<p>Join a server</p>
@@ -465,6 +581,29 @@
 					{/each}
 				{/if}
 			</ul>
+			{#if canManageChannels && selectedServerId}
+				<div class="create-form-toggle">
+					{#if showCreateChannel}
+						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); createChannel(); }}>
+							<input
+								type="text"
+								placeholder="Channel name"
+								maxlength="100"
+								bind:value={newChannelName}
+								disabled={isCreatingChannel}
+							/>
+							<div class="inline-form-actions">
+								<button type="submit" disabled={isCreatingChannel || !newChannelName.trim()}>
+									{isCreatingChannel ? 'Creating...' : 'Create'}
+								</button>
+								<button type="button" class="cancel-button" onclick={() => { showCreateChannel = false; newChannelName = ''; }}>Cancel</button>
+							</div>
+						</form>
+					{:else}
+						<button class="list-button secondary" onclick={() => { showCreateChannel = true; }}>+ Add Channel</button>
+					{/if}
+				</div>
+			{/if}
 		</aside>
 
 		<section class="chat">
@@ -846,6 +985,44 @@
 		font-size: 0.7rem;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
+	}
+
+	.create-form-toggle {
+		margin-top: 0.75rem;
+	}
+
+	.inline-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.inline-form input {
+		padding: 0.5rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e5e5e5;
+		background: #fafafa;
+		font-size: 0.85rem;
+	}
+
+	.inline-form-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.inline-form-actions button {
+		padding: 0.4rem 0.75rem;
+		font-size: 0.8rem;
+		border-radius: 10px;
+	}
+
+	.cancel-button {
+		background: #e5e5e5;
+		color: #333;
+	}
+
+	.cancel-button:hover:not(:disabled) {
+		background: #d1d1d1;
 	}
 
 	@media (max-width: 1100px) {
