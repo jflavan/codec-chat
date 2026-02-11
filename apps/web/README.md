@@ -11,7 +11,7 @@ cp .env.example .env
 ```
 
 ```env
-PUBLIC_API_BASE_URL=http://localhost:5000
+PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=YOUR_DEV_CLIENT_ID
 ```
 
@@ -22,13 +22,13 @@ npm install
 npm run dev
 ```
 
-The web app runs at http://localhost:5173 by default.
+The web app runs at http://localhost:5174 by default.
 
 ## API prerequisites
 
 - Ensure the API is running at `PUBLIC_API_BASE_URL`.
 - `Google:ClientId` must be set in the API's development settings to match your client ID.
-- CORS in the API should allow `http://localhost:5173` for local testing.
+- CORS in the API should allow `http://localhost:5174` for local testing.
 
 ## Multi-account testing
 

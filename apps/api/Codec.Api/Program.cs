@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Data.Sqlite;
 using System.Security.Claims;
 using Codec.Api.Data;
 using Codec.Api.Models;
@@ -29,6 +30,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.Authority = "https://accounts.google.com";
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -133,6 +135,102 @@ app.MapPost("/servers/{serverId:guid}/join", async (Guid serverId, ClaimsPrincip
     });
 }).RequireAuthorization();
 
+app.MapPost("/servers", async (
+    CreateServerRequest request,
+    ClaimsPrincipal user,
+    CodecDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest(new { error = "Server name is required." });
+    }
+
+    if (request.Name.Trim().Length > 100)
+    {
+        return Results.BadRequest(new { error = "Server name must be 100 characters or fewer." });
+    }
+
+    var appUser = await GetOrCreateUserAsync(user, db);
+
+    var server = new Server { Name = request.Name.Trim() };
+    db.Servers.Add(server);
+
+    var defaultChannel = new Channel { Name = "general", Server = server };
+    db.Channels.Add(defaultChannel);
+
+    var membership = new ServerMember
+    {
+        Server = server,
+        UserId = appUser.Id,
+        Role = ServerRole.Owner,
+        JoinedAt = DateTimeOffset.UtcNow
+    };
+    db.ServerMembers.Add(membership);
+
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/servers/{server.Id}", new
+    {
+        server.Id,
+        server.Name,
+        role = membership.Role.ToString()
+    });
+}).RequireAuthorization();
+
+app.MapPost("/servers/{serverId:guid}/channels", async (
+    Guid serverId,
+    CreateChannelRequest request,
+    ClaimsPrincipal user,
+    CodecDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest(new { error = "Channel name is required." });
+    }
+
+    if (request.Name.Trim().Length > 100)
+    {
+        return Results.BadRequest(new { error = "Channel name must be 100 characters or fewer." });
+    }
+
+    var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+    if (!serverExists)
+    {
+        return Results.NotFound(new { error = "Server not found." });
+    }
+
+    var appUser = await GetOrCreateUserAsync(user, db);
+    var membership = await db.ServerMembers
+        .AsNoTracking()
+        .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+    if (membership is null)
+    {
+        return Results.Forbid();
+    }
+
+    if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+    {
+        return Results.Forbid();
+    }
+
+    var channel = new Channel
+    {
+        ServerId = serverId,
+        Name = request.Name.Trim()
+    };
+
+    db.Channels.Add(channel);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/servers/{serverId}/channels/{channel.Id}", new
+    {
+        channel.Id,
+        channel.Name,
+        channel.ServerId
+    });
+}).RequireAuthorization();
+
 app.MapGet("/servers/{serverId:guid}/members", async (Guid serverId, ClaimsPrincipal user, CodecDbContext db) =>
 {
     var appUser = await GetOrCreateUserAsync(user, db);
@@ -148,7 +246,7 @@ app.MapGet("/servers/{serverId:guid}/members", async (Guid serverId, ClaimsPrinc
         .Select(member => new
         {
             member.UserId,
-            member.Role,
+            Role = member.Role.ToString(),
             member.JoinedAt,
             member.User!.DisplayName,
             member.User.Email,
@@ -280,6 +378,8 @@ app.MapGet("/me", async (ClaimsPrincipal user, CodecDbContext db) =>
 }).RequireAuthorization();
 
 // Resolves the application user from claims, creating one if missing.
+// Handles concurrent requests for the same user by catching UNIQUE constraint
+// violations and retrying the lookup.
 static async Task<User> GetOrCreateUserAsync(ClaimsPrincipal user, CodecDbContext db)
 {
     var subject = user.FindFirst("sub")?.Value;
@@ -288,10 +388,11 @@ static async Task<User> GetOrCreateUserAsync(ClaimsPrincipal user, CodecDbContex
         throw new InvalidOperationException("Missing Google subject claim.");
     }
 
-    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == subject);
     var displayName = user.FindFirst("name")?.Value ?? user.Identity?.Name ?? "Unknown";
     var email = user.FindFirst("email")?.Value;
     var avatarUrl = user.FindFirst("picture")?.Value;
+
+    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == subject);
 
     if (existing is not null)
     {
@@ -312,7 +413,18 @@ static async Task<User> GetOrCreateUserAsync(ClaimsPrincipal user, CodecDbContex
     };
 
     db.Users.Add(appUser);
-    await db.SaveChangesAsync();
+
+    try
+    {
+        await db.SaveChangesAsync();
+    }
+    catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteErrorCode: 19 })
+    {
+        // Another concurrent request already created this user. Detach and re-fetch.
+        db.Entry(appUser).State = EntityState.Detached;
+        return await db.Users.FirstAsync(u => u.GoogleSubject == subject);
+    }
+
     return appUser;
 }
 

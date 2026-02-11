@@ -13,6 +13,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Server Management
 - ✅ Server discovery (browse all servers)
+- ✅ Server creation (authenticated user becomes Owner)
 - ✅ Server joining flow
 - ✅ Server membership tracking
 - ✅ Server member list display
@@ -21,6 +22,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Channel & Messaging
 - ✅ Channel list per server
+- ✅ Channel creation (Owner/Admin only)
 - ✅ Text message feed with persistence
 - ✅ Post new messages
 - ✅ Message history retrieval
@@ -72,12 +74,11 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Real-time member list updates
 
 ### Server Management
-- Server creation
 - Server settings/configuration
 - Server invites (invite codes)
 - Server icons/avatars
-- Channel creation and management
 - Channel categories/organization
+- Channel editing and deletion
 
 ### File & Media
 - File uploads (images, documents)

@@ -16,8 +16,8 @@ This guide walks through setting up the Codec development environment from scrat
 5. Configure the consent screen if prompted
 6. Select **Web application** as application type
 7. Add authorized JavaScript origins:
-   - `http://localhost:5173` (for local development)
-   - `http://localhost:5000` (optional, for API testing)
+   - `http://localhost:5174` (for local development)
+   - `http://localhost:5050` (optional, for API testing)
 8. Save and copy the **Client ID**
 
 ## API Setup
@@ -37,7 +37,7 @@ This guide walks through setting up the Codec development environment from scrat
        "Default": "Data Source=codec-dev.db"
      },
      "Cors": {
-       "AllowedOrigins": ["http://localhost:5173"]
+       "AllowedOrigins": ["http://localhost:5174"]
      }
    }
    ```
@@ -50,7 +50,7 @@ This guide walks through setting up the Codec development environment from scrat
    ```
    
    The API will:
-   - Run at `http://localhost:5000` by default
+   - Run at `http://localhost:5050` by default
    - Automatically apply database migrations
    - Seed initial data if the database is empty
 
@@ -68,7 +68,7 @@ This guide walks through setting up the Codec development environment from scrat
 
 3. Update `.env` with your values:
    ```env
-   PUBLIC_API_BASE_URL=http://localhost:5000
+   PUBLIC_API_BASE_URL=http://localhost:5050
    PUBLIC_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID_HERE
    ```
 
@@ -78,7 +78,7 @@ This guide walks through setting up the Codec development environment from scrat
    npm run dev
    ```
    
-   The web app runs at `http://localhost:5173` by default.
+   The web app runs at `http://localhost:5174` by default.
 
 ## Database Migrations
 
@@ -108,7 +108,7 @@ dotnet ef migrations script
 
 ## Testing the Setup
 
-1. Open `http://localhost:5173` in your browser
+1. Open `http://localhost:5174` in your browser
 2. Click **Sign in with Google**
 3. Complete the Google authentication flow
 4. You should see:
@@ -117,8 +117,8 @@ dotnet ef migrations script
    - Ability to join servers and view channels
 
 ## Default Ports
-- **Web:** `http://localhost:5173`
-- **API:** `http://localhost:5000`
+- **Web:** `http://localhost:5174`
+- **API:** `http://localhost:5050`
 
 ## Troubleshooting
 
@@ -131,11 +131,11 @@ dotnet ef migrations script
   - **Solution:** Verify `PUBLIC_GOOGLE_CLIENT_ID` in `.env` matches your Google Cloud Console client ID
   
 - **Error:** "Unauthorized JavaScript origin"
-  - **Solution:** Add `http://localhost:5173` to authorized origins in Google Cloud Console
+  - **Solution:** Add `http://localhost:5174` to authorized origins in Google Cloud Console
 
 ### CORS errors
 - **Error:** "Access-Control-Allow-Origin"
-  - **Solution:** Ensure `http://localhost:5173` is in `Cors:AllowedOrigins` in API settings
+  - **Solution:** Ensure `http://localhost:5174` is in `Cors:AllowedOrigins` in API settings
 
 ### Database issues
 - Delete the database file and restart the API to reseed:

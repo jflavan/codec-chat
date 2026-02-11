@@ -1,5 +1,6 @@
 using Codec.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Codec.Api.Data;
 
@@ -48,5 +49,19 @@ public class CodecDbContext : DbContext
             .HasOne(member => member.User)
             .WithMany(user => user.ServerMemberships)
             .HasForeignKey(member => member.UserId);
+
+        // SQLite does not natively support DateTimeOffset ordering.
+        // Store as ISO 8601 strings so ORDER BY works correctly.
+        var dateTimeOffsetConverter = new DateTimeOffsetToStringConverter();
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
+                {
+                    property.SetValueConverter(dateTimeOffsetConverter);
+                }
+            }
+        }
     }
 }

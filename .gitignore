@@ -66,6 +66,9 @@ dist/
 *.db-shm
 *.db-wal
 
+# Log files
+*.log
+
 # Local app secrets
 appsettings.Development.json
 apps/api/Codec.Api/appsettings.Development.json

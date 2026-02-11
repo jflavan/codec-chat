@@ -90,6 +90,7 @@ Represents an authenticated user in the system.
 | `Email` | string | User's email address |
 | `AvatarUrl` | string? | Profile picture URL |
 | `CreatedAt` | DateTimeOffset | Account creation timestamp |
+| `UpdatedAt` | DateTimeOffset | Last profile update timestamp |
 
 **Relationships:**
 - One-to-many with `ServerMember`
@@ -98,6 +99,7 @@ Represents an authenticated user in the system.
 **Notes:**
 - `GoogleSubject` is the primary link to Google identity
 - Auto-created on first sign-in
+- Profile fields (DisplayName, Email, AvatarUrl) updated on each sign-in
 - `AvatarUrl` is optional (nullable)
 
 #### Server
@@ -193,9 +195,25 @@ public class CodecDbContext : DbContext
 
         // Configure relationships and indexes
         // ... (see actual implementation)
+
+        // SQLite does not natively support DateTimeOffset ordering.
+        // Store as ISO 8601 strings so ORDER BY works correctly.
+        var dateTimeOffsetConverter = new DateTimeOffsetToStringConverter();
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
+                {
+                    property.SetValueConverter(dateTimeOffsetConverter);
+                }
+            }
+        }
     }
 }
 ```
+
+> **SQLite DateTimeOffset Handling:** SQLite does not natively support `DateTimeOffset` in `ORDER BY` clauses. A `DateTimeOffsetToStringConverter` is applied to all `DateTimeOffset` properties, storing them as ISO 8601 strings. This ensures correct ordering and filtering without requiring raw SQL workarounds.
 
 ## Migrations
 

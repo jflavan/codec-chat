@@ -1,4 +1,4 @@
-@Codec.Api_HostAddress = http://localhost:5000
+@Codec.Api_HostAddress = http://localhost:5050
 
 GET {{Codec.Api_HostAddress}}/health
 Accept: application/json

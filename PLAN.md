@@ -48,8 +48,38 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - UI loading/error states added
 - Server membership and roles with join flow
 - Server member listing in API and UI
+- Server creation endpoint and UI
+- Channel creation endpoint and UI (Owner/Admin only)
+
+## Task breakdown: Server & Channel Creation
+
+### API – Server creation (`POST /servers`)
+- [x] Add `CreateServerRequest` record (Name, required, max 100 chars)
+- [x] Add endpoint: validate input → create Server → create default "general" channel → add user as Owner → return new server
+- [x] Return 201 Created with server payload
+
+### API – Channel creation (`POST /servers/{serverId}/channels`)
+- [x] Add `CreateChannelRequest` record (Name, required, max 100 chars)
+- [x] Add endpoint: validate input → verify membership → enforce Owner/Admin role → create Channel → return 201
+- [x] Return 403 for non-admin members, 404 for missing server
+
+### Web – Server creation UI
+- [x] Add "Create Server" button in server sidebar
+- [x] Inline form with name input and submit
+- [x] On success, reload server list and select the new server
+
+### Web – Channel creation UI
+- [x] Add "Add Channel" button in channels sidebar (visible to Owner/Admin)
+- [x] Inline form with name input and submit
+- [x] On success, reload channel list and select the new channel
+
+### Documentation
+- [x] Update ARCHITECTURE.md with new endpoints
+- [x] Update FEATURES.md to mark server/channel creation as implemented
+- [x] Update README.md features list
 
 ## Next steps
-- Verify local runs for API and web
-- Introduce role-based authorization rules
+- Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI
+- Server settings and configuration
+- Channel editing/deletion

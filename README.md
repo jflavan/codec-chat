@@ -24,7 +24,7 @@ codec/
 ### 1. Configure Google Sign-In
 1. Create an OAuth 2.0 Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Add authorized JavaScript origins:
-   - `http://localhost:5173` (for development)
+   - `http://localhost:5174` (for development)
 3. Copy your Client ID for the next steps
 
 ### 2. Start the API
@@ -33,24 +33,28 @@ cd apps/api/Codec.Api
 # Edit appsettings.Development.json and set Google:ClientId
 dotnet run
 ```
-The API runs at `http://localhost:5000` by default.
+The API runs at `http://localhost:5050` by default.
 
 **Note:** The API will fail fast if `Google:ClientId` is missing. SQLite database migrations run automatically in development.
+
+> **macOS users:** Port 5000 is reserved by AirPlay Receiver. The API uses port 5050 to avoid this conflict.
 
 ### 3. Start the Web App
 ```bash
 cd apps/web
 cp .env.example .env
-# Edit .env and set PUBLIC_GOOGLE_CLIENT_ID and PUBLIC_API_BASE_URL
+# Edit .env and set PUBLIC_GOOGLE_CLIENT_ID and PUBLIC_API_BASE_URL (http://localhost:5050)
 npm install
 npm run dev
 ```
-The web app runs at `http://localhost:5173` by default.
+The web app runs at `http://localhost:5174` by default.
 
 ## Features
 - ✅ Google Sign-In authentication
-- ✅ Server discovery and joining
+- ✅ Server creation and discovery
+- ✅ Server joining and membership
 - ✅ Server membership and roles (Owner, Admin, Member)
+- ✅ Channel creation (Owner/Admin only)
 - ✅ Channel browsing within servers
 - ✅ Real-time message posting and viewing
 - ✅ User profile display

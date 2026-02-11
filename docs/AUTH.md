@@ -35,7 +35,7 @@ All authenticated API requests include the ID token in the Authorization header:
 
 ```http
 GET /servers HTTP/1.1
-Host: localhost:5000
+Host: localhost:5050
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
@@ -48,6 +48,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.Authority = "https://accounts.google.com";
+        options.MapInboundClaims = false; // Preserve raw JWT claim names (sub, name, email, picture)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -77,42 +78,58 @@ app.MapGet("/me", async (ClaimsPrincipal user, CodecDbContext db) =>
     return Results.Ok(appUser);
 }).RequireAuthorization();
 
-async Task<User> GetOrCreateUserAsync(ClaimsPrincipal principal, CodecDbContext db)
+// With MapInboundClaims = false, raw JWT claim names are preserved.
+static async Task<User> GetOrCreateUserAsync(ClaimsPrincipal user, CodecDbContext db)
 {
-    var googleSub = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-    var user = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSub);
-    
-    if (user is null)
+    var subject = user.FindFirst("sub")?.Value;
+    var displayName = user.FindFirst("name")?.Value ?? user.Identity?.Name ?? "Unknown";
+    var email = user.FindFirst("email")?.Value;
+    var avatarUrl = user.FindFirst("picture")?.Value;
+
+    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == subject);
+
+    if (existing is not null)
     {
-        user = new User
-        {
-            GoogleSubject = googleSub,
-            DisplayName = principal.FindFirstValue(ClaimTypes.Name),
-            Email = principal.FindFirstValue(ClaimTypes.Email),
-            AvatarUrl = principal.FindFirstValue("picture")
-        };
-        db.Users.Add(user);
+        existing.DisplayName = displayName;
+        existing.Email = email;
+        existing.AvatarUrl = avatarUrl;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
+        return existing;
     }
-    
-    return user;
+
+    var appUser = new User
+    {
+        GoogleSubject = subject,
+        DisplayName = displayName,
+        Email = email,
+        AvatarUrl = avatarUrl
+    };
+
+    db.Users.Add(appUser);
+    await db.SaveChangesAsync();
+    return appUser;
 }
 ```
+
+> **Note:** `MapInboundClaims = false` is set on the JwtBearer configuration so that raw JWT claim names (`sub`, `name`, `email`, `picture`) pass through without being remapped to .NET `ClaimTypes` URIs. This simplifies claim access in application code.
 
 ## Token Claims
 
 Google ID tokens contain the following claims:
 
-| Claim | Type | Description | Example |
-|-------|------|-------------|---------|
-| `sub` | NameIdentifier | Unique Google user ID | `110169484474386276334` |
-| `email` | Email | User's email address | `user@example.com` |
-| `name` | Name | Full name | `John Doe` |
-| `picture` | Custom | Avatar URL | `https://lh3.googleusercontent.com/...` |
-| `iss` | Issuer | Token issuer | `accounts.google.com` |
-| `aud` | Audience | Client ID | `123456789-abc.apps.googleusercontent.com` |
-| `exp` | Expiration | Token expiry timestamp | `1707672600` |
-| `iat` | IssuedAt | Token issued timestamp | `1707669000` |
+| Claim | Description | Example |
+|-------|-------------|----------|
+| `sub` | Unique Google user ID | `110169484474386276334` |
+| `email` | User's email address | `user@example.com` |
+| `name` | Full name | `John Doe` |
+| `picture` | Avatar URL | `https://lh3.googleusercontent.com/...` |
+| `iss` | Token issuer | `accounts.google.com` |
+| `aud` | Client ID | `123456789-abc.apps.googleusercontent.com` |
+| `exp` | Token expiry timestamp | `1707672600` |
+| `iat` | Token issued timestamp | `1707669000` |
+
+> With `MapInboundClaims = false`, these claim names are used as-is in the `ClaimsPrincipal`. Without this setting, the JwtBearer middleware would remap them to `ClaimTypes` URIs (e.g., `sub` → `ClaimTypes.NameIdentifier`).
 
 ## Configuration
 
@@ -123,7 +140,7 @@ Google ID tokens contain the following claims:
 PUBLIC_GOOGLE_CLIENT_ID=123456789-abc.apps.googleusercontent.com
 
 # API base URL for requests
-PUBLIC_API_BASE_URL=http://localhost:5000
+PUBLIC_API_BASE_URL=http://localhost:5050
 ```
 
 ### API Server (`apps/api/Codec.Api/appsettings.Development.json`)
@@ -134,7 +151,7 @@ PUBLIC_API_BASE_URL=http://localhost:5000
     "ClientId": "123456789-abc.apps.googleusercontent.com"
   },
   "Cors": {
-    "AllowedOrigins": ["http://localhost:5173"]
+    "AllowedOrigins": ["http://localhost:5174"]
   }
 }
 ```
@@ -148,7 +165,7 @@ PUBLIC_API_BASE_URL=http://localhost:5000
 3. Click **Create Credentials** > **OAuth 2.0 Client ID**
 4. Configure application type as **Web application**
 5. Add **Authorized JavaScript origins**:
-   - Development: `http://localhost:5173`
+   - Development: `http://localhost:5174`
    - Production: `https://yourdomain.com`
 6. **Do not** add redirect URIs (not needed for ID token flow)
 7. Copy the generated Client ID
@@ -262,7 +279,7 @@ app.Use(async (context, next) =>
 
 ### Error: "Unauthorized JavaScript origin"
 **Cause:** Origin not allowed in Google Cloud Console
-**Solution:** Add `http://localhost:5173` to authorized origins
+**Solution:** Add `http://localhost:5174` to authorized origins
 
 ### Error: "CORS policy error"
 **Cause:** API not allowing requests from web origin
