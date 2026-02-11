@@ -487,11 +487,11 @@
 	<!-- Server sidebar (narrow icon rail) -->
 	<nav class="server-sidebar" aria-label="Servers">
 		<div class="server-list">
-			<button class="server-icon home-icon" aria-label="Home" onclick={() => {}}>
+			<div class="server-icon home-icon" aria-label="Home">
 				<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 					<path d="M2.3 7.7l9-5.4a1.2 1.2 0 0 1 1.4 0l9 5.4a.6.6 0 0 1-.3 1.1H19v8.6a.6.6 0 0 1-.6.6h-3.8v-5a1 1 0 0 0-1-1h-3.2a1 1 0 0 0-1 1v5H5.6a.6.6 0 0 1-.6-.6V8.8H2.6a.6.6 0 0 1-.3-1.1z"/>
 				</svg>
-			</button>
+			</div>
 
 			<div class="server-separator" role="separator"></div>
 
@@ -502,7 +502,7 @@
 			{:else}
 				{#each servers as server}
 					<div class="server-pill-wrapper">
-						<div class="server-pill" class:active={server.serverId === selectedServerId} class:hover-pill={server.serverId !== selectedServerId}></div>
+						<div class="server-pill" class:active={server.serverId === selectedServerId}></div>
 						<button
 							class="server-icon"
 							class:active={server.serverId === selectedServerId}
@@ -797,7 +797,7 @@
 			{/if}
 
 			{#if regulars.length > 0}
-				<h3 class="member-group-heading">Members — {regulars.length}</h3>
+				<h3 class="member-group-heading">Other — {regulars.length}</h3>
 				<ul class="member-list" role="list">
 					{#each regulars as member}
 						<li class="member-item">
@@ -893,11 +893,7 @@
 		transition: height 150ms ease, opacity 150ms ease;
 	}
 
-	.server-pill.hover-pill {
-		opacity: 0;
-	}
-
-	.server-pill-wrapper:hover .server-pill.hover-pill {
+	.server-pill-wrapper:hover .server-pill:not(.active) {
 		opacity: 1;
 		height: 20px;
 	}
@@ -1315,21 +1311,22 @@
 		flex-shrink: 0;
 		padding: 0 16px 24px;
 		display: flex;
+		align-items: center;
 		gap: 0;
-		position: relative;
+		background: var(--bg-primary);
 	}
 
 	.composer-input {
 		flex: 1;
 		padding: 12px 16px;
-		padding-right: 48px;
-		border-radius: 8px;
+		border-radius: 8px 0 0 8px;
 		border: none;
 		background: var(--bg-tertiary);
 		color: var(--text-normal);
 		font-size: 15px;
 		font-family: inherit;
 		outline: none;
+		min-height: 20px;
 	}
 
 	.composer-input::placeholder {
@@ -1345,30 +1342,27 @@
 	}
 
 	.composer-send {
-		position: absolute;
-		right: 20px;
-		top: 50%;
-		transform: translateY(-50%);
-		background: none;
+		background: var(--bg-tertiary);
 		border: none;
-		padding: 6px;
+		padding: 12px 12px;
+		border-radius: 0 8px 8px 0;
 		color: var(--text-muted);
 		cursor: pointer;
-		border-radius: 4px;
 		display: grid;
 		place-items: center;
+		flex-shrink: 0;
 		transition: color 150ms ease;
 	}
 
 	.composer-send:hover:not(:disabled) {
 		color: var(--accent);
-		background: none;
+		background: var(--bg-tertiary);
 	}
 
 	.composer-send:disabled {
 		opacity: 0.3;
 		cursor: not-allowed;
-		background: none;
+		background: var(--bg-tertiary);
 	}
 
 	/* ===== Members sidebar ===== */
