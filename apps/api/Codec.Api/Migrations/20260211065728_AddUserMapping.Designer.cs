@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260211065728_AddUserMapping")]
+    partial class AddUserMapping
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.4");
@@ -84,27 +87,6 @@ namespace Codec.Api.Migrations
                     b.ToTable("Servers");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.ServerMember", b =>
-                {
-                    b.Property<Guid>("ServerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTimeOffset>("JoinedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("ServerId", "UserId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("ServerMembers");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -167,25 +149,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("Channel");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.ServerMember", b =>
-                {
-                    b.HasOne("Codec.Api.Models.Server", "Server")
-                        .WithMany("Members")
-                        .HasForeignKey("ServerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Codec.Api.Models.User", "User")
-                        .WithMany("ServerMemberships")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Server");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.Channel", b =>
                 {
                     b.Navigation("Messages");
@@ -194,15 +157,11 @@ namespace Codec.Api.Migrations
             modelBuilder.Entity("Codec.Api.Models.Server", b =>
                 {
                     b.Navigation("Channels");
-
-                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.User", b =>
                 {
                     b.Navigation("Messages");
-
-                    b.Navigation("ServerMemberships");
                 });
 #pragma warning restore 612, 618
         }

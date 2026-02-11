@@ -12,6 +12,8 @@ public class CodecDbContext : DbContext
     public DbSet<Server> Servers => Set<Server>();
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,5 +26,27 @@ public class CodecDbContext : DbContext
             .HasMany(channel => channel.Messages)
             .WithOne(message => message.Channel)
             .HasForeignKey(message => message.ChannelId);
+
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.GoogleSubject)
+            .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasMany(user => user.Messages)
+            .WithOne(message => message.AuthorUser)
+            .HasForeignKey(message => message.AuthorUserId);
+
+        modelBuilder.Entity<ServerMember>()
+            .HasKey(member => new { member.ServerId, member.UserId });
+
+        modelBuilder.Entity<ServerMember>()
+            .HasOne(member => member.Server)
+            .WithMany(server => server.Members)
+            .HasForeignKey(member => member.ServerId);
+
+        modelBuilder.Entity<ServerMember>()
+            .HasOne(member => member.User)
+            .WithMany(user => user.ServerMemberships)
+            .HasForeignKey(member => member.UserId);
     }
 }
