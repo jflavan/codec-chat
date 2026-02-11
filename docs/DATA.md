@@ -10,11 +10,12 @@ Codec uses SQLite with EF Core for the initial persistence layer. This keeps loc
 ## Initial entities
 - Server: collection of channels
 - Channel: belongs to a server
-- Message: belongs to a channel, stores author name and body
+- Message: belongs to a channel, stores author name, body, and optional user link
+- User: maps Google subject to profile data
+- ServerMember: join table between servers and users with a role
 
 ## Next steps
-- Add user identity mapping (Google subject)
-- Add server membership and roles
+- Define role permissions and moderation rules
 - Decide on production database path and migration strategy
 
 ## Migrations

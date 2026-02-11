@@ -44,8 +44,12 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Read-only API endpoints for servers/channels/messages
 - Authenticated message posting endpoint
 - Web UI wired to API data
+- User identity mapping stored from Google subject
+- UI loading/error states added
+- Server membership and roles with join flow
+- Server member listing in API and UI
 
 ## Next steps
 - Verify local runs for API and web
-- Add auth-based user mapping and message ownership
-- Add basic validation and error surfaces in UI
+- Introduce role-based authorization rules
+- Add richer validation and error surfaces in UI
