@@ -1,33 +1,38 @@
-# sv
+# Codec Web
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
-
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv create --template minimal --types ts --no-install apps/web
-```
+SvelteKit client for Codec (Discord-like chat). Handles Google Sign-In, server/channel browsing, and message posting against the ASP.NET Core API.
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+1. Copy the env template and set values:
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+cp .env.example .env
 ```
+
+```env
+PUBLIC_API_BASE_URL=http://localhost:5000
+PUBLIC_GOOGLE_CLIENT_ID=YOUR_DEV_CLIENT_ID
+```
+
+2. Install dependencies and start the dev server:
+
+```sh
+npm install
+npm run dev
+```
+
+The web app runs at http://localhost:5173 by default.
+
+## API prerequisites
+
+- Ensure the API is running at `PUBLIC_API_BASE_URL`.
+- `Google:ClientId` must be set in the API's development settings to match your client ID.
+- CORS in the API should allow `http://localhost:5173` for local testing.
+
+## Multi-account testing
+
+Use two different Google accounts (or an incognito window) to sign in as separate users. This lets you verify member lists and message posting between different identities.
 
 ## Building
 
@@ -39,4 +44,11 @@ npm run build
 
 You can preview the production build with `npm run preview`.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## Useful commands
+
+```sh
+npm run check
+npm run lint:events
+```
+
+`npm run check` runs `svelte-check` and verifies that deprecated `on:*` event directives are not used.
