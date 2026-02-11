@@ -52,6 +52,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Server member listing in API and UI
 - Server creation endpoint and UI
 - Channel creation endpoint and UI (Owner/Admin only)
+- Discord-inspired dark theme with three-column layout
+- Design spec documented in `docs/DESIGN.md`
 
 ## Task breakdown: Server & Channel Creation
 
@@ -80,8 +82,32 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update FEATURES.md to mark server/channel creation as implemented
 - [x] Update README.md features list
 
+## Task breakdown: Front-End Design Refinement
+
+### Design specification
+- [x] Create `docs/DESIGN.md` with Discord-inspired design spec (layout, colors, typography, components, responsive, accessibility)
+
+### UI implementation
+- [x] Three-column layout: server icon rail (72px) + channel sidebar (240px) + flexible chat area
+- [x] Fourth column: members sidebar (240px), hidden on smaller screens
+- [x] Dark color scheme with CSS custom properties (blurple accent #5865f2, dark backgrounds)
+- [x] Discord-style server icons (circular, hover morph, active pill indicator)
+- [x] Channel list with `#` hash icon prefix and active/hover states
+- [x] Message feed with avatar, author, timestamp, grouped consecutive messages
+- [x] Composer with inline send button and focus glow
+- [x] User panel pinned to bottom of channel sidebar
+- [x] Members sidebar grouped by role (Owner, Admin, Member)
+- [x] Responsive breakpoints (≤899px single-column, 900-1199px three-column, ≥1200px four-column)
+- [x] Accessibility: focus-visible outlines, prefers-reduced-motion, semantic HTML, ARIA labels
+
+### Documentation
+- [x] Update PLAN.md with design refinement milestone
+- [x] Update FEATURES.md to reflect design implementation
+
 ## Next steps
 - Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI
 - Server settings and configuration
 - Channel editing/deletion
+- Light mode theme toggle
+- Mobile slide-out navigation for server/channel sidebars
