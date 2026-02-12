@@ -69,7 +69,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - +page.svelte reduced to ~75-line thin composition shell
 - Sign-out button in user panel
 - Emoji reactions on messages (toggle, real-time sync via SignalR, floating action bar, reaction pills)
-- Friends feature fully implemented (friend requests, friends list, user search, real-time SignalR events, Friends panel UI)
+- Friends feature fully implemented (friend requests, friends list, user search, real-time SignalR events, Friends panel UI, notification badge on Home icon)
 
 ## Task breakdown: Session Persistence
 

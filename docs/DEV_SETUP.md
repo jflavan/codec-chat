@@ -119,6 +119,12 @@ dotnet ef migrations script
 6. Both users should see:
    - Real-time message delivery (messages appear without page refresh)
    - Typing indicators when the other user types in the same channel
+7. Test the Friends feature:
+   - Click the Home icon in the server sidebar to open the Friends panel
+   - Go to the **Add Friend** tab, search for the other user by name or email
+   - Send a friend request — the other user should see a notification badge on their Home icon
+   - Accept/decline the request from the **Pending** tab
+   - Confirmed friends appear in the **All Friends** tab
 
 ## Default Ports
 - **Web:** `http://localhost:5174`

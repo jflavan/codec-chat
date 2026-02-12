@@ -62,12 +62,18 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Typing indicators (“X is typing…”)
 - ✅ User profile display
 - ✅ Member lists for servers
+- ✅ Friends system (send/accept/decline/cancel requests, friends list, remove friend)
+- ✅ User search for adding friends (by name or email)
+- ✅ Real-time friend request notifications via SignalR
+- ✅ Friends panel accessible from Home icon with notification badge
+- ✅ Emoji reactions on messages (toggle, reaction pills with counts, real-time sync)
 
 ## Documentation
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
 - [Authentication](docs/AUTH.md) - How Google ID token validation works
 - [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints
 - [Features](docs/FEATURES.md) - Current and planned features
+- [Friends](docs/FRIENDS.md) - Friends feature specification
 - [Data Layer](docs/DATA.md) - Database schema and migrations
 
 ## Technology Stack
