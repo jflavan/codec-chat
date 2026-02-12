@@ -52,6 +52,57 @@ export class ApiClient {
 		});
 	}
 
+	/** Upload a custom global avatar image. */
+	async uploadAvatar(token: string, file: File): Promise<{ avatarUrl: string }> {
+		const form = new FormData();
+		form.append('file', file);
+		return this.request(`${this.baseUrl}/me/avatar`, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}` },
+			body: form
+		});
+	}
+
+	/** Remove the custom global avatar, reverting to the Google profile picture. */
+	async deleteAvatar(token: string): Promise<{ avatarUrl: string }> {
+		return this.request(`${this.baseUrl}/me/avatar`, {
+			method: 'DELETE',
+			headers: this.headers(token)
+		});
+	}
+
+	/** Upload a server-specific avatar image. */
+	async uploadServerAvatar(
+		token: string,
+		serverId: string,
+		file: File
+	): Promise<{ avatarUrl: string }> {
+		const form = new FormData();
+		form.append('file', file);
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/avatar`,
+			{
+				method: 'POST',
+				headers: { Authorization: `Bearer ${token}` },
+				body: form
+			}
+		);
+	}
+
+	/** Remove the server-specific avatar, falling back to the global avatar. */
+	async deleteServerAvatar(
+		token: string,
+		serverId: string
+	): Promise<{ avatarUrl: string }> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/avatar`,
+			{
+				method: 'DELETE',
+				headers: this.headers(token)
+			}
+		);
+	}
+
 	/* ───── Servers ───── */
 
 	getServers(token: string): Promise<MemberServer[]> {

@@ -13,7 +13,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("servers")]
-public class ServersController(CodecDbContext db, IUserService userService) : ControllerBase
+public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -161,12 +161,26 @@ public class ServersController(CodecDbContext db, IUserService userService) : Co
                 member.JoinedAt,
                 member.User!.DisplayName,
                 member.User.Email,
-                member.User.AvatarUrl
+                member.User.AvatarUrl,
+                member.User.CustomAvatarPath,
+                ServerCustomAvatarPath = member.CustomAvatarPath
             })
             .OrderBy(member => member.DisplayName)
             .ToListAsync();
 
-        return Ok(members);
+        var result = members.Select(member => new
+        {
+            member.UserId,
+            member.Role,
+            member.JoinedAt,
+            member.DisplayName,
+            member.Email,
+            AvatarUrl = avatarService.ResolveUrl(member.ServerCustomAvatarPath)
+                     ?? avatarService.ResolveUrl(member.CustomAvatarPath)
+                     ?? member.AvatarUrl
+        });
+
+        return Ok(result);
     }
 
     /// <summary>

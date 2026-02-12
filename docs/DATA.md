@@ -98,7 +98,8 @@ Represents an authenticated user in the system.
 | `GoogleSubject` | string (unique) | Google user ID for authentication |
 | `DisplayName` | string | User's display name |
 | `Email` | string | User's email address |
-| `AvatarUrl` | string? | Profile picture URL |
+| `AvatarUrl` | string? | Google profile picture URL |
+| `CustomAvatarPath` | string? | Relative path to a user-uploaded avatar file |
 | `CreatedAt` | DateTimeOffset | Account creation timestamp |
 | `UpdatedAt` | DateTimeOffset | Last profile update timestamp |
 
@@ -110,7 +111,9 @@ Represents an authenticated user in the system.
 - `GoogleSubject` is the primary link to Google identity
 - Auto-created on first sign-in
 - Profile fields (DisplayName, Email, AvatarUrl) updated on each sign-in
-- `AvatarUrl` is optional (nullable)
+- `AvatarUrl` is the Google profile picture (always updated on sign-in)
+- `CustomAvatarPath` is `null` when using the default Google avatar; non-null when the user uploads a custom avatar
+- The effective avatar URL uses the fallback chain: custom upload → Google profile picture
 
 #### Server
 Top-level organizational unit (equivalent to Discord servers).
@@ -134,6 +137,7 @@ Join table linking users to servers with role information.
 | `UserId` | Guid (PK, FK) | Reference to User |
 | `Role` | ServerRole (enum) | User's role in the server |
 | `JoinedAt` | DateTimeOffset | When user joined |
+| `CustomAvatarPath` | string? | Relative path to a server-specific avatar file |
 
 **Composite Primary Key:** (`ServerId`, `UserId`)
 

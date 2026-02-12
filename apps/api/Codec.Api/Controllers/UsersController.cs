@@ -10,7 +10,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("")]
-public class UsersController(IUserService userService) : ControllerBase
+public class UsersController(IUserService userService, IAvatarService avatarService) : ControllerBase
 {
     /// <summary>
     /// Returns the authenticated user's profile and JWT claims.
@@ -20,6 +20,8 @@ public class UsersController(IUserService userService) : ControllerBase
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
         var claims = User.Claims.Select(claim => new { claim.Type, claim.Value });
+        var effectiveAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
+
         return Ok(new
         {
             user = new
@@ -27,7 +29,7 @@ public class UsersController(IUserService userService) : ControllerBase
                 appUser.Id,
                 appUser.DisplayName,
                 appUser.Email,
-                appUser.AvatarUrl,
+                AvatarUrl = effectiveAvatarUrl,
                 appUser.GoogleSubject
             },
             claims

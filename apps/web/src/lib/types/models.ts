@@ -34,6 +34,7 @@ export type Message = {
 	createdAt: string;
 	channelId: string;
 	authorUserId?: string | null;
+	authorAvatarUrl?: string | null;
 	reactions: Reaction[];
 };
 

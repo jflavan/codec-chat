@@ -200,6 +200,8 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 
 #### User Profile
 - `GET /me` - Get current user profile
+- `POST /me/avatar` - Upload a custom global avatar (multipart/form-data, 10 MB max; JPG, JPEG, PNG, WebP, GIF)
+- `DELETE /me/avatar` - Remove custom avatar, revert to Google profile picture
 
 #### Server Management
 - `GET /servers` - List servers user is a member of
@@ -209,6 +211,8 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `GET /servers/{serverId}/members` - List server members (requires membership)
 - `GET /servers/{serverId}/channels` - List channels in a server (requires membership)
 - `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner or Admin role)
+- `POST /servers/{serverId}/avatar` - Upload a server-specific avatar (multipart/form-data, overrides global avatar in this server)
+- `DELETE /servers/{serverId}/avatar` - Remove server-specific avatar, fall back to global avatar
 
 #### Messaging
 - `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership)
@@ -353,7 +357,7 @@ User ────┬──── ServerMember ──── Server
 #### User
 - Internal representation of authenticated users
 - Linked to Google identity via `GoogleSubject`
-- Fields: Id, GoogleSubject, DisplayName, Email, AvatarUrl
+- Fields: Id, GoogleSubject, DisplayName, Email, AvatarUrl, CustomAvatarPath
 
 #### Server
 - Top-level organizational unit (like Discord servers)
@@ -363,7 +367,7 @@ User ────┬──── ServerMember ──── Server
 #### ServerMember
 - Join table linking users to servers
 - Tracks role and join date
-- Fields: ServerId, UserId, Role (Owner/Admin/Member), JoinedAt
+- Fields: ServerId, UserId, Role (Owner/Admin/Member), JoinedAt, CustomAvatarPath
 
 #### Channel
 - Text communication channel within a server

@@ -31,6 +31,7 @@ public class UserService(CodecDbContext db) : IUserService
         {
             existing.DisplayName = displayName;
             existing.Email = email;
+            // Only update the Google avatar URL; preserve the custom upload path.
             existing.AvatarUrl = avatarUrl;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
