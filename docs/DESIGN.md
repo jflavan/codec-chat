@@ -122,6 +122,14 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 - Fixed to bottom of channel sidebar
 - Current user avatar (32px), display name, role
 - Subtle top border separator
+- **Avatar upload**: clicking the avatar opens a file picker; hover shows a semi-transparent overlay with a "+" icon
+
+### Avatar Display
+
+- **Messages**: 40px circular avatar to the left of the author name; falls back to a colored initial placeholder when no image is available
+- **Member list**: 32px circular avatar; same fallback behavior
+- **User panel**: 32px circular avatar with click-to-upload overlay
+- **Fallback chain**: server avatar → custom global avatar → Google profile picture → initial letter on accent-colored circle
 
 ### Member List
 

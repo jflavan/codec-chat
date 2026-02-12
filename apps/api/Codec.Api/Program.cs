@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.FileProviders;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Services;
@@ -69,6 +70,12 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 
 builder.Services.AddScoped<IUserService, UserService>();
 
+// Avatar storage configuration.
+var avatarStoragePath = Path.Combine(builder.Environment.ContentRootPath, "uploads", "avatars");
+Directory.CreateDirectory(avatarStoragePath);
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"]?.TrimEnd('/') ?? "";
+builder.Services.AddSingleton<IAvatarService>(new AvatarService(avatarStoragePath, $"{apiBaseUrl}/uploads/avatars"));
+
 var app = builder.Build();
 
 // Ensure the default "Codec HQ" server exists in every environment.
@@ -90,6 +97,14 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseCors("dev");
+
+// Serve uploaded avatar files as static content.
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(avatarStoragePath),
+    RequestPath = "/uploads/avatars"
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

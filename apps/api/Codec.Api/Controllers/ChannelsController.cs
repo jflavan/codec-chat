@@ -15,7 +15,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub) : ControllerBase
+public class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService) : ControllerBase
 {
     /// <summary>
     /// Returns messages for a channel, ordered by creation time. Requires server membership.
@@ -47,7 +47,9 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
                 message.AuthorUserId,
                 message.Body,
                 message.CreatedAt,
-                message.ChannelId
+                message.ChannelId,
+                AuthorCustomAvatarPath = message.AuthorUser != null ? message.AuthorUser.CustomAvatarPath : null,
+                AuthorGoogleAvatarUrl = message.AuthorUser != null ? message.AuthorUser.AvatarUrl : null
             })
             .ToListAsync();
 
@@ -82,6 +84,7 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             message.Body,
             message.CreatedAt,
             message.ChannelId,
+            AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
             Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
                 ? reactions
                 : Array.Empty<ReactionSummary>()
@@ -129,6 +132,8 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
         db.Messages.Add(message);
         await db.SaveChangesAsync();
 
+        var authorAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
+
         var payload = new
         {
             message.Id,
@@ -137,6 +142,7 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             message.Body,
             message.CreatedAt,
             message.ChannelId,
+            AuthorAvatarUrl = authorAvatarUrl,
             Reactions = Array.Empty<object>()
         };
 

@@ -73,6 +73,7 @@ export class AppState {
 	isJoining = $state(false);
 	isCreatingServer = $state(false);
 	isCreatingChannel = $state(false);
+	isUploadingAvatar = $state(false);
 
 	/* ───── UI toggles ───── */
 	showCreateServer = $state(false);
@@ -364,6 +365,85 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isCreatingChannel = false;
+		}
+	}
+
+	/* ═══════════════════ Avatar ═══════════════════ */
+
+	/** Upload a custom global avatar and refresh the local profile. */
+	async uploadAvatar(file: File): Promise<void> {
+		if (!this.idToken) return;
+		this.isUploadingAvatar = true;
+		this.error = null;
+		try {
+			const { avatarUrl } = await this.api.uploadAvatar(this.idToken, file);
+			if (this.me) {
+				this.me = {
+					...this.me,
+					user: { ...this.me.user, avatarUrl }
+				};
+			}
+			// Refresh member list so the sidebar picks up the new avatar.
+			if (this.selectedServerId) {
+				await this.loadMembers(this.selectedServerId);
+			}
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingAvatar = false;
+		}
+	}
+
+	/** Remove the custom global avatar and revert to the Google profile picture. */
+	async deleteAvatar(): Promise<void> {
+		if (!this.idToken) return;
+		this.isUploadingAvatar = true;
+		this.error = null;
+		try {
+			const { avatarUrl } = await this.api.deleteAvatar(this.idToken);
+			if (this.me) {
+				this.me = {
+					...this.me,
+					user: { ...this.me.user, avatarUrl }
+				};
+			}
+			if (this.selectedServerId) {
+				await this.loadMembers(this.selectedServerId);
+			}
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingAvatar = false;
+		}
+	}
+
+	/** Upload a server-specific avatar for the current user. */
+	async uploadServerAvatar(serverId: string, file: File): Promise<void> {
+		if (!this.idToken) return;
+		this.isUploadingAvatar = true;
+		this.error = null;
+		try {
+			await this.api.uploadServerAvatar(this.idToken, serverId, file);
+			await this.loadMembers(serverId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingAvatar = false;
+		}
+	}
+
+	/** Remove the server-specific avatar for the current user. */
+	async deleteServerAvatar(serverId: string): Promise<void> {
+		if (!this.idToken) return;
+		this.isUploadingAvatar = true;
+		this.error = null;
+		try {
+			await this.api.deleteServerAvatar(this.idToken, serverId);
+			await this.loadMembers(serverId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingAvatar = false;
 		}
 	}
 

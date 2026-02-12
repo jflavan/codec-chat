@@ -66,8 +66,14 @@ dist/
 *.db-shm
 *.db-wal
 
+# Uploaded files
+uploads/
+
 # Log files
 *.log
+
+# OS files
+.DS_Store
 
 # Local app secrets
 appsettings.Development.json

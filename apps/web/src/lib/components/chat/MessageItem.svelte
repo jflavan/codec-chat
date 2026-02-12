@@ -58,9 +58,13 @@
 
 	{#if !grouped}
 		<div class="message-avatar-col">
-			<div class="message-avatar" aria-hidden="true">
-				{message.authorName.slice(0, 1).toUpperCase()}
-			</div>
+			{#if message.authorAvatarUrl}
+				<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
+			{:else}
+				<div class="message-avatar" aria-hidden="true">
+					{message.authorName.slice(0, 1).toUpperCase()}
+				</div>
+			{/if}
 		</div>
 		<div class="message-content">
 			<div class="message-header">
@@ -213,6 +217,14 @@
 		font-size: 16px;
 		display: grid;
 		place-items: center;
+		flex-shrink: 0;
+	}
+
+	.message-avatar-img {
+		width: 40px;
+		height: 40px;
+		border-radius: 50%;
+		object-fit: cover;
 		flex-shrink: 0;
 	}
 

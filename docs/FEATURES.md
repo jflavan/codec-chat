@@ -14,6 +14,19 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ User identity mapping (Google subject to internal User ID)
 - ✅ Auto user creation on first sign-in
 
+### Avatar System
+- ✅ Custom avatar upload (JPG, JPEG, PNG, WebP, GIF)
+- ✅ File validation: 10 MB max, MIME type and extension whitelisting
+- ✅ Content-hash filenames for cache busting
+- ✅ Global user avatar (shown across all servers)
+- ✅ Server-specific avatar (overrides global avatar within a single server)
+- ✅ Fallback chain: server avatar → custom global avatar → Google profile picture → initial placeholder
+- ✅ Click-to-upload UI in user panel with hover overlay
+- ✅ Author avatar images displayed in chat messages
+- ✅ Avatar images displayed in member list sidebar
+- ✅ Static file serving for uploaded avatars
+- ✅ Delete avatar endpoints (revert to Google profile picture or global avatar)
+
 ### Server Management
 - ✅ Server discovery (browse all servers)
 - ✅ Server creation (authenticated user becomes Owner)
@@ -113,9 +126,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Channel editing and deletion
 
 ### File & Media
+- ✅ Avatar image uploads (user and server-specific)
+- ✅ Image format validation and size limits
 - File uploads (images, documents)
 - Image preview and gallery
-- File size limits and validation
 - Drag-and-drop upload
 
 ## 🔮 Future (Later)

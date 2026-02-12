@@ -7,6 +7,13 @@ public class User
     public string DisplayName { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string? AvatarUrl { get; set; }
+
+    /// <summary>
+    /// Relative path to a user-uploaded avatar file. When set, this takes
+    /// priority over the Google-sourced <see cref="AvatarUrl"/>.
+    /// </summary>
+    public string? CustomAvatarPath { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public List<Message> Messages { get; set; } = new();
