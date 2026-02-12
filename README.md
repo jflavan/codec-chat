@@ -61,11 +61,13 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Real-time message posting and viewing via SignalR (WebSockets)
 - ✅ Typing indicators (“X is typing…”)
 - ✅ User profile display
+- ✅ Custom avatar upload with server-specific overrides and fallback chain
 - ✅ Member lists for servers
 - ✅ Friends system (send/accept/decline/cancel requests, friends list, remove friend)
 - ✅ User search for adding friends (by name or email)
 - ✅ Real-time friend request notifications via SignalR
 - ✅ Friends panel accessible from Home icon with notification badge
+- ✅ Direct messages — 1-on-1 private conversations with real-time delivery, typing indicators, and unread badges
 - ✅ Emoji reactions on messages (toggle, reaction pills with counts, real-time sync)
 
 ## Documentation
@@ -73,7 +75,9 @@ The web app runs at `http://localhost:5174` by default.
 - [Authentication](docs/AUTH.md) - How Google ID token validation works
 - [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints
 - [Features](docs/FEATURES.md) - Current and planned features
+- [Design](docs/DESIGN.md) - UI/UX design specification and theme
 - [Friends](docs/FRIENDS.md) - Friends feature specification
+- [Direct Messages](docs/DIRECT_MESSAGES.md) - Direct messages feature specification
 - [Data Layer](docs/DATA.md) - Database schema and migrations
 
 ## Technology Stack
