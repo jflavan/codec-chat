@@ -87,6 +87,7 @@ This resolution is performed:
 - **Min length:** 1 character (empty strings are treated as `null` / no nickname)
 - **Allowed characters:** Any Unicode characters (including emoji), trimmed of leading/trailing whitespace
 - **Uniqueness:** Nicknames are **not** unique — multiple users may have the same nickname (consistent with Discord's behavior)
+- **Content filtering:** Not enforced in the initial release. The API reserves `422 Unprocessable Entity` for a future profanity/content filter (see Open Questions)
 
 ## API Endpoints
 
@@ -297,6 +298,9 @@ A single EF Core migration (`AddUserNickname`) will:
 2. All existing users will have `Nickname = null` (no data migration needed)
 
 ```sql
+-- Illustrative SQL (SQLite syntax). The actual EF Core migration will
+-- generate provider-appropriate DDL for the configured database.
+
 -- Up
 ALTER TABLE Users ADD COLUMN Nickname TEXT NULL;
 
