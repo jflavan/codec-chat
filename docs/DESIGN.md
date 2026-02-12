@@ -1,6 +1,6 @@
 # Codec Front-End Design Specification
 
-This document defines the visual design language for Codec, inspired by Discord's proven chat-application patterns.
+This document defines the visual design language for Codec, using a **Metal Gear Solid "CODEC"–inspired phosphor-green CRT palette** (see [THEME.md](THEME.md)) applied to Discord's proven chat-application layout patterns.
 
 ## Layout Architecture
 
@@ -38,36 +38,36 @@ Codec uses a **three-column layout** as its core structure:
 
 ## Color Scheme & Theming
 
-### Dark Mode (Default)
+The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THEME.md](THEME.md). Every surface uses a near-black green "glass", with bright phosphor text and a small amount of amber/red for warning and danger states.
+
+### CODEC CRT Mode (Default)
 
 | Token                | Value      | Usage                                  |
 | -------------------- | ---------- | -------------------------------------- |
-| `--bg-primary`       | `#313338`  | Main content background                |
-| `--bg-secondary`     | `#2b2d31`  | Channel sidebar background             |
-| `--bg-tertiary`      | `#1e1f22`  | Server sidebar & input field bg        |
-| `--bg-message-hover` | `#2e3035`  | Message hover state                    |
-| `--accent`           | `#5865f2`  | Blurple – primary accent/buttons       |
-| `--accent-hover`     | `#4752c4`  | Button hover state                     |
-| `--text-normal`      | `#dbdee1`  | Primary readable text                  |
-| `--text-muted`       | `#949ba4`  | Secondary/timestamp text               |
-| `--text-header`      | `#f2f3f5`  | Headers and channel names              |
-| `--danger`           | `#da373c`  | Error states and destructive actions   |
-| `--success`          | `#23a559`  | Success states and online indicators   |
-| `--border`           | `#3f4147`  | Subtle dividers between sections       |
-
-### Light Mode (Future)
-
-| Token           | Value     |
-| --------------- | --------- |
-| `--bg-primary`  | `#ffffff` |
-| `--bg-secondary`| `#f2f3f5` |
-| Maintains same accent and status colors |
+| `--bg-primary`       | `#0B1A10`  | Main chat surface (surface-1)          |
+| `--bg-secondary`     | `#07110A`  | Channel sidebar background (bg-1)      |
+| `--bg-tertiary`      | `#050B07`  | Server sidebar & app background (bg-0) |
+| `--bg-message-hover` | `#102417`  | Message hover / elevated popouts (surface-2) |
+| `--accent`           | `#00FF66`  | Primary accent – links, buttons, toggles |
+| `--accent-hover`     | `#33FFB2`  | Secondary accent / button hover state  |
+| `--text-normal`      | `#86FF6B`  | Primary readable text (body)           |
+| `--text-muted`       | `#3ED44E`  | Timestamps, secondary labels           |
+| `--text-header`      | `#B7FF9A`  | Headers, channel names (text-strong)   |
+| `--text-dim`         | `#2D7A3A`  | Placeholders, disabled text            |
+| `--warn`             | `#FFB000`  | Warning / attention (amber)            |
+| `--danger`           | `#FF3B3B`  | Error states and destructive actions   |
+| `--success`          | `#00FF66`  | Success states and online indicators   |
+| `--border`           | `#1E3A26`  | Dividers / outlines between sections   |
+| `--grid`             | `#14301F`  | Subtle UI grid lines                   |
+| `--mention-bg`       | `#123A22`  | Mention highlight background           |
+| `--selection-bg`     | `#0F3A22`  | Text selection background              |
+| `--input-bg`         | `#06160C`  | Composer / input field background      |
 
 ## Typography
 
 | Element          | Font Family                                    | Size   | Weight | Color              |
 | ---------------- | ---------------------------------------------- | ------ | ------ | ------------------ |
-| App title        | `'gg sans', 'Space Grotesk', system-ui`        | 20px   | 700    | `--text-header`    |
+| App title        | `'Space Grotesk', system-ui, sans-serif`        | 20px   | 700    | `--text-header`    |
 | Server name      | same                                           | 16px   | 600    | `--text-header`    |
 | Channel name     | same                                           | 16px   | 500    | `--text-normal`    |
 | Category header  | same                                           | 12px   | 700    | `--text-muted`     |
@@ -75,6 +75,7 @@ Codec uses a **three-column layout** as its core structure:
 | Message body     | same                                           | 15px   | 400    | `--text-normal`    |
 | Timestamp        | same                                           | 12px   | 400    | `--text-muted`     |
 | Muted / meta     | same                                           | 13px   | 400    | `--text-muted`     |
+| Placeholder      | same                                           | 15px   | 400    | `--text-dim`       |
 
 ## Key UI Components
 
@@ -110,10 +111,10 @@ Codec uses a **three-column layout** as its core structure:
 
 ### Input Fields
 
-- Dark background (`--bg-tertiary`)
+- Dark background (`--input-bg`)
 - Rounded corners (8px)
 - Focus state: subtle `--accent` outline/glow
-- Placeholder text in `--text-muted`
+- Placeholder text in `--text-dim`
 - Multiline composer with auto-grow (future)
 
 ### User Panel (Bottom of Channel Sidebar)
@@ -168,7 +169,7 @@ Codec uses a **three-column layout** as its core structure:
 
 ## Implementation Notes
 
-- All colors defined as CSS custom properties on `:root` for easy theming
+- All colors defined as CSS custom properties on `:root` following the CODEC CRT palette in [THEME.md](THEME.md)
 - Component-scoped styles in Svelte `<style>` blocks
 - Font loaded via Google Fonts (`Space Grotesk` as primary, system-ui fallback)
 - Semantic HTML throughout for accessibility

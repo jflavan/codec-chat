@@ -818,20 +818,26 @@
 </div>
 
 <style>
-	/* ===== Design tokens ===== */
+	/* ===== Design tokens (CODEC phosphor-green CRT palette) ===== */
 	:global(:root) {
-		--bg-primary: #313338;
-		--bg-secondary: #2b2d31;
-		--bg-tertiary: #1e1f22;
-		--bg-message-hover: #2e3035;
-		--accent: #5865f2;
-		--accent-hover: #4752c4;
-		--text-normal: #dbdee1;
-		--text-muted: #949ba4;
-		--text-header: #f2f3f5;
-		--danger: #da373c;
-		--success: #23a559;
-		--border: #3f4147;
+		--bg-primary: #0B1A10;
+		--bg-secondary: #07110A;
+		--bg-tertiary: #050B07;
+		--bg-message-hover: #102417;
+		--accent: #00FF66;
+		--accent-hover: #33FFB2;
+		--text-normal: #86FF6B;
+		--text-muted: #3ED44E;
+		--text-header: #B7FF9A;
+		--text-dim: #2D7A3A;
+		--warn: #FFB000;
+		--danger: #FF3B3B;
+		--success: #00FF66;
+		--border: #1E3A26;
+		--grid: #14301F;
+		--mention-bg: #123A22;
+		--selection-bg: #0F3A22;
+		--input-bg: #06160C;
 	}
 
 	:global(body) {
@@ -922,13 +928,13 @@
 	.server-icon:hover {
 		border-radius: 16px;
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 	}
 
 	.server-icon.active {
 		border-radius: 16px;
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 	}
 
 	.home-icon {
@@ -938,7 +944,7 @@
 
 	.home-icon:hover {
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 	}
 
 	.add-server {
@@ -948,7 +954,7 @@
 
 	.add-server:hover {
 		background: var(--success);
-		color: #fff;
+		color: var(--bg-tertiary);
 		border-radius: 16px;
 	}
 
@@ -963,7 +969,7 @@
 	.discover-icon:hover {
 		border-color: var(--success);
 		background: var(--success);
-		color: #fff;
+		color: var(--bg-tertiary);
 		border-radius: 16px;
 	}
 
@@ -1013,7 +1019,7 @@
 		display: flex;
 		align-items: center;
 		padding: 0 16px;
-		border-bottom: 1px solid var(--bg-tertiary);
+		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
 
@@ -1032,7 +1038,7 @@
 		overflow-y: auto;
 		padding: 8px 8px 16px;
 		scrollbar-width: thin;
-		scrollbar-color: var(--bg-tertiary) transparent;
+		scrollbar-color: var(--border) transparent;
 	}
 
 	.channel-category {
@@ -1144,7 +1150,7 @@
 
 	.user-panel-avatar.placeholder {
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 		font-weight: 700;
 		font-size: 14px;
 		display: grid;
@@ -1189,7 +1195,7 @@
 		display: flex;
 		align-items: center;
 		padding: 0 16px;
-		border-bottom: 1px solid var(--bg-tertiary);
+		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
 
@@ -1209,7 +1215,7 @@
 	.error-banner {
 		padding: 8px 16px;
 		background: var(--danger);
-		color: #fff;
+		color: var(--bg-tertiary);
 		font-size: 14px;
 		flex-shrink: 0;
 	}
@@ -1220,7 +1226,7 @@
 		overflow-y: auto;
 		padding: 16px 0 8px;
 		scrollbar-width: thin;
-		scrollbar-color: var(--bg-tertiary) transparent;
+		scrollbar-color: var(--border) transparent;
 	}
 
 	.feed-status {
@@ -1258,7 +1264,7 @@
 		height: 40px;
 		border-radius: 50%;
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 		font-weight: 700;
 		font-size: 16px;
 		display: grid;
@@ -1321,7 +1327,7 @@
 		padding: 12px 16px;
 		border-radius: 8px 0 0 8px;
 		border: none;
-		background: var(--bg-tertiary);
+		background: var(--input-bg);
 		color: var(--text-normal);
 		font-size: 15px;
 		font-family: inherit;
@@ -1330,7 +1336,7 @@
 	}
 
 	.composer-input::placeholder {
-		color: var(--text-muted);
+		color: var(--text-dim);
 	}
 
 	.composer-input:focus {
@@ -1342,7 +1348,7 @@
 	}
 
 	.composer-send {
-		background: var(--bg-tertiary);
+		background: var(--input-bg);
 		border: none;
 		padding: 12px 12px;
 		border-radius: 0 8px 8px 0;
@@ -1356,13 +1362,13 @@
 
 	.composer-send:hover:not(:disabled) {
 		color: var(--accent);
-		background: var(--bg-tertiary);
+		background: var(--input-bg);
 	}
 
 	.composer-send:disabled {
 		opacity: 0.3;
 		cursor: not-allowed;
-		background: var(--bg-tertiary);
+		background: var(--input-bg);
 	}
 
 	/* ===== Members sidebar ===== */
@@ -1371,7 +1377,7 @@
 		padding: 16px 8px;
 		overflow-y: auto;
 		scrollbar-width: thin;
-		scrollbar-color: var(--bg-tertiary) transparent;
+		scrollbar-color: var(--border) transparent;
 	}
 
 	.sidebar-status {
@@ -1425,7 +1431,7 @@
 		height: 32px;
 		border-radius: 50%;
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 		font-weight: 700;
 		font-size: 14px;
 		display: grid;
@@ -1457,7 +1463,7 @@
 		padding: 8px 10px;
 		border-radius: 4px;
 		border: none;
-		background: var(--bg-tertiary);
+		background: var(--input-bg);
 		color: var(--text-normal);
 		font-size: 14px;
 		font-family: inherit;
@@ -1465,7 +1471,7 @@
 	}
 
 	.inline-form input::placeholder {
-		color: var(--text-muted);
+		color: var(--text-dim);
 	}
 
 	.inline-form input:focus {
@@ -1482,7 +1488,7 @@
 		border-radius: 3px;
 		padding: 6px 14px;
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 		font-weight: 600;
 		font-size: 13px;
 		cursor: pointer;
@@ -1520,6 +1526,12 @@
 	/* ===== Utility ===== */
 	.muted {
 		color: var(--text-muted);
+	}
+
+	/* ===== Global selection ===== */
+	:global(::selection) {
+		background: var(--selection-bg);
+		color: var(--text-header);
 	}
 
 	/* ===== Accessibility ===== */

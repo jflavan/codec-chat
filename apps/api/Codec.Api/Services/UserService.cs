@@ -47,6 +47,22 @@ public class UserService(CodecDbContext db) : IUserService
 
         db.Users.Add(appUser);
 
+        // Auto-join the new user to the default "Codec HQ" server.
+        var defaultServerExists = await db.Servers
+            .AsNoTracking()
+            .AnyAsync(s => s.Id == Server.DefaultServerId);
+
+        if (defaultServerExists)
+        {
+            db.ServerMembers.Add(new ServerMember
+            {
+                ServerId = Server.DefaultServerId,
+                User = appUser,
+                Role = ServerRole.Member,
+                JoinedAt = DateTimeOffset.UtcNow
+            });
+        }
+
         try
         {
             await db.SaveChangesAsync();

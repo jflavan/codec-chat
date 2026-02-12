@@ -49,12 +49,22 @@ builder.Services.AddScoped<IUserService, UserService>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Ensure the default "Codec HQ" server exists in every environment.
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<CodecDbContext>();
-    db.Database.Migrate();
-    await SeedData.InitializeAsync(db);
+
+    if (app.Environment.IsDevelopment())
+    {
+        db.Database.Migrate();
+    }
+
+    await SeedData.EnsureDefaultServerAsync(db);
+
+    if (app.Environment.IsDevelopment())
+    {
+        await SeedData.InitializeAsync(db);
+    }
 }
 
 app.UseCors("dev");
