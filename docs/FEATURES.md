@@ -122,15 +122,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ## 📋 Planned (Near-term)
 
-### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
-- 1-on-1 private conversations between friends
-- DM conversations list in sidebar (sorted by most recent message)
-- Real-time message delivery via SignalR
-- Typing indicators in DM conversations
-- Close / reopen DM conversations
-- Start DM from friends list
-- Reuses existing chat components (MessageFeed, Composer, TypingIndicator)
-
 ### User Settings ([detailed spec](USER_SETTINGS.md))
 - Centralized settings screen accessed from gear icon in User Panel
 - Full-screen modal overlay with category navigation sidebar
