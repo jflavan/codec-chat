@@ -62,6 +62,11 @@ src/
 │   │   │   ├── ReactionBar.svelte        # Reaction pills (emoji + count)
 │   │   │   ├── Composer.svelte           # Message input with send button
 │   │   │   └── TypingIndicator.svelte    # Animated typing dots
+│   │   ├── friends/
+│   │   │   ├── FriendsPanel.svelte       # Friends view with tab navigation
+│   │   │   ├── FriendsList.svelte        # Confirmed friends list
+│   │   │   ├── PendingRequests.svelte    # Incoming/outgoing friend requests
+│   │   │   └── AddFriend.svelte          # User search & send request
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
 │   │       └── MemberItem.svelte         # Single member card
@@ -81,6 +86,10 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
       ├── ServerSidebar      → getAppState()
       ├── ChannelSidebar     → getAppState()
       │   └── UserPanel      → getAppState()
+      ├── FriendsPanel      → getAppState()  (shown when Home is active)
+      │   ├── FriendsList    → getAppState()
+      │   ├── PendingRequests → getAppState()
+      │   └── AddFriend      → getAppState()
       ├── ChatArea           → getAppState()
       │   ├── MessageFeed    → getAppState()
       │   ├── Composer       → getAppState()
@@ -122,8 +131,10 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - **JSON serialization:** camelCase payload naming (configured via `AddJsonProtocol`) to match REST API conventions
 - **Key Features:**
   - Channel-scoped groups — clients join/leave groups per channel
+  - User-scoped groups — clients auto-join `user-{userId}` on connect for friend events
   - Real-time message broadcast on `POST /channels/{channelId}/messages`
   - Typing indicators (`UserTyping` / `UserStoppedTyping` events)
+  - Friend-related event delivery (request received/accepted/declined/cancelled, friend removed)
   - Automatic reconnect via `withAutomaticReconnect()`
 
 ### Data Layer
@@ -219,6 +230,17 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; broadcasts via SignalR)
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership; broadcasts via SignalR)
 
+#### Friends
+- `GET /friends` - List confirmed friends (returns the other user + friendship date)
+- `DELETE /friends/{friendshipId}` - Remove a confirmed friend (broadcasts `FriendRemoved` via SignalR)
+- `POST /friends/requests` - Send a friend request (broadcasts `FriendRequestReceived` via SignalR)
+- `GET /friends/requests?direction=received|sent` - List pending friend requests
+- `PUT /friends/requests/{requestId}` - Accept or decline a friend request (broadcasts `FriendRequestAccepted` or `FriendRequestDeclined` via SignalR)
+- `DELETE /friends/requests/{requestId}` - Cancel a sent friend request (broadcasts `FriendRequestCancelled` via SignalR)
+
+#### User Search
+- `GET /users/search?q=...` - Search users by display name or email (returns up to 20 results with relationship status)
+
 ### SignalR Hub (`/hubs/chat`)
 
 The SignalR hub provides real-time communication. Clients connect with their JWT token via query string.
@@ -240,6 +262,11 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 | `ReactionUpdated` | `{ messageId, channelId, reactions: [{ emoji, count, userIds }] }` | Reaction toggled on a message |
+| `FriendRequestReceived` | `{ requestId, requester: { id, displayName, avatarUrl }, createdAt }` | Friend request received (sent to recipient's user group) |
+| `FriendRequestAccepted` | `{ friendshipId, user: { id, displayName, avatarUrl }, since }` | Friend request accepted (sent to requester's user group) |
+| `FriendRequestDeclined` | `{ requestId }` | Friend request declined (sent to requester's user group) |
+| `FriendRequestCancelled` | `{ requestId }` | Friend request cancelled (sent to recipient's user group) |
+| `FriendRemoved` | `{ friendshipId, userId }` | Friend removed (sent to the other participant's user group) |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -349,7 +376,10 @@ User ────┬──── ServerMember ──── Server
          │                         │
          ├──── Message ──────── Channel
          │        │
-         └──── Reaction ────────┘
+         ├──── Reaction ────────┘
+         │
+         └──── Friendship ──── User
+              (Requester)     (Recipient)
 ```
 
 ### Core Entities
@@ -382,6 +412,12 @@ User ────┬──── ServerMember ──── Server
 - Emoji reaction on a message by a user
 - Fields: Id, MessageId, UserId, Emoji, CreatedAt
 - Unique constraint on (MessageId, UserId, Emoji) — one reaction per emoji per user per message
+
+#### Friendship
+- Relationship between two users (friend request or confirmed friendship)
+- Fields: Id, RequesterId, RecipientId, Status (Pending/Accepted/Declined), CreatedAt, UpdatedAt
+- Unique constraint on (RequesterId, RecipientId) — one friendship record per user pair
+- Bidirectional lookup: both sent and received requests checked to prevent duplicates
 
 ## Configuration
 

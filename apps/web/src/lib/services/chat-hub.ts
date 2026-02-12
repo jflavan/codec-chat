@@ -1,6 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
-import type { Message, Reaction } from '$lib/types/index.js';
+import type { Message, Reaction, FriendUser } from '$lib/types/index.js';
 
 export type ReactionUpdate = {
 	messageId: string;
@@ -8,11 +8,41 @@ export type ReactionUpdate = {
 	reactions: Reaction[];
 };
 
+export type FriendRequestReceivedEvent = {
+	requestId: string;
+	requester: FriendUser;
+	createdAt: string;
+};
+
+export type FriendRequestAcceptedEvent = {
+	friendshipId: string;
+	user: FriendUser;
+	since: string;
+};
+
+export type FriendRequestDeclinedEvent = {
+	requestId: string;
+};
+
+export type FriendRequestCancelledEvent = {
+	requestId: string;
+};
+
+export type FriendRemovedEvent = {
+	friendshipId: string;
+	userId: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
 	onUserStoppedTyping: (channelId: string, displayName: string) => void;
 	onReactionUpdated: (update: ReactionUpdate) => void;
+	onFriendRequestReceived?: (event: FriendRequestReceivedEvent) => void;
+	onFriendRequestAccepted?: (event: FriendRequestAcceptedEvent) => void;
+	onFriendRequestDeclined?: (event: FriendRequestDeclinedEvent) => void;
+	onFriendRequestCancelled?: (event: FriendRequestCancelledEvent) => void;
+	onFriendRemoved?: (event: FriendRemovedEvent) => void;
 };
 
 /**
@@ -41,6 +71,22 @@ export class ChatHubService {
 		connection.on('UserTyping', callbacks.onUserTyping);
 		connection.on('UserStoppedTyping', callbacks.onUserStoppedTyping);
 		connection.on('ReactionUpdated', callbacks.onReactionUpdated);
+
+		if (callbacks.onFriendRequestReceived) {
+			connection.on('FriendRequestReceived', callbacks.onFriendRequestReceived);
+		}
+		if (callbacks.onFriendRequestAccepted) {
+			connection.on('FriendRequestAccepted', callbacks.onFriendRequestAccepted);
+		}
+		if (callbacks.onFriendRequestDeclined) {
+			connection.on('FriendRequestDeclined', callbacks.onFriendRequestDeclined);
+		}
+		if (callbacks.onFriendRequestCancelled) {
+			connection.on('FriendRequestCancelled', callbacks.onFriendRequestCancelled);
+		}
+		if (callbacks.onFriendRemoved) {
+			connection.on('FriendRemoved', callbacks.onFriendRemoved);
+		}
 
 		try {
 			await connection.start();

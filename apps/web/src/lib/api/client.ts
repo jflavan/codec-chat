@@ -5,7 +5,10 @@ import type {
 	Message,
 	Reaction,
 	Member,
-	UserProfile
+	UserProfile,
+	Friend,
+	FriendRequest,
+	UserSearchResult
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -42,6 +45,14 @@ export class ApiClient {
 			throw new ApiError(response.status, body?.error);
 		}
 		return response.json() as Promise<T>;
+	}
+
+	private async requestVoid(url: string, init: RequestInit): Promise<void> {
+		const response = await fetch(url, init);
+		if (!response.ok) {
+			const body = await response.json().catch(() => null);
+			throw new ApiError(response.status, body?.error);
+		}
 	}
 
 	/* ───── User ───── */
@@ -189,6 +200,67 @@ export class ApiClient {
 				headers: this.headers(token, true),
 				body: JSON.stringify({ emoji })
 			}
+		);
+	}
+
+	/* ───── Friends ───── */
+
+	getFriends(token: string): Promise<Friend[]> {
+		return this.request(`${this.baseUrl}/friends`, {
+			headers: this.headers(token)
+		});
+	}
+
+	removeFriend(token: string, friendshipId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/friends/${encodeURIComponent(friendshipId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	getFriendRequests(token: string, direction: 'received' | 'sent'): Promise<FriendRequest[]> {
+		return this.request(
+			`${this.baseUrl}/friends/requests?direction=${encodeURIComponent(direction)}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	sendFriendRequest(token: string, recipientUserId: string): Promise<FriendRequest> {
+		return this.request(`${this.baseUrl}/friends/requests`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ recipientUserId })
+		});
+	}
+
+	respondToFriendRequest(
+		token: string,
+		requestId: string,
+		action: 'accept' | 'decline'
+	): Promise<FriendRequest> {
+		return this.request(
+			`${this.baseUrl}/friends/requests/${encodeURIComponent(requestId)}`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ action })
+			}
+		);
+	}
+
+	cancelFriendRequest(token: string, requestId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/friends/requests/${encodeURIComponent(requestId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/* ───── User Search ───── */
+
+	searchUsers(token: string, query: string): Promise<UserSearchResult[]> {
+		return this.request(
+			`${this.baseUrl}/users/search?q=${encodeURIComponent(query)}`,
+			{ headers: this.headers(token) }
 		);
 	}
 }

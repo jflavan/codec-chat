@@ -6,7 +6,10 @@ import type {
 	Channel,
 	Message,
 	Member,
-	UserProfile
+	UserProfile,
+	Friend,
+	FriendRequest,
+	UserSearchResult
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -51,6 +54,10 @@ export class AppState {
 	channels = $state<Channel[]>([]);
 	messages = $state<Message[]>([]);
 	members = $state<Member[]>([]);
+	friends = $state<Friend[]>([]);
+	incomingRequests = $state<FriendRequest[]>([]);
+	outgoingRequests = $state<FriendRequest[]>([]);
+	userSearchResults = $state<UserSearchResult[]>([]);
 
 	/* ───── selection ───── */
 	selectedServerId = $state<string | null>(null);
@@ -74,10 +81,15 @@ export class AppState {
 	isCreatingServer = $state(false);
 	isCreatingChannel = $state(false);
 	isUploadingAvatar = $state(false);
+	isLoadingFriends = $state(false);
+	isSearchingUsers = $state(false);
 
 	/* ───── UI toggles ───── */
 	showCreateServer = $state(false);
 	showCreateChannel = $state(false);
+	showFriendsPanel = $state(false);
+	friendsTab = $state<'all' | 'pending' | 'add'>('all');
+	friendSearchQuery = $state('');
 
 	/* ───── form fields ───── */
 	newServerName = $state('');
@@ -162,10 +174,17 @@ export class AppState {
 		this.channels = [];
 		this.messages = [];
 		this.members = [];
+		this.friends = [];
+		this.incomingRequests = [];
+		this.outgoingRequests = [];
+		this.userSearchResults = [];
 		this.selectedServerId = null;
 		this.selectedChannelId = null;
 		this.typingUsers = [];
 		this.error = null;
+		this.showFriendsPanel = false;
+		this.friendsTab = 'all';
+		this.friendSearchQuery = '';
 
 		await tick();
 		renderGoogleButton('google-button');
@@ -263,12 +282,6 @@ export class AppState {
 	}
 
 	/* ═══════════════════ Actions ═══════════════════ */
-
-	async selectServer(serverId: string): Promise<void> {
-		this.selectedServerId = serverId;
-		await this.loadChannels(serverId);
-		await this.loadMembers(serverId);
-	}
 
 	async selectChannel(channelId: string): Promise<void> {
 		const previousChannelId = this.selectedChannelId;
@@ -465,6 +478,132 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Friends ═══════════════════ */
+
+	/** Navigate to the friends panel (Home view). */
+	goHome(): void {
+		this.showFriendsPanel = true;
+		this.selectedServerId = null;
+		this.selectedChannelId = null;
+		this.channels = [];
+		this.messages = [];
+		this.members = [];
+		this.loadFriends();
+		this.loadFriendRequests();
+	}
+
+	/** Navigate back to a server view. */
+	async selectServer(serverId: string): Promise<void> {
+		this.showFriendsPanel = false;
+		this.selectedServerId = serverId;
+		await this.loadChannels(serverId);
+		await this.loadMembers(serverId);
+	}
+
+	async loadFriends(): Promise<void> {
+		if (!this.idToken) return;
+		this.isLoadingFriends = true;
+		try {
+			this.friends = await this.api.getFriends(this.idToken);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingFriends = false;
+		}
+	}
+
+	async loadFriendRequests(): Promise<void> {
+		if (!this.idToken) return;
+		this.isLoadingFriends = true;
+		try {
+			const [incoming, outgoing] = await Promise.all([
+				this.api.getFriendRequests(this.idToken, 'received'),
+				this.api.getFriendRequests(this.idToken, 'sent')
+			]);
+			this.incomingRequests = incoming;
+			this.outgoingRequests = outgoing;
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingFriends = false;
+		}
+	}
+
+	async sendFriendRequest(recipientUserId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.sendFriendRequest(this.idToken, recipientUserId);
+			await this.loadFriendRequests();
+			// Refresh search results to update relationship status.
+			if (this.friendSearchQuery.trim().length >= 2) {
+				await this.searchUsers(this.friendSearchQuery);
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async acceptFriendRequest(requestId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.respondToFriendRequest(this.idToken, requestId, 'accept');
+			await this.loadFriends();
+			await this.loadFriendRequests();
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async declineFriendRequest(requestId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.respondToFriendRequest(this.idToken, requestId, 'decline');
+			await this.loadFriendRequests();
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async cancelFriendRequest(requestId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.cancelFriendRequest(this.idToken, requestId);
+			await this.loadFriendRequests();
+			if (this.friendSearchQuery.trim().length >= 2) {
+				await this.searchUsers(this.friendSearchQuery);
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async removeFriend(friendshipId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.removeFriend(this.idToken, friendshipId);
+			await this.loadFriends();
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async searchUsers(query: string): Promise<void> {
+		if (!this.idToken) return;
+		this.friendSearchQuery = query;
+		if (query.trim().length < 2) {
+			this.userSearchResults = [];
+			return;
+		}
+		this.isSearchingUsers = true;
+		try {
+			this.userSearchResults = await this.api.searchUsers(this.idToken, query);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isSearchingUsers = false;
+		}
+	}
+
 	/* ═══════════════════ SignalR ═══════════════════ */
 
 	private async startSignalR(token: string): Promise<void> {
@@ -492,6 +631,22 @@ export class AppState {
 						m.id === update.messageId ? { ...m, reactions: update.reactions } : m
 					);
 				}
+			},
+			onFriendRequestReceived: () => {
+				this.loadFriendRequests();
+			},
+			onFriendRequestAccepted: () => {
+				this.loadFriends();
+				this.loadFriendRequests();
+			},
+			onFriendRequestDeclined: () => {
+				this.loadFriendRequests();
+			},
+			onFriendRequestCancelled: () => {
+				this.loadFriendRequests();
+			},
+			onFriendRemoved: () => {
+				this.loadFriends();
 			}
 		});
 

@@ -6,5 +6,10 @@ export type {
 	Channel,
 	Message,
 	Member,
-	UserProfile
+	UserProfile,
+	FriendshipStatus,
+	FriendUser,
+	Friend,
+	FriendRequest,
+	UserSearchResult
 } from './types/index.js';

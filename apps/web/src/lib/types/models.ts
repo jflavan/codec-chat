@@ -57,3 +57,38 @@ export type UserProfile = {
 		avatarUrl?: string;
 	};
 };
+
+/** Friendship status enum matching the API. */
+export type FriendshipStatus = 'Pending' | 'Accepted' | 'Declined';
+
+/** A user summary as returned by friend-related endpoints. */
+export type FriendUser = {
+	id: string;
+	displayName: string;
+	avatarUrl?: string | null;
+};
+
+/** Confirmed friend entry returned by GET /friends. */
+export type Friend = {
+	friendshipId: string;
+	user: FriendUser;
+	since: string;
+};
+
+/** Pending friend request returned by GET /friends/requests. */
+export type FriendRequest = {
+	id: string;
+	requester: FriendUser;
+	recipient: FriendUser;
+	status: FriendshipStatus;
+	createdAt: string;
+};
+
+/** User search result returned by GET /users/search. */
+export type UserSearchResult = {
+	id: string;
+	displayName: string;
+	email?: string | null;
+	avatarUrl?: string | null;
+	relationshipStatus: string;
+};

@@ -7,11 +7,22 @@
 <nav class="server-sidebar" aria-label="Servers">
 	<div class="server-list">
 		<!-- Home icon -->
-		<div class="server-icon home-icon" aria-label="Home">
+		<button
+			class="server-icon home-icon"
+			class:active={app.showFriendsPanel}
+			aria-label="Home"
+			title="Home"
+			onclick={() => app.goHome()}
+		>
 			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M2.3 7.7l9-5.4a1.2 1.2 0 0 1 1.4 0l9 5.4a.6.6 0 0 1-.3 1.1H19v8.6a.6.6 0 0 1-.6.6h-3.8v-5a1 1 0 0 0-1-1h-3.2a1 1 0 0 0-1 1v5H5.6a.6.6 0 0 1-.6-.6V8.8H2.6a.6.6 0 0 1-.3-1.1z"/>
 			</svg>
-		</div>
+			{#if app.incomingRequests.length > 0}
+				<span class="notification-badge" aria-label="{app.incomingRequests.length} pending friend requests">
+					{app.incomingRequests.length}
+				</span>
+			{/if}
+		</button>
 
 		<div class="server-separator" role="separator"></div>
 
@@ -168,6 +179,7 @@
 	}
 
 	.home-icon {
+		position: relative;
 		background: var(--bg-primary);
 		color: var(--text-header);
 	}
@@ -175,6 +187,24 @@
 	.home-icon:hover {
 		background: var(--accent);
 		color: var(--bg-tertiary);
+	}
+
+	.notification-badge {
+		position: absolute;
+		bottom: -2px;
+		right: -4px;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 9px;
+		background: var(--danger);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 18px;
+		text-align: center;
+		pointer-events: none;
+		box-shadow: 0 0 0 3px var(--bg-tertiary);
 	}
 
 	.add-server {

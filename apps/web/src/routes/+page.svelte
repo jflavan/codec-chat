@@ -6,6 +6,7 @@
 	import ChannelSidebar from '$lib/components/channel-sidebar/ChannelSidebar.svelte';
 	import ChatArea from '$lib/components/chat/ChatArea.svelte';
 	import MembersSidebar from '$lib/components/members/MembersSidebar.svelte';
+	import FriendsPanel from '$lib/components/friends/FriendsPanel.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -33,11 +34,15 @@
 	<title>Codec</title>
 </svelte:head>
 
-<div class="app-shell">
+<div class="app-shell" class:friends-mode={app.showFriendsPanel}>
 	<ServerSidebar />
-	<ChannelSidebar />
-	<ChatArea />
-	<MembersSidebar />
+	{#if app.showFriendsPanel}
+		<FriendsPanel />
+	{:else}
+		<ChannelSidebar />
+		<ChatArea />
+		<MembersSidebar />
+	{/if}
 </div>
 
 <style>
@@ -48,12 +53,16 @@
 		overflow: hidden;
 	}
 
+	.app-shell.friends-mode {
+		grid-template-columns: 72px minmax(0, 1fr);
+	}
+
 	@media (max-width: 1199px) {
 		.app-shell {
 			grid-template-columns: 72px 240px minmax(0, 1fr);
 		}
 
-		.app-shell > :global(:nth-child(4)) {
+		.app-shell:not(.friends-mode) > :global(:nth-child(4)) {
 			display: none;
 		}
 	}
@@ -64,13 +73,16 @@
 			grid-template-rows: 1fr;
 		}
 
-		.app-shell > :global(:nth-child(1)),
-		.app-shell > :global(:nth-child(2)),
-		.app-shell > :global(:nth-child(4)) {
+		.app-shell > :global(:nth-child(1)) {
 			display: none;
 		}
 
-		.app-shell > :global(:nth-child(3)) {
+		.app-shell:not(.friends-mode) > :global(:nth-child(2)),
+		.app-shell:not(.friends-mode) > :global(:nth-child(4)) {
+			display: none;
+		}
+
+		.app-shell:not(.friends-mode) > :global(:nth-child(3)) {
 			height: 100vh;
 		}
 	}

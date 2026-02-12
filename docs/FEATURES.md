@@ -48,6 +48,14 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Typing indicators ("X is typing…")
 - ✅ Emoji reactions on messages (toggle via floating action bar, reaction pills with counts, real-time sync via SignalR)
 
+### Friends ([detailed spec](FRIENDS.md))
+- ✅ Friend requests (send, accept, decline, cancel)
+- ✅ Friends list with avatar and display name
+- ✅ Remove friend
+- ✅ User search for adding friends
+- ✅ Real-time friend request notifications via SignalR
+- ✅ Friends panel accessible from Home icon in server sidebar
+
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
 - ✅ Three-column layout: server icon rail, channel sidebar, chat area
@@ -74,7 +82,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Auth module: token persistence (`localStorage`), session management, Google SDK wrapper
 - ✅ SignalR service: `ChatHubService` for hub connection lifecycle
 - ✅ CSS design tokens (`tokens.css`) and global base styles (`global.css`)
-- ✅ Feature-grouped component directories (server-sidebar, channel-sidebar, chat, members)
+- ✅ Feature-grouped component directories (server-sidebar, channel-sidebar, chat, members, friends)
 - ✅ Thin page composition shell (`+page.svelte` ~75 lines)
 - ✅ Barrel exports via `$lib/index.ts`
 
@@ -103,14 +111,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - 🔄 Client-side form validation
 
 ## 📋 Planned (Near-term)
-
-### Friends ([detailed spec](FRIENDS.md))
-- Friend requests (send, accept, decline, cancel)
-- Friends list with avatar and display name
-- Remove friend
-- User search for adding friends
-- Real-time friend request notifications via SignalR
-- Friends panel accessible from Home icon in server sidebar
 
 ### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
 - 1-on-1 private conversations between friends

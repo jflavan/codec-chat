@@ -85,6 +85,17 @@ EF Core migrations make database provider switches straightforward.
                          │ Name        │       │
                          │ CreatedAt   │       │
                          └─────────────┘       │
+                                               │
+┌─────────────┐         ┌─────────────┐       │
+│   User      │         │  Friendship │       │
+│ (Requester) │         │─────────────│       │
+│─────────────│         │ Id (PK)     │       │
+│ Id ─────────│───────►│ RequesterId │       │
+└─────────────┘         │ RecipientId │◄───────┘
+                         │ Status      │
+                         │ CreatedAt   │
+                         │ UpdatedAt   │
+                         └─────────────┘
 ```
 
 ### Entity Definitions
@@ -106,6 +117,8 @@ Represents an authenticated user in the system.
 **Relationships:**
 - One-to-many with `ServerMember`
 - One-to-many with `Message`
+- One-to-many with `Friendship` (as Requester, via `SentFriendRequests`)
+- One-to-many with `Friendship` (as Recipient, via `ReceivedFriendRequests`)
 
 **Notes:**
 - `GoogleSubject` is the primary link to Google identity
@@ -208,6 +221,39 @@ Emoji reaction on a message by a specific user.
 - Many-to-one with `Message` (cascade delete)
 - Many-to-one with `User` (cascade delete)
 
+#### Friendship
+Relationship between two users (friend request or confirmed friendship).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique friendship identifier |
+| `RequesterId` | Guid (FK) | Reference to User who sent the request |
+| `RecipientId` | Guid (FK) | Reference to User who received the request |
+| `Status` | FriendshipStatus (enum) | Current state of the relationship |
+| `CreatedAt` | DateTimeOffset | When the request was sent |
+| `UpdatedAt` | DateTimeOffset | When the status last changed |
+
+**Unique Constraint:** (`RequesterId`, `RecipientId`) — one friendship record per user pair
+
+**Relationships:**
+- Many-to-one with `User` (as Requester, restrict delete)
+- Many-to-one with `User` (as Recipient, restrict delete)
+
+**FriendshipStatus Enum:**
+```csharp
+public enum FriendshipStatus
+{
+    Pending = 0,    // Request sent, awaiting response
+    Accepted = 1,   // Both users are friends
+    Declined = 2    // Recipient declined the request
+}
+```
+
+**Notes:**
+- Before inserting, both `(RequesterId, RecipientId)` and `(RecipientId, RequesterId)` are checked to prevent duplicate relationships
+- Self-friendship is prevented at the API level (`RequesterId` must differ from `RecipientId`)
+- Declined requests retain the record (status changes to `Declined`); cancelled requests delete the record
+
 ## Database Context
 
 ```csharp
@@ -219,6 +265,7 @@ public class CodecDbContext : DbContext
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
+    public DbSet<Friendship> Friendships => Set<Friendship>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -388,6 +435,19 @@ modelBuilder.Entity<Reaction>()
 // Reaction lookup by user
 modelBuilder.Entity<Reaction>()
     .HasIndex(r => r.UserId);
+
+// Friendship: unique pair constraint (one relationship per user pair)
+modelBuilder.Entity<Friendship>()
+    .HasIndex(f => new { f.RequesterId, f.RecipientId })
+    .IsUnique();
+
+// Friendship: fast lookup by requester
+modelBuilder.Entity<Friendship>()
+    .HasIndex(f => f.RequesterId);
+
+// Friendship: fast lookup by recipient
+modelBuilder.Entity<Friendship>()
+    .HasIndex(f => f.RecipientId);
 ```
 
 ### Query Patterns

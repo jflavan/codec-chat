@@ -69,6 +69,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - +page.svelte reduced to ~75-line thin composition shell
 - Sign-out button in user panel
 - Emoji reactions on messages (toggle, real-time sync via SignalR, floating action bar, reaction pills)
+- Friends feature fully implemented (friend requests, friends list, user search, real-time SignalR events, Friends panel UI)
 
 ## Task breakdown: Session Persistence
 
@@ -225,32 +226,32 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Task breakdown: Friends (see [docs/FRIENDS.md](docs/FRIENDS.md))
 
 ### API
-- [ ] Create `Friendship` entity and `FriendshipStatus` enum in `Models/`
-- [ ] Add `Friendships` DbSet to `CodecDbContext`
-- [ ] Configure entity relationships, unique constraint, and indexes in `OnModelCreating`
-- [ ] Create and apply EF Core migration (`AddFriendships`)
-- [ ] Create `FriendsController` with all endpoints
-- [ ] Add user search endpoint (`GET /users/search?q=...`) for the Add Friend flow
-- [ ] Add user-scoped SignalR group support to `ChatHub` (join `user-{userId}` group on connect)
-- [ ] Broadcast friend-related events via SignalR
+- [x] Create `Friendship` entity and `FriendshipStatus` enum in `Models/`
+- [x] Add `Friendships` DbSet to `CodecDbContext`
+- [x] Configure entity relationships, unique constraint, and indexes in `OnModelCreating`
+- [x] Create and apply EF Core migration (`AddFriendships`)
+- [x] Create `FriendsController` with all endpoints
+- [x] Add user search endpoint (`GET /users/search?q=...`) for the Add Friend flow
+- [x] Add user-scoped SignalR group support to `ChatHub` (join `user-{userId}` group on connect)
+- [x] Broadcast friend-related events via SignalR
 
 ### Web
-- [ ] Add `Friendship`, `FriendRequest`, and `FriendshipStatus` types to `models.ts`
-- [ ] Add friend-related API methods to `ApiClient`
-- [ ] Add friend-related SignalR event handlers to `ChatHubService`
-- [ ] Add friends state management to `AppState`
-- [ ] Create `FriendsPanel.svelte` component with tab navigation
-- [ ] Create `FriendsList.svelte` (All Friends tab)
-- [ ] Create `PendingRequests.svelte` (Pending tab)
-- [ ] Create `AddFriend.svelte` (Add Friend tab with search)
-- [ ] Wire Home icon in `ServerSidebar` to display the Friends panel
+- [x] Add `Friendship`, `FriendRequest`, and `FriendshipStatus` types to `models.ts`
+- [x] Add friend-related API methods to `ApiClient`
+- [x] Add friend-related SignalR event handlers to `ChatHubService`
+- [x] Add friends state management to `AppState`
+- [x] Create `FriendsPanel.svelte` component with tab navigation
+- [x] Create `FriendsList.svelte` (All Friends tab)
+- [x] Create `PendingRequests.svelte` (Pending tab)
+- [x] Create `AddFriend.svelte` (Add Friend tab with search)
+- [x] Wire Home icon in `ServerSidebar` to display the Friends panel
 
 ### Documentation
-- [ ] Update `ARCHITECTURE.md` with new endpoints and SignalR events
-- [ ] Update `DATA.md` with Friendship entity and schema diagram
-- [ ] Update `FEATURES.md` to track Friends feature progress
-- [ ] Update `DESIGN.md` with Friends panel UI specification
-- [ ] Update `PLAN.md` with Friends task breakdown
+- [x] Update `ARCHITECTURE.md` with new endpoints and SignalR events
+- [x] Update `DATA.md` with Friendship entity and schema diagram
+- [x] Update `FEATURES.md` to track Friends feature progress
+- [x] Update `DESIGN.md` with Friends panel UI specification
+- [x] Update `PLAN.md` with Friends task breakdown
 
 ## Task breakdown: Direct Messages (see [docs/DIRECT_MESSAGES.md](docs/DIRECT_MESSAGES.md))
 

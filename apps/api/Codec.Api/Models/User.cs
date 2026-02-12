@@ -19,4 +19,6 @@ public class User
     public List<Message> Messages { get; set; } = new();
     public List<ServerMember> ServerMemberships { get; set; } = new();
     public List<Reaction> Reactions { get; set; } = new();
+    public List<Friendship> SentFriendRequests { get; set; } = new();
+    public List<Friendship> ReceivedFriendRequests { get; set; } = new();
 }

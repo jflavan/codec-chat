@@ -163,6 +163,60 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 - Clickable to toggle the reaction on/off
 - Hover: background shifts to `--bg-message-hover`
 
+## Friends Panel
+
+The Friends panel replaces the channel sidebar + chat area + members sidebar when the Home icon is active. It uses a simplified two-column layout: server icon rail (72px) + Friends panel (flexible width).
+
+### Tab Bar
+
+Three tabs at the top of the Friends panel:
+
+| Tab | Content |
+|-----|---------|
+| **All Friends** | Confirmed friends list |
+| **Pending** | Incoming and outgoing friend requests (badge shows count) |
+| **Add Friend** | User search and send request |
+
+- Tab bar uses `--bg-secondary` background with `--accent` underline on the active tab
+- Tabs styled as buttons with `--text-muted` default, `--accent` when active
+- Pending tab shows a badge count (total incoming + outgoing) styled with `--accent` background
+
+### All Friends Tab
+
+- List of confirmed friends, each showing: avatar (32px circular), display name, and "Friends since" date
+- Remove Friend button with `--danger` color, visible on each row
+- Empty state message when no friends exist
+- Follows the same card pattern as `MemberItem` in `MembersSidebar`
+
+### Pending Tab
+
+- **Incoming Requests** section header, followed by request cards
+  - Each card: avatar (32px), display name, request date
+  - Accept button (checkmark, `--accent` / primary style) and Decline button (✕, `--danger`)
+- **Outgoing Requests** section header, followed by request cards
+  - Each card: avatar (32px), display name, request date
+  - Cancel button (✕, `--danger`)
+- Empty state messages for each section when no requests exist
+
+### Add Friend Tab
+
+- Text input field with placeholder "Search by name or email..."
+- Uses `--input-bg` background, `--accent` focus glow (same as Composer)
+- Search results appear below after 300ms debounce
+- Each result shows: avatar (32px), display name, email, and a contextual action button
+  - "Send Request" button (`--accent` primary style) if no existing relationship
+  - "Pending" label (disabled, `--text-muted`) if a request already exists
+  - "Friends" label (disabled, `--text-muted`) if already friends
+- Loading state shown during search with `--text-muted` text
+
+### Friends Mode Responsive Behavior
+
+| Breakpoint | Layout |
+|-----------|--------|
+| ≥ 1200px | Two-column: server rail (72px) + Friends panel (flexible) |
+| 900–1199px | Two-column: server rail (72px) + Friends panel (flexible) |
+| ≤ 899px | Single-column: slide-out navigation, full-width Friends panel |
+
 ## Animations & Micro-interactions
 
 - **Transitions**: 150–200ms ease for background/color changes
@@ -206,7 +260,7 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 - All colors defined as CSS custom properties on `:root` in `$lib/styles/tokens.css` following the CODEC CRT palette in [THEME.md](THEME.md)
 - Global base styles (resets, font imports, selection, focus-visible) in `$lib/styles/global.css`, imported once in `+layout.svelte`
 - Component-scoped styles in Svelte `<style>` blocks within each component
-- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`
+- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`, `friends/`
 - Font loaded via Google Fonts (`Space Grotesk` as primary, system-ui fallback) with preconnect links in `+layout.svelte`
 - Semantic HTML throughout for accessibility
 - `prefers-color-scheme` media query ready for future light mode toggle
