@@ -122,6 +122,20 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ## 📋 Planned (Near-term)
 
+### User Settings ([detailed spec](USER_SETTINGS.md))
+- Centralized settings screen accessed from gear icon in User Panel
+- Full-screen modal overlay with category navigation sidebar
+- My Profile section: nickname editing, avatar management, profile preview
+- My Account section: read-only account info, sign-out
+- Extensible for future categories (notifications, privacy, appearance)
+
+### Nicknames ([detailed spec](NICKNAMES.md))
+- User-chosen display name that overrides Google-provided name
+- Managed via User Settings → My Profile section
+- Effective display name shown in messages, member lists, friends, User Panel, typing indicators
+- Fallback chain: nickname → Google display name
+- Validation: 1–32 characters, Unicode supported
+
 ### Messaging Features
 - Message editing and deletion
 - Rich text formatting (markdown)
@@ -168,10 +182,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Granular permissions
 
 ### Customization
-- User preferences/settings
+- ~~User preferences/settings~~ → [planned](USER_SETTINGS.md)
 - Server themes
 - Custom emojis
-- Profile customization
+- ~~Profile customization~~ → [planned: nicknames](NICKNAMES.md)
 - Status messages
 
 ### Enterprise Features
