@@ -7,6 +7,8 @@
 	import ChatArea from '$lib/components/chat/ChatArea.svelte';
 	import MembersSidebar from '$lib/components/members/MembersSidebar.svelte';
 	import FriendsPanel from '$lib/components/friends/FriendsPanel.svelte';
+	import HomeSidebar from '$lib/components/dm/HomeSidebar.svelte';
+	import DmChatArea from '$lib/components/dm/DmChatArea.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -34,10 +36,15 @@
 	<title>Codec</title>
 </svelte:head>
 
-<div class="app-shell" class:friends-mode={app.showFriendsPanel}>
+<div class="app-shell" class:home-mode={app.showFriendsPanel} class:dm-active={app.showFriendsPanel && app.activeDmChannelId}>
 	<ServerSidebar />
 	{#if app.showFriendsPanel}
-		<FriendsPanel />
+		<HomeSidebar />
+		{#if app.activeDmChannelId}
+			<DmChatArea />
+		{:else}
+			<FriendsPanel />
+		{/if}
 	{:else}
 		<ChannelSidebar />
 		<ChatArea />
@@ -53,8 +60,8 @@
 		overflow: hidden;
 	}
 
-	.app-shell.friends-mode {
-		grid-template-columns: 72px minmax(0, 1fr);
+	.app-shell.home-mode {
+		grid-template-columns: 72px 240px minmax(0, 1fr);
 	}
 
 	@media (max-width: 1199px) {
@@ -62,7 +69,7 @@
 			grid-template-columns: 72px 240px minmax(0, 1fr);
 		}
 
-		.app-shell:not(.friends-mode) > :global(:nth-child(4)) {
+		.app-shell:not(.home-mode) > :global(:nth-child(4)) {
 			display: none;
 		}
 	}
@@ -77,13 +84,21 @@
 			display: none;
 		}
 
-		.app-shell:not(.friends-mode) > :global(:nth-child(2)),
-		.app-shell:not(.friends-mode) > :global(:nth-child(4)) {
+		.app-shell:not(.home-mode) > :global(:nth-child(2)),
+		.app-shell:not(.home-mode) > :global(:nth-child(4)) {
 			display: none;
 		}
 
-		.app-shell:not(.friends-mode) > :global(:nth-child(3)) {
+		.app-shell:not(.home-mode) > :global(:nth-child(3)) {
 			height: 100vh;
+		}
+
+		.app-shell.home-mode:not(.dm-active) > :global(:nth-child(2)) {
+			display: none;
+		}
+
+		.app-shell.home-mode.dm-active > :global(:nth-child(2)) {
+			display: none;
 		}
 	}
 </style>

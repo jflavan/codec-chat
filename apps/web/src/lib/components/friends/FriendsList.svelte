@@ -21,7 +21,11 @@
 		<ul class="list" role="list">
 			{#each app.friends as friend (friend.friendshipId)}
 				<li class="friend-item">
-					<div class="friend-info">
+					<button
+						class="friend-info"
+						onclick={() => app.openDmWithUser(friend.user.id)}
+						aria-label="Message {friend.user.displayName}"
+					>
 						{#if friend.user.avatarUrl}
 							<img class="avatar" src={friend.user.avatarUrl} alt="" />
 						{:else}
@@ -33,7 +37,7 @@
 							<span class="friend-name">{friend.user.displayName}</span>
 							<span class="friend-since">Friends since {formatDate(friend.since)}</span>
 						</div>
-					</div>
+					</button>
 					<button
 						class="btn-danger"
 						onclick={() => app.removeFriend(friend.friendshipId)}
@@ -87,6 +91,12 @@
 		align-items: center;
 		gap: 10px;
 		min-width: 0;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		font-family: inherit;
+		text-align: left;
 	}
 
 	.avatar {

@@ -9,7 +9,9 @@ import type {
 	UserProfile,
 	Friend,
 	FriendRequest,
-	UserSearchResult
+	UserSearchResult,
+	DmConversation,
+	DirectMessage
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -59,6 +61,13 @@ export class AppState {
 	outgoingRequests = $state<FriendRequest[]>([]);
 	userSearchResults = $state<UserSearchResult[]>([]);
 
+	/* ───── DM data ───── */
+	dmConversations = $state<DmConversation[]>([]);
+	dmMessages = $state<DirectMessage[]>([]);
+	activeDmChannelId = $state<string | null>(null);
+	dmTypingUsers = $state<string[]>([]);
+	unreadDmCounts = $state<Map<string, number>>(new Map());
+
 	/* ───── selection ───── */
 	selectedServerId = $state<string | null>(null);
 	selectedChannelId = $state<string | null>(null);
@@ -83,6 +92,9 @@ export class AppState {
 	isUploadingAvatar = $state(false);
 	isLoadingFriends = $state(false);
 	isSearchingUsers = $state(false);
+	isLoadingDmConversations = $state(false);
+	isLoadingDmMessages = $state(false);
+	isSendingDm = $state(false);
 
 	/* ───── UI toggles ───── */
 	showCreateServer = $state(false);
@@ -95,6 +107,7 @@ export class AppState {
 	newServerName = $state('');
 	newChannelName = $state('');
 	messageBody = $state('');
+	dmMessageBody = $state('');
 
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
@@ -116,6 +129,14 @@ export class AppState {
 
 	readonly selectedChannelName = $derived(
 		this.channels.find((c) => c.id === this.selectedChannelId)?.name ?? null
+	);
+
+	readonly activeDmParticipant = $derived(
+		this.dmConversations.find((c) => c.id === this.activeDmChannelId)?.participant ?? null
+	);
+
+	readonly homeBadgeCount = $derived(
+		this.incomingRequests.length + this.unreadDmCounts.size
 	);
 
 	/* ───── internals ───── */
@@ -178,6 +199,12 @@ export class AppState {
 		this.incomingRequests = [];
 		this.outgoingRequests = [];
 		this.userSearchResults = [];
+		this.dmConversations = [];
+		this.dmMessages = [];
+		this.activeDmChannelId = null;
+		this.dmTypingUsers = [];
+		this.dmMessageBody = '';
+		this.unreadDmCounts = new Map();
 		this.selectedServerId = null;
 		this.selectedChannelId = null;
 		this.typingUsers = [];
@@ -490,6 +517,7 @@ export class AppState {
 		this.members = [];
 		this.loadFriends();
 		this.loadFriendRequests();
+		this.loadDmConversations();
 	}
 
 	/** Navigate back to a server view. */
@@ -604,6 +632,113 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Direct Messages ═══════════════════ */
+
+	async loadDmConversations(): Promise<void> {
+		if (!this.idToken) return;
+		this.isLoadingDmConversations = true;
+		try {
+			this.dmConversations = await this.api.getDmConversations(this.idToken);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingDmConversations = false;
+		}
+	}
+
+	async selectDmConversation(dmChannelId: string): Promise<void> {
+		const previousDmId = this.activeDmChannelId;
+		this.activeDmChannelId = dmChannelId;
+		this.dmTypingUsers = [];
+		this.dmMessageBody = '';
+
+		// Clear unread for this conversation.
+		if (this.unreadDmCounts.has(dmChannelId)) {
+			const next = new Map(this.unreadDmCounts);
+			next.delete(dmChannelId);
+			this.unreadDmCounts = next;
+		}
+
+		if (previousDmId) await this.hub.leaveDmChannel(previousDmId);
+		await this.hub.joinDmChannel(dmChannelId);
+		await this.loadDmMessages(dmChannelId);
+	}
+
+	async loadDmMessages(dmChannelId: string): Promise<void> {
+		if (!this.idToken) return;
+		this.isLoadingDmMessages = true;
+		try {
+			this.dmMessages = await this.api.getDmMessages(this.idToken, dmChannelId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingDmMessages = false;
+		}
+	}
+
+	async sendDmMessage(): Promise<void> {
+		if (!this.idToken || !this.activeDmChannelId) return;
+
+		const body = this.dmMessageBody.trim();
+		if (!body) {
+			this.error = 'Message body is required.';
+			return;
+		}
+
+		this.isSendingDm = true;
+		try {
+			await this.api.sendDm(this.idToken, this.activeDmChannelId, body);
+			this.dmMessageBody = '';
+
+			if (this.me) {
+				this.hub.clearDmTyping(this.activeDmChannelId, this.me.user.displayName);
+			}
+
+			// If SignalR is not connected, fall back to full reload.
+			if (!this.hub.isConnected) {
+				await this.loadDmMessages(this.activeDmChannelId);
+			}
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isSendingDm = false;
+		}
+	}
+
+	/** Open or create a DM conversation with a friend. */
+	async openDmWithUser(userId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			const result = await this.api.createOrResumeDm(this.idToken, userId);
+			await this.loadDmConversations();
+			await this.selectDmConversation(result.id);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async closeDmConversation(dmChannelId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.closeDmConversation(this.idToken, dmChannelId);
+			this.dmConversations = this.dmConversations.filter((c) => c.id !== dmChannelId);
+			if (this.activeDmChannelId === dmChannelId) {
+				await this.hub.leaveDmChannel(dmChannelId);
+				this.activeDmChannelId = null;
+				this.dmMessages = [];
+				this.dmTypingUsers = [];
+				this.dmMessageBody = '';
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	handleDmComposerInput(): void {
+		if (!this.activeDmChannelId || !this.me) return;
+		this.hub.emitDmTyping(this.activeDmChannelId, this.me.user.displayName);
+	}
+
 	/* ═══════════════════ SignalR ═══════════════════ */
 
 	private async startSignalR(token: string): Promise<void> {
@@ -647,11 +782,42 @@ export class AppState {
 			},
 			onFriendRemoved: () => {
 				this.loadFriends();
+			},
+			onReceiveDm: (msg) => {
+				if (msg.dmChannelId === this.activeDmChannelId) {
+					if (!this.dmMessages.some((m) => m.id === msg.id)) {
+						this.dmMessages = [...this.dmMessages, msg];
+					}
+				} else {
+					// Increment unread count for this channel.
+					const next = new Map(this.unreadDmCounts);
+					next.set(msg.dmChannelId, (next.get(msg.dmChannelId) ?? 0) + 1);
+					this.unreadDmCounts = next;
+				}
+				// Refresh conversation list to update last message preview and order.
+				this.loadDmConversations();
+			},
+			onDmTyping: (dmChannelId, displayName) => {
+				if (dmChannelId === this.activeDmChannelId && !this.dmTypingUsers.includes(displayName)) {
+					this.dmTypingUsers = [...this.dmTypingUsers, displayName];
+				}
+			},
+			onDmStoppedTyping: (dmChannelId, displayName) => {
+				if (dmChannelId === this.activeDmChannelId) {
+					this.dmTypingUsers = this.dmTypingUsers.filter((u) => u !== displayName);
+				}
+			},
+			onDmConversationOpened: () => {
+				// A new DM conversation was opened by another user — refresh the list.
+				this.loadDmConversations();
 			}
 		});
 
 		if (this.selectedChannelId) {
 			await this.hub.joinChannel(this.selectedChannelId);
+		}
+		if (this.activeDmChannelId) {
+			await this.hub.joinDmChannel(this.activeDmChannelId);
 		}
 	}
 

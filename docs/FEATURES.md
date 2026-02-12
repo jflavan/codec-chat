@@ -57,6 +57,15 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Friends panel accessible from Home icon in server sidebar
 - ✅ Notification badge on Home icon for pending incoming friend requests
 
+### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
+- ✅ 1-on-1 private conversations between friends
+- ✅ DM conversations list in sidebar (sorted by most recent message)
+- ✅ Real-time message delivery via SignalR
+- ✅ Typing indicators in DM conversations
+- ✅ Close / reopen DM conversations
+- ✅ Start DM from friends list
+- ✅ Home screen layout with DM sidebar + Friends panel / DM chat area
+
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
 - ✅ Three-column layout: server icon rail, channel sidebar, chat area
@@ -113,6 +122,15 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ## 📋 Planned (Near-term)
 
+### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
+- 1-on-1 private conversations between friends
+- DM conversations list in sidebar (sorted by most recent message)
+- Real-time message delivery via SignalR
+- Typing indicators in DM conversations
+- Close / reopen DM conversations
+- Start DM from friends list
+- Reuses existing chat components (MessageFeed, Composer, TypingIndicator)
+
 ### User Settings ([detailed spec](USER_SETTINGS.md))
 - Centralized settings screen accessed from gear icon in User Panel
 - Full-screen modal overlay with category navigation sidebar
@@ -126,15 +144,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Effective display name shown in messages, member lists, friends, User Panel, typing indicators
 - Fallback chain: nickname → Google display name
 - Validation: 1–32 characters, Unicode supported
-
-### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
-- 1-on-1 private conversations between friends
-- DM conversations list in sidebar (sorted by most recent message)
-- Real-time message delivery via SignalR
-- Typing indicators in DM conversations
-- Close / reopen DM conversations
-- Start DM from friends list
-- Reuses existing chat components (MessageFeed, Composer, TypingIndicator)
 
 ### Messaging Features
 - Message editing and deletion
