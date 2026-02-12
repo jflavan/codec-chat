@@ -72,6 +72,9 @@ uploads/
 # Log files
 *.log
 
+# OS files
+.DS_Store
+
 # Local app secrets
 appsettings.Development.json
 apps/api/Codec.Api/appsettings.Development.json

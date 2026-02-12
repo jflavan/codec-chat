@@ -73,7 +73,8 @@ builder.Services.AddScoped<IUserService, UserService>();
 // Avatar storage configuration.
 var avatarStoragePath = Path.Combine(builder.Environment.ContentRootPath, "uploads", "avatars");
 Directory.CreateDirectory(avatarStoragePath);
-builder.Services.AddSingleton<IAvatarService>(new AvatarService(avatarStoragePath, "/uploads/avatars"));
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"]?.TrimEnd('/') ?? "";
+builder.Services.AddSingleton<IAvatarService>(new AvatarService(avatarStoragePath, $"{apiBaseUrl}/uploads/avatars"));
 
 var app = builder.Build();
 
