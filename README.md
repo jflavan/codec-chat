@@ -58,7 +58,8 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Server membership and roles (Owner, Admin, Member)
 - ✅ Channel creation (Owner/Admin only)
 - ✅ Channel browsing within servers
-- ✅ Real-time message posting and viewing
+- ✅ Real-time message posting and viewing via SignalR (WebSockets)
+- ✅ Typing indicators (“X is typing…”)
 - ✅ User profile display
 - ✅ Member lists for servers
 
@@ -72,5 +73,6 @@ The web app runs at `http://localhost:5174` by default.
 ## Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
 - **Backend:** ASP.NET Core 9, Controller-based APIs
+- **Real-time:** SignalR (WebSockets)
 - **Database:** SQLite with Entity Framework Core
 - **Authentication:** Google Identity Services (ID tokens)

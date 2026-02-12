@@ -56,6 +56,12 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Design spec documented in `docs/DESIGN.md`
 - Session persistence via localStorage (1-week sessions survive page reload)
 - Automatic token refresh via Google One Tap (`auto_select`)
+- SignalR hub (`/hubs/chat`) for real-time messaging and typing indicators
+- Real-time message broadcast on message post (via `IHubContext<ChatHub>`)
+- Typing indicators (UserTyping / UserStoppedTyping events)
+- WebSocket JWT authentication via `access_token` query parameter
+- camelCase JSON serialization for SignalR payloads
+- Client-side SignalR connection with automatic reconnect
 
 ## Task breakdown: Session Persistence
 
@@ -129,6 +135,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Add richer validation and error surfaces in UI
 - Server settings and configuration
 - Channel editing/deletion
+- Presence indicators (online/offline/away)
+- Real-time member list updates
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars
 - Sign-out button in user panel

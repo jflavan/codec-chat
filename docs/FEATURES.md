@@ -31,6 +31,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Message history retrieval
 - ✅ Author attribution (name, user ID)
 - ✅ Timestamp display
+- ✅ Real-time message delivery via SignalR (no page refresh needed)
+- ✅ Typing indicators ("X is typing…")
 
 ### UI/UX
 - ✅ Discord-inspired dark theme (CSS custom properties, blurple accent)
@@ -56,6 +58,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ SQLite database with EF Core
 - ✅ Automatic database migrations in dev
 - ✅ Seed data for development
+- ✅ SignalR hub (`/hubs/chat`) for real-time communication
+- ✅ WebSocket JWT authentication via query string
+- ✅ camelCase JSON serialization for SignalR payloads
 
 ## 🚧 In Progress
 
@@ -80,10 +85,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Message search
 
 ### Real-time Features
-- SignalR/WebSocket integration
-- Live message updates
+- ✅ SignalR/WebSocket integration
+- ✅ Live message updates (no page refresh)
+- ✅ Typing indicators
 - Presence indicators (online/offline/away)
-- Typing indicators
 - Real-time member list updates
 
 ### Server Management

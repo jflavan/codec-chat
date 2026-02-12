@@ -62,6 +62,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = googleClientId, // Your Google Client ID
             ValidateLifetime = true
         };
+
+        // Allow SignalR to read the JWT from the query string for WebSocket connections.
+        // WebSocket requests cannot set Authorization headers, so the token is passed
+        // via the access_token query parameter instead.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 ```
 

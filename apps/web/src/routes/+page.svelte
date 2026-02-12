@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { env } from '$env/dynamic/public';
+	import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
+	import type { HubConnection } from '@microsoft/signalr';
 
 	type MemberServer = { serverId: string; name: string; role: string };
 	type DiscoverServer = { id: string; name: string; isMember: boolean };
@@ -54,6 +56,10 @@
 	let isCreatingChannel = $state(false);
 	let showCreateChannel = $state(false);
 	let newChannelName = $state('');
+
+	let hubConnection = $state<HubConnection | null>(null);
+	let typingUsers = $state<string[]>([]);
+	let typingTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	const isSignedIn = $derived.by(() => Boolean(idToken));
 
@@ -110,6 +116,7 @@
 	}
 
 	async function signOut() {
+		await stopSignalR();
 		clearSession();
 		servers = [];
 		discoverServers = [];
@@ -118,6 +125,7 @@
 		members = [];
 		selectedServerId = null;
 		selectedChannelId = null;
+		typingUsers = [];
 		error = null;
 
 		// Wait for Svelte to re-render so the #google-button div is in the DOM
@@ -232,7 +240,19 @@
 			}
 
 			channels = await response.json();
+			const previousChannelId = selectedChannelId;
 			selectedChannelId = channels[0]?.id ?? null;
+
+			// Join the SignalR group for the auto-selected channel
+			if (hubConnection?.state === HubConnectionState.Connected) {
+				if (previousChannelId) {
+					hubConnection.invoke('LeaveChannel', previousChannelId).catch(() => {});
+				}
+				if (selectedChannelId) {
+					hubConnection.invoke('JoinChannel', selectedChannelId).catch(() => {});
+				}
+			}
+
 			if (selectedChannelId) {
 				await loadMessages(selectedChannelId);
 			} else {
@@ -274,7 +294,17 @@
 	}
 
 	async function selectChannel(channelId: string) {
+		const previousChannelId = selectedChannelId;
 		selectedChannelId = channelId;
+		typingUsers = [];
+
+		if (hubConnection?.state === HubConnectionState.Connected) {
+			if (previousChannelId) {
+				hubConnection.invoke('LeaveChannel', previousChannelId).catch(() => {});
+			}
+			hubConnection.invoke('JoinChannel', channelId).catch(() => {});
+		}
+
 		await loadMessages(channelId);
 	}
 
@@ -354,7 +384,18 @@
 			}
 
 			messageBody = '';
-			await loadMessages(selectedChannelId);
+
+			// Stop typing indicator since the message was sent.
+			if (typingTimeout) clearTimeout(typingTimeout);
+			if (hubConnection?.state === HubConnectionState.Connected && me) {
+				hubConnection.invoke('StopTyping', selectedChannelId, me.user.displayName).catch(() => {});
+			}
+
+			// If SignalR is connected the message will arrive via ReceiveMessage,
+			// otherwise fall back to a full reload.
+			if (!hubConnection || hubConnection.state !== HubConnectionState.Connected) {
+				await loadMessages(selectedChannelId);
+			}
 		} finally {
 			isSending = false;
 		}
@@ -509,6 +550,74 @@
 		callMe();
 		loadServers();
 		loadDiscoverServers();
+		startSignalR(token);
+	}
+
+	async function startSignalR(token: string) {
+		if (!apiBaseUrl) return;
+
+		const connection = new HubConnectionBuilder()
+			.withUrl(`${apiBaseUrl}/hubs/chat`, { accessTokenFactory: () => token })
+			.withAutomaticReconnect()
+			.build();
+
+		connection.on('ReceiveMessage', (msg: Message) => {
+			if (msg.channelId === selectedChannelId) {
+				const exists = messages.some((m) => m.id === msg.id);
+				if (!exists) {
+					messages = [...messages, msg];
+				}
+			}
+		});
+
+		connection.on('UserTyping', (channelId: string, displayName: string) => {
+			if (channelId === selectedChannelId && !typingUsers.includes(displayName)) {
+				typingUsers = [...typingUsers, displayName];
+			}
+		});
+
+		connection.on('UserStoppedTyping', (channelId: string, displayName: string) => {
+			if (channelId === selectedChannelId) {
+				typingUsers = typingUsers.filter((u) => u !== displayName);
+			}
+		});
+
+		try {
+			await connection.start();
+			hubConnection = connection;
+			if (selectedChannelId) {
+				await connection.invoke('JoinChannel', selectedChannelId);
+			}
+		} catch {
+			// SignalR connection failed; real-time features will be unavailable.
+		}
+	}
+
+	async function stopSignalR() {
+		if (hubConnection) {
+			try {
+				await hubConnection.stop();
+			} catch {
+				// ignore errors during disconnect
+			}
+			hubConnection = null;
+		}
+	}
+
+	function handleComposerInput() {
+		if (!hubConnection || hubConnection.state !== HubConnectionState.Connected) return;
+		if (!selectedChannelId || !me) return;
+
+		const displayName = me.user.displayName;
+
+		hubConnection.invoke('StartTyping', selectedChannelId, displayName).catch(() => {});
+
+		if (typingTimeout) clearTimeout(typingTimeout);
+		typingTimeout = setTimeout(() => {
+			if (hubConnection?.state === HubConnectionState.Connected && selectedChannelId) {
+				hubConnection.invoke('StopTyping', selectedChannelId, displayName).catch(() => {});
+			}
+		}, 2000);
 	}
 
 	onMount(() => {
@@ -558,6 +667,10 @@
 		};
 
 		document.head.appendChild(script);
+	});
+
+	onDestroy(() => {
+		stopSignalR();
 	});
 </script>
 
@@ -817,6 +930,23 @@
 			{/if}
 		</div>
 
+		{#if typingUsers.length > 0}
+			<div class="typing-indicator" aria-live="polite">
+				<span class="typing-dots" aria-hidden="true">
+					<span class="dot"></span><span class="dot"></span><span class="dot"></span>
+				</span>
+				<span class="typing-text">
+					{#if typingUsers.length === 1}
+						<strong>{typingUsers[0]}</strong> is typing…
+					{:else if typingUsers.length === 2}
+						<strong>{typingUsers[0]}</strong> and <strong>{typingUsers[1]}</strong> are typing…
+					{:else}
+						Several people are typing…
+					{/if}
+				</span>
+			</div>
+		{/if}
+
 		<form class="composer" onsubmit={(e) => { e.preventDefault(); sendMessage(); }}>
 			<input
 				class="composer-input"
@@ -824,6 +954,7 @@
 				placeholder={selectedChannelId ? `Message #${channels.find((c) => c.id === selectedChannelId)?.name ?? 'channel'}` : 'Select a channel…'}
 				bind:value={messageBody}
 				disabled={!selectedChannelId || isSending}
+				oninput={handleComposerInput}
 			/>
 			<button
 				class="composer-send"
@@ -1423,6 +1554,47 @@
 		color: var(--text-normal);
 		line-height: 1.375;
 		word-break: break-word;
+	}
+
+	/* ===== Typing indicator ===== */
+	.typing-indicator {
+		flex-shrink: 0;
+		padding: 2px 16px 4px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 13px;
+		color: var(--text-muted);
+		background: var(--bg-primary);
+		min-height: 20px;
+	}
+
+	.typing-dots {
+		display: inline-flex;
+		gap: 3px;
+		align-items: center;
+	}
+
+	.typing-dots .dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--text-muted);
+		animation: typing-bounce 1.4s infinite ease-in-out both;
+	}
+
+	.typing-dots .dot:nth-child(1) { animation-delay: 0s; }
+	.typing-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+	.typing-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+
+	@keyframes typing-bounce {
+		0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+		40% { transform: scale(1); opacity: 1; }
+	}
+
+	.typing-text strong {
+		color: var(--text-header);
+		font-weight: 600;
 	}
 
 	/* ===== Composer ===== */
