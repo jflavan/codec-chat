@@ -116,6 +116,7 @@
 	}
 
 	async function signOut() {
+		await stopSignalR();
 		clearSession();
 		servers = [];
 		discoverServers = [];
@@ -124,6 +125,7 @@
 		members = [];
 		selectedServerId = null;
 		selectedChannelId = null;
+		typingUsers = [];
 		error = null;
 
 		// Wait for Svelte to re-render so the #google-button div is in the DOM
@@ -548,9 +550,10 @@
 		callMe();
 		loadServers();
 		loadDiscoverServers();
+		startSignalR(token);
 	}
 
-		async function startSignalR(token: string) {
+	async function startSignalR(token: string) {
 		if (!apiBaseUrl) return;
 
 		const connection = new HubConnectionBuilder()
@@ -616,7 +619,7 @@
 			}
 		}, 2000);
 	}
-	
+
 	onMount(() => {
 		if (!env.PUBLIC_GOOGLE_CLIENT_ID) {
 			setError('Missing PUBLIC_GOOGLE_CLIENT_ID.');
@@ -648,11 +651,7 @@
 				client_id: env.PUBLIC_GOOGLE_CLIENT_ID,
 				auto_select: true,
 				callback: (response: { credential: string }) => {
-					idToken = response.credential;
-					status = 'Signed in';
-					callMe();
-					loadServers();
-					loadDiscoverServers();
+					handleCredential(response.credential);
 				}
 			});
 
