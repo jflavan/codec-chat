@@ -51,6 +51,7 @@ The web app runs at `http://localhost:5174` by default.
 
 ## Features
 - ✅ Google Sign-In authentication
+- ✅ **Default server ("Codec HQ")** — created automatically on startup; every new user is auto-joined as a Member on first sign-in
 - ✅ Server creation and discovery
 - ✅ Server joining and membership
 - ✅ Server membership and roles (Owner, Admin, Member)
