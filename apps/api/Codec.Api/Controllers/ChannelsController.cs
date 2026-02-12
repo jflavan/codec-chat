@@ -1,8 +1,10 @@
 using Codec.Api.Data;
+using Codec.Api.Hubs;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Controllers;
@@ -13,7 +15,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public class ChannelsController(CodecDbContext db, IUserService userService) : ControllerBase
+public class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub) : ControllerBase
 {
     /// <summary>
     /// Returns messages for a channel, ordered by creation time. Requires server membership.
@@ -91,7 +93,7 @@ public class ChannelsController(CodecDbContext db, IUserService userService) : C
         db.Messages.Add(message);
         await db.SaveChangesAsync();
 
-        return Created($"/channels/{channelId}/messages/{message.Id}", new
+        var payload = new
         {
             message.Id,
             message.AuthorName,
@@ -99,6 +101,10 @@ public class ChannelsController(CodecDbContext db, IUserService userService) : C
             message.Body,
             message.CreatedAt,
             message.ChannelId
-        });
+        };
+
+        await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
+
+        return Created($"/channels/{channelId}/messages/{message.Id}", payload);
     }
 }
