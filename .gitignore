@@ -71,6 +71,7 @@ uploads/
 
 # Log files
 *.log
+.playwright-mcp/
 
 # OS files
 .DS_Store
