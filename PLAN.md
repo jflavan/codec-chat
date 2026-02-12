@@ -222,6 +222,66 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update README.md (features list)
 - [x] Update apps/web/README.md (file tree)
 
+## Task breakdown: Friends (see [docs/FRIENDS.md](docs/FRIENDS.md))
+
+### API
+- [ ] Create `Friendship` entity and `FriendshipStatus` enum in `Models/`
+- [ ] Add `Friendships` DbSet to `CodecDbContext`
+- [ ] Configure entity relationships, unique constraint, and indexes in `OnModelCreating`
+- [ ] Create and apply EF Core migration (`AddFriendships`)
+- [ ] Create `FriendsController` with all endpoints
+- [ ] Add user search endpoint (`GET /users/search?q=...`) for the Add Friend flow
+- [ ] Add user-scoped SignalR group support to `ChatHub` (join `user-{userId}` group on connect)
+- [ ] Broadcast friend-related events via SignalR
+
+### Web
+- [ ] Add `Friendship`, `FriendRequest`, and `FriendshipStatus` types to `models.ts`
+- [ ] Add friend-related API methods to `ApiClient`
+- [ ] Add friend-related SignalR event handlers to `ChatHubService`
+- [ ] Add friends state management to `AppState`
+- [ ] Create `FriendsPanel.svelte` component with tab navigation
+- [ ] Create `FriendsList.svelte` (All Friends tab)
+- [ ] Create `PendingRequests.svelte` (Pending tab)
+- [ ] Create `AddFriend.svelte` (Add Friend tab with search)
+- [ ] Wire Home icon in `ServerSidebar` to display the Friends panel
+
+### Documentation
+- [ ] Update `ARCHITECTURE.md` with new endpoints and SignalR events
+- [ ] Update `DATA.md` with Friendship entity and schema diagram
+- [ ] Update `FEATURES.md` to track Friends feature progress
+- [ ] Update `DESIGN.md` with Friends panel UI specification
+- [ ] Update `PLAN.md` with Friends task breakdown
+
+## Task breakdown: Direct Messages (see [docs/DIRECT_MESSAGES.md](docs/DIRECT_MESSAGES.md))
+
+### API
+- [ ] Create `DmChannel`, `DmChannelMember`, and `DirectMessage` entities in `Models/`
+- [ ] Add DbSets to `CodecDbContext` and configure relationships, keys, and indexes
+- [ ] Create and apply EF Core migration (`AddDirectMessages`)
+- [ ] Create `DmController` with all endpoints (create/resume, list, send, close)
+- [ ] Add friendship validation — verify accepted friendship before allowing DM creation
+- [ ] Add DM-specific SignalR hub methods (`JoinDmChannel`, `LeaveDmChannel`, `StartDmTyping`, `StopDmTyping`)
+- [ ] Broadcast `ReceiveDm`, `DmTyping`, `DmStoppedTyping`, and `DmConversationOpened` events via SignalR
+- [ ] Re-open closed conversations when new messages are sent
+
+### Web
+- [ ] Add `DmChannel`, `DmConversation`, and `DirectMessage` types to `models.ts`
+- [ ] Add DM-related API methods to `ApiClient`
+- [ ] Add DM-related SignalR event handlers to `ChatHubService`
+- [ ] Add DM state management to `AppState` (conversations list, active conversation, messages)
+- [ ] Create `DmList.svelte` component (conversation sidebar entries)
+- [ ] Create `DmChatArea.svelte` wrapper (adapts `ChatArea` components for DM context)
+- [ ] Wire Home icon navigation to show DM list + Friends panel
+- [ ] Wire friend click in `FriendsList.svelte` to open/create DM conversation
+- [ ] Adapt `Composer.svelte` placeholder for DM context
+
+### Documentation
+- [ ] Update `ARCHITECTURE.md` with DM endpoints, SignalR events, and data model
+- [ ] Update `DATA.md` with DM entities and schema diagram
+- [ ] Update `FEATURES.md` to track Direct Messages feature progress
+- [ ] Update `DESIGN.md` with DM UI specification
+- [ ] Update `PLAN.md` with DM task breakdown
+
 ## Next steps
 - Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI

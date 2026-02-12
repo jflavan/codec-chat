@@ -104,8 +104,24 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ## 📋 Planned (Near-term)
 
+### Friends ([detailed spec](FRIENDS.md))
+- Friend requests (send, accept, decline, cancel)
+- Friends list with avatar and display name
+- Remove friend
+- User search for adding friends
+- Real-time friend request notifications via SignalR
+- Friends panel accessible from Home icon in server sidebar
+
+### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
+- 1-on-1 private conversations between friends
+- DM conversations list in sidebar (sorted by most recent message)
+- Real-time message delivery via SignalR
+- Typing indicators in DM conversations
+- Close / reopen DM conversations
+- Start DM from friends list
+- Reuses existing chat components (MessageFeed, Composer, TypingIndicator)
+
 ### Messaging Features
-- Direct messages (1-on-1 chat)
 - Message editing and deletion
 - Rich text formatting (markdown)
 - @mentions
