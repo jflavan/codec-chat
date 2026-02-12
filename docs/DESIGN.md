@@ -9,7 +9,7 @@ Codec uses a **three-column layout** as its core structure:
 ### Left Sidebar – Server List (~72px wide)
 
 - Vertical list of server icons rendered as circular avatars
-- Home / logo button at the top
+- Home / logo button at the top with notification badge for pending friend requests
 - "Add Server" button at the bottom
 - Circular icons (48px) with 3px rounded-rectangle pill indicator for active server
 - Hover: slight scale-up + rounded-rectangle shape morph
@@ -86,6 +86,16 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 - Grouped consecutive messages from the same author collapse the avatar/name (compact spacing)
 - Hover reveals subtle background highlight
 - Full message width; no chat-bubble wrapping
+
+### Home Icon Notification Badge
+
+- Red badge (`--danger` background, white text) at bottom-right of the Home icon
+- Displays the count of pending incoming friend requests
+- Only visible when count > 0
+- 18px height, min-width 18px, 9px border-radius (pill shape)
+- 11px bold font, centered text
+- 3px solid border matching `--bg-tertiary` for visual separation from the icon
+- Reactively updates when friend requests are received/accepted/declined via SignalR
 
 ### Server Icons
 

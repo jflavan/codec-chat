@@ -55,6 +55,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ User search for adding friends
 - ✅ Real-time friend request notifications via SignalR
 - ✅ Friends panel accessible from Home icon in server sidebar
+- ✅ Notification badge on Home icon for pending incoming friend requests
 
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)

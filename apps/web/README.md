@@ -1,6 +1,6 @@
 # Codec Web
 
-SvelteKit 2.x client for Codec — a Discord-like chat application. Handles Google Sign-In, server/channel browsing, real-time messaging (SignalR), and typing indicators against the ASP.NET Core API.
+SvelteKit 2.x client for Codec — a Discord-like chat application. Handles Google Sign-In, server/channel browsing, real-time messaging (SignalR), typing indicators, friends management, and emoji reactions against the ASP.NET Core API.
 
 ## Architecture
 
@@ -20,6 +20,7 @@ src/
 │   │   ├── server-sidebar/   # Server icon rail
 │   │   ├── channel-sidebar/  # Channel list, user panel
 │   │   ├── chat/             # Message feed, composer, typing indicator, reactions
+│   │   ├── friends/          # Friends panel, friends list, pending requests, add friend
 │   │   └── members/          # Members sidebar grouped by role
 │   └── index.ts         # Public barrel exports
 └── routes/
