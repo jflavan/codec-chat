@@ -171,7 +171,19 @@
 			}
 
 			channels = await response.json();
+			const previousChannelId = selectedChannelId;
 			selectedChannelId = channels[0]?.id ?? null;
+
+			// Join the SignalR group for the auto-selected channel
+			if (hubConnection?.state === HubConnectionState.Connected) {
+				if (previousChannelId) {
+					hubConnection.invoke('LeaveChannel', previousChannelId).catch(() => {});
+				}
+				if (selectedChannelId) {
+					hubConnection.invoke('JoinChannel', selectedChannelId).catch(() => {});
+				}
+			}
+
 			if (selectedChannelId) {
 				await loadMessages(selectedChannelId);
 			} else {
