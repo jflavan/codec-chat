@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { env } from '$env/dynamic/public';
 
 	type MemberServer = { serverId: string; name: string; role: string };
@@ -66,6 +66,73 @@
 	);
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL;
+
+	const TOKEN_KEY = 'codec_id_token';
+	const LOGIN_TS_KEY = 'codec_login_ts';
+	const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+	/** Decode a JWT payload without verifying the signature (client-side only). */
+	function decodeJwtPayload(token: string): Record<string, unknown> | null {
+		try {
+			const base64 = token.split('.')[1];
+			const json = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+			return JSON.parse(json);
+		} catch {
+			return null;
+		}
+	}
+
+	function isTokenExpired(token: string): boolean {
+		const payload = decodeJwtPayload(token);
+		if (!payload || typeof payload.exp !== 'number') return true;
+		return Date.now() >= (payload.exp - 60) * 1000;
+	}
+
+	function isSessionExpired(): boolean {
+		const loginTs = localStorage.getItem(LOGIN_TS_KEY);
+		if (!loginTs) return true;
+		return Date.now() - Number(loginTs) > MAX_SESSION_MS;
+	}
+
+	function persistToken(token: string) {
+		localStorage.setItem(TOKEN_KEY, token);
+		if (!localStorage.getItem(LOGIN_TS_KEY)) {
+			localStorage.setItem(LOGIN_TS_KEY, String(Date.now()));
+		}
+	}
+
+	function clearSession() {
+		localStorage.removeItem(TOKEN_KEY);
+		localStorage.removeItem(LOGIN_TS_KEY);
+		idToken = null;
+		me = null;
+		status = 'Signed out';
+	}
+
+	async function signOut() {
+		clearSession();
+		servers = [];
+		discoverServers = [];
+		channels = [];
+		messages = [];
+		members = [];
+		selectedServerId = null;
+		selectedChannelId = null;
+		error = null;
+
+		// Wait for Svelte to re-render so the #google-button div is in the DOM
+		await tick();
+
+		const google = (window as unknown as { google?: any }).google;
+		if (google?.accounts?.id) {
+			google.accounts.id.disableAutoSelect();
+			google.accounts.id.renderButton(document.getElementById('google-button'), {
+				theme: 'outline',
+				size: 'large'
+			});
+			google.accounts.id.prompt();
+		}
+	}
 
 	function setError(message: string) {
 		error = message;
@@ -435,10 +502,29 @@
 		}
 	}
 
+	function handleCredential(token: string) {
+		idToken = token;
+		status = 'Signed in';
+		persistToken(token);
+		callMe();
+		loadServers();
+		loadDiscoverServers();
+	}
+
 	onMount(() => {
 		if (!env.PUBLIC_GOOGLE_CLIENT_ID) {
 			setError('Missing PUBLIC_GOOGLE_CLIENT_ID.');
 			return;
+		}
+
+		// Restore persisted token if the session is still valid
+		if (!isSessionExpired()) {
+			const stored = localStorage.getItem(TOKEN_KEY);
+			if (stored && !isTokenExpired(stored)) {
+				handleCredential(stored);
+			}
+		} else {
+			clearSession();
 		}
 
 		const script = document.createElement('script');
@@ -454,19 +540,21 @@
 
 			google.accounts.id.initialize({
 				client_id: env.PUBLIC_GOOGLE_CLIENT_ID,
+				auto_select: true,
 				callback: (response: { credential: string }) => {
-					idToken = response.credential;
-					status = 'Signed in';
-					callMe();
-					loadServers();
-					loadDiscoverServers();
+					handleCredential(response.credential);
 				}
 			});
 
-			google.accounts.id.renderButton(document.getElementById('google-button'), {
-				theme: 'outline',
-				size: 'large'
-			});
+			// Only render the sign-in button if not already authenticated
+			if (!idToken) {
+				google.accounts.id.renderButton(document.getElementById('google-button'), {
+					theme: 'outline',
+					size: 'large'
+				});
+				// Trigger One Tap for silent re-auth when stored token is expired
+				google.accounts.id.prompt();
+			}
 		};
 
 		document.head.appendChild(script);
@@ -660,6 +748,11 @@
 						{/if}
 					</div>
 				</div>
+				<button class="sign-out-btn" onclick={signOut} aria-label="Sign out" title="Sign out">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+						<path d="M5 5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7v-2H5V5zm16 7-4-4v3H9v2h8v3l4-4z"/>
+					</svg>
+				</button>
 			{:else}
 				<div id="google-button" class="google-button"></div>
 				<span class="user-panel-status">{status}</span>
@@ -1138,6 +1231,26 @@
 		align-items: center;
 		gap: 8px;
 		overflow: hidden;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.sign-out-btn {
+		background: none;
+		border: none;
+		padding: 4px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.sign-out-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
 	}
 
 	.user-panel-avatar {

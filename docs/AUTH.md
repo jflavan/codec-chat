@@ -6,6 +6,8 @@ This document explains how authentication works in Codec using Google ID tokens.
 
 Codec uses a **stateless authentication** model powered by Google Identity Services. The web client obtains a JWT ID token from Google, and the API validates it on each request without maintaining server-side sessions.
 
+To provide a seamless user experience, the web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week**.
+
 ## Authentication Flow
 
 ### 1. Client-Side Sign-In
@@ -16,16 +18,19 @@ The web client uses Google Identity Services JavaScript SDK:
 // Initialize Google Identity Services
 google.accounts.id.initialize({
   client_id: PUBLIC_GOOGLE_CLIENT_ID,
+  auto_select: true, // Enable silent re-authentication
   callback: handleCredentialResponse
 });
 
-// User clicks "Sign in with Google"
+// User clicks "Sign in with Google", or One Tap fires automatically
 google.accounts.id.prompt();
 
 // Receive ID token
 function handleCredentialResponse(response) {
   const idToken = response.credential; // JWT token
-  // Store token and use for API calls
+  // Persist token to localStorage for session continuity
+  localStorage.setItem('codec_id_token', idToken);
+  localStorage.setItem('codec_login_ts', String(Date.now())); // track session age
 }
 ```
 
@@ -195,12 +200,20 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - No server-side sessions to hijack
 - Tokens contain all necessary information
 
-### Current Limitations
+### Session Persistence
 
-⚠️ **Token Refresh**
-- Tokens expire after 1 hour
-- User must re-authenticate manually
-- Future: Implement automatic token refresh
+✅ **localStorage Token Storage**
+- ID token persisted to `localStorage` across page reloads
+- Client-side JWT `exp` claim check (with 60-second buffer) prevents sending stale tokens
+- Maximum session duration capped at **7 days** via a stored login timestamp
+- Session is cleared automatically when the 1-week limit is reached
+
+✅ **Automatic Token Refresh**
+- Google Identity Services initialized with `auto_select: true`
+- `google.accounts.id.prompt()` triggers One Tap silent re-authentication
+- When a stored token expires (but session is still within 1 week), Google silently issues a fresh token
+
+### Current Limitations
 
 ⚠️ **Token Revocation**
 - No real-time token invalidation
@@ -210,6 +223,11 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 ⚠️ **Single Identity Provider**
 - Only Google authentication supported
 - Future: Add Microsoft, GitHub, email/password
+
+⚠️ **Sign-Out**
+- No explicit sign-out button yet
+- Users can clear session by clearing browser storage
+- Future: Add sign-out UI that calls `clearSession()` and `google.accounts.id.disableAutoSelect()`
 
 ## Production Recommendations
 
@@ -255,10 +273,6 @@ app.Use(async (context, next) =>
 
 ### Optional Enhancements
 
-💡 **Token Refresh**
-- Implement automatic token renewal
-- Use refresh tokens for long-lived sessions
-
 💡 **Multi-Factor Authentication**
 - Require MFA for sensitive operations
 - Integrate with Google's MFA
@@ -287,7 +301,7 @@ app.Use(async (context, next) =>
 
 ### Error: "Token expired"
 **Cause:** ID token older than 1 hour
-**Solution:** User must sign in again or implement token refresh
+**Solution:** The client automatically attempts silent re-authentication via Google One Tap. If One Tap is blocked or the 1-week session has expired, the user must sign in again manually
 
 ## References
 

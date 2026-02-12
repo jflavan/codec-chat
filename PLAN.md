@@ -54,6 +54,26 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Channel creation endpoint and UI (Owner/Admin only)
 - Discord-inspired dark theme with three-column layout
 - Design spec documented in `docs/DESIGN.md`
+- Session persistence via localStorage (1-week sessions survive page reload)
+- Automatic token refresh via Google One Tap (`auto_select`)
+
+## Task breakdown: Session Persistence
+
+### Web – Persist login across reloads
+- [x] Store Google ID token in `localStorage` on sign-in
+- [x] Restore token from `localStorage` on page load (if not expired)
+- [x] Enforce 1-week maximum session duration
+- [x] Client-side JWT expiration check (with 60-second buffer)
+- [x] Enable Google One Tap `auto_select` for silent token refresh
+- [x] Call `google.accounts.id.prompt()` to trigger silent re-auth when stored token is expired
+- [x] `clearSession()` helper to wipe stored credentials on session expiry
+
+### Documentation
+- [x] Update PLAN.md with session persistence task breakdown
+- [x] Update FEATURES.md to mark session persistence as implemented
+- [x] Update README.md features list
+- [x] Update AUTH.md with session persistence details
+- [x] Update ARCHITECTURE.md authentication flow
 
 ## Task breakdown: Server & Channel Creation
 
@@ -111,3 +131,4 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Channel editing/deletion
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars
+- Sign-out button in user panel

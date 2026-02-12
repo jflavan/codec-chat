@@ -89,6 +89,8 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - Tokens are short-lived (typically 1 hour)
 - API does not issue its own tokens
 - User identity mapped to internal User records via Google subject
+- Web client persists token in `localStorage` for session continuity (up to 1 week)
+- Automatic silent token refresh via Google One Tap (`auto_select: true`)
 
 ## API Endpoints
 
