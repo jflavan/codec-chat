@@ -1,6 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
-import type { Message, Reaction, FriendUser } from '$lib/types/index.js';
+import type { Message, Reaction, FriendUser, DirectMessage, DmParticipant } from '$lib/types/index.js';
 
 export type ReactionUpdate = {
 	messageId: string;
@@ -33,6 +33,13 @@ export type FriendRemovedEvent = {
 	userId: string;
 };
 
+export type ReceiveDmEvent = DirectMessage;
+
+export type DmConversationOpenedEvent = {
+	dmChannelId: string;
+	participant: DmParticipant;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -43,6 +50,10 @@ export type SignalRCallbacks = {
 	onFriendRequestDeclined?: (event: FriendRequestDeclinedEvent) => void;
 	onFriendRequestCancelled?: (event: FriendRequestCancelledEvent) => void;
 	onFriendRemoved?: (event: FriendRemovedEvent) => void;
+	onReceiveDm?: (event: ReceiveDmEvent) => void;
+	onDmTyping?: (dmChannelId: string, displayName: string) => void;
+	onDmStoppedTyping?: (dmChannelId: string, displayName: string) => void;
+	onDmConversationOpened?: (event: DmConversationOpenedEvent) => void;
 };
 
 /**
@@ -86,6 +97,18 @@ export class ChatHubService {
 		}
 		if (callbacks.onFriendRemoved) {
 			connection.on('FriendRemoved', callbacks.onFriendRemoved);
+		}
+		if (callbacks.onReceiveDm) {
+			connection.on('ReceiveDm', callbacks.onReceiveDm);
+		}
+		if (callbacks.onDmTyping) {
+			connection.on('DmTyping', callbacks.onDmTyping);
+		}
+		if (callbacks.onDmStoppedTyping) {
+			connection.on('DmStoppedTyping', callbacks.onDmStoppedTyping);
+		}
+		if (callbacks.onDmConversationOpened) {
+			connection.on('DmConversationOpened', callbacks.onDmConversationOpened);
 		}
 
 		try {
@@ -136,6 +159,41 @@ export class ChatHubService {
 		if (this.typingTimeout) clearTimeout(this.typingTimeout);
 		if (this.isConnected) {
 			this.connection!.invoke('StopTyping', channelId, displayName).catch(() => {});
+		}
+	}
+
+	/* ───── DM channel groups ───── */
+
+	async joinDmChannel(dmChannelId: string): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('JoinDmChannel', dmChannelId).catch(() => {});
+		}
+	}
+
+	async leaveDmChannel(dmChannelId: string): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('LeaveDmChannel', dmChannelId).catch(() => {});
+		}
+	}
+
+	private dmTypingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	/** Emit a DM typing indicator, auto-clearing after 2 s of inactivity. */
+	emitDmTyping(dmChannelId: string, displayName: string): void {
+		if (!this.isConnected) return;
+
+		this.connection!.invoke('StartDmTyping', dmChannelId, displayName).catch(() => {});
+
+		if (this.dmTypingTimeout) clearTimeout(this.dmTypingTimeout);
+		this.dmTypingTimeout = setTimeout(() => {
+			this.clearDmTyping(dmChannelId, displayName);
+		}, 2000);
+	}
+
+	clearDmTyping(dmChannelId: string, displayName: string): void {
+		if (this.dmTypingTimeout) clearTimeout(this.dmTypingTimeout);
+		if (this.isConnected) {
+			this.connection!.invoke('StopDmTyping', dmChannelId, displayName).catch(() => {});
 		}
 	}
 }

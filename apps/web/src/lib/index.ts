@@ -11,5 +11,9 @@ export type {
 	FriendUser,
 	Friend,
 	FriendRequest,
-	UserSearchResult
+	UserSearchResult,
+	DmParticipant,
+	DmLastMessage,
+	DmConversation,
+	DirectMessage
 } from './types/index.js';

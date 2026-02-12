@@ -92,3 +92,36 @@ export type UserSearchResult = {
 	avatarUrl?: string | null;
 	relationshipStatus: string;
 };
+
+/** Participant info in a DM conversation. */
+export type DmParticipant = {
+	id: string;
+	displayName: string;
+	avatarUrl?: string | null;
+};
+
+/** Last message preview in a DM conversation. */
+export type DmLastMessage = {
+	authorName: string;
+	body: string;
+	createdAt: string;
+};
+
+/** DM conversation entry returned by GET /dm/channels. */
+export type DmConversation = {
+	id: string;
+	participant: DmParticipant;
+	lastMessage: DmLastMessage | null;
+	sortDate: string;
+};
+
+/** Direct message in a DM conversation. */
+export type DirectMessage = {
+	id: string;
+	dmChannelId: string;
+	authorUserId: string;
+	authorName: string;
+	body: string;
+	createdAt: string;
+	authorAvatarUrl?: string | null;
+};

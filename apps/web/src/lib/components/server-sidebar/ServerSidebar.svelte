@@ -17,9 +17,9 @@
 			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M2.3 7.7l9-5.4a1.2 1.2 0 0 1 1.4 0l9 5.4a.6.6 0 0 1-.3 1.1H19v8.6a.6.6 0 0 1-.6.6h-3.8v-5a1 1 0 0 0-1-1h-3.2a1 1 0 0 0-1 1v5H5.6a.6.6 0 0 1-.6-.6V8.8H2.6a.6.6 0 0 1-.3-1.1z"/>
 			</svg>
-			{#if app.incomingRequests.length > 0}
-				<span class="notification-badge" aria-label="{app.incomingRequests.length} pending friend requests">
-					{app.incomingRequests.length}
+			{#if app.homeBadgeCount > 0}
+				<span class="notification-badge" aria-label="{app.homeBadgeCount} notifications">
+					{app.homeBadgeCount}
 				</span>
 			{/if}
 		</button>

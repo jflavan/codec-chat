@@ -57,6 +57,15 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Friends panel accessible from Home icon in server sidebar
 - ✅ Notification badge on Home icon for pending incoming friend requests
 
+### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
+- ✅ 1-on-1 private conversations between friends
+- ✅ DM conversations list in sidebar (sorted by most recent message)
+- ✅ Real-time message delivery via SignalR
+- ✅ Typing indicators in DM conversations
+- ✅ Close / reopen DM conversations
+- ✅ Start DM from friends list
+- ✅ Home screen layout with DM sidebar + Friends panel / DM chat area
+
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
 - ✅ Three-column layout: server icon rail, channel sidebar, chat area
@@ -112,15 +121,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - 🔄 Client-side form validation
 
 ## 📋 Planned (Near-term)
-
-### Direct Messages ([detailed spec](DIRECT_MESSAGES.md))
-- 1-on-1 private conversations between friends
-- DM conversations list in sidebar (sorted by most recent message)
-- Real-time message delivery via SignalR
-- Typing indicators in DM conversations
-- Close / reopen DM conversations
-- Start DM from friends list
-- Reuses existing chat components (MessageFeed, Composer, TypingIndicator)
 
 ### Messaging Features
 - Message editing and deletion
