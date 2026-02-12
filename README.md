@@ -50,7 +50,8 @@ npm run dev
 The web app runs at `http://localhost:5174` by default.
 
 ## Features
-- ✅ Google Sign-In authentication
+- ✅ Google Sign-In authentication with persistent sessions (1-week duration)
+- ✅ Automatic silent token refresh via Google One Tap
 - ✅ **Default server ("Codec HQ")** — created automatically on startup; every new user is auto-joined as a Member on first sign-in
 - ✅ Server creation and discovery
 - ✅ Server joining and membership

@@ -7,6 +7,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ### Authentication & User Management
 - ✅ Google Sign-In integration
 - ✅ JWT ID token validation by API
+- ✅ Persistent login sessions (1-week duration, survives page reload)
+- ✅ Token stored in `localStorage` with expiration checking
+- ✅ Automatic silent token refresh via Google One Tap (`auto_select`)
 - ✅ User profile display (name, email, avatar)
 - ✅ User identity mapping (Google subject to internal User ID)
 - ✅ Auto user creation on first sign-in
