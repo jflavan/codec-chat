@@ -8,7 +8,9 @@ import type {
 	UserProfile,
 	Friend,
 	FriendRequest,
-	UserSearchResult
+	UserSearchResult,
+	DmConversation,
+	DirectMessage
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -261,6 +263,50 @@ export class ApiClient {
 		return this.request(
 			`${this.baseUrl}/users/search?q=${encodeURIComponent(query)}`,
 			{ headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Direct Messages ───── */
+
+	createOrResumeDm(
+		token: string,
+		recipientUserId: string
+	): Promise<{ id: string; participant: { id: string; displayName: string; avatarUrl?: string | null }; createdAt: string }> {
+		return this.request(`${this.baseUrl}/dm/channels`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ recipientUserId })
+		});
+	}
+
+	getDmConversations(token: string): Promise<DmConversation[]> {
+		return this.request(`${this.baseUrl}/dm/channels`, {
+			headers: this.headers(token)
+		});
+	}
+
+	getDmMessages(token: string, channelId: string): Promise<DirectMessage[]> {
+		return this.request(
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	sendDm(token: string, channelId: string, body: string): Promise<DirectMessage> {
+		return this.request(
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages`,
+			{
+				method: 'POST',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ body })
+			}
+		);
+	}
+
+	closeDmConversation(token: string, channelId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
 		);
 	}
 }

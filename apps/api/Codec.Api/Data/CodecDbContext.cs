@@ -17,6 +17,9 @@ public class CodecDbContext : DbContext
     public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
+    public DbSet<DmChannel> DmChannels => Set<DmChannel>();
+    public DbSet<DmChannelMember> DmChannelMembers => Set<DmChannelMember>();
+    public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,6 +93,43 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<Friendship>()
             .HasIndex(friendship => friendship.RecipientId);
+
+        // DM channel member relationships and composite primary key.
+        modelBuilder.Entity<DmChannelMember>()
+            .HasKey(member => new { member.DmChannelId, member.UserId });
+
+        modelBuilder.Entity<DmChannelMember>()
+            .HasOne(member => member.DmChannel)
+            .WithMany(channel => channel.Members)
+            .HasForeignKey(member => member.DmChannelId);
+
+        modelBuilder.Entity<DmChannelMember>()
+            .HasOne(member => member.User)
+            .WithMany(user => user.DmChannelMemberships)
+            .HasForeignKey(member => member.UserId);
+
+        modelBuilder.Entity<DmChannelMember>()
+            .HasIndex(member => member.UserId);
+
+        modelBuilder.Entity<DmChannelMember>()
+            .HasIndex(member => member.DmChannelId);
+
+        // Direct message relationships and indexes.
+        modelBuilder.Entity<DirectMessage>()
+            .HasOne(message => message.DmChannel)
+            .WithMany(channel => channel.Messages)
+            .HasForeignKey(message => message.DmChannelId);
+
+        modelBuilder.Entity<DirectMessage>()
+            .HasOne(message => message.AuthorUser)
+            .WithMany(user => user.DirectMessages)
+            .HasForeignKey(message => message.AuthorUserId);
+
+        modelBuilder.Entity<DirectMessage>()
+            .HasIndex(message => message.DmChannelId);
+
+        modelBuilder.Entity<DirectMessage>()
+            .HasIndex(message => message.AuthorUserId);
 
         // SQLite does not natively support DateTimeOffset ordering.
         // Store as ISO 8601 strings so ORDER BY works correctly.

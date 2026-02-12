@@ -70,6 +70,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Sign-out button in user panel
 - Emoji reactions on messages (toggle, real-time sync via SignalR, floating action bar, reaction pills)
 - Friends feature fully implemented (friend requests, friends list, user search, real-time SignalR events, Friends panel UI, notification badge on Home icon)
+- Direct Messages feature fully implemented (1-on-1 private messaging between friends, DM conversations list, real-time delivery via SignalR, typing indicators, close/reopen conversations, start DM from friends list)
 
 ## Task breakdown: Session Persistence
 
@@ -256,32 +257,33 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Task breakdown: Direct Messages (see [docs/DIRECT_MESSAGES.md](docs/DIRECT_MESSAGES.md))
 
 ### API
-- [ ] Create `DmChannel`, `DmChannelMember`, and `DirectMessage` entities in `Models/`
-- [ ] Add DbSets to `CodecDbContext` and configure relationships, keys, and indexes
-- [ ] Create and apply EF Core migration (`AddDirectMessages`)
-- [ ] Create `DmController` with all endpoints (create/resume, list, send, close)
-- [ ] Add friendship validation — verify accepted friendship before allowing DM creation
-- [ ] Add DM-specific SignalR hub methods (`JoinDmChannel`, `LeaveDmChannel`, `StartDmTyping`, `StopDmTyping`)
-- [ ] Broadcast `ReceiveDm`, `DmTyping`, `DmStoppedTyping`, and `DmConversationOpened` events via SignalR
-- [ ] Re-open closed conversations when new messages are sent
+- [x] Create `DmChannel`, `DmChannelMember`, and `DirectMessage` entities in `Models/`
+- [x] Add DbSets to `CodecDbContext` and configure relationships, keys, and indexes
+- [x] Create and apply EF Core migration (`AddDirectMessages`)
+- [x] Create `DmController` with all endpoints (create/resume, list, send, close)
+- [x] Add friendship validation — verify accepted friendship before allowing DM creation
+- [x] Add DM-specific SignalR hub methods (`JoinDmChannel`, `LeaveDmChannel`, `StartDmTyping`, `StopDmTyping`)
+- [x] Broadcast `ReceiveDm`, `DmTyping`, `DmStoppedTyping`, and `DmConversationOpened` events via SignalR
+- [x] Re-open closed conversations when new messages are sent
 
 ### Web
-- [ ] Add `DmChannel`, `DmConversation`, and `DirectMessage` types to `models.ts`
-- [ ] Add DM-related API methods to `ApiClient`
-- [ ] Add DM-related SignalR event handlers to `ChatHubService`
-- [ ] Add DM state management to `AppState` (conversations list, active conversation, messages)
-- [ ] Create `DmList.svelte` component (conversation sidebar entries)
-- [ ] Create `DmChatArea.svelte` wrapper (adapts `ChatArea` components for DM context)
-- [ ] Wire Home icon navigation to show DM list + Friends panel
-- [ ] Wire friend click in `FriendsList.svelte` to open/create DM conversation
-- [ ] Adapt `Composer.svelte` placeholder for DM context
+- [x] Add `DmChannel`, `DmConversation`, and `DirectMessage` types to `models.ts`
+- [x] Add DM-related API methods to `ApiClient`
+- [x] Add DM-related SignalR event handlers to `ChatHubService`
+- [x] Add DM state management to `AppState` (conversations list, active conversation, messages)
+- [x] Create `DmList.svelte` component (conversation sidebar entries)
+- [x] Create `DmChatArea.svelte` wrapper (adapts `ChatArea` components for DM context)
+- [x] Create `HomeSidebar.svelte` — sidebar with Friends nav + DM conversations list
+- [x] Wire Home icon navigation to show DM list + Friends panel
+- [x] Wire friend click in `FriendsList.svelte` to open/create DM conversation
+- [x] DM-specific Composer with "Message @{displayName}" placeholder
 
 ### Documentation
-- [ ] Update `ARCHITECTURE.md` with DM endpoints, SignalR events, and data model
-- [ ] Update `DATA.md` with DM entities and schema diagram
-- [ ] Update `FEATURES.md` to track Direct Messages feature progress
-- [ ] Update `DESIGN.md` with DM UI specification
-- [ ] Update `PLAN.md` with DM task breakdown
+- [x] Update `ARCHITECTURE.md` with DM endpoints, SignalR events, and data model
+- [x] Update `DATA.md` with DM entities and schema diagram
+- [x] Update `FEATURES.md` to track Direct Messages feature progress
+- [x] Update `DESIGN.md` with DM UI specification
+- [x] Update `PLAN.md` with DM task breakdown
 
 ## Next steps
 - Introduce role-based authorization rules for additional operations

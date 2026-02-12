@@ -10,5 +10,9 @@ export type {
 	FriendUser,
 	Friend,
 	FriendRequest,
-	UserSearchResult
+	UserSearchResult,
+	DmParticipant,
+	DmLastMessage,
+	DmConversation,
+	DirectMessage
 } from './models.js';

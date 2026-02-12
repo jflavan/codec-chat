@@ -96,6 +96,26 @@ EF Core migrations make database provider switches straightforward.
                          │ CreatedAt   │
                          │ UpdatedAt   │
                          └─────────────┘
+
+┌─────────────┐       ┌─────────────────┐       ┌─────────────┐
+│   User      │       │ DmChannelMember │       │  DmChannel  │
+│─────────────│       │─────────────────│       │─────────────│
+│ Id ─────────│──────►│ UserId (PK,FK)  │       │ Id ─────────│
+│ DisplayName │       │ DmChannelId     │◄──────│ CreatedAt   │
+│ AvatarUrl   │       │ IsOpen          │       └──────┬──────┘
+└─────────────┘       │ JoinedAt        │              │
+                      └─────────────────┘              │
+                                                       │
+                      ┌─────────────────┐              │
+                      │ DirectMessage   │              │
+                      │─────────────────│              │
+                      │ Id (PK)         │              │
+                      │ DmChannelId (FK)│──────────────┘
+                      │ AuthorUserId(FK)│──────► User
+                      │ AuthorName      │
+                      │ Body            │
+                      │ CreatedAt       │
+                      └─────────────────┘
 ```
 
 ### Entity Definitions
@@ -119,6 +139,8 @@ Represents an authenticated user in the system.
 - One-to-many with `Message`
 - One-to-many with `Friendship` (as Requester, via `SentFriendRequests`)
 - One-to-many with `Friendship` (as Recipient, via `ReceivedFriendRequests`)
+- One-to-many with `DmChannelMember` (DM conversations the user participates in)
+- One-to-many with `DirectMessage` (DM messages authored by the user)
 
 **Notes:**
 - `GoogleSubject` is the primary link to Google identity
@@ -254,6 +276,62 @@ public enum FriendshipStatus
 - Self-friendship is prevented at the API level (`RequesterId` must differ from `RecipientId`)
 - Declined requests retain the record (status changes to `Declined`); cancelled requests delete the record
 
+#### DmChannel
+A private 1-on-1 conversation channel, not attached to any server.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique DM channel identifier |
+| `CreatedAt` | DateTimeOffset | When the conversation was started |
+
+**Relationships:**
+- One-to-many with `DmChannelMember`
+- One-to-many with `DirectMessage`
+
+**Notes:**
+- Each `DmChannel` has exactly two `DmChannelMember` entries (enforced at API level)
+- Only one `DmChannel` may exist for a given pair of users (enforced by application logic)
+
+#### DmChannelMember
+Join table linking users to DM channels.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `DmChannelId` | Guid (PK, FK) | Reference to DmChannel |
+| `UserId` | Guid (PK, FK) | Reference to User |
+| `IsOpen` | bool | Whether the conversation appears in the user's sidebar (default: `true`) |
+| `JoinedAt` | DateTimeOffset | When the user was added to the conversation |
+
+**Composite Primary Key:** (`DmChannelId`, `UserId`)
+
+**Relationships:**
+- Many-to-one with `DmChannel`
+- Many-to-one with `User`
+
+**Notes:**
+- `IsOpen` controls visibility — closing a conversation sets this to `false` without deleting data
+- Sending a new message re-opens the conversation for both participants
+
+#### DirectMessage
+Individual message within a DM conversation.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique message identifier |
+| `DmChannelId` | Guid (FK) | Reference to DmChannel |
+| `AuthorUserId` | Guid (FK) | Reference to User |
+| `AuthorName` | string | Display name snapshot (denormalized) |
+| `Body` | string | Message content (plain text) |
+| `CreatedAt` | DateTimeOffset | Message timestamp |
+
+**Relationships:**
+- Many-to-one with `DmChannel`
+- Many-to-one with `User`
+
+**Notes:**
+- `AuthorName` is a snapshot (denormalized) for performance, matching the server `Message` entity pattern
+- Follows the same structure as server channel messages
+
 ## Database Context
 
 ```csharp
@@ -266,6 +344,9 @@ public class CodecDbContext : DbContext
     public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
+    public DbSet<DmChannel> DmChannels => Set<DmChannel>();
+    public DbSet<DmChannelMember> DmChannelMembers => Set<DmChannelMember>();
+    public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -448,6 +529,22 @@ modelBuilder.Entity<Friendship>()
 // Friendship: fast lookup by recipient
 modelBuilder.Entity<Friendship>()
     .HasIndex(f => f.RecipientId);
+
+// DmChannelMember: fast lookup of a user's DM conversations
+modelBuilder.Entity<DmChannelMember>()
+    .HasIndex(m => m.UserId);
+
+// DmChannelMember: fast lookup of members in a DM channel
+modelBuilder.Entity<DmChannelMember>()
+    .HasIndex(m => m.DmChannelId);
+
+// DirectMessage: fast retrieval of messages in a conversation
+modelBuilder.Entity<DirectMessage>()
+    .HasIndex(m => m.DmChannelId);
+
+// DirectMessage: fast lookup of messages by author
+modelBuilder.Entity<DirectMessage>()
+    .HasIndex(m => m.AuthorUserId);
 ```
 
 ### Query Patterns
@@ -470,7 +567,6 @@ var messages = await db.Messages
 ## Future Schema Changes
 
 ### Near-term Additions
-- Direct message channels (1-on-1 chat)
 - File attachments metadata
 - User preferences/settings
 

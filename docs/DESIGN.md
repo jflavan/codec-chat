@@ -227,6 +227,49 @@ Three tabs at the top of the Friends panel:
 | 900–1199px | Two-column: server rail (72px) + Friends panel (flexible) |
 | ≤ 899px | Single-column: slide-out navigation, full-width Friends panel |
 
+## Direct Messages
+
+### Home Screen Layout
+
+When the Home icon is selected, the layout changes to a three-column design:
+
+| Column | Width | Content |
+|--------|-------|---------|
+| Server icon rail | 72px | Same as server mode |
+| Home sidebar | 240px | Friends navigation button + DM conversation list |
+| Main area | Flexible | FriendsPanel (no DM selected) or DmChatArea (DM selected) |
+
+### Home Sidebar
+
+- **Friends navigation button** at the top: icon + "Friends" label, pending badge count
+  - Active state: `--bg-message-hover` background, `--text-header` color
+  - Clicking deselects any active DM and shows the FriendsPanel
+- **DM Conversations list** below: scrollable list of active conversations
+  - Section header: "DIRECT MESSAGES" (11px, uppercase, `--text-muted`)
+
+### DM Conversation List Entries
+
+- Each entry shows: participant avatar (32px circular), display name, last message preview (truncated, `--text-muted`)
+- Active (selected) conversation: `--bg-message-hover` background, `--text-header` name
+- Hover: `--bg-message-hover` background, close button visible
+- Close button (✕): appears on hover at right side, `--danger` on hover
+
+### DM Chat Area
+
+The DM chat area reuses existing chat patterns with DM-specific adaptations:
+
+- **Header**: Participant avatar (24px) + display name (no `#` prefix, no server context)
+- **Message Feed**: Same grouping, avatars, timestamps, and hover states as server messages
+- **Composer**: Placeholder text "Message @{displayName}", same styling as channel composer
+- **Typing Indicator**: Shows "{displayName} is typing…" with animated dots
+- **Jump to bottom**: Same floating pill button with unread badge
+
+### Starting a DM from Friends List
+
+- Clicking a friend in the **All Friends** tab opens (or creates) a DM conversation
+- The friend entry is styled as a button with pointer cursor
+- The DM conversation is immediately selected in the sidebar and the chat area updates
+
 ## Animations & Micro-interactions
 
 - **Transitions**: 150–200ms ease for background/color changes
@@ -270,7 +313,7 @@ Three tabs at the top of the Friends panel:
 - All colors defined as CSS custom properties on `:root` in `$lib/styles/tokens.css` following the CODEC CRT palette in [THEME.md](THEME.md)
 - Global base styles (resets, font imports, selection, focus-visible) in `$lib/styles/global.css`, imported once in `+layout.svelte`
 - Component-scoped styles in Svelte `<style>` blocks within each component
-- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`, `friends/`
+- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`, `friends/`, `dm/`
 - Font loaded via Google Fonts (`Space Grotesk` as primary, system-ui fallback) with preconnect links in `+layout.svelte`
 - Semantic HTML throughout for accessibility
 - `prefers-color-scheme` media query ready for future light mode toggle

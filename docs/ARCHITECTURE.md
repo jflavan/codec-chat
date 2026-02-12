@@ -64,9 +64,13 @@ src/
 │   │   │   └── TypingIndicator.svelte    # Animated typing dots
 │   │   ├── friends/
 │   │   │   ├── FriendsPanel.svelte       # Friends view with tab navigation
-│   │   │   ├── FriendsList.svelte        # Confirmed friends list
+│   │   │   ├── FriendsList.svelte        # Confirmed friends list (click to DM)
 │   │   │   ├── PendingRequests.svelte    # Incoming/outgoing friend requests
 │   │   │   └── AddFriend.svelte          # User search & send request
+│   │   ├── dm/
+│   │   │   ├── HomeSidebar.svelte        # Home sidebar (Friends nav + DM list)
+│   │   │   ├── DmList.svelte             # DM conversation entries
+│   │   │   └── DmChatArea.svelte         # DM chat (header, feed, composer, typing)
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
 │   │       └── MemberItem.svelte         # Single member card
@@ -86,10 +90,13 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
       ├── ServerSidebar      → getAppState()
       ├── ChannelSidebar     → getAppState()
       │   └── UserPanel      → getAppState()
-      ├── FriendsPanel      → getAppState()  (shown when Home is active)
+      ├── HomeSidebar        → getAppState()  (shown when Home is active)
+      │   └── DmList         → getAppState()
+      ├── FriendsPanel       → getAppState()  (shown when Home active, no DM selected)
       │   ├── FriendsList    → getAppState()
       │   ├── PendingRequests → getAppState()
       │   └── AddFriend      → getAppState()
+      ├── DmChatArea         → getAppState()  (shown when DM conversation selected)
       ├── ChatArea           → getAppState()
       │   ├── MessageFeed    → getAppState()
       │   ├── Composer       → getAppState()
@@ -132,8 +139,11 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - **Key Features:**
   - Channel-scoped groups — clients join/leave groups per channel
   - User-scoped groups — clients auto-join `user-{userId}` on connect for friend events
+  - DM channel groups — clients join `dm-{dmChannelId}` for DM-specific events
   - Real-time message broadcast on `POST /channels/{channelId}/messages`
+  - DM message broadcast on `POST /dm/channels/{channelId}/messages`
   - Typing indicators (`UserTyping` / `UserStoppedTyping` events)
+  - DM typing indicators (`DmTyping` / `DmStoppedTyping` events)
   - Friend-related event delivery (request received/accepted/declined/cancelled, friend removed)
   - Automatic reconnect via `withAutomaticReconnect()`
 
@@ -241,6 +251,13 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 #### User Search
 - `GET /users/search?q=...` - Search users by display name or email (returns up to 20 results with relationship status)
 
+#### Direct Messages
+- `POST /dm/channels` - Start or resume a DM conversation with a friend (returns existing or creates new)
+- `GET /dm/channels` - List open DM conversations (sorted by most recent message, `IsOpen = true` only)
+- `GET /dm/channels/{channelId}/messages` - Get messages in a DM conversation (paginated via `before`/`limit`)
+- `POST /dm/channels/{channelId}/messages` - Send a direct message (broadcasts `ReceiveDm` via SignalR; reopens closed conversations)
+- `DELETE /dm/channels/{channelId}` - Close a DM conversation (sets `IsOpen = false` for current user; messages preserved)
+
 ### SignalR Hub (`/hubs/chat`)
 
 The SignalR hub provides real-time communication. Clients connect with their JWT token via query string.
@@ -254,6 +271,10 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `LeaveChannel` | `channelId: string` | Leave a channel group |
 | `StartTyping` | `channelId: string, displayName: string` | Broadcast typing indicator to channel |
 | `StopTyping` | `channelId: string, displayName: string` | Clear typing indicator |
+| `JoinDmChannel` | `dmChannelId: string` | Join a DM channel group for real-time events |
+| `LeaveDmChannel` | `dmChannelId: string` | Leave a DM channel group |
+| `StartDmTyping` | `dmChannelId: string, displayName: string` | Broadcast typing indicator to DM partner |
+| `StopDmTyping` | `dmChannelId: string, displayName: string` | Clear typing indicator |
 
 #### Server → Client Events
 | Event | Payload | Description |
@@ -267,6 +288,10 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `FriendRequestDeclined` | `{ requestId }` | Friend request declined (sent to requester's user group) |
 | `FriendRequestCancelled` | `{ requestId }` | Friend request cancelled (sent to recipient's user group) |
 | `FriendRemoved` | `{ friendshipId, userId }` | Friend removed (sent to the other participant's user group) |
+| `ReceiveDm` | `{ id, dmChannelId, authorUserId, authorName, body, createdAt }` | New DM received (sent to DM channel group + recipient user group) |
+| `DmTyping` | `{ dmChannelId, displayName }` | DM partner started typing |
+| `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
+| `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -378,8 +403,12 @@ User ────┬──── ServerMember ──── Server
          │        │
          ├──── Reaction ────────┘
          │
-         └──── Friendship ──── User
-              (Requester)     (Recipient)
+         ├──── Friendship ──── User
+         │    (Requester)     (Recipient)
+         │
+         └──── DmChannelMember ──── DmChannel
+                                       │
+                                  DirectMessage
 ```
 
 ### Core Entities
@@ -418,6 +447,22 @@ User ────┬──── ServerMember ──── Server
 - Fields: Id, RequesterId, RecipientId, Status (Pending/Accepted/Declined), CreatedAt, UpdatedAt
 - Unique constraint on (RequesterId, RecipientId) — one friendship record per user pair
 - Bidirectional lookup: both sent and received requests checked to prevent duplicates
+
+#### DmChannel
+- A private 1-on-1 conversation channel (not attached to any server)
+- Fields: Id, CreatedAt
+- Exactly two members per channel (enforced at API level)
+
+#### DmChannelMember
+- Join table linking users to DM channels
+- Fields: DmChannelId, UserId, IsOpen, JoinedAt
+- Composite primary key: (DmChannelId, UserId)
+- `IsOpen` controls whether the conversation appears in the user's sidebar
+
+#### DirectMessage
+- Individual message within a DM conversation
+- Fields: Id, DmChannelId, AuthorUserId, AuthorName, Body, CreatedAt
+- Follows the same shape as the server `Message` entity
 
 ## Configuration
 

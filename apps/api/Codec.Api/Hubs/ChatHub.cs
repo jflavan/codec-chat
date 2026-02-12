@@ -53,4 +53,38 @@ public class ChatHub(IUserService userService) : Hub
     {
         await Clients.OthersInGroup(channelId).SendAsync("UserStoppedTyping", channelId, displayName);
     }
+
+    /// <summary>
+    /// Adds the caller to a DM channel group for receiving real-time messages.
+    /// </summary>
+    public async Task JoinDmChannel(string dmChannelId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"dm-{dmChannelId}");
+    }
+
+    /// <summary>
+    /// Removes the caller from a DM channel group.
+    /// </summary>
+    public async Task LeaveDmChannel(string dmChannelId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"dm-{dmChannelId}");
+    }
+
+    /// <summary>
+    /// Broadcasts a typing indicator to the other participant in a DM conversation.
+    /// </summary>
+    public async Task StartDmTyping(string dmChannelId, string displayName)
+    {
+        await Clients.OthersInGroup($"dm-{dmChannelId}")
+            .SendAsync("DmTyping", dmChannelId, displayName);
+    }
+
+    /// <summary>
+    /// Clears the typing indicator in a DM conversation.
+    /// </summary>
+    public async Task StopDmTyping(string dmChannelId, string displayName)
+    {
+        await Clients.OthersInGroup($"dm-{dmChannelId}")
+            .SendAsync("DmStoppedTyping", dmChannelId, displayName);
+    }
 }
