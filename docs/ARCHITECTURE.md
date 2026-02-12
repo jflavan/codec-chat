@@ -6,6 +6,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 ### Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
 - **Backend:** ASP.NET Core 9 Web API (Controller-based APIs)
+- **Real-time:** SignalR (WebSockets with automatic fallback)
 - **Database:** SQLite with Entity Framework Core 9
 - **Authentication:** Google Identity Services (ID token validation)
 - **Deployment:** Containerized (Docker support)
@@ -31,9 +32,21 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Key Features:**
   - Stateless JWT validation
   - RESTful controller-based API design (`[ApiController]`)
+  - SignalR hub for real-time messaging and typing indicators
   - Shared `UserService` for cross-cutting user resolution
   - Automatic migrations (development)
   - CORS support for local development
+
+### Real-time Layer (SignalR)
+- **Hub endpoint:** `/hubs/chat`
+- **Transport:** WebSockets (with automatic fallback to Server-Sent Events / Long Polling)
+- **Authentication:** JWT passed via `access_token` query parameter for WebSocket connections
+- **JSON serialization:** camelCase payload naming (configured via `AddJsonProtocol`) to match REST API conventions
+- **Key Features:**
+  - Channel-scoped groups — clients join/leave groups per channel
+  - Real-time message broadcast on `POST /channels/{channelId}/messages`
+  - Typing indicators (`UserTyping` / `UserStoppedTyping` events)
+  - Automatic reconnect via `withAutomaticReconnect()`
 
 ### Data Layer
 - **ORM:** Entity Framework Core 9
@@ -72,6 +85,12 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
        │  8. Response (JSON)                            │
        │<───────────────────────────────────────────────┤
        │                       │                        │
+       │  9. SignalR connect (/hubs/chat?access_token)  │
+       ├───────────────────────────────────────────────>│
+       │                       │                        │
+       │  10. WebSocket established                     │
+       │<───────────────────────────────────────────────┤
+       │                       │                        │
 ```
 
 ### Authentication Details
@@ -91,6 +110,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - User identity mapped to internal User records via Google subject
 - Web client persists token in `localStorage` for session continuity (up to 1 week)
 - Automatic silent token refresh via Google One Tap (`auto_select: true`)
+- SignalR WebSocket connections authenticate via `access_token` query parameter (standard pattern for WebSocket auth since `Authorization` headers aren't supported)
 
 ## API Endpoints
 
@@ -114,7 +134,28 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 
 #### Messaging
 - `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership)
-- `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership)
+- `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; broadcasts via SignalR)
+
+### SignalR Hub (`/hubs/chat`)
+
+The SignalR hub provides real-time communication. Clients connect with their JWT token via query string.
+
+**Connection URL:** `{API_BASE_URL}/hubs/chat?access_token={JWT}`
+
+#### Client → Server Methods
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `JoinChannel` | `channelId: string` | Join a channel group to receive real-time events |
+| `LeaveChannel` | `channelId: string` | Leave a channel group |
+| `StartTyping` | `channelId: string, displayName: string` | Broadcast typing indicator to channel |
+| `StopTyping` | `channelId: string, displayName: string` | Clear typing indicator |
+
+#### Server → Client Events
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `ReceiveMessage` | `{ id, authorName, authorUserId, body, createdAt, channelId }` | New message posted to current channel |
+| `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
+| `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -328,11 +369,12 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 - Efficient EF Core queries (AsNoTracking)
 - Vite build optimization
 - Tree-shaking and code splitting
+- SignalR for real-time message delivery and typing indicators (eliminates polling)
+- Channel-scoped SignalR groups (targeted broadcasts, not global fan-out)
 
 ### Future Improvements
 - Response caching
 - Database indexing strategy
-- SignalR for real-time updates (reduce polling)
 - CDN for static assets
 - Connection pooling
 - Query optimization with compiled queries

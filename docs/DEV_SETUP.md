@@ -115,6 +115,10 @@ dotnet ef migrations script
    - Your user profile
    - A list of available servers (seeded data: "Codec HQ")
    - Ability to join servers and view channels
+5. Open a second browser window (or incognito) and sign in with a different account
+6. Both users should see:
+   - Real-time message delivery (messages appear without page refresh)
+   - Typing indicators when the other user types in the same channel
 
 ## Default Ports
 - **Web:** `http://localhost:5174`
