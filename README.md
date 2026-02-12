@@ -1,6 +1,10 @@
 # Codec
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core Web API. Users authenticate via Google Sign-In; the web client obtains an ID token and the API validates it on each request.
+
+> ⚠️ **Alpha status:** Codec is in active alpha development. APIs, data models, and UI may change without notice. Not recommended for production use.
 
 ## Repository Structure
 ```
@@ -79,6 +83,12 @@ The web app runs at `http://localhost:5174` by default.
 - [Friends](docs/FRIENDS.md) - Friends feature specification
 - [Direct Messages](docs/DIRECT_MESSAGES.md) - Direct messages feature specification
 - [Data Layer](docs/DATA.md) - Database schema and migrations
+
+## Community & Project Policies
+- [License](LICENSE) - MIT license
+- [Contributing](CONTRIBUTING.md) - How to contribute and submit PRs
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Community behavior expectations
+- [Security Policy](SECURITY.md) - How to report vulnerabilities responsibly
 
 ## Technology Stack
 - **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management
