@@ -478,46 +478,47 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
 	<link
-		href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap"
+		href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
 		rel="stylesheet"
 	/>
 </svelte:head>
 
-<main>
-	<header class="topbar">
-		<div>
-			<h1>Codec</h1>
-			<p>Discord-like chat, starting with Google Sign-In.</p>
-		</div>
-		<div class="auth">
-			<div id="google-button" class="google-button"></div>
-			<p class="status">{status}</p>
-		</div>
-	</header>
+<div class="app-shell">
+	<!-- Server sidebar (narrow icon rail) -->
+	<nav class="server-sidebar" aria-label="Servers">
+		<div class="server-list">
+			<div class="server-icon home-icon" aria-label="Home">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M2.3 7.7l9-5.4a1.2 1.2 0 0 1 1.4 0l9 5.4a.6.6 0 0 1-.3 1.1H19v8.6a.6.6 0 0 1-.6.6h-3.8v-5a1 1 0 0 0-1-1h-3.2a1 1 0 0 0-1 1v5H5.6a.6.6 0 0 1-.6-.6V8.8H2.6a.6.6 0 0 1-.3-1.1z"/>
+				</svg>
+			</div>
 
-	<section class="layout">
-		<aside class="servers">
-			<h2>Servers</h2>
-			<ul>
-				{#if !isSignedIn}
-					<li class="muted">Sign in to load your servers.</li>
-				{:else if isLoadingServers}
-					<li class="muted">Loading servers...</li>
-				{:else if servers.length === 0}
-					<li class="muted">No servers yet.</li>
-				{:else}
-					{#each servers as server}
-						<li class:active={server.serverId === selectedServerId}>
-							<button class="list-button" onclick={() => selectServer(server.serverId)}>
-								{server.name}
-							</button>
-						</li>
-					{/each}
-				{/if}
-			</ul>
+			<div class="server-separator" role="separator"></div>
+
+			{#if !isSignedIn}
+				<p class="muted server-hint">Sign in</p>
+			{:else if isLoadingServers}
+				<p class="muted server-hint">…</p>
+			{:else}
+				{#each servers as server}
+					<div class="server-pill-wrapper">
+						<div class="server-pill" class:active={server.serverId === selectedServerId}></div>
+						<button
+							class="server-icon"
+							class:active={server.serverId === selectedServerId}
+							onclick={() => selectServer(server.serverId)}
+							aria-label="Server: {server.name}"
+							title={server.name}
+						>
+							{server.name.slice(0, 1).toUpperCase()}
+						</button>
+					</div>
+				{/each}
+			{/if}
+
 			{#if isSignedIn}
-				<div class="create-form-toggle">
-					{#if showCreateServer}
+				{#if showCreateServer}
+					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); createServer(); }}>
 							<input
 								type="text"
@@ -527,522 +528,1037 @@
 								disabled={isCreatingServer}
 							/>
 							<div class="inline-form-actions">
-								<button type="submit" disabled={isCreatingServer || !newServerName.trim()}>
-									{isCreatingServer ? 'Creating...' : 'Create'}
+								<button type="submit" class="btn-primary" disabled={isCreatingServer || !newServerName.trim()}>
+									{isCreatingServer ? '…' : 'Create'}
 								</button>
-								<button type="button" class="cancel-button" onclick={() => { showCreateServer = false; newServerName = ''; }}>Cancel</button>
+								<button type="button" class="btn-secondary" onclick={() => { showCreateServer = false; newServerName = ''; }}>Cancel</button>
 							</div>
 						</form>
-					{:else}
-						<button class="list-button secondary" onclick={() => { showCreateServer = true; }}>+ Create Server</button>
-					{/if}
-				</div>
+					</div>
+				{:else}
+					<button
+						class="server-icon add-server"
+						aria-label="Create a server"
+						title="Create a server"
+						onclick={() => { showCreateServer = true; }}
+					>
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+							<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
+						</svg>
+					</button>
+				{/if}
 			{/if}
-			{#if isSignedIn && discoverServers.some((server) => !server.isMember)}
-				<div class="discover">
-					<p>Join a server</p>
-					<ul>
-						{#if isLoadingDiscover}
-							<li class="muted">Loading servers...</li>
-						{:else}
-							{#each discoverServers as server}
-								{#if !server.isMember}
-									<li>
-										<button
-											class="list-button secondary"
-											onclick={() => joinServer(server.id)}
-											disabled={isJoining}
-										>
-											Join {server.name}
-										</button>
-									</li>
-								{/if}
-							{/each}
-						{/if}
-					</ul>
-				</div>
-			{/if}
-		</aside>
 
-		<aside class="channels">
-			<h2>Channels</h2>
-			<ul>
+			{#if isSignedIn && discoverServers.some((server) => !server.isMember)}
+				<div class="server-separator" role="separator"></div>
+				{#if isLoadingDiscover}
+					<p class="muted server-hint">…</p>
+				{:else}
+					{#each discoverServers as server}
+						{#if !server.isMember}
+							<button
+								class="server-icon discover-icon"
+								onclick={() => joinServer(server.id)}
+								disabled={isJoining}
+								aria-label="Join {server.name}"
+								title="Join {server.name}"
+							>
+								{server.name.slice(0, 1).toUpperCase()}
+							</button>
+						{/if}
+					{/each}
+				{/if}
+			{/if}
+		</div>
+	</nav>
+
+	<!-- Channel sidebar -->
+	<aside class="channel-sidebar" aria-label="Channels">
+		<div class="channel-header">
+			<h2 class="server-name">
+				{#if selectedServerId}
+					{servers.find((s) => s.serverId === selectedServerId)?.name ?? 'Server'}
+				{:else}
+					Codec
+				{/if}
+			</h2>
+		</div>
+
+		<div class="channel-list-scroll">
+			<div class="channel-category">
+				<span class="category-label">Text Channels</span>
+				{#if canManageChannels && selectedServerId}
+					{#if showCreateChannel}
+						<!-- inline create form replaces button -->
+					{:else}
+						<button class="category-action" aria-label="Create channel" onclick={() => { showCreateChannel = true; }}>
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+								<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
+							</svg>
+						</button>
+					{/if}
+				{/if}
+			</div>
+
+			<ul class="channel-list" role="list">
 				{#if isLoadingChannels}
-					<li class="muted">Loading channels...</li>
+					<li class="muted channel-item">Loading…</li>
 				{:else if channels.length === 0}
-					<li class="muted">No channels yet.</li>
+					<li class="muted channel-item">No channels yet.</li>
 				{:else}
 					{#each channels as channel}
-						<li class:active={channel.id === selectedChannelId}>
-							<button class="list-button" onclick={() => selectChannel(channel.id)}>
-								#{channel.name}
+						<li>
+							<button
+								class="channel-item"
+								class:active={channel.id === selectedChannelId}
+								onclick={() => selectChannel(channel.id)}
+							>
+								<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M5.88 21 7.1 14H3.5l.3-2h3.6l.9-5H4.8l.3-2h3.5L9.8 3h2l-1.2 2h5L16.8 3h2l-1.2 2H21l-.3 2h-3.5l-.9 5h3.5l-.3 2h-3.6L14.7 21h-2l1.2-7h-5L7.7 21h-2zm4.3-9h5l.9-5h-5l-.9 5z"/>
+								</svg>
+								<span>{channel.name}</span>
 							</button>
 						</li>
 					{/each}
 				{/if}
 			</ul>
-			{#if canManageChannels && selectedServerId}
-				<div class="create-form-toggle">
-					{#if showCreateChannel}
-						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); createChannel(); }}>
-							<input
-								type="text"
-								placeholder="Channel name"
-								maxlength="100"
-								bind:value={newChannelName}
-								disabled={isCreatingChannel}
-							/>
-							<div class="inline-form-actions">
-								<button type="submit" disabled={isCreatingChannel || !newChannelName.trim()}>
-									{isCreatingChannel ? 'Creating...' : 'Create'}
-								</button>
-								<button type="button" class="cancel-button" onclick={() => { showCreateChannel = false; newChannelName = ''; }}>Cancel</button>
-							</div>
-						</form>
-					{:else}
-						<button class="list-button secondary" onclick={() => { showCreateChannel = true; }}>+ Add Channel</button>
-					{/if}
-				</div>
+
+			{#if canManageChannels && selectedServerId && showCreateChannel}
+				<form class="inline-form channel-create-form" onsubmit={(e) => { e.preventDefault(); createChannel(); }}>
+					<input
+						type="text"
+						placeholder="new-channel"
+						maxlength="100"
+						bind:value={newChannelName}
+						disabled={isCreatingChannel}
+					/>
+					<div class="inline-form-actions">
+						<button type="submit" class="btn-primary" disabled={isCreatingChannel || !newChannelName.trim()}>
+							{isCreatingChannel ? '…' : 'Create'}
+						</button>
+						<button type="button" class="btn-secondary" onclick={() => { showCreateChannel = false; newChannelName = ''; }}>Cancel</button>
+					</div>
+				</form>
 			{/if}
-		</aside>
+		</div>
 
-		<section class="chat">
-			<div class="chat-header">
-				<div>
-					<h2>
-						{#if selectedChannelId}
-							#{channels.find((channel) => channel.id === selectedChannelId)?.name ?? 'channel'}
-						{:else}
-							Select a channel
-						{/if}
-					</h2>
-					<p>Ship logs and quick updates.</p>
-				</div>
-				<button onclick={callMe}>Call /me</button>
-			</div>
-
-			<div class="messages">
-				{#if isLoadingMessages}
-					<p class="muted">Loading messages...</p>
-				{:else if messages.length === 0}
-					<p class="muted">No messages yet.</p>
-				{:else}
-					{#each messages as message}
-						<article>
-							<div>
-								<strong>{message.authorName}</strong>
-								<span>{formatTime(message.createdAt)}</span>
-							</div>
-							<p>{message.body}</p>
-						</article>
-					{/each}
-				{/if}
-			</div>
-
-			<div class="composer">
-				<input
-					type="text"
-					placeholder="Message #build-log"
-					bind:value={messageBody}
-					disabled={!selectedChannelId || isSending}
-				/>
-				<button
-					onclick={sendMessage}
-					disabled={!selectedChannelId || !messageBody.trim() || isSending}
-				>
-					Send
-				</button>
-			</div>
-		</section>
-
-		<aside class="inspector">
-			<h2>Auth status</h2>
-			{#if error}
-				<p class="error">{error}</p>
-			{/if}
-			{#if isLoadingMe}
-				<p class="muted">Loading profile...</p>
-			{:else if me}
-				<div class="user-card">
+		<!-- User panel at bottom -->
+		<div class="user-panel">
+			{#if me}
+				<div class="user-panel-info">
 					{#if me.user.avatarUrl}
-						<img src={me.user.avatarUrl} alt="Avatar" />
+						<img class="user-panel-avatar" src={me.user.avatarUrl} alt="Your avatar" />
+					{:else}
+						<div class="user-panel-avatar placeholder" aria-hidden="true">
+							{me.user.displayName.slice(0, 1).toUpperCase()}
+						</div>
 					{/if}
-					<div>
-						<strong>{me.user.displayName}</strong>
-						{#if me.user.email}
-							<p class="muted">{me.user.email}</p>
+					<div class="user-panel-names">
+						<span class="user-panel-display">{me.user.displayName}</span>
+						{#if currentServerRole}
+							<span class="user-panel-role">{currentServerRole}</span>
 						{/if}
 					</div>
 				</div>
 			{:else}
-				<p class="muted">Call /me to see the authenticated response.</p>
+				<div id="google-button" class="google-button"></div>
+				<span class="user-panel-status">{status}</span>
 			{/if}
+		</div>
+	</aside>
 
-			<h2>Members</h2>
-			{#if !isSignedIn}
-				<p class="muted">Sign in to see server members.</p>
-			{:else if !selectedServerId}
-				<p class="muted">Select a server to view members.</p>
-			{:else if isLoadingMembers}
-				<p class="muted">Loading members...</p>
-			{:else if members.length === 0}
-				<p class="muted">No members yet.</p>
+	<!-- Main chat area -->
+	<main class="chat-main" aria-label="Chat">
+		<header class="chat-header">
+			<div class="chat-header-left">
+				<svg class="channel-hash" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M5.88 21 7.1 14H3.5l.3-2h3.6l.9-5H4.8l.3-2h3.5L9.8 3h2l-1.2 2h5L16.8 3h2l-1.2 2H21l-.3 2h-3.5l-.9 5h3.5l-.3 2h-3.6L14.7 21h-2l1.2-7h-5L7.7 21h-2zm4.3-9h5l.9-5h-5l-.9 5z"/>
+				</svg>
+				<h1 class="chat-channel-name">
+					{#if selectedChannelId}
+						{channels.find((c) => c.id === selectedChannelId)?.name ?? 'channel'}
+					{:else}
+						Select a channel
+					{/if}
+				</h1>
+			</div>
+		</header>
+
+		{#if error}
+			<div class="error-banner" role="alert">{error}</div>
+		{/if}
+
+		<div class="message-feed">
+			{#if isLoadingMessages}
+				<p class="muted feed-status">Loading messages…</p>
+			{:else if messages.length === 0}
+				<p class="muted feed-status">No messages yet. Start the conversation!</p>
 			{:else}
-				<ul class="member-list">
-					{#each members as member}
-						<li>
-							<div class="member-card">
-								{#if member.avatarUrl}
-									<img src={member.avatarUrl} alt="Avatar" />
-								{:else}
-									<div class="member-avatar" aria-hidden="true">
-										{member.displayName.slice(0, 1).toUpperCase()}
-									</div>
-								{/if}
-								<div>
-									<strong>{member.displayName}</strong>
-									<span class="role-badge">{member.role}</span>
-									{#if member.email}
-										<p class="muted">{member.email}</p>
-									{/if}
+				{#each messages as message, i}
+					{@const prevMessage = i > 0 ? messages[i - 1] : null}
+					{@const isGrouped = prevMessage?.authorUserId === message.authorUserId && prevMessage?.authorName === message.authorName}
+					<article class="message" class:grouped={isGrouped}>
+						{#if !isGrouped}
+							<div class="message-avatar-col">
+								<div class="message-avatar" aria-hidden="true">
+									{message.authorName.slice(0, 1).toUpperCase()}
 								</div>
 							</div>
+							<div class="message-content">
+								<div class="message-header">
+									<strong class="message-author">{message.authorName}</strong>
+									<time class="message-time">{formatTime(message.createdAt)}</time>
+								</div>
+								<p class="message-body">{message.body}</p>
+							</div>
+						{:else}
+							<div class="message-avatar-col">
+								<time class="message-time-inline">{formatTime(message.createdAt)}</time>
+							</div>
+							<div class="message-content">
+								<p class="message-body">{message.body}</p>
+							</div>
+						{/if}
+					</article>
+				{/each}
+			{/if}
+		</div>
+
+		<form class="composer" onsubmit={(e) => { e.preventDefault(); sendMessage(); }}>
+			<input
+				class="composer-input"
+				type="text"
+				placeholder={selectedChannelId ? `Message #${channels.find((c) => c.id === selectedChannelId)?.name ?? 'channel'}` : 'Select a channel…'}
+				bind:value={messageBody}
+				disabled={!selectedChannelId || isSending}
+			/>
+			<button
+				class="composer-send"
+				type="submit"
+				disabled={!selectedChannelId || !messageBody.trim() || isSending}
+				aria-label="Send message"
+			>
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+					<path d="M2.5 2.3a.75.75 0 0 1 .8-.05l14 7a.75.75 0 0 1 0 1.34l-14 7A.75.75 0 0 1 2.2 17l1.9-6.5a.5.5 0 0 1 .47-.35h4.68a.75.75 0 0 0 0-1.5H4.57a.5.5 0 0 1-.47-.35L2.2 1.8a.75.75 0 0 1 .3-.8z"/>
+				</svg>
+			</button>
+		</form>
+	</main>
+
+	<!-- Members sidebar -->
+	<aside class="members-sidebar" aria-label="Members">
+		{#if !isSignedIn}
+			<p class="muted sidebar-status">Sign in to see members.</p>
+		{:else if !selectedServerId}
+			<p class="muted sidebar-status">Select a server.</p>
+		{:else if isLoadingMembers}
+			<p class="muted sidebar-status">Loading members…</p>
+		{:else if members.length === 0}
+			<p class="muted sidebar-status">No members yet.</p>
+		{:else}
+			{@const owners = members.filter((m) => m.role === 'Owner')}
+			{@const admins = members.filter((m) => m.role === 'Admin')}
+			{@const regulars = members.filter((m) => m.role === 'Member')}
+
+			{#if owners.length > 0}
+				<h3 class="member-group-heading">Owner — {owners.length}</h3>
+				<ul class="member-list" role="list">
+					{#each owners as member}
+						<li class="member-item">
+							{#if member.avatarUrl}
+								<img class="member-avatar-img" src={member.avatarUrl} alt="" />
+							{:else}
+								<div class="member-avatar-placeholder" aria-hidden="true">
+									{member.displayName.slice(0, 1).toUpperCase()}
+								</div>
+							{/if}
+							<span class="member-name">{member.displayName}</span>
 						</li>
 					{/each}
 				</ul>
 			{/if}
-		</aside>
-	</section>
-</main>
+
+			{#if admins.length > 0}
+				<h3 class="member-group-heading">Admin — {admins.length}</h3>
+				<ul class="member-list" role="list">
+					{#each admins as member}
+						<li class="member-item">
+							{#if member.avatarUrl}
+								<img class="member-avatar-img" src={member.avatarUrl} alt="" />
+							{:else}
+								<div class="member-avatar-placeholder" aria-hidden="true">
+									{member.displayName.slice(0, 1).toUpperCase()}
+								</div>
+							{/if}
+							<span class="member-name">{member.displayName}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if regulars.length > 0}
+				<h3 class="member-group-heading">Other — {regulars.length}</h3>
+				<ul class="member-list" role="list">
+					{#each regulars as member}
+						<li class="member-item">
+							{#if member.avatarUrl}
+								<img class="member-avatar-img" src={member.avatarUrl} alt="" />
+							{:else}
+								<div class="member-avatar-placeholder" aria-hidden="true">
+									{member.displayName.slice(0, 1).toUpperCase()}
+								</div>
+							{/if}
+							<span class="member-name">{member.displayName}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</aside>
+</div>
 
 <style>
+	/* ===== Design tokens ===== */
+	:global(:root) {
+		--bg-primary: #313338;
+		--bg-secondary: #2b2d31;
+		--bg-tertiary: #1e1f22;
+		--bg-message-hover: #2e3035;
+		--accent: #5865f2;
+		--accent-hover: #4752c4;
+		--text-normal: #dbdee1;
+		--text-muted: #949ba4;
+		--text-header: #f2f3f5;
+		--danger: #da373c;
+		--success: #23a559;
+		--border: #3f4147;
+	}
+
 	:global(body) {
 		margin: 0;
-		font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-		background: radial-gradient(circle at top, #f8f0e8 0%, #f2f2f2 45%, #ffffff 100%);
-		color: #161616;
+		font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+		background: var(--bg-tertiary);
+		color: var(--text-normal);
+		font-size: 15px;
+		line-height: 1.375;
 	}
 
-	main {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 3rem 1.5rem 4rem;
+	/* ===== App shell - full viewport grid ===== */
+	.app-shell {
+		display: grid;
+		grid-template-columns: 72px 240px minmax(0, 1fr) 240px;
+		height: 100vh;
+		overflow: hidden;
+	}
+
+	/* ===== Server sidebar (icon rail) ===== */
+	.server-sidebar {
+		background: var(--bg-tertiary);
 		display: flex;
 		flex-direction: column;
-		gap: 2.5rem;
-	}
-
-	.topbar {
-		display: flex;
-		justify-content: space-between;
 		align-items: center;
-		gap: 2rem;
+		padding: 12px 0 12px;
+		overflow-y: auto;
+		scrollbar-width: none;
 	}
 
-	.topbar h1 {
-		font-size: clamp(2.5rem, 4vw, 3.5rem);
-		margin: 0 0 0.5rem;
+	.server-sidebar::-webkit-scrollbar {
+		display: none;
 	}
 
-	.topbar p {
-		margin: 0;
-		color: #4a4a4a;
-	}
-
-	.auth {
-		text-align: right;
-	}
-
-	.layout {
-		display: grid;
-		grid-template-columns: 150px 200px minmax(0, 1fr) 260px;
-		gap: 1.5rem;
-	}
-
-	.status {
-		margin: 0.5rem 0 0;
-		color: #2a2a2a;
-		font-weight: 600;
-	}
-
-	.servers,
-	.channels,
-	.inspector {
-		padding: 1.25rem;
-		border-radius: 18px;
-		background: #ffffff;
-		box-shadow: 0 18px 45px rgba(20, 20, 20, 0.08);
-	}
-
-	.chat {
-		padding: 1.25rem;
-		border-radius: 18px;
-		background: #ffffff;
-		box-shadow: 0 18px 45px rgba(20, 20, 20, 0.08);
+	.server-list {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	.servers h2,
-	.channels h2,
-	.inspector h2,
-	.chat-header h2 {
-		margin: 0 0 0.75rem;
-		font-size: 1rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: #6b6b6b;
-	}
-
-	ul {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.servers li,
-	.channels li {
-		border-radius: 12px;
-		background: #f4f4f4;
-		font-weight: 600;
-	}
-
-	.list-button {
+		align-items: center;
+		gap: 8px;
 		width: 100%;
-		text-align: left;
-		border: none;
-		background: transparent;
-		font-weight: 600;
-		padding: 0.5rem 0.75rem;
-		cursor: pointer;
 	}
 
-	.list-button.secondary {
-		background: #eef2ff;
-		color: #1e3a8a;
-		border-radius: 10px;
-	}
-
-	li.active {
-		background: #e0e7ff;
-		color: #1e3a8a;
-	}
-
-	.discover {
-		margin-top: 1rem;
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.discover p {
-		margin: 0;
-		font-size: 0.85rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: #6b6b6b;
-	}
-
-	.chat-header {
+	.server-pill-wrapper {
+		position: relative;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
+		justify-content: center;
+		width: 100%;
 	}
 
-	.chat-header p {
-		margin: 0;
-		color: #6b6b6b;
+	.server-pill {
+		position: absolute;
+		left: 0;
+		width: 4px;
+		border-radius: 0 4px 4px 0;
+		background: var(--text-header);
+		height: 8px;
+		opacity: 0;
+		transition: height 150ms ease, opacity 150ms ease;
 	}
 
-	.messages {
-		display: grid;
-		gap: 1rem;
+	.server-pill-wrapper:hover .server-pill:not(.active) {
+		opacity: 1;
+		height: 20px;
 	}
 
-	article {
-		padding: 0.75rem 1rem;
-		border-radius: 14px;
-		background: #f8f8f8;
+	.server-pill.active {
+		opacity: 1;
+		height: 36px;
 	}
 
-	article div {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	article span {
-		color: #8a8a8a;
-		font-size: 0.85rem;
-	}
-
-	article p {
-		margin: 0.5rem 0 0;
-	}
-
-	.composer {
-		display: grid;
-		grid-template-columns: 1fr auto;
-		gap: 0.75rem;
-	}
-
-	input {
-		padding: 0.75rem 1rem;
-		border-radius: 12px;
-		border: 1px solid #e5e5e5;
-		background: #fafafa;
-	}
-
-	button {
+	.server-icon {
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
 		border: none;
-		border-radius: 12px;
-		padding: 0.75rem 1.5rem;
-		background: #1d4ed8;
-		color: #ffffff;
+		background: var(--bg-primary);
+		color: var(--text-header);
+		font-size: 18px;
 		font-weight: 600;
+		display: grid;
+		place-items: center;
 		cursor: pointer;
+		transition: border-radius 200ms ease, background-color 200ms ease, color 200ms ease;
+		font-family: inherit;
 	}
 
-	button:disabled {
-		background: #cbd5f5;
+	.server-icon:hover {
+		border-radius: 16px;
+		background: var(--accent);
+		color: #fff;
+	}
+
+	.server-icon.active {
+		border-radius: 16px;
+		background: var(--accent);
+		color: #fff;
+	}
+
+	.home-icon {
+		background: var(--bg-primary);
+		color: var(--text-header);
+	}
+
+	.home-icon:hover {
+		background: var(--accent);
+		color: #fff;
+	}
+
+	.add-server {
+		background: var(--bg-primary);
+		color: var(--success);
+	}
+
+	.add-server:hover {
+		background: var(--success);
+		color: #fff;
+		border-radius: 16px;
+	}
+
+	.discover-icon {
+		background: var(--bg-primary);
+		color: var(--success);
+		border: 2px dashed var(--border);
+		width: 44px;
+		height: 44px;
+	}
+
+	.discover-icon:hover {
+		border-color: var(--success);
+		background: var(--success);
+		color: #fff;
+		border-radius: 16px;
+	}
+
+	.discover-icon:disabled {
+		opacity: 0.5;
 		cursor: not-allowed;
 	}
 
-	button:hover:not(:disabled) {
-		background: #1e40af;
+	.server-separator {
+		width: 32px;
+		height: 2px;
+		background: var(--border);
+		border-radius: 1px;
+		margin: 4px 0;
 	}
 
-	.error {
-		color: #b91c1c;
-		margin-top: 0.75rem;
+	.server-hint {
+		font-size: 10px;
+		text-align: center;
+		margin: 0;
 	}
 
-	.muted {
-		color: #6b6b6b;
+	.server-create-popover {
+		position: absolute;
+		left: 76px;
+		top: 50%;
+		transform: translateY(-50%);
+		z-index: 40;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 12px;
+		width: 220px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 	}
 
-	.user-card {
+	/* ===== Channel sidebar ===== */
+	.channel-sidebar {
+		background: var(--bg-secondary);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.channel-header {
+		height: 48px;
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem;
-		border-radius: 12px;
-		background: #f4f4f4;
+		padding: 0 16px;
+		border-bottom: 1px solid var(--bg-tertiary);
+		flex-shrink: 0;
 	}
 
-	.user-card img {
+	.server-name {
+		margin: 0;
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--text-header);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.channel-list-scroll {
+		flex: 1;
+		overflow-y: auto;
+		padding: 8px 8px 16px;
+		scrollbar-width: thin;
+		scrollbar-color: var(--bg-tertiary) transparent;
+	}
+
+	.channel-category {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 8px 4px;
+	}
+
+	.category-label {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--text-muted);
+	}
+
+	.category-action {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		border-radius: 3px;
+		width: 18px;
+		height: 18px;
+	}
+
+	.category-action:hover {
+		color: var(--text-header);
+	}
+
+	.channel-list {
+		list-style: none;
+		padding: 0;
+		margin: 2px 0 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.channel-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		padding: 6px 8px;
+		border-radius: 4px;
+		border: none;
+		background: transparent;
+		color: var(--text-muted);
+		font-size: 15px;
+		font-weight: 500;
+		cursor: pointer;
+		text-align: left;
+		font-family: inherit;
+		transition: background-color 150ms ease, color 150ms ease;
+	}
+
+	.channel-item:hover {
+		background: var(--bg-message-hover);
+		color: var(--text-normal);
+	}
+
+	.channel-item.active {
+		background: var(--bg-message-hover);
+		color: var(--text-header);
+		font-weight: 600;
+	}
+
+	.channel-hash {
+		flex-shrink: 0;
+		color: var(--text-muted);
+		opacity: 0.7;
+	}
+
+	.channel-create-form {
+		padding: 8px;
+	}
+
+	/* ===== User panel (bottom of channel sidebar) ===== */
+	.user-panel {
+		flex-shrink: 0;
+		padding: 8px;
+		background: var(--bg-tertiary);
+		border-top: 1px solid var(--border);
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 52px;
+	}
+
+	.user-panel-info {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		overflow: hidden;
+	}
+
+	.user-panel-avatar {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
+	}
+
+	.user-panel-avatar.placeholder {
+		background: var(--accent);
+		color: #fff;
+		font-weight: 700;
+		font-size: 14px;
+		display: grid;
+		place-items: center;
+	}
+
+	.user-panel-names {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.user-panel-display {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-header);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.user-panel-role {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	.user-panel-status {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	/* ===== Main chat area ===== */
+	.chat-main {
+		background: var(--bg-primary);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.chat-header {
+		height: 48px;
+		display: flex;
+		align-items: center;
+		padding: 0 16px;
+		border-bottom: 1px solid var(--bg-tertiary);
+		flex-shrink: 0;
+	}
+
+	.chat-header-left {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.chat-channel-name {
+		margin: 0;
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--text-header);
+	}
+
+	.error-banner {
+		padding: 8px 16px;
+		background: var(--danger);
+		color: #fff;
+		font-size: 14px;
+		flex-shrink: 0;
+	}
+
+	/* ===== Message feed ===== */
+	.message-feed {
+		flex: 1;
+		overflow-y: auto;
+		padding: 16px 0 8px;
+		scrollbar-width: thin;
+		scrollbar-color: var(--bg-tertiary) transparent;
+	}
+
+	.feed-status {
+		padding: 16px;
+		text-align: center;
+	}
+
+	.message {
+		display: grid;
+		grid-template-columns: 56px 1fr;
+		padding: 2px 16px;
+		transition: background-color 150ms ease;
+	}
+
+	.message:hover {
+		background: var(--bg-message-hover);
+	}
+
+	.message:not(.grouped) {
+		margin-top: 16px;
+	}
+
+	.message.grouped {
+		margin-top: 0;
+	}
+
+	.message-avatar-col {
+		display: flex;
+		justify-content: center;
+		padding-top: 2px;
+	}
+
+	.message-avatar {
 		width: 40px;
 		height: 40px;
 		border-radius: 50%;
-		object-fit: cover;
+		background: var(--accent);
+		color: #fff;
+		font-weight: 700;
+		font-size: 16px;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+	}
+
+	.message-content {
+		min-width: 0;
+	}
+
+	.message-header {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+	}
+
+	.message-author {
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--text-header);
+	}
+
+	.message-time {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	.message-time-inline {
+		font-size: 11px;
+		color: transparent;
+		text-align: center;
+		width: 100%;
+		display: block;
+	}
+
+	.message:hover .message-time-inline {
+		color: var(--text-muted);
+	}
+
+	.message-body {
+		margin: 2px 0 0;
+		color: var(--text-normal);
+		line-height: 1.375;
+		word-break: break-word;
+	}
+
+	/* ===== Composer ===== */
+	.composer {
+		flex-shrink: 0;
+		padding: 0 16px 24px;
+		display: flex;
+		align-items: center;
+		gap: 0;
+		background: var(--bg-primary);
+	}
+
+	.composer-input {
+		flex: 1;
+		padding: 12px 16px;
+		border-radius: 8px 0 0 8px;
+		border: none;
+		background: var(--bg-tertiary);
+		color: var(--text-normal);
+		font-size: 15px;
+		font-family: inherit;
+		outline: none;
+		min-height: 20px;
+	}
+
+	.composer-input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.composer-input:focus {
+		box-shadow: 0 0 0 2px var(--accent);
+	}
+
+	.composer-input:disabled {
+		opacity: 0.5;
+	}
+
+	.composer-send {
+		background: var(--bg-tertiary);
+		border: none;
+		padding: 12px 12px;
+		border-radius: 0 8px 8px 0;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease;
+	}
+
+	.composer-send:hover:not(:disabled) {
+		color: var(--accent);
+		background: var(--bg-tertiary);
+	}
+
+	.composer-send:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+		background: var(--bg-tertiary);
+	}
+
+	/* ===== Members sidebar ===== */
+	.members-sidebar {
+		background: var(--bg-secondary);
+		padding: 16px 8px;
+		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: var(--bg-tertiary) transparent;
+	}
+
+	.sidebar-status {
+		padding: 8px;
+		font-size: 13px;
+		text-align: center;
+	}
+
+	.member-group-heading {
+		padding: 16px 8px 4px;
+		margin: 0;
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--text-muted);
 	}
 
 	.member-list {
 		list-style: none;
 		padding: 0;
 		margin: 0;
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.member-card {
 		display: flex;
-		gap: 0.75rem;
-		align-items: center;
-		padding: 0.75rem;
-		border-radius: 12px;
-		background: #f8f8f8;
+		flex-direction: column;
 	}
 
-	.member-card img {
-		width: 36px;
-		height: 36px;
+	.member-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: 4px;
+		cursor: default;
+		transition: background-color 150ms ease;
+	}
+
+	.member-item:hover {
+		background: var(--bg-message-hover);
+	}
+
+	.member-avatar-img {
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		object-fit: cover;
+		flex-shrink: 0;
 	}
 
-	.member-avatar {
-		width: 36px;
-		height: 36px;
+	.member-avatar-placeholder {
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
+		background: var(--accent);
+		color: #fff;
+		font-weight: 700;
+		font-size: 14px;
 		display: grid;
 		place-items: center;
-		background: #dbeafe;
-		color: #1e40af;
-		font-weight: 700;
+		flex-shrink: 0;
 	}
 
-	.role-badge {
-		display: inline-block;
-		margin-left: 0.5rem;
-		padding: 0.2rem 0.5rem;
-		border-radius: 999px;
-		background: #e0e7ff;
-		color: #1e3a8a;
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
+	.member-name {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.create-form-toggle {
-		margin-top: 0.75rem;
+	.member-item:hover .member-name {
+		color: var(--text-normal);
 	}
 
+	/* ===== Shared form styles ===== */
 	.inline-form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 8px;
 	}
 
 	.inline-form input {
-		padding: 0.5rem 0.75rem;
-		border-radius: 10px;
-		border: 1px solid #e5e5e5;
-		background: #fafafa;
-		font-size: 0.85rem;
+		padding: 8px 10px;
+		border-radius: 4px;
+		border: none;
+		background: var(--bg-tertiary);
+		color: var(--text-normal);
+		font-size: 14px;
+		font-family: inherit;
+		outline: none;
+	}
+
+	.inline-form input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.inline-form input:focus {
+		box-shadow: 0 0 0 2px var(--accent);
 	}
 
 	.inline-form-actions {
 		display: flex;
-		gap: 0.5rem;
+		gap: 6px;
 	}
 
-	.inline-form-actions button {
-		padding: 0.4rem 0.75rem;
-		font-size: 0.8rem;
-		border-radius: 10px;
+	.btn-primary {
+		border: none;
+		border-radius: 3px;
+		padding: 6px 14px;
+		background: var(--accent);
+		color: #fff;
+		font-weight: 600;
+		font-size: 13px;
+		cursor: pointer;
+		font-family: inherit;
+		transition: background-color 150ms ease;
 	}
 
-	.cancel-button {
-		background: #e5e5e5;
-		color: #333;
+	.btn-primary:hover:not(:disabled) {
+		background: var(--accent-hover);
 	}
 
-	.cancel-button:hover:not(:disabled) {
-		background: #d1d1d1;
+	.btn-primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
-	@media (max-width: 1100px) {
-		.layout {
-			grid-template-columns: 140px 190px minmax(0, 1fr);
+	.btn-secondary {
+		border: none;
+		border-radius: 3px;
+		padding: 6px 14px;
+		background: transparent;
+		color: var(--text-muted);
+		font-weight: 500;
+		font-size: 13px;
+		cursor: pointer;
+		font-family: inherit;
+		transition: color 150ms ease;
+	}
+
+	.btn-secondary:hover:not(:disabled) {
+		color: var(--text-header);
+		background: transparent;
+	}
+
+	/* ===== Utility ===== */
+	.muted {
+		color: var(--text-muted);
+	}
+
+	/* ===== Accessibility ===== */
+	:global(:focus-visible) {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(*) {
+			transition-duration: 0ms !important;
+		}
+	}
+
+	/* ===== Responsive ===== */
+	@media (max-width: 1199px) {
+		.app-shell {
+			grid-template-columns: 72px 240px minmax(0, 1fr);
 		}
 
-		.inspector {
-			grid-column: 1 / -1;
+		.members-sidebar {
+			display: none;
 		}
 	}
 
-	@media (max-width: 840px) {
-		.layout {
+	@media (max-width: 899px) {
+		.app-shell {
 			grid-template-columns: 1fr;
+			grid-template-rows: 1fr;
 		}
 
-		.topbar {
-			flex-direction: column;
-			align-items: flex-start;
+		.server-sidebar,
+		.channel-sidebar,
+		.members-sidebar {
+			display: none;
+		}
+
+		.chat-main {
+			height: 100vh;
 		}
 	}
 </style>

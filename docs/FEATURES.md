@@ -30,11 +30,20 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Timestamp display
 
 ### UI/UX
-- ✅ App shell layout (servers sidebar, channels list, message panel)
+- ✅ Discord-inspired dark theme (CSS custom properties, blurple accent)
+- ✅ Three-column layout: server icon rail, channel sidebar, chat area
+- ✅ Fourth column: members sidebar (responsive, hidden on smaller screens)
+- ✅ Server icon rail with circular icons, active pill indicator, hover morph
+- ✅ Channel list with `#` hash icons and active/hover states
+- ✅ Message feed with avatars, grouped consecutive messages, hover timestamps
+- ✅ Inline message composer with send icon and focus glow
+- ✅ User panel pinned to bottom of channel sidebar
+- ✅ Members sidebar grouped by role (Owner, Admin, Member)
 - ✅ Loading states for async operations
-- ✅ Error handling and display
-- ✅ Responsive layout
-- ✅ Member list sidebar
+- ✅ Error handling and display (banner in chat area)
+- ✅ Responsive breakpoints (mobile, tablet, desktop)
+- ✅ Accessibility: focus-visible outlines, prefers-reduced-motion, semantic HTML, ARIA labels
+- ✅ Design specification documented in `docs/DESIGN.md`
 
 ### API Infrastructure
 - ✅ Health check endpoint (`/health`)
