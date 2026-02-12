@@ -51,9 +51,10 @@ src/
 │   │   └── format.ts       # Date/time formatting helpers
 │   ├── components/
 │   │   ├── server-sidebar/
-│   │   │   └── ServerSidebar.svelte      # Server icon rail (create/discover/join)
+│   │   │   └── ServerSidebar.svelte      # Server icon rail (create/join-via-invite)
 │   │   ├── channel-sidebar/
 │   │   │   ├── ChannelSidebar.svelte     # Channel list & create form
+│   │   │   ├── InvitePanel.svelte        # Invite code management (create/list/revoke)
 │   │   │   └── UserPanel.svelte          # User avatar/name/role & sign-out
 │   │   ├── chat/
 │   │   │   ├── ChatArea.svelte           # Chat shell (header, feed, composer)
@@ -226,14 +227,19 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 
 #### Server Management
 - `GET /servers` - List servers user is a member of
-- `GET /servers/discover` - Browse all available servers
 - `POST /servers` - Create a new server (authenticated user becomes Owner)
-- `POST /servers/{serverId}/join` - Join a server
 - `GET /servers/{serverId}/members` - List server members (requires membership)
 - `GET /servers/{serverId}/channels` - List channels in a server (requires membership)
 - `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner or Admin role)
 - `POST /servers/{serverId}/avatar` - Upload a server-specific avatar (multipart/form-data, overrides global avatar in this server)
 - `DELETE /servers/{serverId}/avatar` - Remove server-specific avatar, fall back to global avatar
+- `DELETE /servers/{serverId}/members/{userId}` - Kick a member from the server (requires Owner or Admin role; broadcasts `KickedFromServer` via SignalR)
+
+#### Server Invites
+- `POST /servers/{serverId}/invites` - Create an invite code (requires Owner or Admin role; generates 8-char alphanumeric code)
+- `GET /servers/{serverId}/invites` - List active invites (requires Owner or Admin role; filters expired invites)
+- `DELETE /servers/{serverId}/invites/{inviteId}` - Revoke an invite code (requires Owner or Admin role)
+- `POST /invites/{code}` - Join a server via invite code (any authenticated user; validates expiry and max uses)
 
 #### Messaging
 - `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership)
@@ -292,6 +298,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `DmTyping` | `{ dmChannelId, displayName }` | DM partner started typing |
 | `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
 | `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |
+| `KickedFromServer` | `{ serverId, serverName }` | User was kicked from a server (sent to kicked user's user group) |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -447,6 +454,12 @@ User ────┬──── ServerMember ──── Server
 - Fields: Id, RequesterId, RecipientId, Status (Pending/Accepted/Declined), CreatedAt, UpdatedAt
 - Unique constraint on (RequesterId, RecipientId) — one friendship record per user pair
 - Bidirectional lookup: both sent and received requests checked to prevent duplicates
+
+#### ServerInvite
+- Invite code for joining a server without using the discover flow
+- Fields: Id, ServerId, Code (unique 8-char alphanumeric), CreatedByUserId, ExpiresAt (nullable), MaxUses (nullable), UseCount, CreatedAt
+- Unique index on Code for fast lookup
+- Relationships: belongs to Server, created by User
 
 #### DmChannel
 - A private 1-on-1 conversation channel (not attached to any server)

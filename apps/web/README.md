@@ -18,8 +18,9 @@ src/
 │   ├── utils/           # Pure utility functions (date formatting, etc.)
 │   ├── components/      # Presentational Svelte 5 components grouped by feature
 │   │   ├── server-sidebar/   # Server icon rail
-│   │   ├── channel-sidebar/  # Channel list, user panel
+│   │   ├── channel-sidebar/  # Channel list, invite panel, user panel
 │   │   ├── chat/             # Message feed, composer, typing indicator, reactions
+│   │   ├── dm/               # DM sidebar, DM chat area
 │   │   ├── friends/          # Friends panel, friends list, pending requests, add friend
 │   │   └── members/          # Members sidebar grouped by role
 │   └── index.ts         # Public barrel exports

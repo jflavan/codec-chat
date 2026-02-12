@@ -57,10 +57,11 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Google Sign-In authentication with persistent sessions (1-week duration)
 - ✅ Automatic silent token refresh via Google One Tap
 - ✅ **Default server ("Codec HQ")** — created automatically on startup; every new user is auto-joined as a Member on first sign-in
-- ✅ Server creation and discovery
-- ✅ Server joining and membership
+- ✅ Server creation and membership
 - ✅ Server membership and roles (Owner, Admin, Member)
 - ✅ Channel creation (Owner/Admin only)
+- ✅ Kick members from servers (Owner/Admin only, with real-time notification)
+- ✅ Server invites — Owner/Admin can generate invite codes; any user can join via code
 - ✅ Channel browsing within servers
 - ✅ Real-time message posting and viewing via SignalR (WebSockets)
 - ✅ Typing indicators (“X is typing…”)

@@ -48,7 +48,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Web UI wired to API data
 - User identity mapping stored from Google subject
 - UI loading/error states added
-- Server membership and roles with join flow
+- Server membership and roles with join flow (invite-only)
 - Server member listing in API and UI
 - Server creation endpoint and UI
 - Channel creation endpoint and UI (Owner/Admin only)
@@ -71,6 +71,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Emoji reactions on messages (toggle, real-time sync via SignalR, floating action bar, reaction pills)
 - Friends feature fully implemented (friend requests, friends list, user search, real-time SignalR events, Friends panel UI, notification badge on Home icon)
 - Direct Messages feature fully implemented (1-on-1 private messaging between friends, DM conversations list, real-time delivery via SignalR, typing indicators, close/reopen conversations, start DM from friends list)
+- Kick member feature implemented (Owner/Admin can kick members, role hierarchy enforced, real-time notification via SignalR, frontend kick button with confirm step)
+- Server invites feature implemented (Owner/Admin create/list/revoke invite codes, any user joins via code, configurable expiry and max uses, frontend invite panel and join-by-code UI)
 
 ## Task breakdown: Session Persistence
 
@@ -156,7 +158,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Import `global.css` in `+layout.svelte` with font preconnect links
 
 ### Component extraction
-- [x] Create `ServerSidebar.svelte` — server icon rail with create/discover/join
+- [x] Create `ServerSidebar.svelte` — server icon rail with create/join-via-invite
 - [x] Create `ChannelSidebar.svelte` — channel list with create form
 - [x] Create `UserPanel.svelte` — user avatar/name/role, sign-out button, Google sign-in button
 - [x] Create `ChatArea.svelte` — chat shell (header, error banner, message feed, typing indicator, composer)

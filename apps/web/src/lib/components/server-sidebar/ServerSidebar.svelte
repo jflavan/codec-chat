@@ -2,6 +2,17 @@
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	const app = getAppState();
+
+	let showJoinByCode = $state(false);
+	let inviteCode = $state('');
+
+	async function handleJoinByCode() {
+		const code = inviteCode.trim();
+		if (!code) return;
+		await app.joinViaInvite(code);
+		inviteCode = '';
+		showJoinByCode = false;
+	}
 </script>
 
 <nav class="server-sidebar" aria-label="Servers">
@@ -48,57 +59,69 @@
 		{/if}
 
 		{#if app.isSignedIn}
-			{#if app.showCreateServer}
-				<div class="server-create-popover">
-					<form class="inline-form" onsubmit={(e) => { e.preventDefault(); app.createServer(); }}>
-						<input
-							type="text"
-							placeholder="Server name"
-							maxlength="100"
-							bind:value={app.newServerName}
-							disabled={app.isCreatingServer}
-						/>
-						<div class="inline-form-actions">
-							<button type="submit" class="btn-primary" disabled={app.isCreatingServer || !app.newServerName.trim()}>
-								{app.isCreatingServer ? '…' : 'Create'}
-							</button>
-							<button type="button" class="btn-secondary" onclick={() => { app.showCreateServer = false; app.newServerName = ''; }}>Cancel</button>
-						</div>
-					</form>
-				</div>
-			{:else}
+			<div class="server-action-wrapper">
 				<button
 					class="server-icon add-server"
 					aria-label="Create a server"
 					title="Create a server"
-					onclick={() => { app.showCreateServer = true; }}
+					onclick={() => { app.showCreateServer = !app.showCreateServer; }}
 				>
 					<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 						<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
 					</svg>
 				</button>
-			{/if}
-		{/if}
+				{#if app.showCreateServer}
+					<div class="server-create-popover">
+						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); app.createServer(); }}>
+							<input
+								type="text"
+								placeholder="Server name"
+								maxlength="100"
+								bind:value={app.newServerName}
+								disabled={app.isCreatingServer}
+							/>
+							<div class="inline-form-actions">
+								<button type="submit" class="btn-primary" disabled={app.isCreatingServer || !app.newServerName.trim()}>
+									{app.isCreatingServer ? '…' : 'Create'}
+								</button>
+								<button type="button" class="btn-secondary" onclick={() => { app.showCreateServer = false; app.newServerName = ''; }}>Cancel</button>
+							</div>
+						</form>
+					</div>
+				{/if}
+			</div>
 
-		{#if app.isSignedIn && app.discoverServers.some((s) => !s.isMember)}
-			<div class="server-separator" role="separator"></div>
-			{#if app.isLoadingDiscover}
-				<p class="muted server-hint">…</p>
-			{:else}
-				{#each app.discoverServers as server}
-					{#if !server.isMember}
-						<button
-							class="server-icon discover-icon"
-							onclick={() => app.joinServer(server.id)}
-							disabled={app.isJoining}
-							aria-label="Join {server.name}"
-							title="Join {server.name}"
-						>
-							{server.name.slice(0, 1).toUpperCase()}
-						</button>
-					{/if}
-				{/each}
-			{/if}
+			<div class="server-action-wrapper">
+				<button
+					class="server-icon join-by-code"
+					aria-label="Join with invite code"
+					title="Join with invite code"
+					onclick={() => { showJoinByCode = !showJoinByCode; }}
+				>
+					<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+						<path d="M5.5 3A2.5 2.5 0 0 0 3 5.5v1a.5.5 0 0 0 1 0v-1A1.5 1.5 0 0 1 5.5 4h1a.5.5 0 0 0 0-1h-1zm8 0a.5.5 0 0 0 0 1h1A1.5 1.5 0 0 1 16 5.5v1a.5.5 0 0 0 1 0v-1A2.5 2.5 0 0 0 14.5 3h-1zM3.5 13a.5.5 0 0 1 .5.5v1A1.5 1.5 0 0 0 5.5 16h1a.5.5 0 0 1 0 1h-1A2.5 2.5 0 0 1 3 14.5v-1a.5.5 0 0 1 .5-.5zm13 0a.5.5 0 0 1 .5.5v1a2.5 2.5 0 0 1-2.5 2.5h-1a.5.5 0 0 1 0-1h1a1.5 1.5 0 0 0 1.5-1.5v-1a.5.5 0 0 1 .5-.5zM8 10a2 2 0 1 1 4 0 2 2 0 0 1-4 0z"/>
+					</svg>
+				</button>
+				{#if showJoinByCode}
+					<div class="server-create-popover">
+						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); handleJoinByCode(); }}>
+							<input
+								type="text"
+								placeholder="Invite code"
+								maxlength="8"
+								bind:value={inviteCode}
+								disabled={app.isJoining}
+							/>
+							<div class="inline-form-actions">
+								<button type="submit" class="btn-primary" disabled={app.isJoining || !inviteCode.trim()}>
+									{app.isJoining ? '…' : 'Join'}
+								</button>
+								<button type="button" class="btn-secondary" onclick={() => { showJoinByCode = false; inviteCode = ''; }}>Cancel</button>
+							</div>
+						</form>
+					</div>
+				{/if}
+			</div>
 		{/if}
 	</div>
 </nav>
@@ -218,24 +241,15 @@
 		border-radius: 16px;
 	}
 
-	.discover-icon {
+	.join-by-code {
 		background: var(--bg-primary);
-		color: var(--success);
-		border: 2px dashed var(--border);
-		width: 44px;
-		height: 44px;
+		color: var(--accent);
 	}
 
-	.discover-icon:hover {
-		border-color: var(--success);
-		background: var(--success);
+	.join-by-code:hover {
+		background: var(--accent);
 		color: var(--bg-tertiary);
 		border-radius: 16px;
-	}
-
-	.discover-icon:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 
 	.server-separator {
@@ -250,6 +264,14 @@
 		font-size: 10px;
 		text-align: center;
 		margin: 0;
+	}
+
+	.server-action-wrapper {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
 	}
 
 	.server-create-popover {

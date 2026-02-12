@@ -2,7 +2,6 @@ import { getContext, setContext } from 'svelte';
 import { tick } from 'svelte';
 import type {
 	MemberServer,
-	DiscoverServer,
 	Channel,
 	Message,
 	Member,
@@ -11,7 +10,8 @@ import type {
 	FriendRequest,
 	UserSearchResult,
 	DmConversation,
-	DirectMessage
+	DirectMessage,
+	ServerInvite
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -52,7 +52,6 @@ export function createAppState(apiBaseUrl: string, googleClientId: string): AppS
 export class AppState {
 	/* ───── domain data ───── */
 	servers = $state<MemberServer[]>([]);
-	discoverServers = $state<DiscoverServer[]>([]);
 	channels = $state<Channel[]>([]);
 	messages = $state<Message[]>([]);
 	members = $state<Member[]>([]);
@@ -68,6 +67,9 @@ export class AppState {
 	dmTypingUsers = $state<string[]>([]);
 	unreadDmCounts = $state<Map<string, number>>(new Map());
 
+	/* ───── invite data ───── */
+	serverInvites = $state<ServerInvite[]>([]);
+
 	/* ───── selection ───── */
 	selectedServerId = $state<string | null>(null);
 	selectedChannelId = $state<string | null>(null);
@@ -80,7 +82,6 @@ export class AppState {
 
 	/* ───── loading flags ───── */
 	isLoadingServers = $state(false);
-	isLoadingDiscover = $state(false);
 	isLoadingChannels = $state(false);
 	isLoadingMessages = $state(false);
 	isLoadingMe = $state(false);
@@ -95,10 +96,13 @@ export class AppState {
 	isLoadingDmConversations = $state(false);
 	isLoadingDmMessages = $state(false);
 	isSendingDm = $state(false);
+	isLoadingInvites = $state(false);
+	isCreatingInvite = $state(false);
 
 	/* ───── UI toggles ───── */
 	showCreateServer = $state(false);
 	showCreateChannel = $state(false);
+	showInvitePanel = $state(false);
 	showFriendsPanel = $state(false);
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
@@ -120,6 +124,14 @@ export class AppState {
 	);
 
 	readonly canManageChannels = $derived(
+		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+	);
+
+	readonly canKickMembers = $derived(
+		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+	);
+
+	readonly canManageInvites = $derived(
 		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
@@ -179,7 +191,6 @@ export class AppState {
 		persistToken(token);
 		this.loadMe();
 		this.loadServers();
-		this.loadDiscoverServers();
 		this.startSignalR(token);
 	}
 
@@ -191,7 +202,6 @@ export class AppState {
 		this.me = null;
 		this.status = 'Signed out';
 		this.servers = [];
-		this.discoverServers = [];
 		this.channels = [];
 		this.messages = [];
 		this.members = [];
@@ -207,6 +217,8 @@ export class AppState {
 		this.unreadDmCounts = new Map();
 		this.selectedServerId = null;
 		this.selectedChannelId = null;
+		this.serverInvites = [];
+		this.showInvitePanel = false;
 		this.typingUsers = [];
 		this.error = null;
 		this.showFriendsPanel = false;
@@ -246,18 +258,6 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isLoadingServers = false;
-		}
-	}
-
-	async loadDiscoverServers(): Promise<void> {
-		if (!this.idToken) return;
-		this.isLoadingDiscover = true;
-		try {
-			this.discoverServers = await this.api.getDiscoverServers(this.idToken);
-		} catch (e) {
-			this.setError(e);
-		} finally {
-			this.isLoadingDiscover = false;
 		}
 	}
 
@@ -349,20 +349,6 @@ export class AppState {
 		}
 	}
 
-	async joinServer(serverId: string): Promise<void> {
-		if (!this.idToken) return;
-		this.isJoining = true;
-		try {
-			await this.api.joinServer(this.idToken, serverId);
-			await this.loadServers();
-			await this.loadDiscoverServers();
-		} catch (e) {
-			this.setError(e);
-		} finally {
-			this.isJoining = false;
-		}
-	}
-
 	async createServer(): Promise<void> {
 		const name = this.newServerName.trim();
 		if (!name) {
@@ -377,7 +363,6 @@ export class AppState {
 			this.newServerName = '';
 			this.showCreateServer = false;
 			await this.loadServers();
-			await this.loadDiscoverServers();
 			await this.selectServer(created.id);
 		} catch (e) {
 			this.setError(e);
@@ -405,6 +390,74 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isCreatingChannel = false;
+		}
+	}
+
+	/* ═══════════════════ Server Moderation ═══════════════════ */
+
+	/** Kick a member from the currently selected server. */
+	async kickMember(userId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.kickMember(this.idToken, this.selectedServerId, userId);
+			await this.loadMembers(this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/* ═══════════════════ Server Invites ═══════════════════ */
+
+	/** Load active invites for the currently selected server. */
+	async loadInvites(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isLoadingInvites = true;
+		try {
+			this.serverInvites = await this.api.getInvites(this.idToken, this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingInvites = false;
+		}
+	}
+
+	/** Create a new invite for the currently selected server. */
+	async createInvite(options?: { maxUses?: number | null; expiresInHours?: number | null }): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isCreatingInvite = true;
+		try {
+			const invite = await this.api.createInvite(this.idToken, this.selectedServerId, options);
+			this.serverInvites = [invite, ...this.serverInvites];
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isCreatingInvite = false;
+		}
+	}
+
+	/** Revoke an invite from the currently selected server. */
+	async revokeInvite(inviteId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.revokeInvite(this.idToken, this.selectedServerId, inviteId);
+			this.serverInvites = this.serverInvites.filter((i) => i.id !== inviteId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Join a server via invite code. */
+	async joinViaInvite(code: string): Promise<void> {
+		if (!this.idToken) return;
+		this.isJoining = true;
+		try {
+			const result = await this.api.joinViaInvite(this.idToken, code);
+			await this.loadServers();
+			await this.selectServer(result.serverId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isJoining = false;
 		}
 	}
 
@@ -523,6 +576,7 @@ export class AppState {
 	/** Navigate back to a server view. */
 	async selectServer(serverId: string): Promise<void> {
 		this.showFriendsPanel = false;
+		this.showInvitePanel = false;
 		this.selectedServerId = serverId;
 		await this.loadChannels(serverId);
 		await this.loadMembers(serverId);
@@ -810,6 +864,21 @@ export class AppState {
 			onDmConversationOpened: () => {
 				// A new DM conversation was opened by another user — refresh the list.
 				this.loadDmConversations();
+			},
+			onKickedFromServer: (event) => {
+				// Remove the server from the local list and navigate away if needed.
+				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
+				if (this.selectedServerId === event.serverId) {
+					this.selectedServerId = this.servers[0]?.serverId ?? null;
+					this.channels = [];
+					this.messages = [];
+					this.members = [];
+					if (this.selectedServerId) {
+						this.loadChannels(this.selectedServerId);
+						this.loadMembers(this.selectedServerId);
+					}
+				}
+				this.error = `You were kicked from "${event.serverName}".`;
 			}
 		});
 

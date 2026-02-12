@@ -20,6 +20,7 @@ public class CodecDbContext : DbContext
     public DbSet<DmChannel> DmChannels => Set<DmChannel>();
     public DbSet<DmChannelMember> DmChannelMembers => Set<DmChannelMember>();
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
+    public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -130,6 +131,24 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<DirectMessage>()
             .HasIndex(message => message.AuthorUserId);
+
+        // Server invite relationships and constraints.
+        modelBuilder.Entity<ServerInvite>()
+            .HasOne(invite => invite.Server)
+            .WithMany(server => server.Invites)
+            .HasForeignKey(invite => invite.ServerId);
+
+        modelBuilder.Entity<ServerInvite>()
+            .HasOne(invite => invite.CreatedByUser)
+            .WithMany(user => user.CreatedInvites)
+            .HasForeignKey(invite => invite.CreatedByUserId);
+
+        modelBuilder.Entity<ServerInvite>()
+            .HasIndex(invite => invite.Code)
+            .IsUnique();
+
+        modelBuilder.Entity<ServerInvite>()
+            .HasIndex(invite => invite.ServerId);
 
         // SQLite does not natively support DateTimeOffset ordering.
         // Store as ISO 8601 strings so ORDER BY works correctly.

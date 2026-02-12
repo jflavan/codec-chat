@@ -28,13 +28,16 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Delete avatar endpoints (revert to Google profile picture or global avatar)
 
 ### Server Management
-- ✅ Server discovery (browse all servers)
 - ✅ Server creation (authenticated user becomes Owner)
-- ✅ Server joining flow
 - ✅ Server membership tracking
 - ✅ Server member list display
 - ✅ Role-based membership (Owner, Admin, Member)
 - ✅ Member display with avatar and role
+- ✅ Kick members (Owner can kick Admins and Members; Admins can kick Members only)
+- ✅ Real-time kick notification via SignalR (kicked user is redirected automatically)
+- ✅ Server invite codes (Owner/Admin create, list, revoke invites; any user can join via code)
+- ✅ Invite code generation (cryptographically random 8-character alphanumeric codes)
+- ✅ Configurable invite expiry (default 7 days, custom hours, or never) and max uses
 
 ### Channel & Messaging
 - ✅ Channel list per server
@@ -111,9 +114,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ## 🚧 In Progress
 
 ### Authorization
-- 🔄 Role-based permissions (Owner/Admin privileges)
+- ✅ Role-based permissions (Owner/Admin privileges)
 - 🔄 Authorization policies for endpoints
-- 🔄 Admin-only operations (channel creation, member management)
+- ✅ Admin-only operations (channel creation, member kicking)
 
 ### Data Validation
 - 🔄 Enhanced input validation
@@ -151,7 +154,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Server Management
 - Server settings/configuration
-- Server invites (invite codes)
+- ~~Server invites (invite codes)~~ → ✅ implemented
 - Server icons/avatars
 - Channel categories/organization
 - Channel editing and deletion
@@ -174,7 +177,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Notification system (push, email)
 
 ### Moderation & Administration
-- User banning/kicking
+- ✅ User kicking (Owner/Admin only, with role hierarchy enforcement)
+- User banning
 - Message moderation
 - Audit logs
 - Report system

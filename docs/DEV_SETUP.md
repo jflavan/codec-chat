@@ -113,8 +113,8 @@ dotnet ef migrations script
 3. Complete the Google authentication flow
 4. You should see:
    - Your user profile
-   - A list of available servers (seeded data: "Codec HQ")
-   - Ability to join servers and view channels
+   - A list of your servers (seeded data: "Codec HQ")
+   - Ability to create servers, join via invite codes, and view channels
 5. Open a second browser window (or incognito) and sign in with a different account
 6. Both users should see:
    - Real-time message delivery (messages appear without page refresh)

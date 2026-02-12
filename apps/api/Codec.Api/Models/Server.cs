@@ -11,4 +11,5 @@ public class Server
     public string Name { get; set; } = string.Empty;
     public List<Channel> Channels { get; set; } = new();
     public List<ServerMember> Members { get; set; } = new();
+    public List<ServerInvite> Invites { get; set; } = new();
 }

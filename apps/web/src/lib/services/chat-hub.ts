@@ -40,6 +40,11 @@ export type DmConversationOpenedEvent = {
 	participant: DmParticipant;
 };
 
+export type KickedFromServerEvent = {
+	serverId: string;
+	serverName: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -54,6 +59,7 @@ export type SignalRCallbacks = {
 	onDmTyping?: (dmChannelId: string, displayName: string) => void;
 	onDmStoppedTyping?: (dmChannelId: string, displayName: string) => void;
 	onDmConversationOpened?: (event: DmConversationOpenedEvent) => void;
+	onKickedFromServer?: (event: KickedFromServerEvent) => void;
 };
 
 /**
@@ -109,6 +115,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onDmConversationOpened) {
 			connection.on('DmConversationOpened', callbacks.onDmConversationOpened);
+		}
+		if (callbacks.onKickedFromServer) {
+			connection.on('KickedFromServer', callbacks.onKickedFromServer);
 		}
 
 		try {

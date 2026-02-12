@@ -1,9 +1,12 @@
+using System.Security.Cryptography;
 using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Codec.Api.Hubs;
 
 namespace Codec.Api.Controllers;
 
@@ -13,7 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("servers")]
-public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService) : ControllerBase
+public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, IHubContext<ChatHub> hub) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -30,26 +33,6 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
                 member.ServerId,
                 Name = member.Server!.Name,
                 Role = member.Role.ToString()
-            })
-            .ToListAsync();
-
-        return Ok(servers);
-    }
-
-    /// <summary>
-    /// Discovers all servers, indicating whether the user is already a member.
-    /// </summary>
-    [HttpGet("discover")]
-    public async Task<IActionResult> Discover()
-    {
-        var appUser = await userService.GetOrCreateUserAsync(User);
-        var servers = await db.Servers
-            .AsNoTracking()
-            .Select(server => new
-            {
-                server.Id,
-                server.Name,
-                IsMember = db.ServerMembers.Any(member => member.ServerId == server.Id && member.UserId == appUser.Id)
             })
             .ToListAsync();
 
@@ -101,44 +84,6 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Joins an existing server as a Member.
-    /// </summary>
-    [HttpPost("{serverId:guid}/join")]
-    public async Task<IActionResult> Join(Guid serverId)
-    {
-        var appUser = await userService.GetOrCreateUserAsync(User);
-        var serverExists = await db.Servers.AsNoTracking().AnyAsync(server => server.Id == serverId);
-        if (!serverExists)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
-
-        var existing = await db.ServerMembers.FindAsync(serverId, appUser.Id);
-        if (existing is not null)
-        {
-            return Ok(new { serverId, userId = appUser.Id, role = existing.Role.ToString() });
-        }
-
-        var membership = new ServerMember
-        {
-            ServerId = serverId,
-            UserId = appUser.Id,
-            Role = ServerRole.Member,
-            JoinedAt = DateTimeOffset.UtcNow
-        };
-
-        db.ServerMembers.Add(membership);
-        await db.SaveChangesAsync();
-
-        return Created($"/servers/{serverId}/members/{appUser.Id}", new
-        {
-            serverId,
-            userId = appUser.Id,
-            role = membership.Role.ToString()
-        });
-    }
-
-    /// <summary>
     /// Lists the members of a server. Requires membership.
     /// </summary>
     [HttpGet("{serverId:guid}/members")]
@@ -181,6 +126,70 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         });
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Kicks a user from a server. Requires Owner or Admin role.
+    /// Owners can kick anyone except themselves; Admins can only kick Members.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/members/{targetUserId:guid}")]
+    public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var callerMembership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (callerMembership is null)
+        {
+            return Forbid();
+        }
+
+        if (callerMembership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        {
+            return Forbid();
+        }
+
+        if (targetUserId == appUser.Id)
+        {
+            return BadRequest(new { error = "You cannot kick yourself." });
+        }
+
+        var targetMembership = await db.ServerMembers
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+
+        if (targetMembership is null)
+        {
+            return NotFound(new { error = "User is not a member of this server." });
+        }
+
+        if (targetMembership.Role is ServerRole.Owner)
+        {
+            return BadRequest(new { error = "Cannot kick the server owner." });
+        }
+
+        if (callerMembership.Role is ServerRole.Admin && targetMembership.Role is ServerRole.Admin)
+        {
+            return Forbid();
+        }
+
+        db.ServerMembers.Remove(targetMembership);
+        await db.SaveChangesAsync();
+
+        // Notify the kicked user in real-time so their client can update.
+        var serverName = await db.Servers
+            .AsNoTracking()
+            .Where(s => s.Id == serverId)
+            .Select(s => s.Name)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
+        await hub.Clients.Group($"user-{targetUserId}").SendAsync("KickedFromServer", new
+        {
+            serverId,
+            serverName
+        });
+
+        return NoContent();
     }
 
     /// <summary>
@@ -256,6 +265,222 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             channel.Id,
             channel.Name,
             channel.ServerId
+        });
+    }
+
+    /* ═══════════════════ Server Invites ═══════════════════ */
+
+    /// <summary>
+    /// Creates a new invite code for a server. Requires Owner or Admin role.
+    /// </summary>
+    [HttpPost("{serverId:guid}/invites")]
+    public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (membership is null)
+        {
+            return Forbid();
+        }
+
+        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        {
+            return Forbid();
+        }
+
+        var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+        if (!serverExists)
+        {
+            return NotFound(new { error = "Server not found." });
+        }
+
+        DateTimeOffset? expiresAt = request.ExpiresInHours switch
+        {
+            null => DateTimeOffset.UtcNow.AddDays(7),
+            0 => null,
+            > 0 => DateTimeOffset.UtcNow.AddHours(request.ExpiresInHours.Value),
+            _ => DateTimeOffset.UtcNow.AddDays(7)
+        };
+
+        var code = GenerateInviteCode();
+
+        var invite = new ServerInvite
+        {
+            ServerId = serverId,
+            Code = code,
+            CreatedByUserId = appUser.Id,
+            ExpiresAt = expiresAt,
+            MaxUses = request.MaxUses is null or 0 ? null : request.MaxUses,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.ServerInvites.Add(invite);
+        await db.SaveChangesAsync();
+
+        return Created($"/servers/{serverId}/invites/{invite.Id}", new
+        {
+            invite.Id,
+            invite.ServerId,
+            invite.Code,
+            invite.ExpiresAt,
+            invite.MaxUses,
+            invite.UseCount,
+            invite.CreatedAt,
+            CreatedByUserId = appUser.Id
+        });
+    }
+
+    /// <summary>
+    /// Lists active invite codes for a server. Requires Owner or Admin role.
+    /// </summary>
+    [HttpGet("{serverId:guid}/invites")]
+    public async Task<IActionResult> GetInvites(Guid serverId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (membership is null)
+        {
+            return Forbid();
+        }
+
+        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        {
+            return Forbid();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var invites = await db.ServerInvites
+            .AsNoTracking()
+            .Where(i => i.ServerId == serverId)
+            .Where(i => i.ExpiresAt == null || i.ExpiresAt > now)
+            .Select(i => new
+            {
+                i.Id,
+                i.ServerId,
+                i.Code,
+                i.ExpiresAt,
+                i.MaxUses,
+                i.UseCount,
+                i.CreatedAt,
+                i.CreatedByUserId
+            })
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync();
+
+        return Ok(invites);
+    }
+
+    /// <summary>
+    /// Revokes (deletes) an invite code. Requires Owner or Admin role.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/invites/{inviteId:guid}")]
+    public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (membership is null)
+        {
+            return Forbid();
+        }
+
+        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        {
+            return Forbid();
+        }
+
+        var invite = await db.ServerInvites
+            .FirstOrDefaultAsync(i => i.Id == inviteId && i.ServerId == serverId);
+
+        if (invite is null)
+        {
+            return NotFound(new { error = "Invite not found." });
+        }
+
+        db.ServerInvites.Remove(invite);
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Joins a server via an invite code. Any authenticated user can use this.
+    /// Uses an absolute route to break out of the "servers" prefix.
+    /// </summary>
+    [HttpPost("/invites/{code}")]
+    public async Task<IActionResult> JoinViaInvite(string code)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var now = DateTimeOffset.UtcNow;
+
+        var invite = await db.ServerInvites
+            .FirstOrDefaultAsync(i => i.Code == code);
+
+        if (invite is null)
+        {
+            return NotFound(new { error = "Invalid invite code." });
+        }
+
+        if (invite.ExpiresAt is not null && invite.ExpiresAt <= now)
+        {
+            return BadRequest(new { error = "This invite has expired." });
+        }
+
+        if (invite.MaxUses is not null && invite.UseCount >= invite.MaxUses)
+        {
+            return BadRequest(new { error = "This invite has reached maximum uses." });
+        }
+
+        var existingMembership = await db.ServerMembers
+            .FindAsync(invite.ServerId, appUser.Id);
+
+        if (existingMembership is not null)
+        {
+            return Ok(new
+            {
+                serverId = invite.ServerId,
+                userId = appUser.Id,
+                role = existingMembership.Role.ToString()
+            });
+        }
+
+        var membership = new ServerMember
+        {
+            ServerId = invite.ServerId,
+            UserId = appUser.Id,
+            Role = ServerRole.Member,
+            JoinedAt = DateTimeOffset.UtcNow
+        };
+
+        db.ServerMembers.Add(membership);
+        invite.UseCount++;
+        await db.SaveChangesAsync();
+
+        return Created($"/servers/{invite.ServerId}/members/{appUser.Id}", new
+        {
+            serverId = invite.ServerId,
+            userId = appUser.Id,
+            role = membership.Role.ToString()
+        });
+    }
+
+    private static string GenerateInviteCode()
+    {
+        Span<byte> bytes = stackalloc byte[8];
+        RandomNumberGenerator.Fill(bytes);
+        return string.Create(8, bytes.ToArray(), static (span, b) =>
+        {
+            const string c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            for (var i = 0; i < span.Length; i++)
+                span[i] = c[b[i] % c.Length];
         });
     }
 }

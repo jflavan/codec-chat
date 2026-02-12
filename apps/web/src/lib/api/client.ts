@@ -1,6 +1,5 @@
 import type {
 	MemberServer,
-	DiscoverServer,
 	Channel,
 	Message,
 	Reaction,
@@ -10,7 +9,8 @@ import type {
 	FriendRequest,
 	UserSearchResult,
 	DmConversation,
-	DirectMessage
+	DirectMessage,
+	ServerInvite
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -124,24 +124,11 @@ export class ApiClient {
 		});
 	}
 
-	getDiscoverServers(token: string): Promise<DiscoverServer[]> {
-		return this.request(`${this.baseUrl}/servers/discover`, {
-			headers: this.headers(token)
-		});
-	}
-
 	createServer(token: string, name: string): Promise<{ id: string; name: string; role: string }> {
 		return this.request(`${this.baseUrl}/servers`, {
 			method: 'POST',
 			headers: this.headers(token, true),
 			body: JSON.stringify({ name })
-		});
-	}
-
-	joinServer(token: string, serverId: string): Promise<void> {
-		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/join`, {
-			method: 'POST',
-			headers: this.headers(token)
 		});
 	}
 
@@ -307,6 +294,61 @@ export class ApiClient {
 		return this.requestVoid(
 			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}`,
 			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Server Moderation ───── */
+
+	/** Kick a member from a server (requires Owner or Admin role). */
+	kickMember(token: string, serverId: string, userId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Server Invites ───── */
+
+	/** Create an invite code for a server (requires Owner or Admin role). */
+	createInvite(
+		token: string,
+		serverId: string,
+		options?: { maxUses?: number | null; expiresInHours?: number | null }
+	): Promise<ServerInvite> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/invites`,
+			{
+				method: 'POST',
+				headers: this.headers(token, true),
+				body: JSON.stringify({
+					maxUses: options?.maxUses ?? null,
+					expiresInHours: options?.expiresInHours ?? null
+				})
+			}
+		);
+	}
+
+	/** List active invites for a server (requires Owner or Admin role). */
+	getInvites(token: string, serverId: string): Promise<ServerInvite[]> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/invites`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Revoke an invite code (requires Owner or Admin role). */
+	revokeInvite(token: string, serverId: string, inviteId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/invites/${encodeURIComponent(inviteId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/** Join a server using an invite code. */
+	joinViaInvite(token: string, code: string): Promise<{ serverId: string; userId: string; role: string }> {
+		return this.request(
+			`${this.baseUrl}/invites/${encodeURIComponent(code)}`,
+			{ method: 'POST', headers: this.headers(token) }
 		);
 	}
 }

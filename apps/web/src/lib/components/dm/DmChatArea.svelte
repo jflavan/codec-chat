@@ -7,6 +7,7 @@
 	const BOTTOM_THRESHOLD = 50;
 
 	let container: HTMLDivElement;
+	let dmInputEl: HTMLInputElement;
 	let isLockedToBottom = $state(true);
 	let unreadCount = $state(0);
 
@@ -76,6 +77,12 @@
 			}
 		});
 	});
+
+	async function handleDmSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		await app.sendDmMessage();
+		dmInputEl?.focus();
+	}
 </script>
 
 <main class="dm-chat" aria-label="Direct message conversation">
@@ -172,8 +179,9 @@
 	{/if}
 
 	<!-- Composer -->
-	<form class="composer" onsubmit={(e) => { e.preventDefault(); app.sendDmMessage(); }}>
+	<form class="composer" onsubmit={handleDmSubmit}>
 		<input
+			bind:this={dmInputEl}
 			class="composer-input"
 			type="text"
 			placeholder={app.activeDmParticipant ? `Message @${app.activeDmParticipant.displayName}` : 'Select a conversation…'}

@@ -97,6 +97,19 @@ EF Core migrations make database provider switches straightforward.
                          │ UpdatedAt   │
                          └─────────────┘
 
+┌──────────────┐       ┌───────────────┐
+│ ServerInvite │       │   Server      │
+│──────────────│       │               │
+│ Id (PK)      │       │               │
+│ ServerId (FK)│───────│               │
+│ Code (unique)│       │               │
+│ CreatedBy(FK)│──┐    │               │
+│ ExpiresAt    │  │    └───────────────┘
+│ MaxUses      │  │
+│ UseCount     │  └──────► User
+│ CreatedAt    │
+└──────────────┘
+
 ┌─────────────┐       ┌─────────────────┐       ┌─────────────┐
 │   User      │       │ DmChannelMember │       │  DmChannel  │
 │─────────────│       │─────────────────│       │─────────────│
@@ -141,6 +154,7 @@ Represents an authenticated user in the system.
 - One-to-many with `Friendship` (as Recipient, via `ReceivedFriendRequests`)
 - One-to-many with `DmChannelMember` (DM conversations the user participates in)
 - One-to-many with `DirectMessage` (DM messages authored by the user)
+- One-to-many with `ServerInvite` (invites created by the user, via `CreatedInvites`)
 
 **Notes:**
 - `GoogleSubject` is the primary link to Google identity
@@ -162,6 +176,7 @@ Top-level organizational unit (equivalent to Discord servers).
 **Relationships:**
 - One-to-many with `Channel`
 - One-to-many with `ServerMember`
+- One-to-many with `ServerInvite`
 
 #### ServerMember
 Join table linking users to servers with role information.
@@ -276,6 +291,31 @@ public enum FriendshipStatus
 - Self-friendship is prevented at the API level (`RequesterId` must differ from `RecipientId`)
 - Declined requests retain the record (status changes to `Declined`); cancelled requests delete the record
 
+#### ServerInvite
+Invite code for joining a server. Owners and Admins can create and manage invite codes.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique invite identifier |
+| `ServerId` | Guid (FK) | Reference to Server |
+| `Code` | string (unique) | Short alphanumeric invite code (8 characters) |
+| `CreatedByUserId` | Guid (FK) | Reference to User who created the invite |
+| `ExpiresAt` | DateTimeOffset? | When the invite expires (`null` = never) |
+| `MaxUses` | int? | Maximum number of uses (`null` or `0` = unlimited) |
+| `UseCount` | int | How many times this invite has been used |
+| `CreatedAt` | DateTimeOffset | Invite creation timestamp |
+
+**Unique Constraint:** `Code` — each invite code must be globally unique
+
+**Relationships:**
+- Many-to-one with `Server`
+- Many-to-one with `User` (as creator)
+
+**Notes:**
+- Codes are generated using `System.Security.Cryptography.RandomNumberGenerator` for cryptographic randomness
+- Expired invites are filtered out when listing but not automatically deleted
+- `UseCount` is incremented atomically when a user joins via the code
+
 #### DmChannel
 A private 1-on-1 conversation channel, not attached to any server.
 
@@ -347,6 +387,7 @@ public class CodecDbContext : DbContext
     public DbSet<DmChannel> DmChannels => Set<DmChannel>();
     public DbSet<DmChannelMember> DmChannelMembers => Set<DmChannelMember>();
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
+    public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -545,6 +586,15 @@ modelBuilder.Entity<DirectMessage>()
 // DirectMessage: fast lookup of messages by author
 modelBuilder.Entity<DirectMessage>()
     .HasIndex(m => m.AuthorUserId);
+
+// ServerInvite: unique code for fast lookup when joining
+modelBuilder.Entity<ServerInvite>()
+    .HasIndex(i => i.Code)
+    .IsUnique();
+
+// ServerInvite: fast listing of invites for a server
+modelBuilder.Entity<ServerInvite>()
+    .HasIndex(i => i.ServerId);
 ```
 
 ### Query Patterns

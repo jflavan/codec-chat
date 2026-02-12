@@ -5,13 +5,6 @@ export type MemberServer = {
 	role: string;
 };
 
-/** Server returned from the discover endpoint. */
-export type DiscoverServer = {
-	id: string;
-	name: string;
-	isMember: boolean;
-};
-
 /** Text channel within a server. */
 export type Channel = {
 	id: string;
@@ -124,4 +117,16 @@ export type DirectMessage = {
 	body: string;
 	createdAt: string;
 	authorAvatarUrl?: string | null;
+};
+
+/** Server invite code created by an Owner or Admin. */
+export type ServerInvite = {
+	id: string;
+	serverId: string;
+	code: string;
+	expiresAt: string | null;
+	maxUses: number | null;
+	useCount: number;
+	createdAt: string;
+	createdByUserId: string;
 };

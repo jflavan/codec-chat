@@ -1,6 +1,5 @@
 export type {
 	MemberServer,
-	DiscoverServer,
 	Channel,
 	Message,
 	Reaction,
@@ -14,5 +13,6 @@ export type {
 	DmParticipant,
 	DmLastMessage,
 	DmConversation,
-	DirectMessage
+	DirectMessage,
+	ServerInvite
 } from './models.js';

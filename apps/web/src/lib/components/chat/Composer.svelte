@@ -2,10 +2,18 @@
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	const app = getAppState();
+	let inputEl: HTMLInputElement;
+
+	async function handleSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		await app.sendMessage();
+		inputEl?.focus();
+	}
 </script>
 
-<form class="composer" onsubmit={(e) => { e.preventDefault(); app.sendMessage(); }}>
+<form class="composer" onsubmit={handleSubmit}>
 	<input
+		bind:this={inputEl}
 		class="composer-input"
 		type="text"
 		placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}

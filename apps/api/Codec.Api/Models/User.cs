@@ -23,4 +23,5 @@ public class User
     public List<Friendship> ReceivedFriendRequests { get; set; } = new();
     public List<DmChannelMember> DmChannelMemberships { get; set; } = new();
     public List<DirectMessage> DirectMessages { get; set; } = new();
+    public List<ServerInvite> CreatedInvites { get; set; } = new();
 }
