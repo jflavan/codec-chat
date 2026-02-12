@@ -35,7 +35,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Typing indicators ("X is typing…")
 
 ### UI/UX
-- ✅ Discord-inspired dark theme (CSS custom properties, blurple accent)
+- ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
 - ✅ Three-column layout: server icon rail, channel sidebar, chat area
 - ✅ Fourth column: members sidebar (responsive, hidden on smaller screens)
 - ✅ Server icon rail with circular icons, active pill indicator, hover morph
@@ -49,6 +49,18 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Responsive breakpoints (mobile, tablet, desktop)
 - ✅ Accessibility: focus-visible outlines, prefers-reduced-motion, semantic HTML, ARIA labels
 - ✅ Design specification documented in `docs/DESIGN.md`
+
+### Frontend Architecture
+- ✅ Modular layered architecture (types, API client, auth, services, state, components)
+- ✅ Central `AppState` class with Svelte 5 `$state` / `$derived` runes
+- ✅ Context-based dependency injection (`setContext` / `getContext`)
+- ✅ Typed HTTP client (`ApiClient` class with `ApiError`)
+- ✅ Auth module: token persistence (`localStorage`), session management, Google SDK wrapper
+- ✅ SignalR service: `ChatHubService` for hub connection lifecycle
+- ✅ CSS design tokens (`tokens.css`) and global base styles (`global.css`)
+- ✅ Feature-grouped component directories (server-sidebar, channel-sidebar, chat, members)
+- ✅ Thin page composition shell (`+page.svelte` ~75 lines)
+- ✅ Barrel exports via `$lib/index.ts`
 
 ### API Infrastructure
 - ✅ Health check endpoint (`/health`)

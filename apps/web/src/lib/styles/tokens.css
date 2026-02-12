@@ -1,0 +1,22 @@
+/* ===== CODEC phosphor-green CRT palette – Design Tokens ===== */
+
+:root {
+	--bg-primary: #0B1A10;
+	--bg-secondary: #07110A;
+	--bg-tertiary: #050B07;
+	--bg-message-hover: #102417;
+	--accent: #00FF66;
+	--accent-hover: #33FFB2;
+	--text-normal: #86FF6B;
+	--text-muted: #3ED44E;
+	--text-header: #B7FF9A;
+	--text-dim: #2D7A3A;
+	--warn: #FFB000;
+	--danger: #FF3B3B;
+	--success: #00FF66;
+	--border: #1E3A26;
+	--grid: #14301F;
+	--mention-bg: #123A22;
+	--selection-bg: #0F3A22;
+	--input-bg: #06160C;
+}

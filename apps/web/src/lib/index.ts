@@ -1,1 +1,10 @@
-// place files you want to import through the `$lib` alias in this folder.
+// Re-export public API surface for convenient imports.
+export { createAppState, getAppState } from './state/app-state.svelte.js';
+export type {
+	MemberServer,
+	DiscoverServer,
+	Channel,
+	Message,
+	Member,
+	UserProfile
+} from './types/index.js';

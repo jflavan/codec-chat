@@ -169,8 +169,11 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 
 ## Implementation Notes
 
-- All colors defined as CSS custom properties on `:root` following the CODEC CRT palette in [THEME.md](THEME.md)
-- Component-scoped styles in Svelte `<style>` blocks
-- Font loaded via Google Fonts (`Space Grotesk` as primary, system-ui fallback)
+- All colors defined as CSS custom properties on `:root` in `$lib/styles/tokens.css` following the CODEC CRT palette in [THEME.md](THEME.md)
+- Global base styles (resets, font imports, selection, focus-visible) in `$lib/styles/global.css`, imported once in `+layout.svelte`
+- Component-scoped styles in Svelte `<style>` blocks within each component
+- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`
+- Font loaded via Google Fonts (`Space Grotesk` as primary, system-ui fallback) with preconnect links in `+layout.svelte`
 - Semantic HTML throughout for accessibility
 - `prefers-color-scheme` media query ready for future light mode toggle
+- `prefers-reduced-motion` media query disables transitions when user prefers reduced motion

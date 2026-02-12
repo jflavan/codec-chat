@@ -62,6 +62,12 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - WebSocket JWT authentication via `access_token` query parameter
 - camelCase JSON serialization for SignalR payloads
 - Client-side SignalR connection with automatic reconnect
+- Frontend architecture refactored to modular layers (types, API client, auth, services, state, components)
+- Central AppState class with Svelte 5 $state/$derived runes and context-based DI
+- CSS design tokens extracted to $lib/styles/tokens.css and global.css
+- Feature-grouped Svelte 5 components (server-sidebar, channel-sidebar, chat, members)
+- +page.svelte reduced to ~75-line thin composition shell
+- Sign-out button in user panel
 
 ## Task breakdown: Session Persistence
 
@@ -116,7 +122,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ### UI implementation
 - [x] Three-column layout: server icon rail (72px) + channel sidebar (240px) + flexible chat area
 - [x] Fourth column: members sidebar (240px), hidden on smaller screens
-- [x] Dark color scheme with CSS custom properties (blurple accent #5865f2, dark backgrounds)
+- [x] Dark color scheme with CSS custom properties (CODEC CRT phosphor-green palette)
 - [x] Discord-style server icons (circular, hover morph, active pill indicator)
 - [x] Channel list with `#` hash icon prefix and active/hover states
 - [x] Message feed with avatar, author, timestamp, grouped consecutive messages
@@ -130,6 +136,48 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update PLAN.md with design refinement milestone
 - [x] Update FEATURES.md to reflect design implementation
 
+## Task breakdown: Front-End Architecture Refactoring
+
+### Module extraction
+- [x] Create `$lib/types/models.ts` — shared TypeScript interfaces for domain models
+- [x] Create `$lib/utils/format.ts` — pure utility functions (date/time formatting)
+- [x] Create `$lib/api/client.ts` — typed `ApiClient` class with `ApiError`
+- [x] Create `$lib/auth/session.ts` — token persistence, expiration checking, session management
+- [x] Create `$lib/auth/google.ts` — Google Identity Services SDK initialization wrapper
+- [x] Create `$lib/services/chat-hub.ts` — `ChatHubService` for SignalR hub connection lifecycle
+- [x] Create `$lib/state/app-state.svelte.ts` — central `AppState` class with `$state`/`$derived` runes and context-based DI
+
+### Styles extraction
+- [x] Create `$lib/styles/tokens.css` — CSS custom properties (CODEC CRT design tokens)
+- [x] Create `$lib/styles/global.css` — base styles, resets, font imports
+- [x] Import `global.css` in `+layout.svelte` with font preconnect links
+
+### Component extraction
+- [x] Create `ServerSidebar.svelte` — server icon rail with create/discover/join
+- [x] Create `ChannelSidebar.svelte` — channel list with create form
+- [x] Create `UserPanel.svelte` — user avatar/name/role, sign-out button, Google sign-in button
+- [x] Create `ChatArea.svelte` — chat shell (header, error banner, message feed, typing indicator, composer)
+- [x] Create `MessageFeed.svelte` — scrollable message list with grouping logic
+- [x] Create `MessageItem.svelte` — single message (grouped/ungrouped variants)
+- [x] Create `Composer.svelte` — message input with send button
+- [x] Create `TypingIndicator.svelte` — animated typing dots with user names
+- [x] Create `MembersSidebar.svelte` — members grouped by role using `$derived`
+- [x] Create `MemberItem.svelte` — single member card with avatar
+
+### Page rewrite and verification
+- [x] Rewrite `+page.svelte` as thin composition shell (~75 lines)
+- [x] Update `$lib/index.ts` barrel exports
+- [x] Verify `npm run build` succeeds (0 errors)
+- [x] Verify `svelte-check` passes (0 errors, 0 warnings)
+
+### Documentation
+- [x] Update ARCHITECTURE.md with frontend architecture details
+- [x] Update web/README.md with architecture overview
+- [x] Update FEATURES.md with frontend architecture features
+- [x] Update AUTH.md with modular code references and sign-out status
+- [x] Update DESIGN.md implementation notes
+- [x] Update PLAN.md with refactoring milestone
+
 ## Next steps
 - Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI
@@ -139,4 +187,4 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Real-time member list updates
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars
-- Sign-out button in user panel
+- Comprehensive unit and integration tests for frontend modules

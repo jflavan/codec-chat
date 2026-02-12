@@ -71,7 +71,7 @@ The web app runs at `http://localhost:5174` by default.
 - [Data Layer](docs/DATA.md) - Database schema and migrations
 
 ## Technology Stack
-- **Frontend:** SvelteKit 2.x, TypeScript, Vite
+- **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management
 - **Backend:** ASP.NET Core 9, Controller-based APIs
 - **Real-time:** SignalR (WebSockets)
 - **Database:** SQLite with Entity Framework Core

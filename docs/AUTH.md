@@ -12,26 +12,32 @@ To provide a seamless user experience, the web client persists the token in `loc
 
 ### 1. Client-Side Sign-In
 
-The web client uses Google Identity Services JavaScript SDK:
+The web client uses the Google Identity Services JavaScript SDK. The initialization logic is encapsulated in `$lib/auth/google.ts`:
 
-```javascript
-// Initialize Google Identity Services
-google.accounts.id.initialize({
-  client_id: PUBLIC_GOOGLE_CLIENT_ID,
-  auto_select: true, // Enable silent re-authentication
-  callback: handleCredentialResponse
-});
+```typescript
+// $lib/auth/google.ts — wraps Google Identity Services initialization
+import { initGoogleIdentity, renderGoogleButton } from '$lib/auth/google';
 
-// User clicks "Sign in with Google", or One Tap fires automatically
-google.accounts.id.prompt();
+initGoogleIdentity(clientId, (credential) => {
+  // credential is the JWT ID token
+  persistToken(credential); // $lib/auth/session.ts
+}, { autoSelect: true });
+```
 
-// Receive ID token
-function handleCredentialResponse(response) {
-  const idToken = response.credential; // JWT token
-  // Persist token to localStorage for session continuity
-  localStorage.setItem('codec_id_token', idToken);
-  localStorage.setItem('codec_login_ts', String(Date.now())); // track session age
-}
+Token persistence and session management are handled by `$lib/auth/session.ts`:
+
+```typescript
+// $lib/auth/session.ts — token lifecycle management
+import { persistToken, loadStoredToken, clearSession, isTokenExpired, isSessionExpired } from '$lib/auth/session';
+
+// On sign-in: persist token + login timestamp
+persistToken(idToken);
+
+// On page load: restore token if still valid
+const storedToken = loadStoredToken(); // returns null if expired or session > 1 week
+
+// On sign-out or session expiry
+clearSession();
 ```
 
 ### 2. API Request with Token
@@ -242,9 +248,9 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - Future: Add Microsoft, GitHub, email/password
 
 ⚠️ **Sign-Out**
-- No explicit sign-out button yet
-- Users can clear session by clearing browser storage
-- Future: Add sign-out UI that calls `clearSession()` and `google.accounts.id.disableAutoSelect()`
+- Sign-out button is available in the user panel (bottom of channel sidebar)
+- Calls `clearSession()` from `$lib/auth/session.ts` and `google.accounts.id.disableAutoSelect()`
+- Resets application state and returns user to the sign-in screen
 
 ## Production Recommendations
 

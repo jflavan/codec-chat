@@ -23,6 +23,83 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
   - Client-side Google Sign-In integration
   - Reactive state management with Svelte 5 runes (`$state`, `$derived`)
   - Type-safe API client
+  - Modular component architecture with context-based dependency injection
+
+#### Frontend Architecture
+
+The web client follows a layered, modular architecture. Each layer has a single responsibility and communicates through well-defined interfaces.
+
+```
+src/
+├── lib/
+│   ├── types/              # Shared TypeScript type definitions
+│   │   ├── models.ts       # Domain models (Server, Channel, Message, Member, etc.)
+│   │   └── index.ts        # Barrel re-export
+│   ├── api/
+│   │   └── client.ts       # Typed HTTP client (ApiClient class with ApiError)
+│   ├── auth/
+│   │   ├── session.ts      # Token persistence & session management (localStorage)
+│   │   └── google.ts       # Google Identity Services SDK initialization
+│   ├── services/
+│   │   └── chat-hub.ts     # SignalR hub connection lifecycle (ChatHubService)
+│   ├── state/
+│   │   └── app-state.svelte.ts  # Central reactive state (AppState class with $state/$derived)
+│   ├── styles/
+│   │   ├── tokens.css      # CSS custom properties (CODEC CRT design tokens)
+│   │   └── global.css      # Base styles, resets, font imports
+│   ├── utils/
+│   │   └── format.ts       # Date/time formatting helpers
+│   ├── components/
+│   │   ├── server-sidebar/
+│   │   │   └── ServerSidebar.svelte      # Server icon rail (create/discover/join)
+│   │   ├── channel-sidebar/
+│   │   │   ├── ChannelSidebar.svelte     # Channel list & create form
+│   │   │   └── UserPanel.svelte          # User avatar/name/role & sign-out
+│   │   ├── chat/
+│   │   │   ├── ChatArea.svelte           # Chat shell (header, feed, composer)
+│   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping
+│   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped)
+│   │   │   ├── Composer.svelte           # Message input with send button
+│   │   │   └── TypingIndicator.svelte    # Animated typing dots
+│   │   └── members/
+│   │       ├── MembersSidebar.svelte     # Members grouped by role
+│   │       └── MemberItem.svelte         # Single member card
+│   └── index.ts            # Public barrel exports
+└── routes/
+    ├── +layout.svelte      # Root layout (global CSS, font preconnect)
+    └── +page.svelte        # Thin composition shell (~75 lines)
+```
+
+**State Management Pattern:**
+
+The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$derived`) for fine-grained reactivity. It is created once in `+page.svelte` via `createAppState()` and injected into the component tree via Svelte's `setContext()`. Child components retrieve it with `getAppState()`.
+
+```
++page.svelte
+  └─ createAppState(apiBaseUrl, googleClientId)  → setContext(APP_STATE_KEY, state)
+      ├── ServerSidebar      → getAppState()
+      ├── ChannelSidebar     → getAppState()
+      │   └── UserPanel      → getAppState()
+      ├── ChatArea           → getAppState()
+      │   ├── MessageFeed    → getAppState()
+      │   ├── Composer       → getAppState()
+      │   └── TypingIndicator → getAppState()
+      └── MembersSidebar     → getAppState()
+          └── MemberItem     (receives props, no context needed)
+```
+
+**Layer Responsibilities:**
+
+| Layer | Purpose |
+|-------|---------|
+| `types/` | Shared TypeScript interfaces for domain models |
+| `api/` | HTTP communication with the REST API; typed methods, `encodeURIComponent` on path params |
+| `auth/` | Token lifecycle (persist, load, expire, clear) and Google SDK setup |
+| `services/` | External service integrations (SignalR hub connection management) |
+| `state/` | Central reactive application state; orchestrates API calls, auth, and hub events |
+| `styles/` | Design tokens as CSS custom properties; global base styles |
+| `utils/` | Pure utility functions (formatting, etc.) |
+| `components/` | Presentational Svelte 5 components grouped by feature area |
 
 ### API Server (ASP.NET Core)
 - **Location:** `apps/api/Codec.Api/`
