@@ -79,3 +79,6 @@ uploads/
 # Local app secrets
 appsettings.Development.json
 apps/api/Codec.Api/appsettings.Development.json
+
+# Deployment plan (contains infrastructure details)
+docs/GCP_DEPLOYMENT_PLAN.md
