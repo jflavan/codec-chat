@@ -6,6 +6,21 @@
 	let showJoinByCode = $state(false);
 	let inviteCode = $state('');
 
+	let createWrapperEl = $state<HTMLElement>();
+	let joinWrapperEl = $state<HTMLElement>();
+
+	function handleWindowClick(e: MouseEvent) {
+		const target = e.target as Node;
+		if (app.showCreateServer && createWrapperEl && !createWrapperEl.contains(target)) {
+			app.showCreateServer = false;
+			app.newServerName = '';
+		}
+		if (showJoinByCode && joinWrapperEl && !joinWrapperEl.contains(target)) {
+			showJoinByCode = false;
+			inviteCode = '';
+		}
+	}
+
 	async function handleJoinByCode() {
 		const code = inviteCode.trim();
 		if (!code) return;
@@ -14,6 +29,8 @@
 		showJoinByCode = false;
 	}
 </script>
+
+<svelte:window onclick={handleWindowClick} />
 
 <nav class="server-sidebar" aria-label="Servers">
 	<div class="server-list">
@@ -64,8 +81,11 @@
 			{/each}
 		{/if}
 
-		{#if app.isSignedIn}
-			<div class="server-action-wrapper">
+	</div>
+
+	{#if app.isSignedIn}
+		<div class="server-actions">
+			<div class="server-action-wrapper" bind:this={createWrapperEl}>
 				<button
 					class="server-icon add-server"
 					aria-label="Create a server"
@@ -97,7 +117,7 @@
 				{/if}
 			</div>
 
-			<div class="server-action-wrapper">
+			<div class="server-action-wrapper" bind:this={joinWrapperEl}>
 				<button
 					class="server-icon join-by-code"
 					aria-label="Join with invite code"
@@ -128,8 +148,8 @@
 					</div>
 				{/if}
 			</div>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </nav>
 
 <style>
@@ -139,12 +159,7 @@
 		flex-direction: column;
 		align-items: center;
 		padding: 12px 0 12px;
-		overflow-y: auto;
-		scrollbar-width: none;
-	}
-
-	.server-sidebar::-webkit-scrollbar {
-		display: none;
+		z-index: 1;
 	}
 
 	.server-list {
@@ -153,6 +168,23 @@
 		align-items: center;
 		gap: 8px;
 		width: 100%;
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		scrollbar-width: none;
+	}
+
+	.server-list::-webkit-scrollbar {
+		display: none;
+	}
+
+	.server-actions {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding-top: 8px;
 	}
 
 	.server-pill-wrapper {
@@ -284,8 +316,7 @@
 	.server-create-popover {
 		position: absolute;
 		left: 76px;
-		top: 50%;
-		transform: translateY(-50%);
+		bottom: 0;
 		z-index: 40;
 		background: var(--bg-secondary);
 		border: 1px solid var(--border);
