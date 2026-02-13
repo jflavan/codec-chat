@@ -5,9 +5,52 @@
 	import Composer from './Composer.svelte';
 
 	const app = getAppState();
+
+	let isDragOver = $state(false);
+	let dragCounter = 0;
+
+	function handleDragEnter(e: DragEvent): void {
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		e.preventDefault();
+		dragCounter++;
+		isDragOver = true;
+	}
+
+	function handleDragOver(e: DragEvent): void {
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'copy';
+	}
+
+	function handleDragLeave(e: DragEvent): void {
+		e.preventDefault();
+		dragCounter--;
+		if (dragCounter <= 0) {
+			dragCounter = 0;
+			isDragOver = false;
+		}
+	}
+
+	function handleDrop(e: DragEvent): void {
+		e.preventDefault();
+		dragCounter = 0;
+		isDragOver = false;
+		if (!app.selectedChannelId) return;
+		const file = e.dataTransfer?.files[0];
+		if (file?.type.startsWith('image/')) {
+			app.attachImage(file);
+		}
+	}
 </script>
 
-<main class="chat-main" aria-label="Chat">
+<main
+	class="chat-main"
+	aria-label="Chat"
+	ondragenter={handleDragEnter}
+	ondragover={handleDragOver}
+	ondragleave={handleDragLeave}
+	ondrop={handleDrop}
+>
 	<header class="chat-header">
 		<div class="chat-header-left">
 			<svg class="channel-hash" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -18,6 +61,17 @@
 			</h1>
 		</div>
 	</header>
+
+	{#if isDragOver && app.selectedChannelId}
+		<div class="drop-overlay" aria-hidden="true">
+			<div class="drop-overlay-content">
+				<svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/>
+				</svg>
+				<span class="drop-overlay-text">Drop image to upload</span>
+			</div>
+		</div>
+	{/if}
 
 	<div class="chat-body">
 		{#if app.error}
@@ -36,6 +90,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		position: relative;
 	}
 
 	.chat-header {
@@ -64,6 +119,36 @@
 		flex-shrink: 0;
 		color: var(--text-muted);
 		opacity: 0.7;
+	}
+
+	/* ───── Drop overlay ───── */
+
+	.drop-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 50;
+		display: grid;
+		place-items: center;
+		background: rgba(0, 0, 0, 0.6);
+		pointer-events: none;
+	}
+
+	.drop-overlay-content {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		padding: 32px 48px;
+		border-radius: 12px;
+		border: 2px dashed var(--accent);
+		background: var(--bg-secondary);
+		color: var(--accent);
+	}
+
+	.drop-overlay-text {
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--text-header);
 	}
 
 	.chat-body {

@@ -50,7 +50,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Real-time message delivery via SignalR (no page refresh needed)
 - ✅ Typing indicators ("X is typing…")
 - ✅ Emoji reactions on messages (toggle via floating action bar, reaction pills with counts, real-time sync via SignalR)
-- ✅ Image uploads in messages (PNG, JPEG, WebP, GIF; file picker or clipboard paste; 10 MB max)
+- ✅ Image uploads in messages (PNG, JPEG, WebP, GIF; file picker, clipboard paste, or drag-and-drop; 10 MB max)
 - ✅ Inline image display in message feed (clickable, lazy-loaded, max 400×300px)
 - ✅ Image lightbox — click any image in chat to open a full-size preview overlay with close/open-original controls
 - ✅ @mentions with autocomplete (type `@` to see member picker, display names inserted in composer)
@@ -77,7 +77,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Close / reopen DM conversations
 - ✅ Start DM from friends list
 - ✅ Home screen layout with DM sidebar + Friends panel / DM chat area
-- ✅ Image uploads in DM messages (same format support and paste/picker as server channels)
+- ✅ Image uploads in DM messages (same format support: paste, file picker, and drag-and-drop as server channels)
 - ✅ Message replies in DMs — same inline reply experience as server channels
 
 ### Link Previews ([detailed spec](LINK_PREVIEWS.md))
@@ -119,7 +119,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Floating reaction action bar on message hover (emoji picker with 8 quick emojis)
 - ✅ Reaction pills below messages (emoji + count, highlighted when user has reacted)
 - ✅ Inline message composer with send icon and focus glow
-- ✅ Image attach button (`+`) and clipboard paste support in composer
+- ✅ Image attach button (`+`), clipboard paste, and drag-and-drop support in composer
+- ✅ Drag-and-drop overlay with visual drop zone indicator
 - ✅ Image preview with remove button above composer input
 - ✅ User panel pinned to bottom of channel sidebar (gear icon for settings + sign-out icon)
 - ✅ Members sidebar grouped by role (Owner, Admin, Member)
@@ -208,7 +209,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Image upload endpoint (`POST /uploads/images`) with SHA-256 content-hash filenames
 - ✅ Image lightbox / preview overlay (full-size image modal with Escape to close and open-original link)
 - File uploads (documents, other media)
-- Drag-and-drop upload
+- ~~Drag-and-drop upload~~ → ✅ implemented (images)
 
 ## 🔮 Future (Later)
 

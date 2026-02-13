@@ -73,7 +73,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Direct Messages feature fully implemented (1-on-1 private messaging between friends, DM conversations list, real-time delivery via SignalR, typing indicators, close/reopen conversations, start DM from friends list)
 - Kick member feature implemented (Owner/Admin can kick members, role hierarchy enforced, real-time notification via SignalR, frontend kick button with confirm step)
 - Server invites feature implemented (Owner/Admin create/list/revoke invite codes, any user joins via code, configurable expiry and max uses, frontend invite panel and join-by-code UI)
-- Image uploads feature implemented (upload from desktop or paste from clipboard, PNG/JPEG/WebP/GIF support, 10 MB limit, image preview in composer, inline image display in messages, works in both server channels and DMs)
+- Image uploads feature implemented (upload from desktop, paste from clipboard, or drag-and-drop, PNG/JPEG/WebP/GIF support, 10 MB limit, image preview in composer, inline image display in messages, works in both server channels and DMs)
 - Link previews feature fully implemented (automatic URL detection, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR, clickable thumbnail images)
 - @mentions feature implemented (autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on channel navigation, mentioned message highlighting, @here to notify all channel members)
 - Message replies feature implemented (inline reply to any message in channels or DMs, reply-to-message context in feed, scroll-to-original with highlight animation, Escape to cancel, orphaned reply handling)
@@ -322,6 +322,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add image preview with remove button above composer input
 - [x] Update `MessageItem.svelte` to display inline images (clickable, lazy-loaded)
 - [x] Update `DmChatArea.svelte` with attach, paste, preview, and image display for DMs
+- [x] Add drag-and-drop image support to `ChatArea.svelte` with visual drop overlay
+- [x] Add drag-and-drop image support to `DmChatArea.svelte` with visual drop overlay
 
 ### Verification
 - [x] Backend builds successfully (`dotnet build`)
