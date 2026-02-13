@@ -78,6 +78,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - @mentions feature implemented (autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on channel navigation, mentioned message highlighting, @here to notify all channel members)
 - Message replies feature implemented (inline reply to any message in channels or DMs, reply-to-message context in feed, scroll-to-original with highlight animation, Escape to cancel, orphaned reply handling)
 - Image preview lightbox implemented (full-size overlay on image click, Escape to close, open-original link, works in both server channels and DMs)
+- Text formatting implemented (bold with `*`/`**` and italic with `_`, live preview in composer overlay, works in both server channels and DMs)
 
 ## Task breakdown: Session Persistence
 
@@ -384,6 +385,24 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ### Verification
 - [x] Frontend type-checks with zero errors (`svelte-check`)
+
+## Task breakdown: Text Formatting (Bold & Italic)
+
+### Web — Parsing & rendering
+- [x] Add `FORMAT_REGEX` to `LinkifiedText.svelte` for `**bold**`, `*bold*`, and `_italic_` markers
+- [x] Two-pass parsing: first extract links/mentions, then parse text segments for formatting
+- [x] Render bold as `<strong>` and italic as `<em>` with scoped styles
+- [x] Formatting applies to both channel messages and DMs via shared `LinkifiedText` component
+
+### Web — Composer live preview
+- [x] Create `ComposerOverlay.svelte` — transparent overlay that mirrors composer text with formatting applied
+- [x] Overlay technique: input text rendered transparent with visible caret, formatted overlay positioned behind
+- [x] Integrate overlay into `Composer.svelte` (channel composer)
+- [x] Integrate overlay into `DmChatArea.svelte` (DM composer)
+- [x] Scroll sync between input and overlay for long messages
+
+### Verification
+- [x] Frontend builds successfully (`npm run build`, 0 errors)
 
 ## Next steps
 - Introduce role-based authorization rules for additional operations

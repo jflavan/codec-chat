@@ -59,6 +59,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Badge clearing on channel navigation (counts reset when user enters the mentioned channel)
 - ✅ Mentioned message highlighting (accent border and tinted background on messages that mention the current user or use @here)
 - ✅ Message replies — inline reply to any message with clickable reference preview, scroll-to-original with highlight animation, graceful handling of deleted parent messages
+- ✅ Text formatting — bold (`*text*` or `**text**`) and italic (`_text_`) with live preview in composer
 
 ### Friends ([detailed spec](FRIENDS.md))
 - ✅ Friend requests (send, accept, decline, cancel)
@@ -79,6 +80,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Home screen layout with DM sidebar + Friends panel / DM chat area
 - ✅ Image uploads in DM messages (same format support: paste, file picker, and drag-and-drop as server channels)
 - ✅ Message replies in DMs — same inline reply experience as server channels
+- ✅ Text formatting in DMs — same bold/italic formatting as server channels
 
 ### Link Previews ([detailed spec](LINK_PREVIEWS.md))
 - ✅ Automatic URL detection in message bodies (server channels and DMs)
@@ -170,7 +172,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Messaging Features
 - Message editing and deletion
-- Rich text formatting (markdown)
+- ~~Rich text formatting (markdown)~~ → ✅ implemented (bold and italic)
 - @mentions → ✅ implemented
 - ~~Message replies~~ → ✅ implemented
 - Message search
