@@ -78,7 +78,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Nicknames** — user-chosen display name that overrides Google name across all surfaces (messages, member lists, friends, typing indicators)
 - ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove) and account info
 - ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR
-- ✅ **@mentions** — autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
+- ✅ **@mentions** — autocomplete member picker in composer, @here to notify everyone, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
 
 ## Documentation
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup

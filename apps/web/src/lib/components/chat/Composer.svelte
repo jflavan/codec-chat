@@ -12,13 +12,18 @@
 	let mentionStartIndex = $state(0);
 	let selectedMentionIndex = $state(0);
 
-	const filteredMembers: Member[] = $derived(
-		mentionQuery.length === 0
-			? app.members
-			: app.members.filter((m) =>
-					m.displayName.toLowerCase().includes(mentionQuery.toLowerCase())
-				)
-	);
+	/** Virtual entry representing the @here mention that notifies all channel members. */
+	const hereMember: Member = { userId: 'here', displayName: 'here', avatarUrl: '', role: 'Member', joinedAt: '' };
+
+	const filteredMembers: Member[] = $derived.by(() => {
+		const q = mentionQuery.toLowerCase();
+		const members =
+			mentionQuery.length === 0
+				? app.members
+				: app.members.filter((m) => m.displayName.toLowerCase().includes(q));
+		const showHere = 'here'.includes(q);
+		return showHere ? [hereMember, ...members] : members;
+	});
 
 	function detectMentionTrigger(): void {
 		if (!inputEl) return;
@@ -51,7 +56,10 @@
 		const before = value.slice(0, mentionStartIndex);
 		const afterCursor = value.slice(mentionStartIndex + 1 + mentionQuery.length);
 		app.messageBody = `${before}@${member.displayName} ${afterCursor}`;
-		app.pendingMentions.set(member.displayName, member.userId);
+		// @here is resolved as a keyword, not via pendingMentions
+		if (member.userId !== 'here') {
+			app.pendingMentions.set(member.displayName, member.userId);
+		}
 		showMentionPicker = false;
 		mentionQuery = '';
 		inputEl?.focus();
@@ -140,14 +148,18 @@
 						onmousedown={(e) => { e.preventDefault(); insertMention(member); }}
 						type="button"
 					>
-						{#if member.avatarUrl}
+						{#if member.userId === 'here'}
+							<div class="mention-avatar-placeholder here-icon" aria-hidden="true">@</div>
+							<span class="mention-name">here <span class="mention-hint">— notify everyone in this channel</span></span>
+						{:else if member.avatarUrl}
 							<img class="mention-avatar" src={member.avatarUrl} alt="" />
+							<span class="mention-name">{member.displayName}</span>
 						{:else}
 							<div class="mention-avatar-placeholder" aria-hidden="true">
 								{member.displayName.slice(0, 1).toUpperCase()}
 							</div>
+							<span class="mention-name">{member.displayName}</span>
 						{/if}
-						<span class="mention-name">{member.displayName}</span>
 					</button>
 				</li>
 			{/each}
@@ -390,5 +402,16 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.mention-hint {
+		color: var(--text-muted);
+		font-size: 12px;
+	}
+
+	.here-icon {
+		background: var(--danger, #ed4245);
+		font-weight: 700;
+		font-size: 14px;
 	}
 </style>

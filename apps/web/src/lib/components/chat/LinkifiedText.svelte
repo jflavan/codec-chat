@@ -9,8 +9,9 @@
 		displayName?: string;
 	}
 
-	const COMBINED_REGEX = /(<@[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}>|https?:\/\/[^\s<>"')\]},;]+)/gi;
+	const COMBINED_REGEX = /(<@here>|<@[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}>|https?:\/\/[^\s<>"')\]},;]+)/gi;
 	const MENTION_REGEX = /^<@([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})>$/i;
+	const HERE_REGEX = /^<@here>$/i;
 
 	const segments: TextSegment[] = $derived.by(() => {
 		const result: TextSegment[] = [];
@@ -23,8 +24,14 @@
 			}
 
 			const token = match[0];
-			const mentionMatch = token.match(MENTION_REGEX);
-			if (mentionMatch) {
+			if (HERE_REGEX.test(token)) {
+				result.push({
+					type: 'mention',
+					value: 'here',
+					displayName: 'here'
+				});
+			} else if (token.match(MENTION_REGEX)) {
+				const mentionMatch = token.match(MENTION_REGEX)!;
 				const userId = mentionMatch[1].toLowerCase();
 				const resolved = mentions.find((m) => m.userId.toLowerCase() === userId);
 				result.push({

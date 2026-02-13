@@ -53,9 +53,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Image uploads in messages (PNG, JPEG, WebP, GIF; file picker or clipboard paste; 10 MB max)
 - ✅ Inline image display in message feed (clickable, lazy-loaded, max 400×300px)
 - ✅ @mentions with autocomplete (type `@` to see member picker, display names inserted in composer)
+- ✅ @here mention to notify all channel members (appears as special entry in autocomplete picker)
 - ✅ Mention badge notifications (unread mention count on server icons and channel names)
 - ✅ Badge clearing on channel navigation (counts reset when user enters the mentioned channel)
-- ✅ Mentioned message highlighting (accent border and tinted background on messages that mention the current user)
+- ✅ Mentioned message highlighting (accent border and tinted background on messages that mention the current user or use @here)
 
 ### Friends ([detailed spec](FRIENDS.md))
 - ✅ Friend requests (send, accept, decline, cancel)

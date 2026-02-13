@@ -23,7 +23,10 @@
 	});
 
 	const isMentioned = $derived(
-		Boolean(currentUserId && message.body?.toLowerCase().includes(`<@${currentUserId.toLowerCase()}>`))
+		Boolean(
+			(currentUserId && message.body?.toLowerCase().includes(`<@${currentUserId.toLowerCase()}>`)) ||
+			message.body?.toLowerCase().includes('<@here>')
+		)
 	);
 
 	let showPicker = $state(false);

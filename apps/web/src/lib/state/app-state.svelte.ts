@@ -429,6 +429,8 @@ export class AppState {
 
 	resolveMentions(text: string): string {
 		let result = text;
+		// Convert @here keyword to wire token
+		result = result.replaceAll('@here', '<@here>');
 		for (const [displayName, userId] of this.pendingMentions) {
 			result = result.replaceAll(`@${displayName}`, `<@${userId}>`);
 		}

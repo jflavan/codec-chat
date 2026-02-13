@@ -219,15 +219,42 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
 
         // Notify each mentioned user who is a member of this server.
+        var notifiedUserIds = new HashSet<Guid> { appUser.Id }; // skip author
+
         foreach (var mention in mentions)
         {
-            // Don't notify the author about their own mention.
-            if (mention.UserId == appUser.Id) continue;
+            if (notifiedUserIds.Contains(mention.UserId)) continue;
 
             var isMentionedMember = await userService.IsMemberAsync(channel.ServerId, mention.UserId);
             if (isMentionedMember)
             {
                 await chatHub.Clients.Group($"user-{mention.UserId}").SendAsync("MentionReceived", new
+                {
+                    message.Id,
+                    message.ChannelId,
+                    channel.ServerId,
+                    AuthorName = message.AuthorName,
+                    message.Body
+                });
+                notifiedUserIds.Add(mention.UserId);
+            }
+        }
+
+        // Handle @here: notify all server members who haven't been individually mentioned.
+        if (message.Body.Contains("<@here>", StringComparison.OrdinalIgnoreCase))
+        {
+            var serverMemberIds = await db.ServerMembers
+                .AsNoTracking()
+                .Where(sm => sm.ServerId == channel.ServerId)
+                .Select(sm => sm.UserId)
+                .ToListAsync();
+
+            foreach (var memberId in serverMemberIds)
+            {
+                if (notifiedUserIds.Contains(memberId)) continue;
+                notifiedUserIds.Add(memberId);
+
+                await chatHub.Clients.Group($"user-{memberId}").SendAsync("MentionReceived", new
                 {
                     message.Id,
                     message.ChannelId,
