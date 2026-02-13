@@ -30,11 +30,14 @@ This guide walks through setting up the Codec development environment from scrat
 2. Update `appsettings.Development.json`:
    ```json
    {
-     "Google": {
-       "ClientId": "YOUR_GOOGLE_CLIENT_ID_HERE"
-     },
      "ConnectionStrings": {
        "Default": "Data Source=codec-dev.db"
+     },
+     "Api": {
+       "BaseUrl": "http://localhost:5050"
+     },
+     "Google": {
+       "ClientId": "YOUR_GOOGLE_CLIENT_ID_HERE"
      },
      "Cors": {
        "AllowedOrigins": ["http://localhost:5174"]
@@ -42,7 +45,7 @@ This guide walks through setting up the Codec development environment from scrat
    }
    ```
    
-   **Note:** `Google:ClientId` is required - the API will fail fast on startup if missing.
+   **Note:** `Google:ClientId` is required — the API will fail fast on startup if missing. `Api:BaseUrl` is used to generate public URLs for uploaded avatars and images.
 
 3. Run the API:
    ```bash
@@ -52,7 +55,8 @@ This guide walks through setting up the Codec development environment from scrat
    The API will:
    - Run at `http://localhost:5050` by default
    - Automatically apply database migrations
-   - Seed initial data if the database is empty
+   - Create the default "Codec HQ" server (with `general` and `announcements` channels) if it doesn't exist
+   - Seed sample users and messages if the database is empty
 
 ## Web Setup
 
@@ -112,8 +116,8 @@ dotnet ef migrations script
 2. Click **Sign in with Google**
 3. Complete the Google authentication flow
 4. You should see:
-   - Your user profile
-   - A list of your servers (seeded data: "Codec HQ")
+   - Your user profile (you are automatically joined to the default "Codec HQ" server on first sign-in)
+   - The Codec HQ server with `general`, `announcements`, and `build-log` channels
    - Ability to create servers, join via invite codes, and view channels
 5. Open a second browser window (or incognito) and sign in with a different account
 6. Both users should see:
@@ -125,6 +129,19 @@ dotnet ef migrations script
    - Send a friend request — the other user should see a notification badge on their Home icon
    - Accept/decline the request from the **Pending** tab
    - Confirmed friends appear in the **All Friends** tab
+8. Test Direct Messages:
+   - From the Friends list, click a friend to start a DM conversation
+   - Messages should appear in real-time for both users
+   - Typing indicators should show when the other user is typing
+9. Test additional features:
+   - **Emoji reactions:** hover over a message to see the reaction action bar, click an emoji
+   - **Image uploads:** use the `+` button, paste from clipboard, or drag-and-drop an image into the composer
+   - **@mentions:** type `@` in the composer to see the member autocomplete picker
+   - **Message replies:** hover over a message and click the reply button
+   - **Text formatting:** use `*bold*` or `_italic_` in a message
+   - **Link previews:** paste a URL into a message and send — a preview card should appear
+   - **Nicknames:** click the gear icon (⚙) in the user panel, go to My Profile, and set a nickname
+   - **User Settings:** the gear icon opens the full settings modal (profile, account info)
 
 ## Default Ports
 - **Web:** `http://localhost:5174`
