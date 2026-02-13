@@ -34,7 +34,7 @@ codec/
 ### 2. Start the API
 ```bash
 cd apps/api/Codec.Api
-# Edit appsettings.Development.json and set Google:ClientId
+# Edit appsettings.json - set Google:ClientId and BaseUrl (http://localhost:5050 for local dev)
 dotnet run
 ```
 The API runs at `http://localhost:5050` by default.
