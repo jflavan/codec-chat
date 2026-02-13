@@ -11,6 +11,7 @@ public class DirectMessage
     public Guid AuthorUserId { get; set; }
     public string AuthorName { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DmChannel? DmChannel { get; set; }
     public User? AuthorUser { get; set; }

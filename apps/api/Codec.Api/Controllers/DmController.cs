@@ -238,6 +238,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.AuthorUserId,
                 m.AuthorName,
                 m.Body,
+                m.ImageUrl,
                 m.CreatedAt,
                 AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                 AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
@@ -254,6 +255,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             m.AuthorUserId,
             m.AuthorName,
             m.Body,
+            m.ImageUrl,
             m.CreatedAt,
             AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl
         });
@@ -268,9 +270,9 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpPost("channels/{channelId:guid}/messages")]
     public async Task<IActionResult> SendMessage(Guid channelId, [FromBody] CreateMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Body))
+        if (string.IsNullOrWhiteSpace(request.Body) && string.IsNullOrWhiteSpace(request.ImageUrl))
         {
-            return BadRequest(new { error = "Message body is required." });
+            return BadRequest(new { error = "Message body or image is required." });
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
@@ -301,7 +303,8 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             DmChannelId = channelId,
             AuthorUserId = appUser.Id,
             AuthorName = authorName,
-            Body = request.Body.Trim()
+            Body = request.Body?.Trim() ?? string.Empty,
+            ImageUrl = request.ImageUrl
         };
 
         db.DirectMessages.Add(message);
@@ -326,6 +329,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             message.AuthorUserId,
             message.AuthorName,
             message.Body,
+            message.ImageUrl,
             message.CreatedAt,
             AuthorAvatarUrl = authorAvatarUrl
         };

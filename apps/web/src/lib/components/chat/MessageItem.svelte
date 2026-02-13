@@ -72,7 +72,14 @@
 				<strong class="message-author">{message.authorName}</strong>
 				<time class="message-time">{formatTime(message.createdAt)}</time>
 			</div>
-			<p class="message-body"><LinkifiedText text={message.body} /></p>
+			{#if message.body}
+				<p class="message-body"><LinkifiedText text={message.body} /></p>
+			{/if}
+			{#if message.imageUrl}
+				<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
+					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
+				</a>
+			{/if}
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
 					reactions={message.reactions}
@@ -86,7 +93,14 @@
 			<time class="message-time-inline">{formatTime(message.createdAt)}</time>
 		</div>
 		<div class="message-content">
-			<p class="message-body"><LinkifiedText text={message.body} /></p>
+			{#if message.body}
+				<p class="message-body"><LinkifiedText text={message.body} /></p>
+			{/if}
+			{#if message.imageUrl}
+				<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
+					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
+				</a>
+			{/if}
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
 					reactions={message.reactions}
@@ -267,5 +281,22 @@
 		color: var(--text-normal);
 		line-height: 1.375;
 		word-break: break-word;
+	}
+
+	.message-image-link {
+		display: block;
+		margin-top: 4px;
+		max-width: 400px;
+		border-radius: 8px;
+		overflow: hidden;
+	}
+
+	.message-image {
+		display: block;
+		max-width: 100%;
+		max-height: 300px;
+		border-radius: 8px;
+		object-fit: contain;
+		cursor: pointer;
 	}
 </style>

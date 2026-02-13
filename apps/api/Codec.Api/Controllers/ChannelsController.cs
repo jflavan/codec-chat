@@ -46,6 +46,7 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
                 message.AuthorName,
                 message.AuthorUserId,
                 message.Body,
+                message.ImageUrl,
                 message.CreatedAt,
                 message.ChannelId,
                 AuthorCustomAvatarPath = message.AuthorUser != null ? message.AuthorUser.CustomAvatarPath : null,
@@ -82,6 +83,7 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             message.AuthorName,
             message.AuthorUserId,
             message.Body,
+            message.ImageUrl,
             message.CreatedAt,
             message.ChannelId,
             AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
@@ -99,9 +101,9 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
     [HttpPost("{channelId:guid}/messages")]
     public async Task<IActionResult> PostMessage(Guid channelId, [FromBody] CreateMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Body))
+        if (string.IsNullOrWhiteSpace(request.Body) && string.IsNullOrWhiteSpace(request.ImageUrl))
         {
-            return BadRequest(new { error = "Message body is required." });
+            return BadRequest(new { error = "Message body or image is required." });
         }
 
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
@@ -128,7 +130,8 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             ChannelId = channelId,
             AuthorUserId = appUser.Id,
             AuthorName = authorName,
-            Body = request.Body.Trim()
+            Body = request.Body?.Trim() ?? string.Empty,
+            ImageUrl = request.ImageUrl
         };
 
         db.Messages.Add(message);
@@ -142,6 +145,7 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             message.AuthorName,
             message.AuthorUserId,
             message.Body,
+            message.ImageUrl,
             message.CreatedAt,
             message.ChannelId,
             AuthorAvatarUrl = authorAvatarUrl,

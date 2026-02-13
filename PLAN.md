@@ -73,6 +73,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Direct Messages feature fully implemented (1-on-1 private messaging between friends, DM conversations list, real-time delivery via SignalR, typing indicators, close/reopen conversations, start DM from friends list)
 - Kick member feature implemented (Owner/Admin can kick members, role hierarchy enforced, real-time notification via SignalR, frontend kick button with confirm step)
 - Server invites feature implemented (Owner/Admin create/list/revoke invite codes, any user joins via code, configurable expiry and max uses, frontend invite panel and join-by-code UI)
+- Image uploads feature implemented (upload from desktop or paste from clipboard, PNG/JPEG/WebP/GIF support, 10 MB limit, image preview in composer, inline image display in messages, works in both server channels and DMs)
 
 ## Task breakdown: Session Persistence
 
@@ -325,6 +326,44 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [ ] Update `FEATURES.md` to track Link Previews feature progress
 - [ ] Update `DESIGN.md` with Link Preview Card UI specification
 - [ ] Update `PLAN.md` with Link Previews task breakdown
+
+## Task breakdown: Image Uploads
+
+### API — Data model & migration
+- [x] Add `ImageUrl` nullable property to `Message` and `DirectMessage` entities
+- [x] Update `CreateMessageRequest` DTO to accept optional `ImageUrl`
+- [x] Create and apply EF Core migration (`AddImageUrlToMessages`)
+
+### API — Image upload service & endpoint
+- [x] Create `IImageUploadService` interface and `ImageUploadService` implementation
+- [x] Validate file type (JPEG, PNG, WebP, GIF) and size (10 MB max)
+- [x] Store images with SHA-256 content-hash filenames under `uploads/images/{userId}/`
+- [x] Create `ImageUploadsController` with `POST /uploads/images` endpoint
+- [x] Configure static file serving for uploaded images in `Program.cs`
+
+### API — Message posting integration
+- [x] Update `ChannelsController.PostMessage` to accept and persist `ImageUrl`
+- [x] Update `DmController.SendMessage` to accept and persist `ImageUrl`
+- [x] Allow messages with image-only (no body text required)
+- [x] Include `ImageUrl` in message query responses and SignalR broadcast payloads
+
+### Web — Types, API client & state
+- [x] Add `imageUrl` field to `Message` and `DirectMessage` types in `models.ts`
+- [x] Add `uploadImage()` method to `ApiClient`
+- [x] Update `sendMessage()` and `sendDm()` API methods to accept optional `imageUrl`
+- [x] Add image attachment state and methods to `AppState` (`attachImage`, `clearPendingImage`, etc.)
+- [x] Add client-side file type and size validation with `ALLOWED_IMAGE_TYPES` and `MAX_IMAGE_SIZE_BYTES`
+
+### Web — UI components
+- [x] Update `Composer.svelte` with attach button (`+`), hidden file input, and clipboard paste handler
+- [x] Add image preview with remove button above composer input
+- [x] Update `MessageItem.svelte` to display inline images (clickable, lazy-loaded)
+- [x] Update `DmChatArea.svelte` with attach, paste, preview, and image display for DMs
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`)
+- [x] Frontend type-checks with zero errors (`svelte-check`)
+- [x] UI renders correctly with attach button visible in composer
 
 ## Next steps
 - **Link Previews (Automatic Embeds)** — next planned feature; detection, fetching, and rendering of URL metadata
