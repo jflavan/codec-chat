@@ -21,7 +21,7 @@ codec/
 ## Quick Start
 
 ### 1. Install Prerequisites
-- **Node.js** 20+ and npm — [download](https://nodejs.org/)
+- **Node.js** 24+ and npm — [download](https://nodejs.org/)
 - **.NET SDK** 9.x — [download](https://dotnet.microsoft.com/download/dotnet/9.0)
 - **Google Cloud Console** project with OAuth 2.0 credentials
 
