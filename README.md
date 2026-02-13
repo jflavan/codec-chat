@@ -18,20 +18,20 @@ codec/
 └── scripts/          # Build and utility scripts
 ```
 
-## Prerequisites
-- **Node.js** 20+ and npm
-- **.NET SDK** 9.x
-- **Google Cloud Console** project with OAuth 2.0 credentials
-
 ## Quick Start
 
-### 1. Configure Google Sign-In
+### 1. Install Prerequisites
+- **Node.js** 20+ and npm — [download](https://nodejs.org/)
+- **.NET SDK** 9.x — [download](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **Google Cloud Console** project with OAuth 2.0 credentials
+
+### 2. Configure Google Sign-In
 1. Create an OAuth 2.0 Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Add authorized JavaScript origins:
    - `http://localhost:5174` (for development)
 3. Copy your Client ID for the next steps
 
-### 2. Start the API
+### 3. Start the API
 ```bash
 cd apps/api/Codec.Api
 # Edit appsettings.json - set Google:ClientId and BaseUrl (http://localhost:5050 for local dev)
@@ -43,7 +43,7 @@ The API runs at `http://localhost:5050` by default.
 
 > **macOS users:** Port 5000 is reserved by AirPlay Receiver. The API uses port 5050 to avoid this conflict.
 
-### 3. Start the Web App
+### 4. Start the Web App
 ```bash
 cd apps/web
 cp .env.example .env
