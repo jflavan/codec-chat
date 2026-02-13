@@ -4,6 +4,8 @@
 	import { formatTime } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
 	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
+	import ReplyReference from '$lib/components/chat/ReplyReference.svelte';
+	import ReplyComposerBar from '$lib/components/chat/ReplyComposerBar.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -45,6 +47,21 @@
 		isLockedToBottom = true;
 		unreadCount = 0;
 		scrollToBottom(false);
+	}
+
+	/* ───── Reply highlight & scroll ───── */
+	let highlightedMessageId = $state<string | null>(null);
+
+	function scrollToMessage(messageId: string): void {
+		const el = container?.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+		if (!el) return;
+		el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		highlightedMessageId = messageId;
+		setTimeout(() => { highlightedMessageId = null; }, 1500);
+	}
+
+	function handleReply(message: typeof app.dmMessages[0]): void {
+		app.startReply(message.id, message.authorName, message.body?.slice(0, 100) ?? '', 'dm');
 	}
 
 	// Reset scroll on channel change
@@ -110,6 +127,13 @@
 			}
 		}
 	}
+
+	function handleDmKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Escape' && app.replyingTo?.context === 'dm') {
+			e.preventDefault();
+			app.cancelReply();
+		}
+	}
 </script>
 
 <main class="dm-chat" aria-label="Direct message conversation">
@@ -145,19 +169,30 @@
 			{:else}
 				{#each app.dmMessages as message, i}
 					{@const prev = i > 0 ? app.dmMessages[i - 1] : null}
-					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
-					<article class="message" class:grouped={isGrouped}>
-						{#if !isGrouped}
-							<div class="message-avatar-col">
-								{#if message.authorAvatarUrl}
-									<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
-								{:else}
-									<div class="message-avatar" aria-hidden="true">
-										{message.authorName.slice(0, 1).toUpperCase()}
-									</div>
-								{/if}
-							</div>
-							<div class="message-content">
+					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
+					<!-- Reply action bar -->
+					<div class="dm-message-actions">
+						<button class="dm-action-btn" aria-label="Reply" onclick={() => handleReply(message)}>
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+								<path d="M6.598 2.152a.5.5 0 0 1 .049.703L3.354 6.5H9.5A4.5 4.5 0 0 1 14 11v1a.5.5 0 0 1-1 0v-1A3.5 3.5 0 0 0 9.5 7.5H3.354l3.293 3.645a.5.5 0 0 1-.742.67l-4-4.43a.5.5 0 0 1 0-.67l4-4.43a.5.5 0 0 1 .703-.049z"/>
+							</svg>
+						</button>
+					</div>
+
+					{#if !isGrouped}
+						<div class="message-avatar-col">
+							{#if message.authorAvatarUrl}
+								<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
+							{:else}
+								<div class="message-avatar" aria-hidden="true">
+									{message.authorName.slice(0, 1).toUpperCase()}
+								</div>
+							{/if}
+						</div>
+						<div class="message-content">
+							{#if message.replyContext}
+								<ReplyReference replyContext={message.replyContext} onClickGoToOriginal={() => scrollToMessage(message.replyContext!.messageId)} />
+							{/if}
 								<div class="message-header">
 									<strong class="message-author">{message.authorName}</strong>
 									<time class="message-time">{formatTime(message.createdAt)}</time>
@@ -183,6 +218,9 @@
 							<time class="message-time-inline">{formatTime(message.createdAt)}</time>
 						</div>
 						<div class="message-content">
+							{#if message.replyContext}
+								<ReplyReference replyContext={message.replyContext} onClickGoToOriginal={() => scrollToMessage(message.replyContext!.messageId)} />
+							{/if}
 							{#if message.body}
 								<p class="message-body"><LinkifiedText text={message.body} /></p>
 							{/if}
@@ -201,6 +239,7 @@
 							</div>
 						{/if}
 					</article>
+					</div>
 				{/each}
 			{/if}
 		</div>
@@ -236,6 +275,9 @@
 
 		<!-- Composer -->
 		<form class="composer" onsubmit={handleDmSubmit}>
+		{#if app.replyingTo?.context === 'dm'}
+			<ReplyComposerBar authorName={app.replyingTo.authorName} bodyPreview={app.replyingTo.bodyPreview} onCancel={() => app.cancelReply()} />
+		{/if}
 		{#if app.pendingDmImagePreview}
 			<div class="image-preview">
 				<img src={app.pendingDmImagePreview} alt="Attachment preview" class="preview-thumb" />
@@ -272,6 +314,7 @@
 			bind:value={app.dmMessageBody}
 			disabled={!app.activeDmChannelId || app.isSendingDm}
 			oninput={() => app.handleDmComposerInput()}
+			onkeydown={handleDmKeydown}
 			onpaste={handleDmPaste}
 		/>
 		<button
@@ -702,5 +745,59 @@
 		flex-direction: column;
 		gap: 4px;
 		margin-top: 4px;
+	}
+
+	/* ───── Reply action bar ───── */
+
+	.dm-message-actions {
+		position: absolute;
+		top: -14px;
+		right: 16px;
+		display: none;
+		gap: 2px;
+		padding: 2px 4px;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+		background: var(--bg-secondary);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+		z-index: 2;
+	}
+
+	.message:hover .dm-message-actions { display: flex; }
+
+	.dm-action-btn {
+		display: grid;
+		place-items: center;
+		width: 28px;
+		height: 28px;
+		border: none;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: background-color 100ms ease, color 100ms ease;
+	}
+
+	.dm-action-btn:hover {
+		background: var(--bg-message-hover);
+		color: var(--text-normal);
+	}
+
+	/* ───── Reply highlight ───── */
+
+	:global(.reply-highlight) {
+		animation: dm-reply-highlight-fade 1.5s ease-out;
+	}
+
+	@keyframes dm-reply-highlight-fade {
+		0%   { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+		100% { background: transparent; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.reply-highlight) {
+			animation: none;
+			background: color-mix(in srgb, var(--accent) 10%, transparent);
+		}
 	}
 </style>

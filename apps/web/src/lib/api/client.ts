@@ -199,11 +199,11 @@ export class ApiClient {
 		});
 	}
 
-	sendMessage(token: string, channelId: string, body: string, imageUrl?: string | null): Promise<Message> {
+	sendMessage(token: string, channelId: string, body: string, imageUrl?: string | null, replyToMessageId?: string | null): Promise<Message> {
 		return this.request(`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages`, {
 			method: 'POST',
 			headers: this.headers(token, true),
-			body: JSON.stringify({ body, imageUrl: imageUrl ?? null })
+			body: JSON.stringify({ body, imageUrl: imageUrl ?? null, replyToMessageId: replyToMessageId ?? null })
 		});
 	}
 
@@ -312,13 +312,13 @@ export class ApiClient {
 		);
 	}
 
-	sendDm(token: string, channelId: string, body: string, imageUrl?: string | null): Promise<DirectMessage> {
+	sendDm(token: string, channelId: string, body: string, imageUrl?: string | null, replyToDirectMessageId?: string | null): Promise<DirectMessage> {
 		return this.request(
 			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages`,
 			{
 				method: 'POST',
 				headers: this.headers(token, true),
-				body: JSON.stringify({ body, imageUrl: imageUrl ?? null })
+				body: JSON.stringify({ body, imageUrl: imageUrl ?? null, replyToDirectMessageId: replyToDirectMessageId ?? null })
 			}
 		);
 	}

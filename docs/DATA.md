@@ -251,18 +251,21 @@ Individual chat message in a channel.
 | `AuthorName` | string | Display name snapshot |
 | `Body` | string | Message content |
 | `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
+| `ReplyToMessageId` | Guid? (FK) | Self-referencing FK to parent Message (nullable, ON DELETE SET NULL) |
 | `CreatedAt` | DateTimeOffset | Message timestamp |
 
 **Relationships:**
 - Many-to-one with `Channel`
 - Many-to-one with `User` (optional)
 - One-to-many with `Reaction`
+- Self-referencing: optional many-to-one with `Message` (reply parent, ON DELETE SET NULL)
 
 **Notes:**
 - `AuthorUserId` is nullable for system messages
 - `AuthorName` is a snapshot (denormalized) for performance
 - `Body` is plain text (future: rich text/markdown)
 - A message may have `ImageUrl` only (no body text), body only, or both
+- `ReplyToMessageId` enables inline message replies; set to `null` via `ON DELETE SET NULL` when the parent message is deleted (orphaned reply)
 
 #### Reaction
 Emoji reaction on a message by a specific user.
@@ -386,16 +389,19 @@ Individual message within a DM conversation.
 | `AuthorName` | string | Display name snapshot (denormalized) |
 | `Body` | string | Message content (plain text) |
 | `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
+| `ReplyToDirectMessageId` | Guid? (FK) | Self-referencing FK to parent DirectMessage (nullable, ON DELETE SET NULL) |
 | `CreatedAt` | DateTimeOffset | Message timestamp |
 
 **Relationships:**
 - Many-to-one with `DmChannel`
 - Many-to-one with `User`
+- Self-referencing: optional many-to-one with `DirectMessage` (reply parent, ON DELETE SET NULL)
 
 **Notes:**
 - `AuthorName` is a snapshot (denormalized) for performance, matching the server `Message` entity pattern
 - Follows the same structure as server channel messages
 - A message may have `ImageUrl` only (no body text), body only, or both
+- `ReplyToDirectMessageId` enables inline message replies in DMs; set to `null` via `ON DELETE SET NULL` when the parent message is deleted
 
 #### LinkPreview
 URL metadata extracted from a message body via Open Graph and HTML meta tag parsing.
@@ -614,6 +620,10 @@ modelBuilder.Entity<ServerMember>()
 modelBuilder.Entity<Message>()
     .HasIndex(m => m.ChannelId);
 
+// Message reply self-referencing FK
+modelBuilder.Entity<Message>()
+    .HasIndex(m => m.ReplyToMessageId);
+
 // Reaction uniqueness (one reaction per emoji per user per message)
 modelBuilder.Entity<Reaction>()
     .HasIndex(r => new { r.MessageId, r.UserId, r.Emoji })
@@ -651,6 +661,10 @@ modelBuilder.Entity<DirectMessage>()
 // DirectMessage: fast lookup of messages by author
 modelBuilder.Entity<DirectMessage>()
     .HasIndex(m => m.AuthorUserId);
+
+// DirectMessage: reply self-referencing FK
+modelBuilder.Entity<DirectMessage>()
+    .HasIndex(m => m.ReplyToDirectMessageId);
 
 // ServerInvite: unique code for fast lookup when joining
 modelBuilder.Entity<ServerInvite>()

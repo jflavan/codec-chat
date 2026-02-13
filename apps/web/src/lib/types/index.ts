@@ -3,6 +3,7 @@ export type {
 	Channel,
 	LinkPreview,
 	Mention,
+	ReplyContext,
 	Message,
 	Reaction,
 	Member,

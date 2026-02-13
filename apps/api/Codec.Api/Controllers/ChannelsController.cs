@@ -50,6 +50,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.ImageUrl,
                 message.CreatedAt,
                 message.ChannelId,
+                message.ReplyToMessageId,
                 AuthorCustomAvatarPath = message.AuthorUser != null ? message.AuthorUser.CustomAvatarPath : null,
                 AuthorGoogleAvatarUrl = message.AuthorUser != null ? message.AuthorUser.AvatarUrl : null
             })
@@ -114,6 +115,41 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     u => new MentionDto(u.Id, string.IsNullOrWhiteSpace(u.Nickname) ? u.DisplayName : u.Nickname));
         }
 
+        // Batch-load referenced parent messages for reply context.
+        var replyToIds = messages
+            .Where(m => m.ReplyToMessageId.HasValue)
+            .Select(m => m.ReplyToMessageId!.Value)
+            .Distinct()
+            .ToList();
+
+        var replyContextLookup = new Dictionary<Guid, ReplyContextDto>();
+        if (replyToIds.Count > 0)
+        {
+            var parentMessages = await db.Messages
+                .AsNoTracking()
+                .Where(m => replyToIds.Contains(m.Id))
+                .Select(m => new
+                {
+                    m.Id,
+                    m.AuthorName,
+                    m.AuthorUserId,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
+                    m.Body
+                })
+                .ToListAsync();
+
+            replyContextLookup = parentMessages.ToDictionary(
+                p => p.Id,
+                p => new ReplyContextDto(
+                    p.Id,
+                    p.AuthorName,
+                    avatarService.ResolveUrl(p.AuthorCustomAvatarPath) ?? p.AuthorGoogleAvatarUrl,
+                    p.AuthorUserId,
+                    p.Body.Length > 100 ? p.Body[..100] : p.Body,
+                    false));
+        }
+
         var response = messages.Select(message =>
         {
             var mentionIds = ParseMentionUserIds(message.Body);
@@ -138,7 +174,12 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 LinkPreviews = linkPreviewLookup.TryGetValue(message.Id, out var previews)
                     ? previews
                     : Array.Empty<LinkPreviewDto>(),
-                Mentions = (IReadOnlyList<MentionDto>)mentions
+                Mentions = (IReadOnlyList<MentionDto>)mentions,
+                ReplyContext = message.ReplyToMessageId.HasValue
+                    ? replyContextLookup.TryGetValue(message.ReplyToMessageId.Value, out var ctx)
+                        ? ctx
+                        : new ReplyContextDto(message.ReplyToMessageId.Value, string.Empty, null, null, string.Empty, true)
+                    : (ReplyContextDto?)null
             };
         });
 
@@ -175,13 +216,45 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             authorName = "Unknown";
         }
 
+        // Validate reply-to reference if provided.
+        ReplyContextDto? replyContext = null;
+        if (request.ReplyToMessageId.HasValue)
+        {
+            var replyTarget = await db.Messages
+                .AsNoTracking()
+                .Where(m => m.Id == request.ReplyToMessageId.Value)
+                .Select(m => new { m.Id, m.ChannelId, m.AuthorName, m.AuthorUserId, m.Body,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null })
+                .FirstOrDefaultAsync();
+
+            if (replyTarget is null)
+            {
+                return BadRequest(new { error = "The message being replied to does not exist." });
+            }
+
+            if (replyTarget.ChannelId != channelId)
+            {
+                return BadRequest(new { error = "The message being replied to is in a different channel." });
+            }
+
+            replyContext = new ReplyContextDto(
+                replyTarget.Id,
+                replyTarget.AuthorName,
+                avatarService.ResolveUrl(replyTarget.AuthorCustomAvatarPath) ?? replyTarget.AuthorGoogleAvatarUrl,
+                replyTarget.AuthorUserId,
+                replyTarget.Body.Length > 100 ? replyTarget.Body[..100] : replyTarget.Body,
+                false);
+        }
+
         var message = new Message
         {
             ChannelId = channelId,
             AuthorUserId = appUser.Id,
             AuthorName = authorName,
             Body = request.Body?.Trim() ?? string.Empty,
-            ImageUrl = request.ImageUrl
+            ImageUrl = request.ImageUrl,
+            ReplyToMessageId = request.ReplyToMessageId
         };
 
         db.Messages.Add(message);
@@ -213,7 +286,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             AuthorAvatarUrl = authorAvatarUrl,
             Reactions = Array.Empty<object>(),
             LinkPreviews = Array.Empty<object>(),
-            Mentions = (IReadOnlyList<MentionDto>)mentions
+            Mentions = (IReadOnlyList<MentionDto>)mentions,
+            ReplyContext = replyContext
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
@@ -441,4 +515,16 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     private sealed record ReactionSummary(string Emoji, int Count, IReadOnlyList<Guid> UserIds);
     private sealed record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
     private sealed record MentionDto(Guid UserId, string DisplayName);
+
+    /// <summary>
+    /// Lightweight reply context describing the original message being replied to.
+    /// </summary>
+    private sealed record ReplyContextDto(
+        Guid MessageId,
+        string AuthorName,
+        string? AuthorAvatarUrl,
+        Guid? AuthorUserId,
+        string BodyPreview,
+        bool IsDeleted
+    );
 }

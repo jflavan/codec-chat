@@ -9,6 +9,7 @@
 	let container: HTMLDivElement;
 	let isLockedToBottom = $state(true);
 	let unreadCount = $state(0);
+	let highlightedMessageId = $state<string | null>(null);
 
 	// Internal bookkeeping (not reactive — no $state needed)
 	let isAutoScrolling = false;
@@ -48,6 +49,18 @@
 		isLockedToBottom = true;
 		unreadCount = 0;
 		scrollToBottom(false);
+	}
+
+	function scrollToMessage(messageId: string): void {
+		if (!container) return;
+		const el = container.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+		if (el) {
+			el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			highlightedMessageId = messageId;
+			setTimeout(() => {
+				if (highlightedMessageId === messageId) highlightedMessageId = null;
+			}, 1500);
+		}
 	}
 
 	// Reset scroll state on channel change
@@ -97,7 +110,9 @@
 			{#each app.messages as message, i}
 				{@const prev = i > 0 ? app.messages[i - 1] : null}
 				{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
-				<MessageItem {message} grouped={isGrouped} />
+				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>
+					<MessageItem {message} grouped={isGrouped} onScrollToMessage={scrollToMessage} />
+				</div>
 			{/each}
 		{/if}
 	</div>
@@ -190,5 +205,21 @@
 	.jump-arrow {
 		flex-shrink: 0;
 		opacity: 0.8;
+	}
+
+	.reply-highlight {
+		animation: reply-highlight-fade 1.5s ease-out;
+	}
+
+	@keyframes reply-highlight-fade {
+		0% { background-color: rgba(88, 101, 242, 0.15); }
+		100% { background-color: transparent; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.reply-highlight {
+			animation: none;
+			background-color: rgba(88, 101, 242, 0.1);
+		}
 	}
 </style>

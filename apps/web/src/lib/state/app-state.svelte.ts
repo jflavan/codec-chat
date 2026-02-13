@@ -131,6 +131,9 @@ export class AppState {
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
 
+	/* ───── reply state ───── */
+	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
+
 	/* ───── derived ───── */
 	readonly isSignedIn = $derived(Boolean(this.idToken));
 
@@ -271,6 +274,7 @@ export class AppState {
 		this.friendsTab = 'all';
 		this.friendSearchQuery = '';
 		this.settingsOpen = false;
+		this.replyingTo = null;
 
 		await tick();
 		renderGoogleButton('google-button');
@@ -377,6 +381,7 @@ export class AppState {
 		this.selectedChannelId = channelId;
 		this.typingUsers = [];
 		this.pendingMentions = new Map();
+		this.replyingTo = null;
 
 		// Clear mention badge for this channel
 		const next = new Map(this.channelMentionCounts);
@@ -393,6 +398,7 @@ export class AppState {
 
 		const body = this.resolveMentions(this.messageBody.trim());
 		const imageFile = this.pendingImage;
+		const replyToMessageId = this.replyingTo?.context === 'channel' ? this.replyingTo.messageId : null;
 
 		if (!body && !imageFile) {
 			this.error = 'Message body or image is required.';
@@ -407,10 +413,11 @@ export class AppState {
 				imageUrl = result.imageUrl;
 			}
 
-			await this.api.sendMessage(this.idToken, this.selectedChannelId, body, imageUrl);
+			await this.api.sendMessage(this.idToken, this.selectedChannelId, body, imageUrl, replyToMessageId);
 			this.messageBody = '';
 			this.pendingMentions = new Map();
 			this.clearPendingImage();
+			this.replyingTo = null;
 
 			if (this.me) {
 				this.hub.clearTyping(this.selectedChannelId, this.effectiveDisplayName);
@@ -745,6 +752,18 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Replies ═══════════════════ */
+
+	/** Activate the reply composer bar for a given message. */
+	startReply(messageId: string, authorName: string, bodyPreview: string, context: 'channel' | 'dm' = 'channel'): void {
+		this.replyingTo = { messageId, authorName, bodyPreview, context };
+	}
+
+	/** Clear the reply-in-progress state. */
+	cancelReply(): void {
+		this.replyingTo = null;
+	}
+
 	/* ═══════════════════ Friends ═══════════════════ */
 
 	/** Navigate to the friends panel (Home view). */
@@ -892,6 +911,7 @@ export class AppState {
 		this.activeDmChannelId = dmChannelId;
 		this.dmTypingUsers = [];
 		this.dmMessageBody = '';
+		this.replyingTo = null;
 
 		// Clear unread for this conversation.
 		if (this.unreadDmCounts.has(dmChannelId)) {
@@ -922,6 +942,7 @@ export class AppState {
 
 		const body = this.dmMessageBody.trim();
 		const imageFile = this.pendingDmImage;
+		const replyToDirectMessageId = this.replyingTo?.context === 'dm' ? this.replyingTo.messageId : null;
 
 		if (!body && !imageFile) {
 			this.error = 'Message body or image is required.';
@@ -936,9 +957,10 @@ export class AppState {
 				imageUrl = result.imageUrl;
 			}
 
-			await this.api.sendDm(this.idToken, this.activeDmChannelId, body, imageUrl);
+			await this.api.sendDm(this.idToken, this.activeDmChannelId, body, imageUrl, replyToDirectMessageId);
 			this.dmMessageBody = '';
 			this.clearPendingDmImage();
+			this.replyingTo = null;
 
 			if (this.me) {
 				this.hub.clearDmTyping(this.activeDmChannelId, this.effectiveDisplayName);
@@ -996,7 +1018,7 @@ export class AppState {
 			onMessage: (msg) => {
 				if (msg.channelId === this.selectedChannelId) {
 					if (!this.messages.some((m) => m.id === msg.id)) {
-						this.messages = [...this.messages, { ...msg, linkPreviews: msg.linkPreviews ?? [], mentions: msg.mentions ?? [] }];
+						this.messages = [...this.messages, { ...msg, linkPreviews: msg.linkPreviews ?? [], mentions: msg.mentions ?? [], replyContext: msg.replyContext ?? null }];
 					}
 				}
 			},
@@ -1036,7 +1058,7 @@ export class AppState {
 			onReceiveDm: (msg) => {
 				if (msg.dmChannelId === this.activeDmChannelId) {
 					if (!this.dmMessages.some((m) => m.id === msg.id)) {
-						this.dmMessages = [...this.dmMessages, { ...msg, linkPreviews: msg.linkPreviews ?? [] }];
+						this.dmMessages = [...this.dmMessages, { ...msg, linkPreviews: msg.linkPreviews ?? [], replyContext: msg.replyContext ?? null }];
 					}
 				} else {
 					// Increment unread count for this channel.

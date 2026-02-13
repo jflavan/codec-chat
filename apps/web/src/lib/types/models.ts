@@ -35,6 +35,16 @@ export type Mention = {
 	displayName: string;
 };
 
+/** Compact preview of the message being replied to. */
+export type ReplyContext = {
+	messageId: string;
+	authorName: string;
+	authorAvatarUrl: string | null;
+	authorUserId: string | null;
+	bodyPreview: string;
+	isDeleted: boolean;
+};
+
 /** Chat message in a channel. */
 export type Message = {
 	id: string;
@@ -48,6 +58,7 @@ export type Message = {
 	reactions: Reaction[];
 	linkPreviews: LinkPreview[];
 	mentions: Mention[];
+	replyContext: ReplyContext | null;
 };
 
 /** Member of a server. */
@@ -141,6 +152,7 @@ export type DirectMessage = {
 	createdAt: string;
 	authorAvatarUrl?: string | null;
 	linkPreviews: LinkPreview[];
+	replyContext: ReplyContext | null;
 };
 
 /** Server invite code created by an Owner or Admin. */

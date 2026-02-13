@@ -384,6 +384,70 @@ Link preview cards render below the message body when a message contains URLs. M
 - Server messages: `LinkPreviewCard` rendered inside `MessageItem.svelte`, below image attachments, above reactions
 - DM messages: `LinkPreviewCard` rendered inline in `DmChatArea.svelte`, same positioning
 
+## Message Replies ([detailed spec](REPLIES.md))
+
+Inline replies allow users to reference a previous message. The reply system is available in both server channels and DMs.
+
+### Reply Button
+
+- Added to the floating action bar on message hover (positioned before the emoji react button)
+- Icon: ↩ reply arrow (16×16 SVG), same styling as existing action buttons
+- Clicking sets the reply target in `AppState` and focuses the composer
+
+### Reply Reference (above message body)
+
+Compact clickable bar displayed above the message body when `message.replyContext` is non-null.
+
+```
+┌─────────────────────────────────────────────────┐
+│  ↩  [avatar 16px]  AuthorName  Body preview...  │
+└─────────────────────────────────────────────────┘
+```
+
+| Element | Style |
+|---------|-------|
+| Container | Flex row, 4px 8px padding, 4px border-radius, semi-transparent `--bg-secondary`, cursor pointer |
+| Reply icon (↩) | 14px, `--text-muted`, 0.6 opacity |
+| Avatar | 16px circular, same fallback as message avatars |
+| Author name | 13px, 600 weight, `--accent` color |
+| Body preview | 13px, `--text-muted`, truncated with ellipsis, max-width 400px |
+| Deleted state | Italic "Original message was deleted" in `--text-muted`, no avatar, no click action |
+| Hover | Background shifts to darker `--bg-secondary` (0.8 opacity) |
+| Focus | `--accent` outline, 1px offset |
+| Click action | Scrolls the parent message into view with highlight animation |
+
+### Reply Composer Bar
+
+"Replying to {authorName}" banner shown above the composer input when a reply is active.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Replying to **AuthorName**                                ✕ │
+│  Body preview text...                                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+| Element | Style |
+|---------|-------|
+| Container | `--bg-secondary` background, `--border` bottom border, 8px 12px padding, border-radius 8px 8px 0 0 |
+| "Replying to" label | 13px, `--text-muted` |
+| Author name | 13px, 600 weight, `--accent` color |
+| Body preview | 13px, `--text-muted`, truncated with ellipsis, max-width 500px |
+| Cancel button (✕) | 28×28px, transparent background, `--text-muted` color, hover: `--text-normal` + `--bg-message-hover` |
+| Escape key | Cancels the reply (when mention picker is not open) |
+
+### Scroll-to-Original Highlight
+
+When clicking a `ReplyReference`, the original message scrolls into view and highlights briefly.
+
+| Property | Value |
+|----------|-------|
+| Scroll behavior | `smooth`, `block: center` |
+| Animation | `reply-highlight-fade` keyframe, 1.5s ease-out |
+| Highlight color | `color-mix(in srgb, var(--accent) 15%, transparent)` → transparent |
+| Reduced motion | No animation; static `color-mix(in srgb, var(--accent) 10%, transparent)` background |
+| Element targeting | `data-message-id` attribute on each message wrapper |
+
 ## Animations & Micro-interactions
 
 - **Transitions**: 150–200ms ease for background/color changes
@@ -393,6 +457,7 @@ Link preview cards render below the message body when a message contains URLs. M
 - **Message hover**: background highlight
 - **Buttons**: color shift on hover/active
 - **Kick error banner**: overlay banner with `banner-lifecycle` keyframe animation — fully visible for 75% of duration (3.75s), then fades out over 1.25s with slight upward slide (`translateY(-8px)`)
+- **Reply highlight**: `reply-highlight-fade` keyframe — accent at 15% opacity fading to transparent over 1.5s; respects `prefers-reduced-motion` (no animation, static tinted background instead)
 
 ## Responsive Design
 

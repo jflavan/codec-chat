@@ -61,6 +61,8 @@ src/
 │   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping
 │   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped)
 │   │   │   ├── ReactionBar.svelte        # Reaction pills (emoji + count)
+│   │   │   ├── ReplyReference.svelte     # Inline reply context above message
+│   │   │   ├── ReplyComposerBar.svelte   # "Replying to" bar above composer
 │   │   │   ├── Composer.svelte           # Message input with send button
 │   │   │   └── TypingIndicator.svelte    # Animated typing dots
 │   │   ├── friends/
@@ -253,8 +255,8 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `POST /invites/{code}` - Join a server via invite code (any authenticated user; validates expiry and max uses)
 
 #### Messaging
-- `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership; includes `imageUrl`)
-- `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; accepts optional `imageUrl`; broadcasts via SignalR)
+- `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership; includes `imageUrl`, `replyContext`)
+- `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; accepts optional `imageUrl`, `replyToMessageId`; broadcasts via SignalR)
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership; broadcasts via SignalR)
 
 #### Friends
@@ -271,8 +273,8 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 #### Direct Messages
 - `POST /dm/channels` - Start or resume a DM conversation with a friend (returns existing or creates new)
 - `GET /dm/channels` - List open DM conversations (sorted by most recent message, `IsOpen = true` only)
-- `GET /dm/channels/{channelId}/messages` - Get messages in a DM conversation (paginated via `before`/`limit`; includes `imageUrl`)
-- `POST /dm/channels/{channelId}/messages` - Send a direct message (accepts optional `imageUrl`; broadcasts `ReceiveDm` via SignalR; reopens closed conversations)
+- `GET /dm/channels/{channelId}/messages` - Get messages in a DM conversation (paginated via `before`/`limit`; includes `imageUrl`, `replyContext`)
+- `POST /dm/channels/{channelId}/messages` - Send a direct message (accepts optional `imageUrl`, `replyToDirectMessageId`; broadcasts `ReceiveDm` via SignalR; reopens closed conversations)
 - `DELETE /dm/channels/{channelId}` - Close a DM conversation (sets `IsOpen = false` for current user; messages preserved)
 
 #### Image Uploads
@@ -299,7 +301,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 #### Server → Client Events
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `ReceiveMessage` | `{ id, authorName, authorUserId, body, createdAt, channelId, reactions, imageUrl, linkPreviews }` | New message posted to current channel |
+| `ReceiveMessage` | `{ id, authorName, authorUserId, body, createdAt, channelId, reactions, imageUrl, linkPreviews, replyContext }` | New message posted to current channel |
 | `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 | `ReactionUpdated` | `{ messageId, channelId, reactions: [{ emoji, count, userIds }] }` | Reaction toggled on a message |
@@ -308,7 +310,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `FriendRequestDeclined` | `{ requestId }` | Friend request declined (sent to requester's user group) |
 | `FriendRequestCancelled` | `{ requestId }` | Friend request cancelled (sent to recipient's user group) |
 | `FriendRemoved` | `{ friendshipId, userId }` | Friend removed (sent to the other participant's user group) |
-| `ReceiveDm` | `{ id, dmChannelId, authorUserId, authorName, body, createdAt, imageUrl, linkPreviews }` | New DM received (sent to DM channel group + recipient user group) |
+| `ReceiveDm` | `{ id, dmChannelId, authorUserId, authorName, body, createdAt, imageUrl, linkPreviews, replyContext }` | New DM received (sent to DM channel group + recipient user group) |
 | `DmTyping` | `{ dmChannelId, displayName }` | DM partner started typing |
 | `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
 | `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |
@@ -461,9 +463,10 @@ DirectMessage ─┘
 
 #### Message
 - Individual chat message in a channel
-- Fields: Id, ChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), CreatedAt
+- Fields: Id, ChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), ReplyToMessageId (nullable, self-referencing FK), CreatedAt
 - Has many `Reaction` entries
 - Has many `LinkPreview` entries (max 5, fetched asynchronously after message is posted)
+- Self-referencing FK with ON DELETE SET NULL (orphaned replies show "Original message was deleted")
 
 #### Reaction
 - Emoji reaction on a message by a user
@@ -495,9 +498,10 @@ DirectMessage ─┘
 
 #### DirectMessage
 - Individual message within a DM conversation
-- Fields: Id, DmChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), CreatedAt
+- Fields: Id, DmChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), ReplyToDirectMessageId (nullable, self-referencing FK), CreatedAt
 - Follows the same shape as the server `Message` entity
 - Has many `LinkPreview` entries (max 5, fetched asynchronously after message is posted)
+- Self-referencing FK with ON DELETE SET NULL (orphaned replies show "Original message was deleted")
 
 #### LinkPreview
 - URL metadata extracted from a message body (Open Graph + HTML meta fallbacks)

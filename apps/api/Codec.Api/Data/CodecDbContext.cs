@@ -159,6 +159,26 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<ServerInvite>()
             .HasIndex(invite => invite.ServerId);
 
+        // Message self-reference for replies.
+        modelBuilder.Entity<Message>()
+            .HasOne<Message>()
+            .WithMany()
+            .HasForeignKey(m => m.ReplyToMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Message>()
+            .HasIndex(m => m.ReplyToMessageId);
+
+        // DirectMessage self-reference for replies.
+        modelBuilder.Entity<DirectMessage>()
+            .HasOne<DirectMessage>()
+            .WithMany()
+            .HasForeignKey(dm => dm.ReplyToDirectMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<DirectMessage>()
+            .HasIndex(dm => dm.ReplyToDirectMessageId);
+
         // Link preview relationships, indexes, and check constraint.
         modelBuilder.Entity<LinkPreview>(entity =>
         {

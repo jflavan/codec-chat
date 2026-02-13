@@ -76,6 +76,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Image uploads feature implemented (upload from desktop or paste from clipboard, PNG/JPEG/WebP/GIF support, 10 MB limit, image preview in composer, inline image display in messages, works in both server channels and DMs)
 - Link previews feature fully implemented (automatic URL detection, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR, clickable thumbnail images)
 - @mentions feature implemented (autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on channel navigation, mentioned message highlighting, @here to notify all channel members)
+- Message replies feature implemented (inline reply to any message in channels or DMs, reply-to-message context in feed, scroll-to-original with highlight animation, Escape to cancel, orphaned reply handling)
 
 ## Task breakdown: Session Persistence
 
@@ -325,6 +326,44 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Backend builds successfully (`dotnet build`)
 - [x] Frontend type-checks with zero errors (`svelte-check`)
 - [x] UI renders correctly with attach button visible in composer
+
+## Task breakdown: Message Replies (see [docs/REPLIES.md](docs/REPLIES.md))
+
+### API — Data model & migration
+- [x] Add `ReplyToMessageId` nullable FK to `Message` entity (self-referencing, ON DELETE SET NULL)
+- [x] Add `ReplyToDirectMessageId` nullable FK to `DirectMessage` entity (self-referencing, ON DELETE SET NULL)
+- [x] Update `CreateMessageRequest` DTO to accept optional reply IDs
+- [x] Create and apply EF Core migration (`AddMessageReplies`)
+
+### API — Reply context in retrieval
+- [x] Update `ChannelsController.GetMessages` to batch-load parent messages and include `ReplyContext` DTO
+- [x] Update `DmController.GetMessages` to batch-load parent DMs and include `ReplyContext` DTO
+- [x] `ReplyContextDto` includes messageId, authorName, authorAvatarUrl, authorUserId, bodyPreview (max 100 chars), isDeleted
+
+### API — Reply support in posting
+- [x] Validate reply target in `ChannelsController.PostMessage` (existence + same-channel check, 400 on failure)
+- [x] Validate reply target in `DmController.SendMessage` (existence + same-DM-channel check, 400 on failure)
+- [x] Include `replyContext` in SignalR broadcast payloads for both channel and DM messages
+
+### Web — Types, API client & state
+- [x] Add `ReplyContext` type to `models.ts` (messageId, authorName, authorAvatarUrl, authorUserId, bodyPreview, isDeleted)
+- [x] Add `replyContext` field to `Message` and `DirectMessage` types
+- [x] Update `sendMessage()` and `sendDm()` API methods to accept optional reply ID parameters
+- [x] Add `replyingTo` reactive state to `AppState` with `startReply()` and `cancelReply()` methods
+- [x] Clear reply state on channel/DM switch and sign-out
+- [x] Wire `replyContext` into SignalR message callbacks
+
+### Web — UI components
+- [x] Create `ReplyReference.svelte` — compact clickable bar above message body (avatar, author, preview, deleted state)
+- [x] Create `ReplyComposerBar.svelte` — "Replying to {author}" banner above composer with cancel button
+- [x] Update `MessageItem.svelte` — reply button in floating action bar, `ReplyReference` display for replies
+- [x] Update `MessageFeed.svelte` — `scrollToMessage()` with highlight animation, `data-message-id` attributes
+- [x] Update `Composer.svelte` — integrate `ReplyComposerBar`, Escape key cancels reply
+- [x] Update `DmChatArea.svelte` — full reply support (reply button, `ReplyReference`, `ReplyComposerBar`, scroll-to-message, Escape key)
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`, 0 errors)
+- [x] Frontend type-checks with zero errors (`svelte-check`)
 
 ## Next steps
 - Introduce role-based authorization rules for additional operations

@@ -4,9 +4,18 @@
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
 	import LinkPreviewCard from './LinkPreviewCard.svelte';
+	import ReplyReference from './ReplyReference.svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
-	let { message, grouped = false }: { message: Message; grouped?: boolean } = $props();
+	let {
+		message,
+		grouped = false,
+		onScrollToMessage
+	}: {
+		message: Message;
+		grouped?: boolean;
+		onScrollToMessage?: (messageId: string) => void;
+	} = $props();
 
 	const app = getAppState();
 	const currentUserId = $derived(app.me?.user.id ?? null);
@@ -40,11 +49,26 @@
 	function closePicker() {
 		showPicker = false;
 	}
+
+	function handleReply() {
+		const bodyPreview = message.body.length > 100 ? message.body.slice(0, 100) : message.body;
+		app.startReply(message.id, message.authorName, bodyPreview, 'channel');
+	}
 </script>
 
 <article class="message" class:grouped class:mentioned={isMentioned}>
 	<!-- Floating action bar — appears on hover at top-right of message -->
 	<div class="message-actions" class:picker-open={showPicker}>
+		<button
+			class="action-btn"
+			onclick={handleReply}
+			title="Reply"
+			aria-label="Reply to message"
+		>
+			<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+				<path d="M6.598 2.152a.5.5 0 0 1 .052.707L3.354 6.5H11.5a4.5 4.5 0 0 1 0 9h-1a.5.5 0 0 1 0-1h1a3.5 3.5 0 1 0 0-7H3.354l3.296 3.641a.5.5 0 1 1-.74.672l-4.2-4.638a.5.5 0 0 1 0-.672l4.2-4.638a.5.5 0 0 1 .688-.053z"/>
+			</svg>
+		</button>
 		<button
 			class="action-btn"
 			onclick={() => (showPicker = !showPicker)}
@@ -87,6 +111,12 @@
 			{/if}
 		</div>
 		<div class="message-content">
+			{#if message.replyContext}
+				<ReplyReference
+					replyContext={message.replyContext}
+					onClickGoToOriginal={onScrollToMessage}
+				/>
+			{/if}
 			<div class="message-header">
 				<strong class="message-author">{message.authorName}</strong>
 				<time class="message-time">{formatTime(message.createdAt)}</time>
@@ -119,6 +149,12 @@
 			<time class="message-time-inline">{formatTime(message.createdAt)}</time>
 		</div>
 		<div class="message-content">
+			{#if message.replyContext}
+				<ReplyReference
+					replyContext={message.replyContext}
+					onClickGoToOriginal={onScrollToMessage}
+				/>
+			{/if}
 			{#if message.body}
 				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} /></p>
 			{/if}

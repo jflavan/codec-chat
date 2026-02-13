@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import type { Member } from '$lib/types/index.js';
+	import ReplyComposerBar from './ReplyComposerBar.svelte';
 
 	const app = getAppState();
 	let inputEl: HTMLInputElement;
@@ -66,21 +67,27 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent): void {
-		if (!showMentionPicker || filteredMembers.length === 0) return;
+		if (showMentionPicker && filteredMembers.length > 0) {
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				selectedMentionIndex = (selectedMentionIndex + 1) % filteredMembers.length;
+			} else if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				selectedMentionIndex =
+					(selectedMentionIndex - 1 + filteredMembers.length) % filteredMembers.length;
+			} else if (e.key === 'Enter' || e.key === 'Tab') {
+				e.preventDefault();
+				insertMention(filteredMembers[selectedMentionIndex]);
+			} else if (e.key === 'Escape') {
+				e.preventDefault();
+				showMentionPicker = false;
+			}
+			return;
+		}
 
-		if (e.key === 'ArrowDown') {
+		if (e.key === 'Escape' && app.replyingTo?.context === 'channel') {
 			e.preventDefault();
-			selectedMentionIndex = (selectedMentionIndex + 1) % filteredMembers.length;
-		} else if (e.key === 'ArrowUp') {
-			e.preventDefault();
-			selectedMentionIndex =
-				(selectedMentionIndex - 1 + filteredMembers.length) % filteredMembers.length;
-		} else if (e.key === 'Enter' || e.key === 'Tab') {
-			e.preventDefault();
-			insertMention(filteredMembers[selectedMentionIndex]);
-		} else if (e.key === 'Escape') {
-			e.preventDefault();
-			showMentionPicker = false;
+			app.cancelReply();
 		}
 	}
 
@@ -164,6 +171,10 @@
 				</li>
 			{/each}
 		</ul>
+	{/if}
+
+	{#if app.replyingTo?.context === 'channel'}
+		<ReplyComposerBar authorName={app.replyingTo.authorName} bodyPreview={app.replyingTo.bodyPreview} onCancel={() => app.cancelReply()} />
 	{/if}
 
 	<div class="composer-row">

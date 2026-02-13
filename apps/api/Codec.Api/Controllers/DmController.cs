@@ -240,6 +240,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.Body,
                 m.ImageUrl,
                 m.CreatedAt,
+                m.ReplyToDirectMessageId,
                 AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                 AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
             })
@@ -268,6 +269,41 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                         .ToList());
         }
 
+        // Batch-load referenced parent DMs for reply context.
+        var replyToIds = messages
+            .Where(m => m.ReplyToDirectMessageId.HasValue)
+            .Select(m => m.ReplyToDirectMessageId!.Value)
+            .Distinct()
+            .ToList();
+
+        var replyContextLookup = new Dictionary<Guid, ReplyContextDto>();
+        if (replyToIds.Count > 0)
+        {
+            var parentMessages = await db.DirectMessages
+                .AsNoTracking()
+                .Where(dm => replyToIds.Contains(dm.Id))
+                .Select(dm => new
+                {
+                    dm.Id,
+                    dm.AuthorName,
+                    dm.AuthorUserId,
+                    AuthorCustomAvatarPath = dm.AuthorUser != null ? dm.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = dm.AuthorUser != null ? dm.AuthorUser.AvatarUrl : null,
+                    dm.Body
+                })
+                .ToListAsync();
+
+            replyContextLookup = parentMessages.ToDictionary(
+                p => p.Id,
+                p => new ReplyContextDto(
+                    p.Id,
+                    p.AuthorName,
+                    avatarService.ResolveUrl(p.AuthorCustomAvatarPath) ?? p.AuthorGoogleAvatarUrl,
+                    p.AuthorUserId,
+                    p.Body.Length > 100 ? p.Body[..100] : p.Body,
+                    false));
+        }
+
         var response = messages.Select(m => new
         {
             m.Id,
@@ -280,7 +316,12 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl,
             LinkPreviews = linkPreviewLookup.TryGetValue(m.Id, out var previews)
                 ? previews
-                : Array.Empty<LinkPreviewDto>()
+                : Array.Empty<LinkPreviewDto>(),
+            ReplyContext = m.ReplyToDirectMessageId.HasValue
+                ? replyContextLookup.TryGetValue(m.ReplyToDirectMessageId.Value, out var ctx)
+                    ? ctx
+                    : new ReplyContextDto(m.ReplyToDirectMessageId.Value, string.Empty, null, null, string.Empty, true)
+                : (ReplyContextDto?)null
         });
 
         return Ok(response);
@@ -321,13 +362,45 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             authorName = "Unknown";
         }
 
+        // Validate reply-to reference if provided.
+        ReplyContextDto? replyContext = null;
+        if (request.ReplyToDirectMessageId.HasValue)
+        {
+            var replyTarget = await db.DirectMessages
+                .AsNoTracking()
+                .Where(dm => dm.Id == request.ReplyToDirectMessageId.Value)
+                .Select(dm => new { dm.Id, dm.DmChannelId, dm.AuthorName, dm.AuthorUserId, dm.Body,
+                    AuthorCustomAvatarPath = dm.AuthorUser != null ? dm.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = dm.AuthorUser != null ? dm.AuthorUser.AvatarUrl : null })
+                .FirstOrDefaultAsync();
+
+            if (replyTarget is null)
+            {
+                return BadRequest(new { error = "The message being replied to does not exist." });
+            }
+
+            if (replyTarget.DmChannelId != channelId)
+            {
+                return BadRequest(new { error = "The message being replied to is in a different DM channel." });
+            }
+
+            replyContext = new ReplyContextDto(
+                replyTarget.Id,
+                replyTarget.AuthorName,
+                avatarService.ResolveUrl(replyTarget.AuthorCustomAvatarPath) ?? replyTarget.AuthorGoogleAvatarUrl,
+                replyTarget.AuthorUserId,
+                replyTarget.Body.Length > 100 ? replyTarget.Body[..100] : replyTarget.Body,
+                false);
+        }
+
         var message = new DirectMessage
         {
             DmChannelId = channelId,
             AuthorUserId = appUser.Id,
             AuthorName = authorName,
             Body = request.Body?.Trim() ?? string.Empty,
-            ImageUrl = request.ImageUrl
+            ImageUrl = request.ImageUrl,
+            ReplyToDirectMessageId = request.ReplyToDirectMessageId
         };
 
         db.DirectMessages.Add(message);
@@ -355,7 +428,8 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             message.ImageUrl,
             message.CreatedAt,
             AuthorAvatarUrl = authorAvatarUrl,
-            LinkPreviews = Array.Empty<object>()
+            LinkPreviews = Array.Empty<object>(),
+            ReplyContext = replyContext
         };
 
         // Broadcast to the other participant via their user-scoped group.
@@ -476,4 +550,16 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     }
 
     private sealed record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
+
+    /// <summary>
+    /// Lightweight reply context describing the original DM being replied to.
+    /// </summary>
+    private sealed record ReplyContextDto(
+        Guid MessageId,
+        string AuthorName,
+        string? AuthorAvatarUrl,
+        Guid? AuthorUserId,
+        string BodyPreview,
+        bool IsDeleted
+    );
 }
