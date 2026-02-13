@@ -109,7 +109,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ My Account section: read-only account info (email, Google display name), sign-out
 - ✅ Keyboard accessible: Escape to close, focus trapping via `<dialog>`
 - ✅ Responsive layout: two-column (≥ 900px), tabbed (< 900px)
-- Extensible for future categories (notifications, privacy, appearance)
+- ✅ Extensible for future categories (notifications, privacy, appearance)
 
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
@@ -161,59 +161,36 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ## 🚧 In Progress
 
 ### Authorization
-- ✅ Role-based permissions (Owner/Admin privileges)
-- 🔄 Authorization policies for endpoints
-- ✅ Admin-only operations (channel creation, member kicking)
+- Authorization policies for endpoints
 
 ### Data Validation
-- 🔄 Enhanced input validation
-- 🔄 Error response standardization
-- 🔄 Client-side form validation
+- Enhanced input validation
+- Error response standardization
+- Client-side form validation
 
 ## 📋 Planned (Near-term)
 
 ### Messaging Features
 - Message editing and deletion
-- ~~Rich text formatting (markdown)~~ → ✅ implemented (bold and italic)
-- @mentions → ✅ implemented
-- ~~Message replies~~ → ✅ implemented
 - Message search
 
 ### Real-time Features
-- ✅ SignalR/WebSocket integration
-- ✅ Live message updates (no page refresh)
-- ✅ Typing indicators
 - Presence indicators (online/offline/away)
 - Real-time member list updates
 
 ### Server Management
 - Server settings/configuration
-- ~~Server invites (invite codes)~~ → ✅ implemented
 - Server icons/avatars
 - Channel categories/organization
 - Channel editing and deletion
 
-### Link Previews (Automatic Embeds) ([detailed spec](LINK_PREVIEWS.md))
-- ~~Automatic URL detection in message bodies (server channels and DMs)~~ → ✅ implemented
-- ~~Open Graph + HTML meta tag metadata fetching~~ → ✅ implemented
-- ~~Clickable link preview cards rendered below message text~~ → ✅ implemented
-- ~~Real-time preview delivery via `LinkPreviewsReady` SignalR event~~ → ✅ implemented
-- ~~SSRF protection~~ → ✅ implemented
-- ~~Clickable hyperlinks in message body text~~ → ✅ implemented
-- ~~Responsive card layout~~ → ✅ implemented
-- Link preview caching (deferred)
-- Image proxying for `og:image` URLs (deferred)
-- Video embeds for YouTube/Vimeo (deferred)
+### Link Previews
+- Link preview caching
+- Image proxying for `og:image` URLs
+- Video embeds for YouTube/Vimeo
 
 ### File & Media
-- ✅ Avatar image uploads (user and server-specific)
-- ✅ Image format validation and size limits
-- ✅ Image uploads in chat messages (PNG, JPEG, WebP, GIF via file picker or clipboard paste)
-- ✅ Inline image display in message feed
-- ✅ Image upload endpoint (`POST /uploads/images`) with SHA-256 content-hash filenames
-- ✅ Image lightbox / preview overlay (full-size image modal with Escape to close and open-original link)
 - File uploads (documents, other media)
-- ~~Drag-and-drop upload~~ → ✅ implemented (images)
 
 ## 🔮 Future (Later)
 
@@ -221,12 +198,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Voice channels (WebRTC)
 - Video chat
 - Screen sharing
-- ~~Message replies~~ → ✅ [implemented](REPLIES.md)
 - Message pinning
 - Notification system (push, email)
 
 ### Moderation & Administration
-- ✅ User kicking (Owner/Admin only, with role hierarchy enforcement)
 - User banning
 - Message moderation
 - Audit logs
@@ -235,10 +210,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Granular permissions
 
 ### Customization
-- ~~User preferences/settings~~ → ✅ [implemented](USER_SETTINGS.md)
 - Web client themes
 - Custom emojis
-- ~~Profile customization~~ → ✅ [implemented: nicknames](NICKNAMES.md)
 - Status messages
 
 ### Enterprise Features
