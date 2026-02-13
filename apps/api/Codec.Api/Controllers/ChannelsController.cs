@@ -15,7 +15,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService) : ControllerBase
+public class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
 {
     /// <summary>
     /// Returns messages for a channel, ordered by creation time. Requires server membership.
@@ -77,6 +77,25 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
                         .ToList());
         }
 
+        // Load link previews for all messages in a single query.
+        var linkPreviewLookup = new Dictionary<Guid, IReadOnlyList<LinkPreviewDto>>();
+        if (messageIds.Length > 0)
+        {
+            var linkPreviews = await db.LinkPreviews
+                .AsNoTracking()
+                .Where(lp => lp.MessageId != null && messageIds.Contains(lp.MessageId.Value)
+                    && lp.Status == LinkPreviewStatus.Success)
+                .ToListAsync();
+
+            linkPreviewLookup = linkPreviews
+                .GroupBy(lp => lp.MessageId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<LinkPreviewDto>)group
+                        .Select(lp => new LinkPreviewDto(lp.Url, lp.Title, lp.Description, lp.ImageUrl, lp.SiteName, lp.CanonicalUrl))
+                        .ToList());
+        }
+
         var response = messages.Select(message => new
         {
             message.Id,
@@ -89,7 +108,10 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
             Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
                 ? reactions
-                : Array.Empty<ReactionSummary>()
+                : Array.Empty<ReactionSummary>(),
+            LinkPreviews = linkPreviewLookup.TryGetValue(message.Id, out var previews)
+                ? previews
+                : Array.Empty<LinkPreviewDto>()
         });
 
         return Ok(response);
@@ -149,10 +171,78 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             message.CreatedAt,
             message.ChannelId,
             AuthorAvatarUrl = authorAvatarUrl,
-            Reactions = Array.Empty<object>()
+            Reactions = Array.Empty<object>(),
+            LinkPreviews = Array.Empty<object>()
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
+
+        // Fire-and-forget: extract URLs and fetch link previews in the background.
+        var messageId = message.Id;
+        var messageBody = message.Body;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var scopedDb = scope.ServiceProvider.GetRequiredService<CodecDbContext>();
+                var previewService = scope.ServiceProvider.GetRequiredService<ILinkPreviewService>();
+                var hub = scope.ServiceProvider.GetRequiredService<IHubContext<ChatHub>>();
+
+                var urls = previewService.ExtractUrls(messageBody);
+                if (urls.Count == 0) return;
+
+                var previews = new List<LinkPreview>();
+                foreach (var url in urls)
+                {
+                    var result = await previewService.FetchMetadataAsync(url);
+                    var preview = new LinkPreview
+                    {
+                        MessageId = messageId,
+                        Url = url,
+                        FetchedAt = DateTimeOffset.UtcNow
+                    };
+
+                    if (result is not null)
+                    {
+                        preview.Title = result.Title;
+                        preview.Description = result.Description;
+                        preview.ImageUrl = result.ImageUrl;
+                        preview.SiteName = result.SiteName;
+                        preview.CanonicalUrl = result.CanonicalUrl;
+                        preview.Status = LinkPreviewStatus.Success;
+                    }
+                    else
+                    {
+                        preview.Status = LinkPreviewStatus.Failed;
+                    }
+
+                    previews.Add(preview);
+                }
+
+                scopedDb.LinkPreviews.AddRange(previews);
+                await scopedDb.SaveChangesAsync();
+
+                var successPreviews = previews
+                    .Where(p => p.Status == LinkPreviewStatus.Success)
+                    .Select(p => new LinkPreviewDto(p.Url, p.Title, p.Description, p.ImageUrl, p.SiteName, p.CanonicalUrl))
+                    .ToList();
+
+                if (successPreviews.Count > 0)
+                {
+                    await hub.Clients.Group(channelId.ToString()).SendAsync("LinkPreviewsReady", new
+                    {
+                        MessageId = messageId,
+                        ChannelId = channelId,
+                        LinkPreviews = successPreviews
+                    });
+                }
+            }
+            catch
+            {
+                // Link preview failures must never affect message delivery.
+            }
+        });
 
         return Created($"/channels/{channelId}/messages/{message.Id}", payload);
     }
@@ -238,4 +328,5 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
     }
 
     private sealed record ReactionSummary(string Emoji, int Count, IReadOnlyList<Guid> UserIds);
+    private sealed record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
 }

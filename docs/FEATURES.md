@@ -72,6 +72,16 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Home screen layout with DM sidebar + Friends panel / DM chat area
 - ✅ Image uploads in DM messages (same format support and paste/picker as server channels)
 
+### Link Previews ([detailed spec](LINK_PREVIEWS.md))
+- ✅ Automatic URL detection in message bodies (server channels and DMs)
+- ✅ Open Graph + HTML meta tag metadata fetching (title, description, image, site name)
+- ✅ Clickable link preview cards rendered below message text
+- ✅ Clickable thumbnail images linking to the original URL
+- ✅ Real-time preview delivery via `LinkPreviewsReady` SignalR event
+- ✅ SSRF protection (private IP blocking, DNS rebinding prevention, redirect limits)
+- ✅ Clickable hyperlinks in message body text
+- ✅ Responsive card layout (side-by-side ≥ 600px, stacked < 600px)
+
 ### Nicknames ([detailed spec](NICKNAMES.md))
 - ✅ User-chosen display name that overrides Google-provided name
 - ✅ Set/update nickname via `PUT /me/nickname`, remove via `DELETE /me/nickname`
@@ -170,13 +180,16 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Channel editing and deletion
 
 ### Link Previews (Automatic Embeds) ([detailed spec](LINK_PREVIEWS.md))
-- Automatic URL detection in message bodies (server channels and DMs)
-- Open Graph + HTML meta tag metadata fetching (title, description, image, site name)
-- Clickable link preview cards rendered below message text
-- Real-time preview delivery via `LinkPreviewsReady` SignalR event
-- SSRF protection (private IP blocking, DNS rebinding prevention, redirect limits)
-- Clickable hyperlinks in message body text
-- Responsive card layout (side-by-side ≥ 600px, stacked < 600px)
+- ~~Automatic URL detection in message bodies (server channels and DMs)~~ → ✅ implemented
+- ~~Open Graph + HTML meta tag metadata fetching~~ → ✅ implemented
+- ~~Clickable link preview cards rendered below message text~~ → ✅ implemented
+- ~~Real-time preview delivery via `LinkPreviewsReady` SignalR event~~ → ✅ implemented
+- ~~SSRF protection~~ → ✅ implemented
+- ~~Clickable hyperlinks in message body text~~ → ✅ implemented
+- ~~Responsive card layout~~ → ✅ implemented
+- Link preview caching (deferred)
+- Image proxying for `og:image` URLs (deferred)
+- Video embeds for YouTube/Vimeo (deferred)
 
 ### File & Media
 - ✅ Avatar image uploads (user and server-specific)

@@ -12,4 +12,5 @@ public class Message
     public User? AuthorUser { get; set; }
     public Channel? Channel { get; set; }
     public List<Reaction> Reactions { get; set; } = new();
+    public List<LinkPreview> LinkPreviews { get; set; } = new();
 }

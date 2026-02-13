@@ -131,6 +131,23 @@ EF Core migrations make database provider switches straightforward.
                       │ Body            │
                       │ CreatedAt       │
                       └─────────────────┘
+
+┌─────────────┐       ┌─────────────────┐       ┌────────────────┐
+│   Message   │       │   LinkPreview   │       │ DirectMessage  │
+│─────────────│       │─────────────────│       │────────────────│
+│ Id ─────────│─────►│ MessageId (FK?) │       │ Id ───────────│──┐
+│ Body        │       │ DirectMsgId(FK?)│◄──────│ Body           │  │
+│ ChannelId   │       │ Url             │       │ DmChannelId    │  │
+│ CreatedAt   │       │ Title           │       │ CreatedAt      │  │
+└─────────────┘       │ Description     │       └────────────────┘  │
+                      │ ImageUrl        │                          │
+                      │ SiteName        │                          │
+                      │ CanonicalUrl    │                          │
+                      │ FetchedAt       │                          │
+                      │ Status          │                          │
+                      └─────────────────┘                          │
+                              │                                    │
+                              └────────────────────────────────────┘
 ```
 
 ### Entity Definitions
@@ -380,6 +397,45 @@ Individual message within a DM conversation.
 - Follows the same structure as server channel messages
 - A message may have `ImageUrl` only (no body text), body only, or both
 
+#### LinkPreview
+URL metadata extracted from a message body via Open Graph and HTML meta tag parsing.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique link preview identifier |
+| `MessageId` | Guid? (FK) | Reference to a server channel Message (nullable) |
+| `DirectMessageId` | Guid? (FK) | Reference to a DirectMessage (nullable) |
+| `Url` | string (2048 max) | The original URL found in the message body |
+| `Title` | string? (512 max) | Page title from `og:title` or `<title>` |
+| `Description` | string? (1024 max) | Page description from `og:description` or `<meta name="description">` |
+| `ImageUrl` | string? (2048 max) | Thumbnail URL from `og:image` (HTTPS only) |
+| `SiteName` | string? (256 max) | Site name from `og:site_name` |
+| `CanonicalUrl` | string? (2048 max) | Canonical URL from `og:url` (click-through target if present) |
+| `FetchedAt` | DateTimeOffset | When metadata was fetched |
+| `Status` | LinkPreviewStatus (enum) | `Pending`, `Success`, `Failed` |
+
+**Check Constraint:** Exactly one of `MessageId` or `DirectMessageId` must be non-null
+
+**Relationships:**
+- Many-to-one with `Message` (cascade delete)
+- Many-to-one with `DirectMessage` (cascade delete)
+
+**LinkPreviewStatus Enum:**
+```csharp
+public enum LinkPreviewStatus
+{
+    Pending = 0,   // Metadata fetch has not completed yet
+    Success = 1,   // Metadata was successfully fetched
+    Failed = 2     // Fetch failed (timeout, unreachable, no metadata)
+}
+```
+
+**Notes:**
+- Maximum 5 link previews per message (enforced at application level)
+- Fetched asynchronously after message posting via `LinkPreviewService`
+- Only previews with `Status = Success` are returned to clients
+- SSRF-safe: URL validation + DNS rebinding check via `SocketsHttpHandler.ConnectCallback`
+
 ## Database Context
 
 ```csharp
@@ -396,6 +452,7 @@ public class CodecDbContext : DbContext
     public DbSet<DmChannelMember> DmChannelMembers => Set<DmChannelMember>();
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
     public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
+    public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -603,6 +660,14 @@ modelBuilder.Entity<ServerInvite>()
 // ServerInvite: fast listing of invites for a server
 modelBuilder.Entity<ServerInvite>()
     .HasIndex(i => i.ServerId);
+
+// LinkPreview: fast retrieval of previews for a server message
+modelBuilder.Entity<LinkPreview>()
+    .HasIndex(lp => lp.MessageId);
+
+// LinkPreview: fast retrieval of previews for a DM
+modelBuilder.Entity<LinkPreview>()
+    .HasIndex(lp => lp.DirectMessageId);
 ```
 
 ### Query Patterns
@@ -625,7 +690,7 @@ var messages = await db.Messages
 ## Future Schema Changes
 
 ### Near-term Additions
-- Link preview metadata
+- ~~Link preview metadata~~ → ✅ implemented (`LinkPreview` entity)
 - File attachments metadata (non-image files)
 - User preferences/settings
 

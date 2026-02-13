@@ -3,6 +3,7 @@
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
+	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -169,6 +170,13 @@
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 								</a>
 							{/if}
+							{#if message.linkPreviews?.length}
+								<div class="link-previews">
+									{#each message.linkPreviews as preview}
+										<LinkPreviewCard {preview} />
+									{/each}
+								</div>
+							{/if}
 						</div>
 					{:else}
 						<div class="message-avatar-col">
@@ -182,6 +190,13 @@
 								<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 								</a>
+							{/if}
+							{#if message.linkPreviews?.length}
+								<div class="link-previews">
+									{#each message.linkPreviews as preview}
+										<LinkPreviewCard {preview} />
+									{/each}
+								</div>
 							{/if}
 							</div>
 						{/if}
@@ -680,5 +695,12 @@
 		border-radius: 8px;
 		object-fit: contain;
 		cursor: pointer;
+	}
+
+	.link-previews {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin-top: 4px;
 	}
 </style>

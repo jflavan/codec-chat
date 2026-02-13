@@ -291,41 +291,41 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Task breakdown: Link Previews (see [docs/LINK_PREVIEWS.md](docs/LINK_PREVIEWS.md))
 
 ### API — Data model & migration
-- [ ] Create `LinkPreview` entity and `LinkPreviewStatus` enum in `Models/`
-- [ ] Add `LinkPreviews` navigation property to `Message` and `DirectMessage` entities
-- [ ] Add `LinkPreviews` DbSet to `CodecDbContext` and configure relationships, indexes, and check constraint
-- [ ] Create and apply EF Core migration (`AddLinkPreviews`)
+- [x] Create `LinkPreview` entity and `LinkPreviewStatus` enum in `Models/`
+- [x] Add `LinkPreviews` navigation property to `Message` and `DirectMessage` entities
+- [x] Add `LinkPreviews` DbSet to `CodecDbContext` and configure relationships, indexes, and check constraint
+- [x] Create and apply EF Core migration (`AddLinkPreviews`)
 
 ### API — LinkPreviewService
-- [ ] Create `Services/LinkPreviewService.cs` with URL extraction, SSRF validation, HTTP fetching, and HTML parsing
-- [ ] Register `HttpClient` with `SocketsHttpHandler` (DNS rebinding protection, redirect limits, no cookies)
-- [ ] Implement Open Graph + meta tag parsing with fallback chain
+- [x] Create `Services/LinkPreviewService.cs` with URL extraction, SSRF validation, HTTP fetching, and HTML parsing
+- [x] Register `HttpClient` with `SocketsHttpHandler` (DNS rebinding protection, redirect limits, no cookies)
+- [x] Implement Open Graph + meta tag parsing with fallback chain
 - [ ] Add unit tests for URL extraction, SSRF validation, and metadata parsing
 
 ### API — Integration with message posting
-- [ ] After persisting a message, queue link preview fetching (fire-and-forget for MVP)
-- [ ] After fetching completes, persist `LinkPreview` entities and broadcast `LinkPreviewsReady` via SignalR
-- [ ] Include `linkPreviews` in `GET` message responses (channels and DMs)
-- [ ] Include `linkPreviews: []` in the initial `ReceiveMessage` and `ReceiveDm` SignalR payloads
+- [x] After persisting a message, queue link preview fetching (fire-and-forget for MVP)
+- [x] After fetching completes, persist `LinkPreview` entities and broadcast `LinkPreviewsReady` via SignalR
+- [x] Include `linkPreviews` in `GET` message responses (channels and DMs)
+- [x] Include `linkPreviews: []` in the initial `ReceiveMessage` and `ReceiveDm` SignalR payloads
 
 ### Web — Types, API client & SignalR
-- [ ] Add `LinkPreview` type to `models.ts`
-- [ ] Add `linkPreviews` field to `Message` and `DirectMessage` types
-- [ ] Add `LinkPreviewsReady` event handler to `ChatHubService`
-- [ ] Add `onLinkPreviewsReady` callback in `AppState` to patch messages in-place
+- [x] Add `LinkPreview` type to `models.ts`
+- [x] Add `linkPreviews` field to `Message` and `DirectMessage` types
+- [x] Add `LinkPreviewsReady` event handler to `ChatHubService`
+- [x] Add `onLinkPreviewsReady` callback in `AppState` to patch messages in-place
 
 ### Web — UI components
-- [ ] Create `LinkPreviewCard.svelte` component (accent border, title link, description, thumbnail, site name)
-- [ ] Integrate `LinkPreviewCard` into `MessageItem.svelte` and DM message rendering
-- [ ] Add `linkifyText` utility to render URLs in message bodies as clickable hyperlinks
-- [ ] Add responsive styles for preview cards (side-by-side → stacked)
+- [x] Create `LinkPreviewCard.svelte` component (accent border, title link, description, thumbnail, site name)
+- [x] Integrate `LinkPreviewCard` into `MessageItem.svelte` and DM message rendering
+- [x] Add `linkifyText` utility to render URLs in message bodies as clickable hyperlinks
+- [x] Add responsive styles for preview cards (side-by-side → stacked)
 
 ### Documentation
-- [ ] Update `ARCHITECTURE.md` with LinkPreview entity, SignalR events, and service description
-- [ ] Update `DATA.md` with LinkPreview schema, indexes, and entity definition
-- [ ] Update `FEATURES.md` to track Link Previews feature progress
-- [ ] Update `DESIGN.md` with Link Preview Card UI specification
-- [ ] Update `PLAN.md` with Link Previews task breakdown
+- [x] Update `ARCHITECTURE.md` with LinkPreview entity, SignalR events, and service description
+- [x] Update `DATA.md` with LinkPreview schema, indexes, and entity definition
+- [x] Update `FEATURES.md` to track Link Previews feature progress
+- [x] Update `DESIGN.md` with Link Preview Card UI specification
+- [x] Update `PLAN.md` with Link Previews task breakdown
 
 ## Task breakdown: Image Uploads
 
@@ -366,7 +366,6 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] UI renders correctly with attach button visible in composer
 
 ## Next steps
-- **Link Previews (Automatic Embeds)** — next planned feature; detection, fetching, and rendering of URL metadata
 - Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI
 - Server settings and configuration

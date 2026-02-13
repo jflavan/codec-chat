@@ -941,7 +941,7 @@ export class AppState {
 			onMessage: (msg) => {
 				if (msg.channelId === this.selectedChannelId) {
 					if (!this.messages.some((m) => m.id === msg.id)) {
-						this.messages = [...this.messages, msg];
+						this.messages = [...this.messages, { ...msg, linkPreviews: msg.linkPreviews ?? [] }];
 					}
 				}
 			},
@@ -981,7 +981,7 @@ export class AppState {
 			onReceiveDm: (msg) => {
 				if (msg.dmChannelId === this.activeDmChannelId) {
 					if (!this.dmMessages.some((m) => m.id === msg.id)) {
-						this.dmMessages = [...this.dmMessages, msg];
+						this.dmMessages = [...this.dmMessages, { ...msg, linkPreviews: msg.linkPreviews ?? [] }];
 					}
 				} else {
 					// Increment unread count for this channel.
@@ -1020,6 +1020,24 @@ export class AppState {
 					}
 				}
 				this.setTransientError(`You were kicked from "${event.serverName}".`);
+			},
+			onLinkPreviewsReady: (event) => {
+				// Patch link previews into the matching channel message.
+				if (event.channelId && event.channelId === this.selectedChannelId) {
+					this.messages = this.messages.map((m) =>
+						m.id === event.messageId
+							? { ...m, linkPreviews: event.linkPreviews }
+							: m
+					);
+				}
+				// Patch link previews into the matching DM message.
+				if (event.dmChannelId && event.dmChannelId === this.activeDmChannelId) {
+					this.dmMessages = this.dmMessages.map((m) =>
+						m.id === event.messageId
+							? { ...m, linkPreviews: event.linkPreviews }
+							: m
+					);
+				}
 			}
 		});
 

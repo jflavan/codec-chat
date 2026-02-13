@@ -299,7 +299,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 #### Server → Client Events
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `ReceiveMessage` | `{ id, authorName, authorUserId, body, createdAt, channelId, reactions, imageUrl }` | New message posted to current channel |
+| `ReceiveMessage` | `{ id, authorName, authorUserId, body, createdAt, channelId, reactions, imageUrl, linkPreviews }` | New message posted to current channel |
 | `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 | `ReactionUpdated` | `{ messageId, channelId, reactions: [{ emoji, count, userIds }] }` | Reaction toggled on a message |
@@ -308,11 +308,12 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `FriendRequestDeclined` | `{ requestId }` | Friend request declined (sent to requester's user group) |
 | `FriendRequestCancelled` | `{ requestId }` | Friend request cancelled (sent to recipient's user group) |
 | `FriendRemoved` | `{ friendshipId, userId }` | Friend removed (sent to the other participant's user group) |
-| `ReceiveDm` | `{ id, dmChannelId, authorUserId, authorName, body, createdAt, imageUrl }` | New DM received (sent to DM channel group + recipient user group) |
+| `ReceiveDm` | `{ id, dmChannelId, authorUserId, authorName, body, createdAt, imageUrl, linkPreviews }` | New DM received (sent to DM channel group + recipient user group) |
 | `DmTyping` | `{ dmChannelId, displayName }` | DM partner started typing |
 | `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
 | `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |
 | `KickedFromServer` | `{ serverId, serverName }` | User was kicked from a server (sent to kicked user's user group; displayed as transient overlay banner with 5s fade-out) |
+| `LinkPreviewsReady` | `{ messageId, channelId?, dmChannelId?, linkPreviews: [...] }` | Link preview metadata fetched — frontend patches the message's `linkPreviews` array |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -430,6 +431,10 @@ User ────┬──── ServerMember ──── Server
          └──── DmChannelMember ──── DmChannel
                                        │
                                   DirectMessage
+
+Message ───────┐
+               ├──── LinkPreview
+DirectMessage ─┘
 ```
 
 ### Core Entities
@@ -458,6 +463,7 @@ User ────┬──── ServerMember ──── Server
 - Individual chat message in a channel
 - Fields: Id, ChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), CreatedAt
 - Has many `Reaction` entries
+- Has many `LinkPreview` entries (max 5, fetched asynchronously after message is posted)
 
 #### Reaction
 - Emoji reaction on a message by a user
@@ -491,6 +497,14 @@ User ────┬──── ServerMember ──── Server
 - Individual message within a DM conversation
 - Fields: Id, DmChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), CreatedAt
 - Follows the same shape as the server `Message` entity
+- Has many `LinkPreview` entries (max 5, fetched asynchronously after message is posted)
+
+#### LinkPreview
+- URL metadata extracted from a message body (Open Graph + HTML meta fallbacks)
+- Fields: Id, MessageId (nullable FK), DirectMessageId (nullable FK), Url, Title, Description, ImageUrl, SiteName, CanonicalUrl, FetchedAt, Status
+- Check constraint: exactly one of MessageId or DirectMessageId must be non-null
+- Fetched asynchronously by `LinkPreviewService` after message posting; delivered to clients via `LinkPreviewsReady` SignalR event
+- SSRF protection: private IP blocking, DNS rebinding prevention via `SocketsHttpHandler.ConnectCallback`, redirect limiting
 
 ## Configuration
 

@@ -333,6 +333,57 @@ When a user is kicked from a server, a transient error banner appears as an over
 - **State management:** `AppState.setTransientError()` sets the error and schedules auto-clear after 5 seconds via `setTimeout`
 - **Scope:** Applied in both `ChatArea.svelte` and `DmChatArea.svelte`
 
+## Link Preview Card
+
+Link preview cards render below the message body when a message contains URLs. Metadata (title, description, image, site name) is fetched asynchronously and delivered via SignalR.
+
+### Layout
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ ┌─accent-border (3px, --accent)                              │
+│ │                                                            │
+│ │  EXAMPLE.COM                          ┌──────────────┐     │
+│ │  **Example Domain**                   │              │     │
+│ │  This domain is for use in            │  thumbnail   │     │
+│ │  illustrative examples in             │   (80×80)    │     │
+│ │  documents.                           │              │     │
+│ │                                       └──────────────┘     │
+│ └                                                            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Styling
+
+| Element | Style |
+|---------|-------|
+| Card container | `--bg-secondary` background, `--border` top/right/bottom border, `--accent` left border (3px), 8px border-radius, 12px padding, max-width 520px |
+| Site name | 12px, `--text-muted`, uppercase, letter-spacing 0.02em |
+| Title | 15px, 600 weight, `--accent` color, hover underline, clickable link (`target="_blank"`, `rel="noopener noreferrer"`) |
+| Description | 13px, `--text-normal`, max 3 lines with `-webkit-line-clamp`, truncated at 300 characters |
+| Thumbnail | 80×80px, 4px border-radius, `object-fit: cover`, right-aligned, wrapped in clickable link to same URL as title |
+| Card spacing | 8px margin-top below message body, 4px gap between multiple preview cards |
+
+### Rendering Rules
+
+- If `title` is null/empty, the card is not rendered (graceful no-op)
+- Title links to `canonicalUrl ?? url`
+- Thumbnail image links to the same URL as the title
+- Only `https://` image URLs from `og:image` are displayed
+- Only previews with `Status = Success` are shown
+
+### Responsive Behavior
+
+| Breakpoint | Behavior |
+|-----------|----------|
+| ≥ 600px | Side-by-side layout: text left, thumbnail right |
+| < 600px | Stacked layout: thumbnail above text (full width, max-height 160px) |
+
+### Component Integration
+
+- Server messages: `LinkPreviewCard` rendered inside `MessageItem.svelte`, below image attachments, above reactions
+- DM messages: `LinkPreviewCard` rendered inline in `DmChatArea.svelte`, same positioning
+
 ## Animations & Micro-interactions
 
 - **Transitions**: 150–200ms ease for background/color changes

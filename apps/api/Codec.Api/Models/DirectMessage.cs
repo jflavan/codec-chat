@@ -15,4 +15,5 @@ public class DirectMessage
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DmChannel? DmChannel { get; set; }
     public User? AuthorUser { get; set; }
+    public List<LinkPreview> LinkPreviews { get; set; } = new();
 }

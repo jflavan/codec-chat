@@ -3,6 +3,7 @@
 	import { formatTime } from '$lib/utils/format.js';
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
+	import LinkPreviewCard from './LinkPreviewCard.svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	let { message, grouped = false }: { message: Message; grouped?: boolean } = $props();
@@ -80,6 +81,13 @@
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</a>
 			{/if}
+			{#if message.linkPreviews?.length}
+				<div class="link-previews">
+					{#each message.linkPreviews as preview}
+						<LinkPreviewCard {preview} />
+					{/each}
+				</div>
+			{/if}
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
 					reactions={message.reactions}
@@ -100,6 +108,13 @@
 				<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</a>
+			{/if}
+			{#if message.linkPreviews?.length}
+				<div class="link-previews">
+					{#each message.linkPreviews as preview}
+						<LinkPreviewCard {preview} />
+					{/each}
+				</div>
 			{/if}
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
@@ -298,5 +313,12 @@
 		border-radius: 8px;
 		object-fit: contain;
 		cursor: pointer;
+	}
+
+	.link-previews {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin-top: 4px;
 	}
 </style>

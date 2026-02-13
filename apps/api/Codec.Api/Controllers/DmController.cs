@@ -15,7 +15,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("dm")]
-public class DmController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService) : ControllerBase
+public class DmController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
 {
     /// <summary>
     /// Creates a new DM channel between the current user and the specified recipient,
@@ -248,6 +248,26 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         // Reverse to chronological order for the client.
         messages.Reverse();
 
+        // Load link previews for the returned messages.
+        var messageIds = messages.Select(m => m.Id).ToArray();
+        var linkPreviewLookup = new Dictionary<Guid, IReadOnlyList<LinkPreviewDto>>();
+        if (messageIds.Length > 0)
+        {
+            var linkPreviews = await db.LinkPreviews
+                .AsNoTracking()
+                .Where(lp => lp.DirectMessageId != null && messageIds.Contains(lp.DirectMessageId.Value)
+                    && lp.Status == Models.LinkPreviewStatus.Success)
+                .ToListAsync();
+
+            linkPreviewLookup = linkPreviews
+                .GroupBy(lp => lp.DirectMessageId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<LinkPreviewDto>)group
+                        .Select(lp => new LinkPreviewDto(lp.Url, lp.Title, lp.Description, lp.ImageUrl, lp.SiteName, lp.CanonicalUrl))
+                        .ToList());
+        }
+
         var response = messages.Select(m => new
         {
             m.Id,
@@ -257,7 +277,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             m.Body,
             m.ImageUrl,
             m.CreatedAt,
-            AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl
+            AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl,
+            LinkPreviews = linkPreviewLookup.TryGetValue(m.Id, out var previews)
+                ? previews
+                : Array.Empty<LinkPreviewDto>()
         });
 
         return Ok(response);
@@ -331,7 +354,8 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             message.Body,
             message.ImageUrl,
             message.CreatedAt,
-            AuthorAvatarUrl = authorAvatarUrl
+            AuthorAvatarUrl = authorAvatarUrl,
+            LinkPreviews = Array.Empty<object>()
         };
 
         // Broadcast to the other participant via their user-scoped group.
@@ -350,6 +374,77 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             // set IsOpen = true for all members above, this notification is sent
             // via the ReceiveDm event — the client will handle re-opening from there.
         }
+
+        // Fire-and-forget: extract URLs and fetch link previews in the background.
+        var messageId = message.Id;
+        var messageBody = message.Body;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var scopedDb = scope.ServiceProvider.GetRequiredService<CodecDbContext>();
+                var previewService = scope.ServiceProvider.GetRequiredService<ILinkPreviewService>();
+                var hub = scope.ServiceProvider.GetRequiredService<IHubContext<ChatHub>>();
+
+                var urls = previewService.ExtractUrls(messageBody);
+                if (urls.Count == 0) return;
+
+                var previews = new List<Models.LinkPreview>();
+                foreach (var url in urls)
+                {
+                    var result = await previewService.FetchMetadataAsync(url);
+                    var preview = new Models.LinkPreview
+                    {
+                        DirectMessageId = messageId,
+                        Url = url,
+                        FetchedAt = DateTimeOffset.UtcNow
+                    };
+
+                    if (result is not null)
+                    {
+                        preview.Title = result.Title;
+                        preview.Description = result.Description;
+                        preview.ImageUrl = result.ImageUrl;
+                        preview.SiteName = result.SiteName;
+                        preview.CanonicalUrl = result.CanonicalUrl;
+                        preview.Status = Models.LinkPreviewStatus.Success;
+                    }
+                    else
+                    {
+                        preview.Status = Models.LinkPreviewStatus.Failed;
+                    }
+
+                    previews.Add(preview);
+                }
+
+                scopedDb.LinkPreviews.AddRange(previews);
+                await scopedDb.SaveChangesAsync();
+
+                var successPreviews = previews
+                    .Where(p => p.Status == Models.LinkPreviewStatus.Success)
+                    .Select(p => new LinkPreviewDto(p.Url, p.Title, p.Description, p.ImageUrl, p.SiteName, p.CanonicalUrl))
+                    .ToList();
+
+                if (successPreviews.Count > 0)
+                {
+                    var previewPayload = new
+                    {
+                        MessageId = messageId,
+                        DmChannelId = channelId,
+                        LinkPreviews = successPreviews
+                    };
+
+                    // Broadcast to both the DM channel group and the other user's personal group.
+                    await hub.Clients.Group($"dm-{channelId}").SendAsync("LinkPreviewsReady", previewPayload);
+                    await hub.Clients.Group($"user-{otherMember.UserId}").SendAsync("LinkPreviewsReady", previewPayload);
+                }
+            }
+            catch
+            {
+                // Link preview failures must never affect message delivery.
+            }
+        });
 
         return Created($"/dm/channels/{channelId}/messages/{message.Id}", payload);
     }
@@ -379,4 +474,6 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         return NoContent();
     }
+
+    private sealed record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
 }

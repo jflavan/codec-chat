@@ -77,6 +77,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Image uploads** — post images (PNG, JPEG, WebP, GIF) via file picker or clipboard paste in both server channels and DMs
 - ✅ **Nicknames** — user-chosen display name that overrides Google name across all surfaces (messages, member lists, friends, typing indicators)
 - ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove) and account info
+- ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR
 
 ## Documentation
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
@@ -86,6 +87,7 @@ The web app runs at `http://localhost:5174` by default.
 - [Design](docs/DESIGN.md) - UI/UX design specification and theme
 - [Friends](docs/FRIENDS.md) - Friends feature specification
 - [Direct Messages](docs/DIRECT_MESSAGES.md) - Direct messages feature specification
+- [Link Previews](docs/LINK_PREVIEWS.md) - Link previews feature specification
 - [Nicknames](docs/NICKNAMES.md) - Nicknames feature specification
 - [User Settings](docs/USER_SETTINGS.md) - User settings feature specification
 - [Data Layer](docs/DATA.md) - Database schema and migrations

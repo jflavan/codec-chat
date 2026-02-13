@@ -19,6 +19,16 @@ export type Reaction = {
 	userIds: string[];
 };
 
+/** Link preview metadata for a URL in a message. */
+export type LinkPreview = {
+	url: string;
+	title: string | null;
+	description: string | null;
+	imageUrl: string | null;
+	siteName: string | null;
+	canonicalUrl: string | null;
+};
+
 /** Chat message in a channel. */
 export type Message = {
 	id: string;
@@ -30,6 +40,7 @@ export type Message = {
 	authorUserId?: string | null;
 	authorAvatarUrl?: string | null;
 	reactions: Reaction[];
+	linkPreviews: LinkPreview[];
 };
 
 /** Member of a server. */
@@ -122,6 +133,7 @@ export type DirectMessage = {
 	imageUrl?: string | null;
 	createdAt: string;
 	authorAvatarUrl?: string | null;
+	linkPreviews: LinkPreview[];
 };
 
 /** Server invite code created by an Owner or Admin. */

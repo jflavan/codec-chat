@@ -21,6 +21,7 @@ public class CodecDbContext : DbContext
     public DbSet<DmChannelMember> DmChannelMembers => Set<DmChannelMember>();
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
     public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
+    public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -157,6 +158,27 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<ServerInvite>()
             .HasIndex(invite => invite.ServerId);
+
+        // Link preview relationships, indexes, and check constraint.
+        modelBuilder.Entity<LinkPreview>(entity =>
+        {
+            entity.HasOne(lp => lp.Message)
+                .WithMany(m => m.LinkPreviews)
+                .HasForeignKey(lp => lp.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(lp => lp.DirectMessage)
+                .WithMany(dm => dm.LinkPreviews)
+                .HasForeignKey(lp => lp.DirectMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(lp => lp.MessageId);
+            entity.HasIndex(lp => lp.DirectMessageId);
+
+            // Exactly one of MessageId or DirectMessageId must be non-null.
+            entity.ToTable(t => t.HasCheckConstraint("CK_LinkPreview_SingleParent",
+                "(\"MessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR (\"MessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)"));
+        });
 
         // SQLite does not natively support DateTimeOffset ordering.
         // Store as ISO 8601 strings so ORDER BY works correctly.

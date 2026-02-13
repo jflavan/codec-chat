@@ -506,66 +506,66 @@ function linkifyText(body: string): string {
 ## Acceptance Criteria
 
 ### AC-1: URL Detection
-- [ ] URLs in message bodies (`http://` and `https://`) are detected after the message is posted
-- [ ] A maximum of 5 URLs per message are processed
-- [ ] Non-URL text is not affected
+- [x] URLs in message bodies (`http://` and `https://`) are detected after the message is posted
+- [x] A maximum of 5 URLs per message are processed
+- [x] Non-URL text is not affected
 
 ### AC-2: Metadata Fetching
-- [ ] Open Graph tags (`og:title`, `og:description`, `og:image`, `og:site_name`, `og:url`) are extracted
-- [ ] HTML `<title>` and `<meta name="description">` are used as fallbacks when OG tags are missing
-- [ ] Fetching times out after 5 seconds per URL
-- [ ] Response bodies larger than 512 KB are truncated before parsing
-- [ ] Only `text/html` responses are parsed
+- [x] Open Graph tags (`og:title`, `og:description`, `og:image`, `og:site_name`, `og:url`) are extracted
+- [x] HTML `<title>` and `<meta name="description">` are used as fallbacks when OG tags are missing
+- [x] Fetching times out after 5 seconds per URL
+- [x] Response bodies larger than 512 KB are truncated before parsing
+- [x] Only `text/html` responses are parsed
 
 ### AC-3: SSRF Protection
-- [ ] URLs pointing to private IP ranges are blocked (127.x, 10.x, 172.16–31.x, 192.168.x, link-local)
-- [ ] URLs pointing to `localhost`, `*.local`, and `*.internal` are blocked
-- [ ] DNS resolution is validated against private IP ranges before connecting
-- [ ] Redirects are limited to 3 hops and each hop is revalidated
+- [x] URLs pointing to private IP ranges are blocked (127.x, 10.x, 172.16–31.x, 192.168.x, link-local)
+- [x] URLs pointing to `localhost`, `*.local`, and `*.internal` are blocked
+- [x] DNS resolution is validated against private IP ranges before connecting
+- [x] Redirects are limited to 3 hops and each hop is revalidated
 
 ### AC-4: Link Preview Storage
-- [ ] Link preview entities are persisted in the database with appropriate foreign keys
-- [ ] Previews with `Status = Success` include title (at minimum) and optional description, image, site name
-- [ ] Previews with `Status = Failed` are stored but not returned to clients
+- [x] Link preview entities are persisted in the database with appropriate foreign keys
+- [x] Previews with `Status = Success` include title (at minimum) and optional description, image, site name
+- [x] Previews with `Status = Failed` are stored but not returned to clients
 
 ### AC-5: Real-time Delivery
-- [ ] Messages are delivered immediately via SignalR with `linkPreviews: []`
-- [ ] After metadata is fetched, `LinkPreviewsReady` event is broadcast to the appropriate group
-- [ ] The frontend patches the message's `linkPreviews` array when the event is received
-- [ ] Preview cards appear without requiring a page refresh
+- [x] Messages are delivered immediately via SignalR with `linkPreviews: []`
+- [x] After metadata is fetched, `LinkPreviewsReady` event is broadcast to the appropriate group
+- [x] The frontend patches the message's `linkPreviews` array when the event is received
+- [x] Preview cards appear without requiring a page refresh
 
 ### AC-6: Link Preview Card UI
-- [ ] Preview cards render below the message body with a left accent border
-- [ ] Title is a clickable link that opens in a new tab (`target="_blank"`, `rel="noopener noreferrer"`)
-- [ ] Description is truncated to 300 characters
-- [ ] Thumbnail image is displayed when `imageUrl` is present (80×80px)
-- [ ] Site name is displayed above the title
-- [ ] Cards are responsive (side-by-side ≥ 600px, stacked < 600px)
+- [x] Preview cards render below the message body with a left accent border
+- [x] Title is a clickable link that opens in a new tab (`target="_blank"`, `rel="noopener noreferrer"`)
+- [x] Description is truncated to 300 characters
+- [x] Thumbnail image is displayed when `imageUrl` is present (80×80px)
+- [x] Site name is displayed above the title
+- [x] Cards are responsive (side-by-side ≥ 600px, stacked < 600px)
 
 ### AC-7: Message Body URLs
-- [ ] URLs in the message body are rendered as clickable hyperlinks
-- [ ] Links open in a new tab with `rel="noopener noreferrer"`
-- [ ] Non-URL text is properly escaped (no XSS)
+- [x] URLs in the message body are rendered as clickable hyperlinks
+- [x] Links open in a new tab with `rel="noopener noreferrer"`
+- [x] Non-URL text is properly escaped (no XSS)
 
 ### AC-8: Graceful Degradation
-- [ ] If metadata fetch fails, the URL is still clickable in the message body (no broken embed card)
-- [ ] If a site returns no OG tags and no `<title>`, no preview card is rendered
-- [ ] Network errors and timeouts are handled gracefully without affecting message delivery
+- [x] If metadata fetch fails, the URL is still clickable in the message body (no broken embed card)
+- [x] If a site returns no OG tags and no `<title>`, no preview card is rendered
+- [x] Network errors and timeouts are handled gracefully without affecting message delivery
 
 ### AC-9: DM Link Previews
-- [ ] Link previews work in DM conversations using the same flow
-- [ ] `LinkPreviewsReady` events are delivered to the DM channel group
-- [ ] DM messages include `linkPreviews` in their response and SignalR payload
+- [x] Link previews work in DM conversations using the same flow
+- [x] `LinkPreviewsReady` events are delivered to the DM channel group
+- [x] DM messages include `linkPreviews` in their response and SignalR payload
 
 ### AC-10: Database Integrity
-- [ ] Each `LinkPreview` references exactly one of `MessageId` or `DirectMessageId`
-- [ ] Deleting a message cascades to delete its link previews
-- [ ] Appropriate indexes exist for efficient queries
+- [x] Each `LinkPreview` references exactly one of `MessageId` or `DirectMessageId`
+- [x] Deleting a message cascades to delete its link previews
+- [x] Appropriate indexes exist for efficient queries
 
 ## Dependencies
 
 - **Prerequisite:** Existing message posting flow (server channels and DMs)
-- **New NuGet package:** `AngleSharp` (lightweight HTML parser) — or use regex-based parsing for `<meta>` tags within `<head>` to avoid the dependency
+- **New NuGet package:** None — regex-based parsing is used for `<meta>` tags within `<head>` (no AngleSharp dependency)
 - **Reuses:** Existing SignalR infrastructure, `ChatHubService`, message state management
 - **Related:** Rich text / markdown rendering (future) — link previews complement but do not depend on markdown support
 
@@ -580,46 +580,46 @@ A single EF Core migration (`AddLinkPreviews`) will:
 ## Task Breakdown
 
 ### API — Data model & migration
-- [ ] Create `LinkPreview` entity and `LinkPreviewStatus` enum in `Models/`
-- [ ] Add `LinkPreviews` navigation property to `Message` and `DirectMessage` entities
-- [ ] Add `LinkPreviews` DbSet to `CodecDbContext` and configure relationships, indexes, and check constraint
-- [ ] Create and apply EF Core migration (`AddLinkPreviews`)
+- [x] Create `LinkPreview` entity and `LinkPreviewStatus` enum in `Models/`
+- [x] Add `LinkPreviews` navigation property to `Message` and `DirectMessage` entities
+- [x] Add `LinkPreviews` DbSet to `CodecDbContext` and configure relationships, indexes, and check constraint
+- [x] Create and apply EF Core migration (`AddLinkPreviews`)
 
 ### API — LinkPreviewService
-- [ ] Create `Services/LinkPreviewService.cs` with URL extraction, SSRF validation, HTTP fetching, and HTML parsing
-- [ ] Register `HttpClient` with `SocketsHttpHandler` (DNS rebinding protection, redirect limits, no cookies)
-- [ ] Implement Open Graph + meta tag parsing with fallback chain
+- [x] Create `Services/LinkPreviewService.cs` with URL extraction, SSRF validation, HTTP fetching, and HTML parsing
+- [x] Register `HttpClient` with `SocketsHttpHandler` (DNS rebinding protection, redirect limits, no cookies)
+- [x] Implement Open Graph + meta tag parsing with fallback chain
 - [ ] Add unit tests for URL extraction, SSRF validation, and metadata parsing
 
 ### API — Integration with message posting
-- [ ] After persisting a message, queue link preview fetching (e.g., `Task.Run` with fire-and-forget for MVP, or `IHostedService` / `Channel<T>` for production)
-- [ ] After fetching completes, persist `LinkPreview` entities and broadcast `LinkPreviewsReady` via SignalR
-- [ ] Include `linkPreviews` in `GET /channels/{channelId}/messages` and `GET /dm/channels/{channelId}/messages` responses
-- [ ] Include `linkPreviews: []` in the initial `ReceiveMessage` and `ReceiveDm` SignalR payloads
+- [x] After persisting a message, queue link preview fetching (e.g., `Task.Run` with fire-and-forget for MVP, or `IHostedService` / `Channel<T>` for production)
+- [x] After fetching completes, persist `LinkPreview` entities and broadcast `LinkPreviewsReady` via SignalR
+- [x] Include `linkPreviews` in `GET /channels/{channelId}/messages` and `GET /dm/channels/{channelId}/messages` responses
+- [x] Include `linkPreviews: []` in the initial `ReceiveMessage` and `ReceiveDm` SignalR payloads
 
 ### Web — Types & API client
-- [ ] Add `LinkPreview` type to `models.ts`
-- [ ] Add `linkPreviews: LinkPreview[]` field to `Message` and `DirectMessage` types
-- [ ] Ensure API client methods for fetching messages include `linkPreviews` in the response mapping
+- [x] Add `LinkPreview` type to `models.ts`
+- [x] Add `linkPreviews: LinkPreview[]` field to `Message` and `DirectMessage` types
+- [x] Ensure API client methods for fetching messages include `linkPreviews` in the response mapping
 
 ### Web — SignalR & state
-- [ ] Add `LinkPreviewsReady` event handler to `ChatHubService`
-- [ ] Add `onLinkPreviewsReady` callback in `AppState.startSignalR()` to patch messages in-place
-- [ ] Ensure newly received messages initialize with `linkPreviews: []`
+- [x] Add `LinkPreviewsReady` event handler to `ChatHubService`
+- [x] Add `onLinkPreviewsReady` callback in `AppState.startSignalR()` to patch messages in-place
+- [x] Ensure newly received messages initialize with `linkPreviews: []`
 
 ### Web — UI components
-- [ ] Create `LinkPreviewCard.svelte` component (accent border, title link, description, thumbnail, site name)
-- [ ] Integrate `LinkPreviewCard` into `MessageItem.svelte` (below message body, above reactions)
-- [ ] Integrate link previews into DM message rendering (`DmChatArea.svelte`)
-- [ ] Add `linkifyText` utility to render URLs in message bodies as clickable hyperlinks
-- [ ] Add responsive styles for preview cards (side-by-side → stacked)
+- [x] Create `LinkPreviewCard.svelte` component (accent border, title link, description, thumbnail, site name)
+- [x] Integrate `LinkPreviewCard` into `MessageItem.svelte` (below message body, above reactions)
+- [x] Integrate link previews into DM message rendering (`DmChatArea.svelte`)
+- [x] Add `linkifyText` utility to render URLs in message bodies as clickable hyperlinks
+- [x] Add responsive styles for preview cards (side-by-side → stacked)
 
 ### Documentation
-- [ ] Update `ARCHITECTURE.md` with LinkPreview entity, SignalR events, and service description
-- [ ] Update `DATA.md` with LinkPreview schema, indexes, and entity definition
-- [ ] Update `FEATURES.md` to track Link Previews feature progress
-- [ ] Update `DESIGN.md` with Link Preview Card UI specification
-- [ ] Update `PLAN.md` with Link Previews task breakdown
+- [x] Update `ARCHITECTURE.md` with LinkPreview entity, SignalR events, and service description
+- [x] Update `DATA.md` with LinkPreview schema, indexes, and entity definition
+- [x] Update `FEATURES.md` to track Link Previews feature progress
+- [x] Update `DESIGN.md` with Link Preview Card UI specification
+- [x] Update `PLAN.md` with Link Previews task breakdown
 
 ## Open Questions
 

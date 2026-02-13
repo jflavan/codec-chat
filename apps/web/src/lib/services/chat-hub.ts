@@ -1,6 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
-import type { Message, Reaction, FriendUser, DirectMessage, DmParticipant } from '$lib/types/index.js';
+import type { Message, Reaction, FriendUser, DirectMessage, DmParticipant, LinkPreview } from '$lib/types/index.js';
 
 export type ReactionUpdate = {
 	messageId: string;
@@ -45,6 +45,13 @@ export type KickedFromServerEvent = {
 	serverName: string;
 };
 
+export type LinkPreviewsReadyEvent = {
+	messageId: string;
+	channelId?: string;
+	dmChannelId?: string;
+	linkPreviews: LinkPreview[];
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -60,6 +67,7 @@ export type SignalRCallbacks = {
 	onDmStoppedTyping?: (dmChannelId: string, displayName: string) => void;
 	onDmConversationOpened?: (event: DmConversationOpenedEvent) => void;
 	onKickedFromServer?: (event: KickedFromServerEvent) => void;
+	onLinkPreviewsReady?: (event: LinkPreviewsReadyEvent) => void;
 };
 
 /**
@@ -118,6 +126,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onKickedFromServer) {
 			connection.on('KickedFromServer', callbacks.onKickedFromServer);
+		}
+		if (callbacks.onLinkPreviewsReady) {
+			connection.on('LinkPreviewsReady', callbacks.onLinkPreviewsReady);
 		}
 
 		try {
