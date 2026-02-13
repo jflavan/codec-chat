@@ -2,6 +2,7 @@
 	import type { Message } from '$lib/types/index.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import ReactionBar from './ReactionBar.svelte';
+	import LinkifiedText from './LinkifiedText.svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	let { message, grouped = false }: { message: Message; grouped?: boolean } = $props();
@@ -71,7 +72,7 @@
 				<strong class="message-author">{message.authorName}</strong>
 				<time class="message-time">{formatTime(message.createdAt)}</time>
 			</div>
-			<p class="message-body">{message.body}</p>
+			<p class="message-body"><LinkifiedText text={message.body} /></p>
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
 					reactions={message.reactions}
@@ -85,7 +86,7 @@
 			<time class="message-time-inline">{formatTime(message.createdAt)}</time>
 		</div>
 		<div class="message-content">
-			<p class="message-body">{message.body}</p>
+			<p class="message-body"><LinkifiedText text={message.body} /></p>
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
 					reactions={message.reactions}

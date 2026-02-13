@@ -2,6 +2,7 @@
 	import { tick, untrack } from 'svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import { formatTime } from '$lib/utils/format.js';
+	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -135,14 +136,14 @@
 									<strong class="message-author">{message.authorName}</strong>
 									<time class="message-time">{formatTime(message.createdAt)}</time>
 								</div>
-								<p class="message-body">{message.body}</p>
-							</div>
-						{:else}
-							<div class="message-avatar-col">
-								<time class="message-time-inline">{formatTime(message.createdAt)}</time>
-							</div>
-							<div class="message-content">
-								<p class="message-body">{message.body}</p>
+							<p class="message-body"><LinkifiedText text={message.body} /></p>
+						</div>
+					{:else}
+						<div class="message-avatar-col">
+							<time class="message-time-inline">{formatTime(message.createdAt)}</time>
+						</div>
+						<div class="message-content">
+							<p class="message-body"><LinkifiedText text={message.body} /></p>
 							</div>
 						{/if}
 					</article>
