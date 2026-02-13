@@ -188,11 +188,22 @@ export class ApiClient {
 		});
 	}
 
-	sendMessage(token: string, channelId: string, body: string): Promise<Message> {
+	/** Upload a chat image. Returns the public URL for the uploaded image. */
+	async uploadImage(token: string, file: File): Promise<{ imageUrl: string }> {
+		const form = new FormData();
+		form.append('file', file);
+		return this.request(`${this.baseUrl}/uploads/images`, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}` },
+			body: form
+		});
+	}
+
+	sendMessage(token: string, channelId: string, body: string, imageUrl?: string | null): Promise<Message> {
 		return this.request(`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages`, {
 			method: 'POST',
 			headers: this.headers(token, true),
-			body: JSON.stringify({ body })
+			body: JSON.stringify({ body, imageUrl: imageUrl ?? null })
 		});
 	}
 
@@ -301,13 +312,13 @@ export class ApiClient {
 		);
 	}
 
-	sendDm(token: string, channelId: string, body: string): Promise<DirectMessage> {
+	sendDm(token: string, channelId: string, body: string, imageUrl?: string | null): Promise<DirectMessage> {
 		return this.request(
 			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages`,
 			{
 				method: 'POST',
 				headers: this.headers(token, true),
-				body: JSON.stringify({ body })
+				body: JSON.stringify({ body, imageUrl: imageUrl ?? null })
 			}
 		);
 	}

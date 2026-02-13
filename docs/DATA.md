@@ -233,6 +233,7 @@ Individual chat message in a channel.
 | `AuthorUserId` | Guid? (FK) | Reference to User (nullable) |
 | `AuthorName` | string | Display name snapshot |
 | `Body` | string | Message content |
+| `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
 | `CreatedAt` | DateTimeOffset | Message timestamp |
 
 **Relationships:**
@@ -244,6 +245,7 @@ Individual chat message in a channel.
 - `AuthorUserId` is nullable for system messages
 - `AuthorName` is a snapshot (denormalized) for performance
 - `Body` is plain text (future: rich text/markdown)
+- A message may have `ImageUrl` only (no body text), body only, or both
 
 #### Reaction
 Emoji reaction on a message by a specific user.
@@ -366,6 +368,7 @@ Individual message within a DM conversation.
 | `AuthorUserId` | Guid (FK) | Reference to User |
 | `AuthorName` | string | Display name snapshot (denormalized) |
 | `Body` | string | Message content (plain text) |
+| `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
 | `CreatedAt` | DateTimeOffset | Message timestamp |
 
 **Relationships:**
@@ -375,6 +378,7 @@ Individual message within a DM conversation.
 **Notes:**
 - `AuthorName` is a snapshot (denormalized) for performance, matching the server `Message` entity pattern
 - Follows the same structure as server channel messages
+- A message may have `ImageUrl` only (no body text), body only, or both
 
 ## Database Context
 
@@ -621,7 +625,8 @@ var messages = await db.Messages
 ## Future Schema Changes
 
 ### Near-term Additions
-- File attachments metadata
+- Link preview metadata
+- File attachments metadata (non-image files)
 - User preferences/settings
 
 ### Long-term Additions

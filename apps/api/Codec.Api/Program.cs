@@ -76,6 +76,11 @@ Directory.CreateDirectory(avatarStoragePath);
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"]?.TrimEnd('/') ?? "";
 builder.Services.AddSingleton<IAvatarService>(new AvatarService(avatarStoragePath, $"{apiBaseUrl}/uploads/avatars"));
 
+// Chat image storage configuration.
+var imageStoragePath = Path.Combine(builder.Environment.ContentRootPath, "uploads", "images");
+Directory.CreateDirectory(imageStoragePath);
+builder.Services.AddSingleton<IImageUploadService>(new ImageUploadService(imageStoragePath, $"{apiBaseUrl}/uploads/images"));
+
 var app = builder.Build();
 
 // Ensure the default "Codec HQ" server exists in every environment.
@@ -103,6 +108,13 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(avatarStoragePath),
     RequestPath = "/uploads/avatars"
+});
+
+// Serve uploaded chat images as static content.
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(imageStoragePath),
+    RequestPath = "/uploads/images"
 });
 
 app.UseAuthentication();

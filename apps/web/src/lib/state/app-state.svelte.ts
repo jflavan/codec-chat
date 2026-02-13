@@ -115,6 +115,12 @@ export class AppState {
 	messageBody = $state('');
 	dmMessageBody = $state('');
 
+	/* ───── image attachments ───── */
+	pendingImage = $state<File | null>(null);
+	pendingImagePreview = $state<string | null>(null);
+	pendingDmImage = $state<File | null>(null);
+	pendingDmImagePreview = $state<string | null>(null);
+
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
 
@@ -342,15 +348,24 @@ export class AppState {
 		if (!this.idToken || !this.selectedChannelId) return;
 
 		const body = this.messageBody.trim();
-		if (!body) {
-			this.error = 'Message body is required.';
+		const imageFile = this.pendingImage;
+
+		if (!body && !imageFile) {
+			this.error = 'Message body or image is required.';
 			return;
 		}
 
 		this.isSending = true;
 		try {
-			await this.api.sendMessage(this.idToken, this.selectedChannelId, body);
+			let imageUrl: string | null = null;
+			if (imageFile) {
+				const result = await this.api.uploadImage(this.idToken, imageFile);
+				imageUrl = result.imageUrl;
+			}
+
+			await this.api.sendMessage(this.idToken, this.selectedChannelId, body, imageUrl);
 			this.messageBody = '';
+			this.clearPendingImage();
 
 			if (this.me) {
 				this.hub.clearTyping(this.selectedChannelId, this.effectiveDisplayName);
@@ -607,6 +622,61 @@ export class AppState {
 		this.hub.emitTyping(this.selectedChannelId, this.effectiveDisplayName);
 	}
 
+	/* ═══════════════════ Image Attachments ═══════════════════ */
+
+	private static readonly ALLOWED_IMAGE_TYPES = new Set([
+		'image/jpeg',
+		'image/png',
+		'image/webp',
+		'image/gif'
+	]);
+
+	/** Attach an image file to the channel message composer. */
+	attachImage(file: File): void {
+		if (!AppState.ALLOWED_IMAGE_TYPES.has(file.type)) {
+			this.error = 'Unsupported image type. Allowed: JPG, PNG, WebP, GIF.';
+			return;
+		}
+		if (file.size > 10 * 1024 * 1024) {
+			this.error = 'Image must be under 10 MB.';
+			return;
+		}
+		this.pendingImage = file;
+		this.pendingImagePreview = URL.createObjectURL(file);
+	}
+
+	/** Remove the pending image attachment from the channel message composer. */
+	clearPendingImage(): void {
+		if (this.pendingImagePreview) {
+			URL.revokeObjectURL(this.pendingImagePreview);
+		}
+		this.pendingImage = null;
+		this.pendingImagePreview = null;
+	}
+
+	/** Attach an image file to the DM message composer. */
+	attachDmImage(file: File): void {
+		if (!AppState.ALLOWED_IMAGE_TYPES.has(file.type)) {
+			this.error = 'Unsupported image type. Allowed: JPG, PNG, WebP, GIF.';
+			return;
+		}
+		if (file.size > 10 * 1024 * 1024) {
+			this.error = 'Image must be under 10 MB.';
+			return;
+		}
+		this.pendingDmImage = file;
+		this.pendingDmImagePreview = URL.createObjectURL(file);
+	}
+
+	/** Remove the pending image attachment from the DM message composer. */
+	clearPendingDmImage(): void {
+		if (this.pendingDmImagePreview) {
+			URL.revokeObjectURL(this.pendingDmImagePreview);
+		}
+		this.pendingDmImage = null;
+		this.pendingDmImagePreview = null;
+	}
+
 	async toggleReaction(messageId: string, emoji: string): Promise<void> {
 		if (!this.idToken || !this.selectedChannelId) return;
 		try {
@@ -796,15 +866,24 @@ export class AppState {
 		if (!this.idToken || !this.activeDmChannelId) return;
 
 		const body = this.dmMessageBody.trim();
-		if (!body) {
-			this.error = 'Message body is required.';
+		const imageFile = this.pendingDmImage;
+
+		if (!body && !imageFile) {
+			this.error = 'Message body or image is required.';
 			return;
 		}
 
 		this.isSendingDm = true;
 		try {
-			await this.api.sendDm(this.idToken, this.activeDmChannelId, body);
+			let imageUrl: string | null = null;
+			if (imageFile) {
+				const result = await this.api.uploadImage(this.idToken, imageFile);
+				imageUrl = result.imageUrl;
+			}
+
+			await this.api.sendDm(this.idToken, this.activeDmChannelId, body, imageUrl);
 			this.dmMessageBody = '';
+			this.clearPendingDmImage();
 
 			if (this.me) {
 				this.hub.clearDmTyping(this.activeDmChannelId, this.effectiveDisplayName);
