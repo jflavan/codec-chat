@@ -84,6 +84,28 @@ export class ApiClient {
 		});
 	}
 
+	/** Set or update the current user's nickname. */
+	async setNickname(
+		token: string,
+		nickname: string
+	): Promise<{ nickname: string; effectiveDisplayName: string }> {
+		return this.request(`${this.baseUrl}/me/nickname`, {
+			method: 'PUT',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ nickname })
+		});
+	}
+
+	/** Remove the current user's nickname, reverting to the Google display name. */
+	async removeNickname(
+		token: string
+	): Promise<{ nickname: null; effectiveDisplayName: string }> {
+		return this.request(`${this.baseUrl}/me/nickname`, {
+			method: 'DELETE',
+			headers: this.headers(token)
+		});
+	}
+
 	/** Upload a server-specific avatar image. */
 	async uploadServerAvatar(
 		token: string,

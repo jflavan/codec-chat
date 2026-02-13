@@ -18,4 +18,10 @@ public interface IUserService
     /// Checks whether a user is a member of the specified server.
     /// </summary>
     Task<bool> IsMemberAsync(Guid serverId, Guid userId);
+
+    /// <summary>
+    /// Returns the effective display name for a user: nickname if set,
+    /// otherwise the Google-provided display name.
+    /// </summary>
+    string GetEffectiveDisplayName(User user);
 }

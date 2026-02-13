@@ -36,9 +36,11 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
                 f.RecipientId,
                 f.UpdatedAt,
                 RequesterDisplayName = f.Requester!.DisplayName,
+                RequesterNickname = f.Requester.Nickname,
                 RequesterAvatarUrl = f.Requester.AvatarUrl,
                 RequesterCustomAvatarPath = f.Requester.CustomAvatarPath,
                 RecipientDisplayName = f.Recipient!.DisplayName,
+                RecipientNickname = f.Recipient.Nickname,
                 RecipientAvatarUrl = f.Recipient.AvatarUrl,
                 RecipientCustomAvatarPath = f.Recipient.CustomAvatarPath
             })
@@ -48,7 +50,9 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
         {
             var isRequester = f.RequesterId == appUser.Id;
             var friendId = isRequester ? f.RecipientId : f.RequesterId;
-            var friendName = isRequester ? f.RecipientDisplayName : f.RequesterDisplayName;
+            var friendNickname = isRequester ? f.RecipientNickname : f.RequesterNickname;
+            var friendGoogleName = isRequester ? f.RecipientDisplayName : f.RequesterDisplayName;
+            var friendName = string.IsNullOrWhiteSpace(friendNickname) ? friendGoogleName : friendNickname;
             var friendGoogleAvatar = isRequester ? f.RecipientAvatarUrl : f.RequesterAvatarUrl;
             var friendCustomPath = isRequester ? f.RecipientCustomAvatarPath : f.RequesterCustomAvatarPath;
 
@@ -146,12 +150,14 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
 
         var requesterAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
         var recipientAvatarUrl = avatarService.ResolveUrl(recipient.CustomAvatarPath) ?? recipient.AvatarUrl;
+        var requesterName = userService.GetEffectiveDisplayName(appUser);
+        var recipientName = string.IsNullOrWhiteSpace(recipient.Nickname) ? recipient.DisplayName : recipient.Nickname;
 
         var payload = new
         {
             friendship.Id,
-            Requester = new { appUser.Id, appUser.DisplayName, AvatarUrl = requesterAvatarUrl },
-            Recipient = new { Id = recipient.Id, recipient.DisplayName, AvatarUrl = recipientAvatarUrl },
+            Requester = new { appUser.Id, DisplayName = requesterName, AvatarUrl = requesterAvatarUrl },
+            Recipient = new { Id = recipient.Id, DisplayName = recipientName, AvatarUrl = recipientAvatarUrl },
             Status = friendship.Status.ToString(),
             friendship.CreatedAt
         };
@@ -160,7 +166,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
             .SendAsync("FriendRequestReceived", new
             {
                 RequestId = friendship.Id,
-                Requester = new { appUser.Id, appUser.DisplayName, AvatarUrl = requesterAvatarUrl },
+                Requester = new { appUser.Id, DisplayName = requesterName, AvatarUrl = requesterAvatarUrl },
                 friendship.CreatedAt
             });
 
@@ -197,9 +203,11 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
                 f.RecipientId,
                 f.CreatedAt,
                 RequesterDisplayName = f.Requester!.DisplayName,
+                RequesterNickname = f.Requester.Nickname,
                 RequesterAvatarUrl = f.Requester.AvatarUrl,
                 RequesterCustomAvatarPath = f.Requester.CustomAvatarPath,
                 RecipientDisplayName = f.Recipient!.DisplayName,
+                RecipientNickname = f.Recipient.Nickname,
                 RecipientAvatarUrl = f.Recipient.AvatarUrl,
                 RecipientCustomAvatarPath = f.Recipient.CustomAvatarPath
             })
@@ -212,13 +220,13 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
             Requester = new
             {
                 Id = f.RequesterId,
-                DisplayName = f.RequesterDisplayName,
+                DisplayName = string.IsNullOrWhiteSpace(f.RequesterNickname) ? f.RequesterDisplayName : f.RequesterNickname,
                 AvatarUrl = avatarService.ResolveUrl(f.RequesterCustomAvatarPath) ?? f.RequesterAvatarUrl
             },
             Recipient = new
             {
                 Id = f.RecipientId,
-                DisplayName = f.RecipientDisplayName,
+                DisplayName = string.IsNullOrWhiteSpace(f.RecipientNickname) ? f.RecipientDisplayName : f.RecipientNickname,
                 AvatarUrl = avatarService.ResolveUrl(f.RecipientCustomAvatarPath) ?? f.RecipientAvatarUrl
             },
             Status = "Pending",
@@ -267,6 +275,8 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
         var recipient = friendship.Recipient!;
         var requesterAvatarUrl = avatarService.ResolveUrl(requester.CustomAvatarPath) ?? requester.AvatarUrl;
         var recipientAvatarUrl = avatarService.ResolveUrl(recipient.CustomAvatarPath) ?? recipient.AvatarUrl;
+        var requesterEffectiveName = string.IsNullOrWhiteSpace(requester.Nickname) ? requester.DisplayName : requester.Nickname;
+        var recipientEffectiveName = string.IsNullOrWhiteSpace(recipient.Nickname) ? recipient.DisplayName : recipient.Nickname;
 
         if (isAccept)
         {
@@ -274,7 +284,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
                 .SendAsync("FriendRequestAccepted", new
                 {
                     FriendshipId = friendship.Id,
-                    User = new { Id = appUser.Id, appUser.DisplayName, AvatarUrl = recipientAvatarUrl },
+                    User = new { Id = appUser.Id, DisplayName = recipientEffectiveName, AvatarUrl = recipientAvatarUrl },
                     Since = friendship.UpdatedAt
                 });
         }
@@ -287,8 +297,8 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
         return Ok(new
         {
             friendship.Id,
-            Requester = new { Id = requester.Id, requester.DisplayName, AvatarUrl = requesterAvatarUrl },
-            Recipient = new { Id = recipient.Id, recipient.DisplayName, AvatarUrl = recipientAvatarUrl },
+            Requester = new { Id = requester.Id, DisplayName = requesterEffectiveName, AvatarUrl = requesterAvatarUrl },
+            Recipient = new { Id = recipient.Id, DisplayName = recipientEffectiveName, AvatarUrl = recipientAvatarUrl },
             Status = friendship.Status.ToString(),
             friendship.CreatedAt,
             friendship.UpdatedAt

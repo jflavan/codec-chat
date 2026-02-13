@@ -5,6 +5,13 @@ public class User
     public Guid Id { get; set; }
     public string GoogleSubject { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// User-chosen display name that overrides the Google-provided
+    /// <see cref="DisplayName"/>. Nullable; max 32 characters.
+    /// </summary>
+    public string? Nickname { get; set; }
+
     public string? Email { get; set; }
     public string? AvatarUrl { get; set; }
 
@@ -16,6 +23,12 @@ public class User
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Returns the effective display name: nickname if set, otherwise the Google display name.
+    /// </summary>
+    public string EffectiveDisplayName =>
+        string.IsNullOrWhiteSpace(Nickname) ? DisplayName : Nickname;
     public List<Message> Messages { get; set; } = new();
     public List<ServerMember> ServerMemberships { get; set; } = new();
     public List<Reaction> Reactions { get; set; } = new();

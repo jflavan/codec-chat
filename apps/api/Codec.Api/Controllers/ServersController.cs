@@ -105,6 +105,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
                 Role = member.Role.ToString(),
                 member.JoinedAt,
                 member.User!.DisplayName,
+                Nickname = member.User.Nickname,
                 member.User.Email,
                 member.User.AvatarUrl,
                 member.User.CustomAvatarPath,
@@ -113,16 +114,20 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             .OrderBy(member => member.DisplayName)
             .ToListAsync();
 
-        var result = members.Select(member => new
+        var result = members.Select(member =>
         {
-            member.UserId,
-            member.Role,
-            member.JoinedAt,
-            member.DisplayName,
-            member.Email,
-            AvatarUrl = avatarService.ResolveUrl(member.ServerCustomAvatarPath)
-                     ?? avatarService.ResolveUrl(member.CustomAvatarPath)
-                     ?? member.AvatarUrl
+            var effectiveName = string.IsNullOrWhiteSpace(member.Nickname) ? member.DisplayName : member.Nickname;
+            return new
+            {
+                member.UserId,
+                member.Role,
+                member.JoinedAt,
+                DisplayName = effectiveName,
+                member.Email,
+                AvatarUrl = avatarService.ResolveUrl(member.ServerCustomAvatarPath)
+                         ?? avatarService.ResolveUrl(member.CustomAvatarPath)
+                         ?? member.AvatarUrl
+            };
         });
 
         return Ok(result);

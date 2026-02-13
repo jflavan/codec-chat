@@ -237,21 +237,21 @@ The User Settings modal is controlled via the existing `AppState` class:
 ## Task Breakdown
 
 ### Web
-- [ ] Add `settingsOpen` state and `openSettings()` / `closeSettings()` methods to `AppState`
-- [ ] Create `UserSettingsModal.svelte` with modal overlay, backdrop, close behavior, and two-column layout
-- [ ] Create `SettingsSidebar.svelte` with category navigation and active state
-- [ ] Create `ProfileSettings.svelte` with profile preview, nickname input, and avatar management
-- [ ] Create `AccountSettings.svelte` with read-only account info and sign-out button
-- [ ] Add gear icon button to `UserPanel.svelte` that opens the settings modal
-- [ ] Wire nickname editing to the API endpoints defined in [NICKNAMES.md](NICKNAMES.md)
-- [ ] Wire avatar upload/remove to existing `POST /me/avatar` and `DELETE /me/avatar` endpoints
-- [ ] Implement responsive layout (two-column ≥ 900px, tabbed < 900px)
-- [ ] Implement focus trapping and keyboard navigation for accessibility
+- [x] Add `settingsOpen` state and `openSettings()` / `closeSettings()` methods to `AppState`
+- [x] Create `UserSettingsModal.svelte` with modal overlay, backdrop, close behavior, and two-column layout
+- [x] Create `SettingsSidebar.svelte` with category navigation and active state
+- [x] Create `ProfileSettings.svelte` with profile preview, nickname input, and avatar management
+- [x] Create `AccountSettings.svelte` with read-only account info and sign-out button
+- [x] Add gear icon button to `UserPanel.svelte` that opens the settings modal
+- [x] Wire nickname editing to the API endpoints defined in [NICKNAMES.md](NICKNAMES.md)
+- [x] Wire avatar upload/remove to existing `POST /me/avatar` and `DELETE /me/avatar` endpoints
+- [x] Implement responsive layout (two-column ≥ 900px, tabbed < 900px)
+- [x] Implement focus trapping and keyboard navigation for accessibility
 
 ### Documentation
-- [ ] Update `ARCHITECTURE.md` with the settings component tree
-- [ ] Update `DESIGN.md` with User Settings modal UI specification
-- [ ] Update `FEATURES.md` to track User Settings feature progress
+- [x] Update `ARCHITECTURE.md` with the settings component tree
+- [x] Update `DESIGN.md` with User Settings modal UI specification
+- [x] Update `FEATURES.md` to track User Settings feature progress
 
 ## Open Questions
 

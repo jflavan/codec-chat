@@ -39,6 +39,14 @@ public class CodecDbContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<User>()
+            .Property(user => user.Nickname)
+            .HasMaxLength(32);
+
+        // EffectiveDisplayName is a computed property; tell EF Core to ignore it.
+        modelBuilder.Entity<User>()
+            .Ignore(user => user.EffectiveDisplayName);
+
+        modelBuilder.Entity<User>()
             .HasMany(user => user.Messages)
             .WithOne(message => message.AuthorUser)
             .HasForeignKey(message => message.AuthorUserId);

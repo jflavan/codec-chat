@@ -117,9 +117,11 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             return Forbid();
         }
 
-        var authorName = string.IsNullOrWhiteSpace(appUser.DisplayName)
-            ? "Unknown"
-            : appUser.DisplayName;
+        var authorName = userService.GetEffectiveDisplayName(appUser);
+        if (string.IsNullOrWhiteSpace(authorName))
+        {
+            authorName = "Unknown";
+        }
 
         var message = new Message
         {

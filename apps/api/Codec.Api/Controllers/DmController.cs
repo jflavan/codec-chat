@@ -63,6 +63,8 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             )
             .FirstOrDefaultAsync();
 
+        var recipientEffectiveName = string.IsNullOrWhiteSpace(recipient.Nickname) ? recipient.DisplayName : recipient.Nickname;
+
         if (existingChannelId != Guid.Empty)
         {
             // Re-open the conversation for the current user if it was closed.
@@ -83,7 +85,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             return Ok(new
             {
                 existingChannel.Id,
-                Participant = new { Id = recipient.Id, recipient.DisplayName, AvatarUrl = recipientAvatarUrl },
+                Participant = new { Id = recipient.Id, DisplayName = recipientEffectiveName, AvatarUrl = recipientAvatarUrl },
                 existingChannel.CreatedAt
             });
         }
@@ -102,17 +104,18 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         var payload = new
         {
             dmChannel.Id,
-            Participant = new { Id = recipient.Id, recipient.DisplayName, AvatarUrl = avatarUrl },
+            Participant = new { Id = recipient.Id, DisplayName = recipientEffectiveName, AvatarUrl = avatarUrl },
             dmChannel.CreatedAt
         };
 
         // Notify the recipient that a DM conversation was opened.
         var appUserAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
+        var appUserEffectiveName = userService.GetEffectiveDisplayName(appUser);
         await chatHub.Clients.Group($"user-{request.RecipientUserId}")
             .SendAsync("DmConversationOpened", new
             {
                 DmChannelId = dmChannel.Id,
-                Participant = new { appUser.Id, appUser.DisplayName, AvatarUrl = appUserAvatarUrl }
+                Participant = new { appUser.Id, DisplayName = appUserEffectiveName, AvatarUrl = appUserAvatarUrl }
             });
 
         return Created($"/dm/channels/{dmChannel.Id}", payload);
@@ -147,6 +150,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.DmChannelId,
                 m.User!.Id,
                 m.User.DisplayName,
+                Nickname = m.User.Nickname,
                 m.User.AvatarUrl,
                 m.User.CustomAvatarPath
             })
@@ -171,13 +175,14 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         var conversations = otherMembers.Select(om =>
         {
             latestMessageLookup.TryGetValue(om.DmChannelId, out var lastMsg);
+            var effectiveName = string.IsNullOrWhiteSpace(om.Nickname) ? om.DisplayName : om.Nickname;
             return new
             {
                 Id = om.DmChannelId,
                 Participant = new
                 {
                     om.Id,
-                    om.DisplayName,
+                    DisplayName = effectiveName,
                     AvatarUrl = avatarService.ResolveUrl(om.CustomAvatarPath) ?? om.AvatarUrl
                 },
                 LastMessage = lastMsg is not null
@@ -285,9 +290,11 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             return StatusCode(403, new { error = "You are not a participant in this conversation." });
         }
 
-        var authorName = string.IsNullOrWhiteSpace(appUser.DisplayName)
-            ? "Unknown"
-            : appUser.DisplayName;
+        var authorName = userService.GetEffectiveDisplayName(appUser);
+        if (string.IsNullOrWhiteSpace(authorName))
+        {
+            authorName = "Unknown";
+        }
 
         var message = new DirectMessage
         {

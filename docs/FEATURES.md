@@ -34,7 +34,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Role-based membership (Owner, Admin, Member)
 - ✅ Member display with avatar and role
 - ✅ Kick members (Owner can kick Admins and Members; Admins can kick Members only)
-- ✅ Real-time kick notification via SignalR (kicked user is redirected automatically)
+- ✅ Real-time kick notification via SignalR (kicked user is redirected automatically, transient overlay banner with 5-second fade-out)
 - ✅ Server invite codes (Owner/Admin create, list, revoke invites; any user can join via code)
 - ✅ Invite code generation (cryptographically random 8-character alphanumeric codes)
 - ✅ Configurable invite expiry (default 7 days, custom hours, or never) and max uses
@@ -69,6 +69,25 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Start DM from friends list
 - ✅ Home screen layout with DM sidebar + Friends panel / DM chat area
 
+### Nicknames ([detailed spec](NICKNAMES.md))
+- ✅ User-chosen display name that overrides Google-provided name
+- ✅ Set/update nickname via `PUT /me/nickname`, remove via `DELETE /me/nickname`
+- ✅ `GET /me` returns `nickname` and `effectiveDisplayName` fields
+- ✅ Effective display name shown in messages, member lists, friends, User Panel, typing indicators
+- ✅ Fallback chain: nickname → Google display name
+- ✅ Validation: 1–32 characters, Unicode supported, trimmed whitespace
+- ✅ User search includes nickname matching and shows `effectiveDisplayName`
+- ✅ Managed via User Settings → My Profile section
+
+### User Settings ([detailed spec](USER_SETTINGS.md))
+- ✅ Centralized settings screen accessed from gear icon (⚙) in User Panel
+- ✅ Full-screen modal overlay with category navigation sidebar
+- ✅ My Profile section: nickname editing with character counter, avatar upload/remove, profile preview
+- ✅ My Account section: read-only account info (email, Google display name), sign-out
+- ✅ Keyboard accessible: Escape to close, focus trapping via `<dialog>`
+- ✅ Responsive layout: two-column (≥ 900px), tabbed (< 900px)
+- Extensible for future categories (notifications, privacy, appearance)
+
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
 - ✅ Three-column layout: server icon rail, channel sidebar, chat area
@@ -79,10 +98,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Floating reaction action bar on message hover (emoji picker with 8 quick emojis)
 - ✅ Reaction pills below messages (emoji + count, highlighted when user has reacted)
 - ✅ Inline message composer with send icon and focus glow
-- ✅ User panel pinned to bottom of channel sidebar
+- ✅ User panel pinned to bottom of channel sidebar (gear icon for settings + sign-out icon)
 - ✅ Members sidebar grouped by role (Owner, Admin, Member)
 - ✅ Loading states for async operations
-- ✅ Error handling and display (banner in chat area)
+- ✅ Error handling and display (transient overlay banner with fade-out animation)
 - ✅ Responsive breakpoints (mobile, tablet, desktop)
 - ✅ Accessibility: focus-visible outlines, prefers-reduced-motion, semantic HTML, ARIA labels
 - ✅ Design specification documented in `docs/DESIGN.md`
@@ -124,20 +143,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - 🔄 Client-side form validation
 
 ## 📋 Planned (Near-term)
-
-### User Settings ([detailed spec](USER_SETTINGS.md))
-- Centralized settings screen accessed from gear icon in User Panel
-- Full-screen modal overlay with category navigation sidebar
-- My Profile section: nickname editing, avatar management, profile preview
-- My Account section: read-only account info, sign-out
-- Extensible for future categories (notifications, privacy, appearance)
-
-### Nicknames ([detailed spec](NICKNAMES.md))
-- User-chosen display name that overrides Google-provided name
-- Managed via User Settings → My Profile section
-- Effective display name shown in messages, member lists, friends, User Panel, typing indicators
-- Fallback chain: nickname → Google display name
-- Validation: 1–32 characters, Unicode supported
 
 ### Messaging Features
 - Message editing and deletion
@@ -186,10 +191,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Granular permissions
 
 ### Customization
-- ~~User preferences/settings~~ → [planned](USER_SETTINGS.md)
+- ~~User preferences/settings~~ → ✅ [implemented](USER_SETTINGS.md)
 - Server themes
 - Custom emojis
-- ~~Profile customization~~ → [planned: nicknames](NICKNAMES.md)
+- ~~Profile customization~~ → ✅ [implemented: nicknames](NICKNAMES.md)
 - Status messages
 
 ### Enterprise Features

@@ -311,31 +311,31 @@ ALTER TABLE Users ADD COLUMN Nickname TEXT NULL;
 ## Task Breakdown
 
 ### API
-- [ ] Add `Nickname` property (nullable string, max 32) to the `User` entity in `Models/User.cs`
-- [ ] Create and apply EF Core migration (`AddUserNickname`)
-- [ ] Add `GetEffectiveDisplayName()` helper to `UserService` (returns `Nickname ?? DisplayName`)
-- [ ] Create `PUT /me/nickname` endpoint in `UsersController` with validation
-- [ ] Create `DELETE /me/nickname` endpoint in `UsersController`
-- [ ] Enhance `GET /me` response to include `nickname` and `effectiveDisplayName` fields
-- [ ] Update message creation logic to use `effectiveDisplayName` for `AuthorName` snapshot
-- [ ] Update user search response to include `effectiveDisplayName`
-- [ ] Update friend-related responses to use `effectiveDisplayName`
-- [ ] Update member list responses to use `effectiveDisplayName`
+- [x] Add `Nickname` property (nullable string, max 32) to the `User` entity in `Models/User.cs`
+- [x] Create and apply EF Core migration (`AddUserNickname`)
+- [x] Add `GetEffectiveDisplayName()` helper to `UserService` (returns `Nickname ?? DisplayName`)
+- [x] Create `PUT /me/nickname` endpoint in `UsersController` with validation
+- [x] Create `DELETE /me/nickname` endpoint in `UsersController`
+- [x] Enhance `GET /me` response to include `nickname` and `effectiveDisplayName` fields
+- [x] Update message creation logic to use `effectiveDisplayName` for `AuthorName` snapshot
+- [x] Update user search response to include `effectiveDisplayName`
+- [x] Update friend-related responses to use `effectiveDisplayName`
+- [x] Update member list responses to use `effectiveDisplayName`
 
 ### Web
-- [ ] Add `nickname` and `effectiveDisplayName` fields to the `UserProfile` type in `models.ts`
-- [ ] Add `setNickname(nickname: string)` and `removeNickname()` methods to `ApiClient`
-- [ ] Update `AppState` to expose `effectiveDisplayName` derived from the `me` profile
-- [ ] Update `UserPanel.svelte` to display `effectiveDisplayName`
-- [ ] Wire nickname input in `ProfileSettings.svelte` to the nickname API endpoints (see [USER_SETTINGS.md](USER_SETTINGS.md))
-- [ ] Update typing indicator to use `effectiveDisplayName` when broadcasting
-- [ ] Update any components that display the current user's name to use `effectiveDisplayName`
+- [x] Add `nickname` and `effectiveDisplayName` fields to the `UserProfile` type in `models.ts`
+- [x] Add `setNickname(nickname: string)` and `removeNickname()` methods to `ApiClient`
+- [x] Update `AppState` to expose `effectiveDisplayName` derived from the `me` profile
+- [x] Update `UserPanel.svelte` to display `effectiveDisplayName`
+- [x] Wire nickname input in `ProfileSettings.svelte` to the nickname API endpoints (see [USER_SETTINGS.md](USER_SETTINGS.md))
+- [x] Update typing indicator to use `effectiveDisplayName` when broadcasting
+- [x] Update any components that display the current user's name to use `effectiveDisplayName`
 
 ### Documentation
-- [ ] Update `ARCHITECTURE.md` with new nickname endpoints
-- [ ] Update `DATA.md` with the `Nickname` column on the User entity
-- [ ] Update `FEATURES.md` to track Nicknames feature progress
-- [ ] Update `DESIGN.md` with nickname display rules
+- [x] Update `ARCHITECTURE.md` with new nickname endpoints
+- [x] Update `DATA.md` with the `Nickname` column on the User entity
+- [x] Update `FEATURES.md` to track Nicknames feature progress
+- [x] Update `DESIGN.md` with nickname display rules
 
 ## Open Questions
 

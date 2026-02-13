@@ -85,4 +85,10 @@ public class UserService(CodecDbContext db) : IUserService
             .AsNoTracking()
             .AnyAsync(member => member.ServerId == serverId && member.UserId == userId);
     }
+
+    /// <inheritdoc />
+    public string GetEffectiveDisplayName(User user)
+    {
+        return string.IsNullOrWhiteSpace(user.Nickname) ? user.DisplayName : user.Nickname;
+    }
 }

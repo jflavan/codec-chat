@@ -9,6 +9,7 @@
 	import FriendsPanel from '$lib/components/friends/FriendsPanel.svelte';
 	import HomeSidebar from '$lib/components/dm/HomeSidebar.svelte';
 	import DmChatArea from '$lib/components/dm/DmChatArea.svelte';
+	import UserSettingsModal from '$lib/components/settings/UserSettingsModal.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -51,6 +52,10 @@
 		<MembersSidebar />
 	{/if}
 </div>
+
+{#if app.settingsOpen}
+	<UserSettingsModal />
+{/if}
 
 <style>
 	.app-shell {

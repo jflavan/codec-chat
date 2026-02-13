@@ -72,6 +72,11 @@ src/
 │   │   │   ├── HomeSidebar.svelte        # Home sidebar (Friends nav + DM list)
 │   │   │   ├── DmList.svelte             # DM conversation entries
 │   │   │   └── DmChatArea.svelte         # DM chat (header, feed, composer, typing)
+│   │   ├── settings/
+│   │   │   ├── UserSettingsModal.svelte   # Full-screen modal overlay shell
+│   │   │   ├── SettingsSidebar.svelte     # Category navigation sidebar
+│   │   │   ├── ProfileSettings.svelte     # Nickname + avatar management
+│   │   │   └── AccountSettings.svelte     # Read-only info + sign out
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
 │   │       └── MemberItem.svelte         # Single member card
@@ -102,8 +107,12 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
       │   ├── MessageFeed    → getAppState()
       │   ├── Composer       → getAppState()
       │   └── TypingIndicator → getAppState()
-      └── MembersSidebar     → getAppState()
-          └── MemberItem     (receives props, no context needed)
+      ├── MembersSidebar     → getAppState()
+      │   └── MemberItem     (receives props, no context needed)
+      └── UserSettingsModal  → getAppState()  (shown when settingsOpen)
+          ├── SettingsSidebar  → getAppState()
+          ├── ProfileSettings  → getAppState()
+          └── AccountSettings  → getAppState()
 ```
 
 **Layer Responsibilities:**
@@ -221,7 +230,9 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 ### Authenticated Endpoints
 
 #### User Profile
-- `GET /me` - Get current user profile
+- `GET /me` - Get current user profile (includes `nickname` and `effectiveDisplayName`)
+- `PUT /me/nickname` - Set or update nickname (1–32 chars, trimmed; returns effective display name)
+- `DELETE /me/nickname` - Remove nickname, revert to Google display name
 - `POST /me/avatar` - Upload a custom global avatar (multipart/form-data, 10 MB max; JPG, JPEG, PNG, WebP, GIF)
 - `DELETE /me/avatar` - Remove custom avatar, revert to Google profile picture
 
@@ -255,7 +266,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `DELETE /friends/requests/{requestId}` - Cancel a sent friend request (broadcasts `FriendRequestCancelled` via SignalR)
 
 #### User Search
-- `GET /users/search?q=...` - Search users by display name or email (returns up to 20 results with relationship status)
+- `GET /users/search?q=...` - Search users by display name, nickname, or email (returns up to 20 results with relationship status and `effectiveDisplayName`)
 
 #### Direct Messages
 - `POST /dm/channels` - Start or resume a DM conversation with a friend (returns existing or creates new)
@@ -298,7 +309,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `DmTyping` | `{ dmChannelId, displayName }` | DM partner started typing |
 | `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
 | `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |
-| `KickedFromServer` | `{ serverId, serverName }` | User was kicked from a server (sent to kicked user's user group) |
+| `KickedFromServer` | `{ serverId, serverName }` | User was kicked from a server (sent to kicked user's user group; displayed as transient overlay banner with 5s fade-out) |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -423,7 +434,8 @@ User ────┬──── ServerMember ──── Server
 #### User
 - Internal representation of authenticated users
 - Linked to Google identity via `GoogleSubject`
-- Fields: Id, GoogleSubject, DisplayName, Email, AvatarUrl, CustomAvatarPath
+- Fields: Id, GoogleSubject, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath
+- Effective display name: `Nickname ?? DisplayName`
 
 #### Server
 - Top-level organizational unit (like Discord servers)

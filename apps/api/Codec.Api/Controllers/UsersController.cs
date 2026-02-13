@@ -24,6 +24,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
         var appUser = await userService.GetOrCreateUserAsync(User);
         var claims = User.Claims.Select(claim => new { claim.Type, claim.Value });
         var effectiveAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
+        var effectiveDisplayName = userService.GetEffectiveDisplayName(appUser);
 
         return Ok(new
         {
@@ -31,11 +32,67 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             {
                 appUser.Id,
                 appUser.DisplayName,
+                appUser.Nickname,
+                EffectiveDisplayName = effectiveDisplayName,
                 appUser.Email,
                 AvatarUrl = effectiveAvatarUrl,
                 appUser.GoogleSubject
             },
             claims
+        });
+    }
+
+    /// <summary>
+    /// Sets or updates the current user's nickname.
+    /// </summary>
+    [HttpPut("me/nickname")]
+    public async Task<IActionResult> SetNickname([FromBody] SetNicknameRequest request)
+    {
+        var trimmed = request.Nickname?.Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
+        }
+
+        if (trimmed.Length > 32)
+        {
+            return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        appUser.Nickname = trimmed;
+        appUser.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            Nickname = appUser.Nickname,
+            EffectiveDisplayName = userService.GetEffectiveDisplayName(appUser)
+        });
+    }
+
+    /// <summary>
+    /// Removes the current user's nickname, reverting to the Google display name.
+    /// </summary>
+    [HttpDelete("me/nickname")]
+    public async Task<IActionResult> RemoveNickname()
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        if (appUser.Nickname is null)
+        {
+            return NotFound(new { error = "No nickname is set." });
+        }
+
+        appUser.Nickname = null;
+        appUser.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            Nickname = (string?)null,
+            EffectiveDisplayName = userService.GetEffectiveDisplayName(appUser)
         });
     }
 
@@ -60,12 +117,14 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             .AsNoTracking()
             .Where(u => u.Id != appUser.Id &&
                         (EF.Functions.Like(u.DisplayName, pattern) ||
+                         (u.Nickname != null && EF.Functions.Like(u.Nickname, pattern)) ||
                          (u.Email != null && EF.Functions.Like(u.Email, pattern))))
             .Take(20)
             .Select(u => new
             {
                 u.Id,
                 u.DisplayName,
+                u.Nickname,
                 u.Email,
                 u.CustomAvatarPath,
                 GoogleAvatarUrl = u.AvatarUrl
@@ -88,11 +147,13 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
                 (f.RecipientId == appUser.Id && f.RequesterId == u.Id));
 
             string relationshipStatus = fs is null ? "None" : fs.Status.ToString();
+            var effectiveDisplayName = string.IsNullOrWhiteSpace(u.Nickname) ? u.DisplayName : u.Nickname;
 
             return new
             {
                 u.Id,
-                u.DisplayName,
+                DisplayName = effectiveDisplayName,
+                EffectiveDisplayName = effectiveDisplayName,
                 u.Email,
                 AvatarUrl = avatarService.ResolveUrl(u.CustomAvatarPath) ?? u.GoogleAvatarUrl,
                 RelationshipStatus = relationshipStatus

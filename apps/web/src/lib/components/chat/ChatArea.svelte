@@ -19,13 +19,15 @@
 		</div>
 	</header>
 
-	{#if app.error}
-		<div class="error-banner" role="alert">{app.error}</div>
-	{/if}
+	<div class="chat-body">
+		{#if app.error}
+			<div class="error-banner" role="alert">{app.error}</div>
+		{/if}
 
-	<MessageFeed />
-	<TypingIndicator />
-	<Composer />
+		<MessageFeed />
+		<TypingIndicator />
+		<Composer />
+	</div>
 </main>
 
 <style>
@@ -64,11 +66,33 @@
 		opacity: 0.7;
 	}
 
+	.chat-body {
+		flex: 1;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	.error-banner {
-		padding: 8px 16px;
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 10;
+		padding: 10px 16px;
 		background: var(--danger);
 		color: var(--bg-tertiary);
 		font-size: 14px;
-		flex-shrink: 0;
+		font-weight: 500;
+		text-align: center;
+		pointer-events: none;
+		animation: banner-lifecycle 5s ease forwards;
+	}
+
+	@keyframes banner-lifecycle {
+		0%   { opacity: 1; transform: translateY(0); }
+		75%  { opacity: 1; transform: translateY(0); }
+		100% { opacity: 0; transform: translateY(-8px); }
 	}
 </style>

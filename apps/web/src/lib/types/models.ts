@@ -46,6 +46,8 @@ export type UserProfile = {
 	user: {
 		id: string;
 		displayName: string;
+		nickname?: string | null;
+		effectiveDisplayName: string;
 		email?: string;
 		avatarUrl?: string;
 	};
@@ -81,6 +83,7 @@ export type FriendRequest = {
 export type UserSearchResult = {
 	id: string;
 	displayName: string;
+	effectiveDisplayName?: string;
 	email?: string | null;
 	avatarUrl?: string | null;
 	relationshipStatus: string;

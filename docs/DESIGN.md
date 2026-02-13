@@ -130,8 +130,11 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 ### User Panel (Bottom of Channel Sidebar)
 
 - Fixed to bottom of channel sidebar
-- Current user avatar (32px), display name, role
+- Current user avatar (32px), **effective display name** (nickname if set, otherwise Google display name), role
 - Subtle top border separator
+- **Gear icon (⚙)**: 16px, `--text-muted` default, transitions to `--accent` on hover (150ms). Opens the User Settings modal.
+- **Sign-out icon (⏻)**: 16px, `--text-muted` default, transitions to `--text-header` on hover (150ms). Signs the user out.
+- Both icons are positioned to the right of the user info, displayed side by side
 - **Avatar upload**: clicking the avatar opens a file picker; hover shows a semi-transparent overlay with a "+" icon
 
 ### Avatar Display
@@ -144,7 +147,7 @@ The palette is drawn from the **CODEC phosphor-green CRT** theme defined in [THE
 ### Member List
 
 - Grouped by role with section headers (OWNER, ADMIN, MEMBER)
-- Member cards: avatar (32px), display name, role badge
+- Member cards: avatar (32px), **effective display name** (nickname if set), role badge
 - Online indicator dot (future)
 
 ## Emoji Reactions
@@ -270,6 +273,66 @@ The DM chat area reuses existing chat patterns with DM-specific adaptations:
 - The friend entry is styled as a button with pointer cursor
 - The DM conversation is immediately selected in the sidebar and the chat area updates
 
+## User Settings Modal
+
+The User Settings screen is a full-screen modal overlay, accessed via the gear icon (⚙) in the User Panel. It uses the HTML `<dialog>` element for native focus trapping.
+
+### Modal Overlay
+
+- **Backdrop:** semi-transparent dark overlay (`rgba(0, 0, 0, 0.85)`)
+- **Layout:** two-column panel centered within the viewport
+  - Left column (~200px): category navigation sidebar (`--bg-tertiary`)
+  - Right column (flexible, max-width 740px): settings content area (`--bg-primary`)
+- **Close button:** "✕" icon at top-right of the content area, or press `Escape`, or click backdrop
+- **Z-index:** modal layer (50), consistent with existing z-index strategy
+
+### Category Navigation Sidebar
+
+| Category | Icon | Content |
+|----------|------|---------|
+| **My Profile** | 👤 | Nickname editing, avatar management, profile preview |
+| **My Account** | 🔒 | Read-only email/Google display name, sign-out |
+
+- Background: `--bg-tertiary`
+- Category items: `--text-muted` default, `--text-header` when active
+- Active indicator: `--bg-message-hover` background with `--accent` left border (3px)
+- Hover: `--bg-message-hover` background
+- ARIA: `role="tablist"` with `role="tab"` items
+
+### My Profile Section
+
+- **Profile preview card**: 64px circular avatar with "Change" hover overlay, effective display name (updates live), email in `--text-muted`
+- **Nickname input**: `--input-bg` background, `--accent` focus glow, 8px border-radius, character counter (`{count}/32`)
+- **Save button**: `--accent` primary style, enabled only when value differs from current nickname
+- **Reset link**: `--danger` text, removes nickname and reverts to Google display name
+- **Avatar upload**: click avatar to open file picker; "Remove Avatar" button (`--danger`) shown when custom avatar is set
+
+### My Account Section
+
+- Read-only display of email and Google display name
+- **Sign Out** button: `--danger` background, calls `closeSettings()` then `signOut()`
+
+### Responsive Behavior
+
+| Breakpoint | Layout |
+|-----------|--------|
+| ≥ 900px | Two-column: category sidebar (200px) + content area (flexible) |
+| < 900px | Single-column: horizontal category tabs at top, full-width content below |
+
+## Kick Error Banner (Overlay)
+
+When a user is kicked from a server, a transient error banner appears as an overlay on top of the chat content. It does not affect the layout or push content down.
+
+- **Positioning:** `position: absolute`, pinned to top of the chat body area (`top: 0; left: 0; right: 0`)
+- **Z-index:** 10 (above chat content, below modals)
+- **Styling:** `--danger` background, `--bg-tertiary` text, 14px font, 500 weight, centered text
+- **Behavior:** `pointer-events: none` — does not block interaction with underlying chat content
+- **Animation:** `banner-lifecycle` keyframe (5s total)
+  - 0–75% (0–3.75s): fully visible (`opacity: 1`)
+  - 75–100% (3.75–5s): fades out (`opacity: 0`) with slight upward slide (`translateY(-8px)`)
+- **State management:** `AppState.setTransientError()` sets the error and schedules auto-clear after 5 seconds via `setTimeout`
+- **Scope:** Applied in both `ChatArea.svelte` and `DmChatArea.svelte`
+
 ## Animations & Micro-interactions
 
 - **Transitions**: 150–200ms ease for background/color changes
@@ -278,6 +341,7 @@ The DM chat area reuses existing chat patterns with DM-specific adaptations:
 - **Channel hover**: background-color transition
 - **Message hover**: background highlight
 - **Buttons**: color shift on hover/active
+- **Kick error banner**: overlay banner with `banner-lifecycle` keyframe animation — fully visible for 75% of duration (3.75s), then fades out over 1.25s with slight upward slide (`translateY(-8px)`)
 
 ## Responsive Design
 
@@ -313,7 +377,7 @@ The DM chat area reuses existing chat patterns with DM-specific adaptations:
 - All colors defined as CSS custom properties on `:root` in `$lib/styles/tokens.css` following the CODEC CRT palette in [THEME.md](THEME.md)
 - Global base styles (resets, font imports, selection, focus-visible) in `$lib/styles/global.css`, imported once in `+layout.svelte`
 - Component-scoped styles in Svelte `<style>` blocks within each component
-- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`, `friends/`, `dm/`
+- Feature-grouped component directories: `server-sidebar/`, `channel-sidebar/`, `chat/`, `members/`, `friends/`, `dm/`, `settings/`
 - Font loaded via Google Fonts (`Space Grotesk` as primary, system-ui fallback) with preconnect links in `+layout.svelte`
 - Semantic HTML throughout for accessibility
 - `prefers-color-scheme` media query ready for future light mode toggle

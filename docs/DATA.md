@@ -41,6 +41,7 @@ EF Core migrations make database provider switches straightforward.
 │ Id (PK)     │◄───┐
 │ GoogleSub   │    │
 │ DisplayName │    │
+│ Nickname    │    │
 │ Email       │    │
 │ AvatarUrl   │    │
 │ CreatedAt   │    │
@@ -115,7 +116,8 @@ EF Core migrations make database provider switches straightforward.
 │─────────────│       │─────────────────│       │─────────────│
 │ Id ─────────│──────►│ UserId (PK,FK)  │       │ Id ─────────│
 │ DisplayName │       │ DmChannelId     │◄──────│ CreatedAt   │
-│ AvatarUrl   │       │ IsOpen          │       └──────┬──────┘
+│ Nickname    │       │ IsOpen          │       └──────┬──────┘
+│ AvatarUrl   │       │ JoinedAt        │              │
 └─────────────┘       │ JoinedAt        │              │
                       └─────────────────┘              │
                                                        │
@@ -140,7 +142,8 @@ Represents an authenticated user in the system.
 |--------|------|-------------|
 | `Id` | Guid (PK) | Unique user identifier |
 | `GoogleSubject` | string (unique) | Google user ID for authentication |
-| `DisplayName` | string | User's display name |
+| `DisplayName` | string | User's display name (from Google) |
+| `Nickname` | string? (max 32) | User-chosen display name override. `null` = use Google display name |
 | `Email` | string | User's email address |
 | `AvatarUrl` | string? | Google profile picture URL |
 | `CustomAvatarPath` | string? | Relative path to a user-uploaded avatar file |
@@ -160,6 +163,7 @@ Represents an authenticated user in the system.
 - `GoogleSubject` is the primary link to Google identity
 - Auto-created on first sign-in
 - Profile fields (DisplayName, Email, AvatarUrl) updated on each sign-in
+- `Nickname` is user-chosen and persists across sign-ins; effective display name resolves as `Nickname ?? DisplayName`
 - `AvatarUrl` is the Google profile picture (always updated on sign-in)
 - `CustomAvatarPath` is `null` when using the default Google avatar; non-null when the user uploads a custom avatar
 - The effective avatar URL uses the fallback chain: custom upload → Google profile picture

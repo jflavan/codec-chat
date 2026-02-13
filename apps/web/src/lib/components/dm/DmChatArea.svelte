@@ -101,12 +101,13 @@
 		</div>
 	</header>
 
-	{#if app.error}
-		<div class="error-banner" role="alert">{app.error}</div>
-	{/if}
+	<div class="dm-body">
+		{#if app.error}
+			<div class="error-banner" role="alert">{app.error}</div>
+		{/if}
 
-	<!-- Message feed -->
-	<div class="feed-wrapper">
+		<!-- Message feed -->
+		<div class="feed-wrapper">
 		<div class="message-feed" bind:this={container} onscroll={handleScroll}>
 			{#if app.isLoadingDmMessages}
 				<p class="muted feed-status">Loading messages…</p>
@@ -178,8 +179,8 @@
 		</div>
 	{/if}
 
-	<!-- Composer -->
-	<form class="composer" onsubmit={handleDmSubmit}>
+		<!-- Composer -->
+		<form class="composer" onsubmit={handleDmSubmit}>
 		<input
 			bind:this={dmInputEl}
 			class="composer-input"
@@ -199,7 +200,8 @@
 				<path d="M2.5 2.3a.75.75 0 0 1 .8-.05l14 7a.75.75 0 0 1 0 1.34l-14 7A.75.75 0 0 1 2.2 17l1.9-6.5a.5.5 0 0 1 .47-.35h4.68a.75.75 0 0 0 0-1.5H4.57a.5.5 0 0 1-.47-.35L2.2 1.8a.75.75 0 0 1 .3-.8z"/>
 			</svg>
 		</button>
-	</form>
+		</form>
+	</div>
 </main>
 
 <style>
@@ -254,12 +256,34 @@
 		color: var(--text-header);
 	}
 
+	.dm-body {
+		flex: 1;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	.error-banner {
-		padding: 8px 16px;
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 10;
+		padding: 10px 16px;
 		background: var(--danger);
 		color: var(--bg-tertiary);
 		font-size: 14px;
-		flex-shrink: 0;
+		font-weight: 500;
+		text-align: center;
+		pointer-events: none;
+		animation: banner-lifecycle 5s ease forwards;
+	}
+
+	@keyframes banner-lifecycle {
+		0%   { opacity: 1; transform: translateY(0); }
+		75%  { opacity: 1; transform: translateY(0); }
+		100% { opacity: 0; transform: translateY(-8px); }
 	}
 
 	/* ───── Message feed ───── */

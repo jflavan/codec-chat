@@ -106,6 +106,8 @@ export class AppState {
 	showFriendsPanel = $state(false);
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
+	settingsOpen = $state(false);
+	settingsCategory = $state<'profile' | 'account'>('profile');
 
 	/* ───── form fields ───── */
 	newServerName = $state('');
@@ -139,6 +141,10 @@ export class AppState {
 		this.servers.find((s) => s.serverId === this.selectedServerId)?.name ?? 'Codec'
 	);
 
+	readonly effectiveDisplayName = $derived(
+		this.me?.user.effectiveDisplayName ?? this.me?.user.displayName ?? ''
+	);
+
 	readonly selectedChannelName = $derived(
 		this.channels.find((c) => c.id === this.selectedChannelId)?.name ?? null
 	);
@@ -161,6 +167,17 @@ export class AppState {
 	) {
 		this.api = new ApiClient(apiBaseUrl);
 		this.hub = new ChatHubService(`${apiBaseUrl}/hubs/chat`);
+	}
+
+	/* ═══════════════════ Settings ═══════════════════ */
+
+	openSettings(): void {
+		this.settingsOpen = true;
+		this.settingsCategory = 'profile';
+	}
+
+	closeSettings(): void {
+		this.settingsOpen = false;
 	}
 
 	/* ═══════════════════ Auth ═══════════════════ */
@@ -224,6 +241,7 @@ export class AppState {
 		this.showFriendsPanel = false;
 		this.friendsTab = 'all';
 		this.friendSearchQuery = '';
+		this.settingsOpen = false;
 
 		await tick();
 		renderGoogleButton('google-button');
@@ -335,7 +353,7 @@ export class AppState {
 			this.messageBody = '';
 
 			if (this.me) {
-				this.hub.clearTyping(this.selectedChannelId, this.me.user.displayName);
+				this.hub.clearTyping(this.selectedChannelId, this.effectiveDisplayName);
 			}
 
 			// If SignalR is not connected, fall back to full reload.
@@ -510,6 +528,50 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Nickname ═══════════════════ */
+
+	/** Set or update the current user's nickname. */
+	async setNickname(nickname: string): Promise<void> {
+		if (!this.idToken) return;
+		this.error = null;
+		try {
+			const result = await this.api.setNickname(this.idToken, nickname);
+			if (this.me) {
+				this.me = {
+					...this.me,
+					user: {
+						...this.me.user,
+						nickname: result.nickname,
+						effectiveDisplayName: result.effectiveDisplayName
+					}
+				};
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Remove the current user's nickname, reverting to the Google display name. */
+	async removeNickname(): Promise<void> {
+		if (!this.idToken) return;
+		this.error = null;
+		try {
+			const result = await this.api.removeNickname(this.idToken);
+			if (this.me) {
+				this.me = {
+					...this.me,
+					user: {
+						...this.me.user,
+						nickname: result.nickname,
+						effectiveDisplayName: result.effectiveDisplayName
+					}
+				};
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
 	/** Upload a server-specific avatar for the current user. */
 	async uploadServerAvatar(serverId: string, file: File): Promise<void> {
 		if (!this.idToken) return;
@@ -542,7 +604,7 @@ export class AppState {
 
 	handleComposerInput(): void {
 		if (!this.selectedChannelId || !this.me) return;
-		this.hub.emitTyping(this.selectedChannelId, this.me.user.displayName);
+		this.hub.emitTyping(this.selectedChannelId, this.effectiveDisplayName);
 	}
 
 	async toggleReaction(messageId: string, emoji: string): Promise<void> {
@@ -745,7 +807,7 @@ export class AppState {
 			this.dmMessageBody = '';
 
 			if (this.me) {
-				this.hub.clearDmTyping(this.activeDmChannelId, this.me.user.displayName);
+				this.hub.clearDmTyping(this.activeDmChannelId, this.effectiveDisplayName);
 			}
 
 			// If SignalR is not connected, fall back to full reload.
@@ -790,7 +852,7 @@ export class AppState {
 
 	handleDmComposerInput(): void {
 		if (!this.activeDmChannelId || !this.me) return;
-		this.hub.emitDmTyping(this.activeDmChannelId, this.me.user.displayName);
+		this.hub.emitDmTyping(this.activeDmChannelId, this.effectiveDisplayName);
 	}
 
 	/* ═══════════════════ SignalR ═══════════════════ */
@@ -878,7 +940,7 @@ export class AppState {
 						this.loadMembers(this.selectedServerId);
 					}
 				}
-				this.error = `You were kicked from "${event.serverName}".`;
+				this.setTransientError(`You were kicked from "${event.serverName}".`);
 			}
 		});
 
@@ -895,6 +957,17 @@ export class AppState {
 	}
 
 	/* ───── helpers ───── */
+
+	private transientErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+	private setTransientError(message: string, durationMs = 5000): void {
+		if (this.transientErrorTimer) clearTimeout(this.transientErrorTimer);
+		this.error = message;
+		this.transientErrorTimer = setTimeout(() => {
+			if (this.error === message) this.error = null;
+			this.transientErrorTimer = null;
+		}, durationMs);
+	}
 
 	private setError(e: unknown): void {
 		if (e instanceof ApiError) {
