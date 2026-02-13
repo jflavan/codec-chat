@@ -43,6 +43,7 @@
 			<p class="muted server-hint">…</p>
 		{:else}
 			{#each app.servers as server}
+				{@const mentionCount = app.serverMentionCount(server.serverId)}
 				<div class="server-pill-wrapper">
 					<div class="server-pill" class:active={server.serverId === app.selectedServerId}></div>
 					<button
@@ -53,6 +54,11 @@
 						title={server.name}
 					>
 						{server.name.slice(0, 1).toUpperCase()}
+						{#if mentionCount > 0}
+							<span class="notification-badge" aria-label="{mentionCount} mentions">
+								{mentionCount}
+							</span>
+						{/if}
 					</button>
 				</div>
 			{/each}
@@ -179,6 +185,7 @@
 	}
 
 	.server-icon {
+		position: relative;
 		width: 48px;
 		height: 48px;
 		border-radius: 50%;

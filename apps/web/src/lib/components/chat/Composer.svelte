@@ -1,14 +1,91 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import type { Member } from '$lib/types/index.js';
 
 	const app = getAppState();
 	let inputEl: HTMLInputElement;
 	let fileInputEl: HTMLInputElement;
 
+	/* ───── Mention autocomplete state ───── */
+	let showMentionPicker = $state(false);
+	let mentionQuery = $state('');
+	let mentionStartIndex = $state(0);
+	let selectedMentionIndex = $state(0);
+
+	const filteredMembers: Member[] = $derived(
+		mentionQuery.length === 0
+			? app.members
+			: app.members.filter((m) =>
+					m.displayName.toLowerCase().includes(mentionQuery.toLowerCase())
+				)
+	);
+
+	function detectMentionTrigger(): void {
+		if (!inputEl) return;
+		const value = inputEl.value;
+		const cursor = inputEl.selectionStart ?? value.length;
+
+		// Walk backwards from cursor to find an unescaped '@'.
+		const textBeforeCursor = value.slice(0, cursor);
+		const atIndex = textBeforeCursor.lastIndexOf('@');
+		if (atIndex === -1 || (atIndex > 0 && textBeforeCursor[atIndex - 1] !== ' ' && atIndex !== 0)) {
+			showMentionPicker = false;
+			return;
+		}
+
+		// Check there's no space between @ and cursor (single-word query).
+		const query = textBeforeCursor.slice(atIndex + 1);
+		if (query.includes(' ') || query.includes('\n')) {
+			showMentionPicker = false;
+			return;
+		}
+
+		mentionQuery = query;
+		mentionStartIndex = atIndex;
+		selectedMentionIndex = 0;
+		showMentionPicker = true;
+	}
+
+	function insertMention(member: Member): void {
+		const value = app.messageBody;
+		const before = value.slice(0, mentionStartIndex);
+		const afterCursor = value.slice(mentionStartIndex + 1 + mentionQuery.length);
+		app.messageBody = `${before}@${member.displayName} ${afterCursor}`;
+		app.pendingMentions.set(member.displayName, member.userId);
+		showMentionPicker = false;
+		mentionQuery = '';
+		inputEl?.focus();
+	}
+
+	function handleKeydown(e: KeyboardEvent): void {
+		if (!showMentionPicker || filteredMembers.length === 0) return;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			selectedMentionIndex = (selectedMentionIndex + 1) % filteredMembers.length;
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			selectedMentionIndex =
+				(selectedMentionIndex - 1 + filteredMembers.length) % filteredMembers.length;
+		} else if (e.key === 'Enter' || e.key === 'Tab') {
+			e.preventDefault();
+			insertMention(filteredMembers[selectedMentionIndex]);
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			showMentionPicker = false;
+		}
+	}
+
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
+		if (showMentionPicker) return;
 		await app.sendMessage();
 		inputEl?.focus();
+	}
+
+	function handleInput(): void {
+		app.handleComposerInput();
+		detectMentionTrigger();
 	}
 
 	function handleFileSelect(e: Event) {
@@ -52,6 +129,31 @@
 			</button>
 		</div>
 	{/if}
+
+	{#if showMentionPicker && filteredMembers.length > 0}
+		<ul class="mention-picker" role="listbox" aria-label="Mention a member">
+			{#each filteredMembers.slice(0, 8) as member, i (member.userId)}
+				<li role="option" aria-selected={i === selectedMentionIndex}>
+					<button
+						class="mention-option"
+						class:selected={i === selectedMentionIndex}
+						onmousedown={(e) => { e.preventDefault(); insertMention(member); }}
+						type="button"
+					>
+						{#if member.avatarUrl}
+							<img class="mention-avatar" src={member.avatarUrl} alt="" />
+						{:else}
+							<div class="mention-avatar-placeholder" aria-hidden="true">
+								{member.displayName.slice(0, 1).toUpperCase()}
+							</div>
+						{/if}
+						<span class="mention-name">{member.displayName}</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
 	<div class="composer-row">
 		<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} />
 		<button
@@ -72,7 +174,8 @@
 			placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
 			bind:value={app.messageBody}
 			disabled={!app.selectedChannelId || app.isSending}
-			oninput={() => app.handleComposerInput()}
+			oninput={handleInput}
+			onkeydown={handleKeydown}
 			onpaste={handlePaste}
 		/>
 		<button
@@ -223,5 +326,69 @@
 		clip: rect(0, 0, 0, 0);
 		white-space: nowrap;
 		border-width: 0;
+	}
+
+	/* ───── Mention picker ───── */
+
+	.mention-picker {
+		list-style: none;
+		margin: 0 0 4px;
+		padding: 4px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--bg-secondary);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+		max-height: 240px;
+		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+
+	.mention-option {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 6px 8px;
+		border: none;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--text-normal);
+		font-size: 14px;
+		font-family: inherit;
+		cursor: pointer;
+		transition: background-color 100ms ease;
+	}
+
+	.mention-option:hover,
+	.mention-option.selected {
+		background: var(--bg-message-hover);
+	}
+
+	.mention-avatar {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
+	}
+
+	.mention-avatar-placeholder {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		background: var(--accent);
+		color: var(--bg-tertiary);
+		font-weight: 700;
+		font-size: 11px;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+	}
+
+	.mention-name {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 </style>

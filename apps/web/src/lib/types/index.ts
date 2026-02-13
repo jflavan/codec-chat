@@ -2,6 +2,7 @@ export type {
 	MemberServer,
 	Channel,
 	LinkPreview,
+	Mention,
 	Message,
 	Reaction,
 	Member,

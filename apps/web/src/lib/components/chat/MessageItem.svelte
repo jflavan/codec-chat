@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Message } from '$lib/types/index.js';
+	import type { Message, Mention } from '$lib/types/index.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
@@ -10,6 +10,21 @@
 
 	const app = getAppState();
 	const currentUserId = $derived(app.me?.user.id ?? null);
+
+	/* Build a comprehensive mentions list: API-provided mentions take priority,
+	   then fall back to the current server member list for any unresolved IDs. */
+	const effectiveMentions: Mention[] = $derived.by(() => {
+		const apiMentions = message.mentions ?? [];
+		const seen = new Set(apiMentions.map((m) => m.userId));
+		const memberFallbacks = app.members
+			.filter((m) => !seen.has(m.userId))
+			.map((m) => ({ userId: m.userId, displayName: m.displayName }));
+		return [...apiMentions, ...memberFallbacks];
+	});
+
+	const isMentioned = $derived(
+		Boolean(currentUserId && message.body?.toLowerCase().includes(`<@${currentUserId.toLowerCase()}>`))
+	);
 
 	let showPicker = $state(false);
 	const quickEmojis = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '🚀', '💯'];
@@ -24,7 +39,7 @@
 	}
 </script>
 
-<article class="message" class:grouped>
+<article class="message" class:grouped class:mentioned={isMentioned}>
 	<!-- Floating action bar — appears on hover at top-right of message -->
 	<div class="message-actions" class:picker-open={showPicker}>
 		<button
@@ -74,7 +89,7 @@
 				<time class="message-time">{formatTime(message.createdAt)}</time>
 			</div>
 			{#if message.body}
-				<p class="message-body"><LinkifiedText text={message.body} /></p>
+				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} /></p>
 			{/if}
 			{#if message.imageUrl}
 				<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
@@ -102,7 +117,7 @@
 		</div>
 		<div class="message-content">
 			{#if message.body}
-				<p class="message-body"><LinkifiedText text={message.body} /></p>
+				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} /></p>
 			{/if}
 			{#if message.imageUrl}
 				<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
@@ -138,6 +153,16 @@
 
 	.message:hover {
 		background: var(--bg-message-hover);
+	}
+
+	.message.mentioned {
+		background: rgba(88, 101, 242, 0.08);
+		border-left: 3px solid var(--accent);
+		padding-left: 13px;
+	}
+
+	.message.mentioned:hover {
+		background: rgba(88, 101, 242, 0.12);
 	}
 
 	.message:not(.grouped) {

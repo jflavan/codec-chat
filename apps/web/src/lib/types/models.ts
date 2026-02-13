@@ -29,6 +29,12 @@ export type LinkPreview = {
 	canonicalUrl: string | null;
 };
 
+/** Resolved user mention in a message. */
+export type Mention = {
+	userId: string;
+	displayName: string;
+};
+
 /** Chat message in a channel. */
 export type Message = {
 	id: string;
@@ -41,6 +47,7 @@ export type Message = {
 	authorAvatarUrl?: string | null;
 	reactions: Reaction[];
 	linkPreviews: LinkPreview[];
+	mentions: Mention[];
 };
 
 /** Member of a server. */

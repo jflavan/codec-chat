@@ -42,6 +42,7 @@
 				<li class="muted channel-item">No channels yet.</li>
 			{:else}
 				{#each app.channels as channel}
+					{@const mentions = app.channelMentionCount(channel.id)}
 					<li>
 						<button
 							class="channel-item"
@@ -52,6 +53,9 @@
 								<path d="M5.88 21 7.1 14H3.5l.3-2h3.6l.9-5H4.8l.3-2h3.5L9.8 3h2l-1.2 2h5L16.8 3h2l-1.2 2H21l-.3 2h-3.5l-.9 5h3.5l-.3 2h-3.6L14.7 21h-2l1.2-7h-5L7.7 21h-2zm4.3-9h5l.9-5h-5l-.9 5z"/>
 							</svg>
 							<span>{channel.name}</span>
+							{#if mentions > 0}
+								<span class="mention-badge" aria-label="{mentions} mentions">{mentions}</span>
+							{/if}
 						</button>
 					</li>
 				{/each}
@@ -212,6 +216,21 @@
 		flex-shrink: 0;
 		color: var(--text-muted);
 		opacity: 0.7;
+	}
+
+	.mention-badge {
+		margin-left: auto;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 9px;
+		background: var(--danger);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 18px;
+		text-align: center;
+		flex-shrink: 0;
 	}
 
 	.channel-create-form {

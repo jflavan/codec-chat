@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Models;
@@ -15,7 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
+public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
 {
     /// <summary>
     /// Returns messages for a channel, ordered by creation time. Requires server membership.
@@ -96,22 +97,49 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
                         .ToList());
         }
 
-        var response = messages.Select(message => new
+        // Resolve mentions for all messages in a single batch query.
+        var allMentionedIds = messages
+            .SelectMany(m => ParseMentionUserIds(m.Body))
+            .Distinct()
+            .ToList();
+
+        var mentionUserLookup = new Dictionary<Guid, MentionDto>();
+        if (allMentionedIds.Count > 0)
         {
-            message.Id,
-            message.AuthorName,
-            message.AuthorUserId,
-            message.Body,
-            message.ImageUrl,
-            message.CreatedAt,
-            message.ChannelId,
-            AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
-            Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
-                ? reactions
-                : Array.Empty<ReactionSummary>(),
-            LinkPreviews = linkPreviewLookup.TryGetValue(message.Id, out var previews)
-                ? previews
-                : Array.Empty<LinkPreviewDto>()
+            mentionUserLookup = await db.Users
+                .AsNoTracking()
+                .Where(u => allMentionedIds.Contains(u.Id))
+                .ToDictionaryAsync(
+                    u => u.Id,
+                    u => new MentionDto(u.Id, string.IsNullOrWhiteSpace(u.Nickname) ? u.DisplayName : u.Nickname));
+        }
+
+        var response = messages.Select(message =>
+        {
+            var mentionIds = ParseMentionUserIds(message.Body);
+            var mentions = mentionIds
+                .Where(id => mentionUserLookup.ContainsKey(id))
+                .Select(id => mentionUserLookup[id])
+                .ToList();
+
+            return new
+            {
+                message.Id,
+                message.AuthorName,
+                message.AuthorUserId,
+                message.Body,
+                message.ImageUrl,
+                message.CreatedAt,
+                message.ChannelId,
+                AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
+                Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
+                    ? reactions
+                    : Array.Empty<ReactionSummary>(),
+                LinkPreviews = linkPreviewLookup.TryGetValue(message.Id, out var previews)
+                    ? previews
+                    : Array.Empty<LinkPreviewDto>(),
+                Mentions = (IReadOnlyList<MentionDto>)mentions
+            };
         });
 
         return Ok(response);
@@ -161,6 +189,18 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
 
         var authorAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
 
+        // Resolve mention tokens in the message body.
+        var mentionIds = ParseMentionUserIds(message.Body);
+        var mentions = new List<MentionDto>();
+        if (mentionIds.Count > 0)
+        {
+            mentions = await db.Users
+                .AsNoTracking()
+                .Where(u => mentionIds.Contains(u.Id))
+                .Select(u => new MentionDto(u.Id, string.IsNullOrWhiteSpace(u.Nickname) ? u.DisplayName : u.Nickname))
+                .ToListAsync();
+        }
+
         var payload = new
         {
             message.Id,
@@ -172,10 +212,31 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
             message.ChannelId,
             AuthorAvatarUrl = authorAvatarUrl,
             Reactions = Array.Empty<object>(),
-            LinkPreviews = Array.Empty<object>()
+            LinkPreviews = Array.Empty<object>(),
+            Mentions = (IReadOnlyList<MentionDto>)mentions
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
+
+        // Notify each mentioned user who is a member of this server.
+        foreach (var mention in mentions)
+        {
+            // Don't notify the author about their own mention.
+            if (mention.UserId == appUser.Id) continue;
+
+            var isMentionedMember = await userService.IsMemberAsync(channel.ServerId, mention.UserId);
+            if (isMentionedMember)
+            {
+                await chatHub.Clients.Group($"user-{mention.UserId}").SendAsync("MentionReceived", new
+                {
+                    message.Id,
+                    message.ChannelId,
+                    channel.ServerId,
+                    AuthorName = message.AuthorName,
+                    message.Body
+                });
+            }
+        }
 
         // Fire-and-forget: extract URLs and fetch link previews in the background.
         var messageId = message.Id;
@@ -327,6 +388,30 @@ public class ChannelsController(CodecDbContext db, IUserService userService, IHu
         return Ok(new { action, reactions = updatedReactions });
     }
 
+    /// <summary>
+    /// Parses <c>&lt;@guid&gt;</c> mention tokens from a message body and returns
+    /// the distinct set of referenced user IDs.
+    /// </summary>
+    private static List<Guid> ParseMentionUserIds(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return [];
+
+        var matches = MentionRegex().Matches(body);
+        var ids = new HashSet<Guid>();
+        foreach (Match match in matches)
+        {
+            if (Guid.TryParse(match.Groups[1].Value, out var userId))
+            {
+                ids.Add(userId);
+            }
+        }
+        return [.. ids];
+    }
+
+    [GeneratedRegex(@"<@([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})>")]
+    private static partial Regex MentionRegex();
+
     private sealed record ReactionSummary(string Emoji, int Count, IReadOnlyList<Guid> UserIds);
     private sealed record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
+    private sealed record MentionDto(Guid UserId, string DisplayName);
 }

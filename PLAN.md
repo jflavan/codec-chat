@@ -75,6 +75,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Server invites feature implemented (Owner/Admin create/list/revoke invite codes, any user joins via code, configurable expiry and max uses, frontend invite panel and join-by-code UI)
 - Image uploads feature implemented (upload from desktop or paste from clipboard, PNG/JPEG/WebP/GIF support, 10 MB limit, image preview in composer, inline image display in messages, works in both server channels and DMs)
 - Link previews feature fully implemented (automatic URL detection, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR, clickable thumbnail images)
+- @mentions feature implemented (autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on channel navigation, mentioned message highlighting)
 
 ## Task breakdown: Session Persistence
 

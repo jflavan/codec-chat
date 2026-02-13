@@ -67,6 +67,12 @@ export class AppState {
 	dmTypingUsers = $state<string[]>([]);
 	unreadDmCounts = $state<Map<string, number>>(new Map());
 
+	/* ───── mention tracking ───── */
+	/** channelId → count of unread mentions */
+	channelMentionCounts = $state<Map<string, number>>(new Map());
+	/** channelId → serverId mapping for aggregation */
+	channelServerMap = $state<Map<string, string>>(new Map());
+
 	/* ───── invite data ───── */
 	serverInvites = $state<ServerInvite[]>([]);
 
@@ -114,6 +120,7 @@ export class AppState {
 	newChannelName = $state('');
 	messageBody = $state('');
 	dmMessageBody = $state('');
+	pendingMentions = $state<Map<string, string>>(new Map());
 
 	/* ───── image attachments ───── */
 	pendingImage = $state<File | null>(null);
@@ -162,6 +169,20 @@ export class AppState {
 	readonly homeBadgeCount = $derived(
 		this.incomingRequests.length + this.unreadDmCounts.size
 	);
+
+	serverMentionCount(serverId: string): number {
+		let total = 0;
+		for (const [channelId, count] of this.channelMentionCounts) {
+			if (this.channelServerMap.get(channelId) === serverId) {
+				total += count;
+			}
+		}
+		return total;
+	}
+
+	channelMentionCount(channelId: string): number {
+		return this.channelMentionCounts.get(channelId) ?? 0;
+	}
 
 	/* ───── internals ───── */
 	private api: ApiClient;
@@ -238,6 +259,8 @@ export class AppState {
 		this.dmTypingUsers = [];
 		this.dmMessageBody = '';
 		this.unreadDmCounts = new Map();
+		this.channelMentionCounts = new Map();
+		this.channelServerMap = new Map();
 		this.selectedServerId = null;
 		this.selectedChannelId = null;
 		this.serverInvites = [];
@@ -290,8 +313,23 @@ export class AppState {
 		this.isLoadingChannels = true;
 		try {
 			this.channels = await this.api.getChannels(this.idToken, serverId);
+
+			// Keep channel→server mapping up to date for mention badge aggregation
+			const mapNext = new Map(this.channelServerMap);
+			for (const ch of this.channels) {
+				mapNext.set(ch.id, serverId);
+			}
+			this.channelServerMap = mapNext;
+
 			const previousChannelId = this.selectedChannelId;
 			this.selectedChannelId = this.channels[0]?.id ?? null;
+
+			// Clear mention badge for the auto-selected channel
+			if (this.selectedChannelId) {
+				const mentionNext = new Map(this.channelMentionCounts);
+				mentionNext.delete(this.selectedChannelId);
+				this.channelMentionCounts = mentionNext;
+			}
 
 			if (previousChannelId) await this.hub.leaveChannel(previousChannelId);
 			if (this.selectedChannelId) await this.hub.joinChannel(this.selectedChannelId);
@@ -338,6 +376,12 @@ export class AppState {
 		const previousChannelId = this.selectedChannelId;
 		this.selectedChannelId = channelId;
 		this.typingUsers = [];
+		this.pendingMentions = new Map();
+
+		// Clear mention badge for this channel
+		const next = new Map(this.channelMentionCounts);
+		next.delete(channelId);
+		this.channelMentionCounts = next;
 
 		if (previousChannelId) await this.hub.leaveChannel(previousChannelId);
 		await this.hub.joinChannel(channelId);
@@ -347,7 +391,7 @@ export class AppState {
 	async sendMessage(): Promise<void> {
 		if (!this.idToken || !this.selectedChannelId) return;
 
-		const body = this.messageBody.trim();
+		const body = this.resolveMentions(this.messageBody.trim());
 		const imageFile = this.pendingImage;
 
 		if (!body && !imageFile) {
@@ -365,6 +409,7 @@ export class AppState {
 
 			await this.api.sendMessage(this.idToken, this.selectedChannelId, body, imageUrl);
 			this.messageBody = '';
+			this.pendingMentions = new Map();
 			this.clearPendingImage();
 
 			if (this.me) {
@@ -380,6 +425,14 @@ export class AppState {
 		} finally {
 			this.isSending = false;
 		}
+	}
+
+	resolveMentions(text: string): string {
+		let result = text;
+		for (const [displayName, userId] of this.pendingMentions) {
+			result = result.replaceAll(`@${displayName}`, `<@${userId}>`);
+		}
+		return result;
 	}
 
 	async createServer(): Promise<void> {
@@ -941,7 +994,7 @@ export class AppState {
 			onMessage: (msg) => {
 				if (msg.channelId === this.selectedChannelId) {
 					if (!this.messages.some((m) => m.id === msg.id)) {
-						this.messages = [...this.messages, { ...msg, linkPreviews: msg.linkPreviews ?? [] }];
+						this.messages = [...this.messages, { ...msg, linkPreviews: msg.linkPreviews ?? [], mentions: msg.mentions ?? [] }];
 					}
 				}
 			},
@@ -1038,6 +1091,17 @@ export class AppState {
 							: m
 					);
 				}
+			},
+			onMentionReceived: (event) => {
+				// Track channel→server mapping for badge aggregation
+				this.channelServerMap.set(event.channelId, event.serverId);
+
+				// Don't increment badge for the channel the user is currently viewing
+				if (event.channelId === this.selectedChannelId) return;
+
+				const next = new Map(this.channelMentionCounts);
+				next.set(event.channelId, (next.get(event.channelId) ?? 0) + 1);
+				this.channelMentionCounts = next;
 			}
 		});
 

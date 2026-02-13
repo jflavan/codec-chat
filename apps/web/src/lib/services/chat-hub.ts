@@ -52,6 +52,14 @@ export type LinkPreviewsReadyEvent = {
 	linkPreviews: LinkPreview[];
 };
 
+export type MentionReceivedEvent = {
+	id: string;
+	channelId: string;
+	serverId: string;
+	authorName: string;
+	body: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -68,6 +76,7 @@ export type SignalRCallbacks = {
 	onDmConversationOpened?: (event: DmConversationOpenedEvent) => void;
 	onKickedFromServer?: (event: KickedFromServerEvent) => void;
 	onLinkPreviewsReady?: (event: LinkPreviewsReadyEvent) => void;
+	onMentionReceived?: (event: MentionReceivedEvent) => void;
 };
 
 /**
@@ -129,6 +138,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onLinkPreviewsReady) {
 			connection.on('LinkPreviewsReady', callbacks.onLinkPreviewsReady);
+		}
+		if (callbacks.onMentionReceived) {
+			connection.on('MentionReceived', callbacks.onMentionReceived);
 		}
 
 		try {

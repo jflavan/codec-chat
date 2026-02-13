@@ -52,6 +52,10 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Emoji reactions on messages (toggle via floating action bar, reaction pills with counts, real-time sync via SignalR)
 - ✅ Image uploads in messages (PNG, JPEG, WebP, GIF; file picker or clipboard paste; 10 MB max)
 - ✅ Inline image display in message feed (clickable, lazy-loaded, max 400×300px)
+- ✅ @mentions with autocomplete (type `@` to see member picker, display names inserted in composer)
+- ✅ Mention badge notifications (unread mention count on server icons and channel names)
+- ✅ Badge clearing on channel navigation (counts reset when user enters the mentioned channel)
+- ✅ Mentioned message highlighting (accent border and tinted background on messages that mention the current user)
 
 ### Friends ([detailed spec](FRIENDS.md))
 - ✅ Friend requests (send, accept, decline, cancel)
@@ -162,7 +166,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ### Messaging Features
 - Message editing and deletion
 - Rich text formatting (markdown)
-- @mentions
+- @mentions → ✅ implemented
 - Message search
 
 ### Real-time Features
@@ -207,7 +211,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Voice channels (WebRTC)
 - Video chat
 - Screen sharing
-- Threads/replies
+- Message replies ([detailed spec](REPLIES.md)) — inline replies to previous messages with clickable reference preview
 - Message pinning
 - Notification system (push, email)
 
@@ -222,7 +226,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Customization
 - ~~User preferences/settings~~ → ✅ [implemented](USER_SETTINGS.md)
-- Server themes
+- Web client themes
 - Custom emojis
 - ~~Profile customization~~ → ✅ [implemented: nicknames](NICKNAMES.md)
 - Status messages
