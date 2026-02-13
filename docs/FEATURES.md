@@ -164,6 +164,15 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Channel categories/organization
 - Channel editing and deletion
 
+### Link Previews (Automatic Embeds) ([detailed spec](LINK_PREVIEWS.md))
+- Automatic URL detection in message bodies (server channels and DMs)
+- Open Graph + HTML meta tag metadata fetching (title, description, image, site name)
+- Clickable link preview cards rendered below message text
+- Real-time preview delivery via `LinkPreviewsReady` SignalR event
+- SSRF protection (private IP blocking, DNS rebinding prevention, redirect limits)
+- Clickable hyperlinks in message body text
+- Responsive card layout (side-by-side ≥ 600px, stacked < 600px)
+
 ### File & Media
 - ✅ Avatar image uploads (user and server-specific)
 - ✅ Image format validation and size limits
