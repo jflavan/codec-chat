@@ -77,6 +77,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Link previews feature fully implemented (automatic URL detection, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR, clickable thumbnail images)
 - @mentions feature implemented (autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on channel navigation, mentioned message highlighting, @here to notify all channel members)
 - Message replies feature implemented (inline reply to any message in channels or DMs, reply-to-message context in feed, scroll-to-original with highlight animation, Escape to cancel, orphaned reply handling)
+- Image preview lightbox implemented (full-size overlay on image click, Escape to close, open-original link, works in both server channels and DMs)
 
 ## Task breakdown: Session Persistence
 
@@ -363,6 +364,23 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ### Verification
 - [x] Backend builds successfully (`dotnet build`, 0 errors)
+- [x] Frontend type-checks with zero errors (`svelte-check`)
+
+## Task breakdown: Image Preview Lightbox
+
+### Web — State
+- [x] Add `lightboxImageUrl` reactive state to `AppState`
+- [x] Add `openImagePreview(url)` and `closeImagePreview()` methods to `AppState`
+- [x] Clear lightbox state on sign-out
+
+### Web — UI components
+- [x] Create `ImagePreview.svelte` — full-screen `<dialog>` lightbox with backdrop, toolbar (open-original, close), Escape to close
+- [x] Update `MessageItem.svelte` — replace `<a>` tag with `<button>` that opens lightbox (both grouped and ungrouped)
+- [x] Update `DmChatArea.svelte` — replace `<a>` tags with `<button>` that opens lightbox (both grouped and ungrouped)
+- [x] Mount `ImagePreview` in `+page.svelte` (app-level, renders above all content)
+- [x] Add hover opacity transition on image thumbnails for visual feedback
+
+### Verification
 - [x] Frontend type-checks with zero errors (`svelte-check`)
 
 ## Next steps

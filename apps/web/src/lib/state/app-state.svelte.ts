@@ -128,6 +128,9 @@ export class AppState {
 	pendingDmImage = $state<File | null>(null);
 	pendingDmImagePreview = $state<string | null>(null);
 
+	/* ───── image lightbox ───── */
+	lightboxImageUrl = $state<string | null>(null);
+
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
 
@@ -275,6 +278,7 @@ export class AppState {
 		this.friendSearchQuery = '';
 		this.settingsOpen = false;
 		this.replyingTo = null;
+		this.lightboxImageUrl = null;
 
 		await tick();
 		renderGoogleButton('google-button');
@@ -737,6 +741,18 @@ export class AppState {
 		}
 		this.pendingDmImage = null;
 		this.pendingDmImagePreview = null;
+	}
+
+	/* ═══════════════════ Image Lightbox ═══════════════════ */
+
+	/** Open the full-screen image lightbox for a given URL. */
+	openImagePreview(url: string): void {
+		this.lightboxImageUrl = url;
+	}
+
+	/** Close the image lightbox. */
+	closeImagePreview(): void {
+		this.lightboxImageUrl = null;
 	}
 
 	async toggleReaction(messageId: string, emoji: string): Promise<void> {

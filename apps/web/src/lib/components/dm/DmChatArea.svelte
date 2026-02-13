@@ -201,9 +201,9 @@
 								<p class="message-body"><LinkifiedText text={message.body} /></p>
 							{/if}
 							{#if message.imageUrl}
-								<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
+								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
-								</a>
+								</button>
 							{/if}
 							{#if message.linkPreviews?.length}
 								<div class="link-previews">
@@ -225,9 +225,9 @@
 								<p class="message-body"><LinkifiedText text={message.body} /></p>
 							{/if}
 							{#if message.imageUrl}
-								<a href={message.imageUrl} target="_blank" rel="noopener noreferrer" class="message-image-link">
+								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
-								</a>
+								</button>
 							{/if}
 							{#if message.linkPreviews?.length}
 								<div class="link-previews">
@@ -729,6 +729,10 @@
 		max-width: 400px;
 		border-radius: 8px;
 		overflow: hidden;
+		border: none;
+		background: none;
+		padding: 0;
+		cursor: pointer;
 	}
 
 	.message-image {
@@ -738,6 +742,11 @@
 		border-radius: 8px;
 		object-fit: contain;
 		cursor: pointer;
+		transition: opacity 150ms ease;
+	}
+
+	.message-image-link:hover .message-image {
+		opacity: 0.85;
 	}
 
 	.link-previews {

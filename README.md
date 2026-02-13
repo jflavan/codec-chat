@@ -75,6 +75,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Direct messages — 1-on-1 private conversations with real-time delivery, typing indicators, and unread badges
 - ✅ Emoji reactions on messages (toggle, reaction pills with counts, real-time sync)
 - ✅ **Image uploads** — post images (PNG, JPEG, WebP, GIF) via file picker or clipboard paste in both server channels and DMs
+- ✅ **Image lightbox** — click any inline image to view it full-size in an overlay with keyboard dismiss and open-original link
 - ✅ **Nicknames** — user-chosen display name that overrides Google name across all surfaces (messages, member lists, friends, typing indicators)
 - ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove) and account info
 - ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR

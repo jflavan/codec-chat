@@ -448,6 +448,35 @@ When clicking a `ReplyReference`, the original message scrolls into view and hig
 | Reduced motion | No animation; static `color-mix(in srgb, var(--accent) 10%, transparent)` background |
 | Element targeting | `data-message-id` attribute on each message wrapper |
 
+### Image Preview Lightbox
+
+Full-screen overlay for viewing images at full resolution. Triggered by clicking any inline image attachment in server channels or DMs.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                                                    [↗]  [✕]         │
+│                                                                      │
+│                        ┌───────────────────┐                         │
+│                        │                   │                         │
+│                        │   Full-size image  │                         │
+│                        │                   │                         │
+│                        └───────────────────┘                         │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+| Element | Style |
+|---------|-------|
+| Overlay | `<div role="dialog">` at z-index 9999, rgba(0,0,0,0.85) backdrop background |
+| Image | max 90vw × 90vh, `object-fit: contain`, 4px border-radius, drop shadow |
+| Toolbar | flex row, aligned top-right, 8px gap |
+| Open-original button (↗) | 36×36px, rgba(255,255,255,0.1) bg, 8px radius, white icon at 80% opacity, hover: 20% bg + full white |
+| Close button (✕) | 40×40px, same style as open-original |
+| Close triggers | Click backdrop, Escape key, close button |
+| Thumbnail hover | `opacity: 0.85` transition (150ms ease) on inline images |
+
+**Component:** `ImagePreview.svelte` — mounted once in `+page.svelte`, reads `lightboxImageUrl` from `AppState`.
+
 ## Animations & Micro-interactions
 
 - **Transitions**: 150–200ms ease for background/color changes

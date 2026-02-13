@@ -52,6 +52,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Emoji reactions on messages (toggle via floating action bar, reaction pills with counts, real-time sync via SignalR)
 - ✅ Image uploads in messages (PNG, JPEG, WebP, GIF; file picker or clipboard paste; 10 MB max)
 - ✅ Inline image display in message feed (clickable, lazy-loaded, max 400×300px)
+- ✅ Image lightbox — click any image in chat to open a full-size preview overlay with close/open-original controls
 - ✅ @mentions with autocomplete (type `@` to see member picker, display names inserted in composer)
 - ✅ @here mention to notify all channel members (appears as special entry in autocomplete picker)
 - ✅ Mention badge notifications (unread mention count on server icons and channel names)
@@ -205,8 +206,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Image uploads in chat messages (PNG, JPEG, WebP, GIF via file picker or clipboard paste)
 - ✅ Inline image display in message feed
 - ✅ Image upload endpoint (`POST /uploads/images`) with SHA-256 content-hash filenames
+- ✅ Image lightbox / preview overlay (full-size image modal with Escape to close and open-original link)
 - File uploads (documents, other media)
-- Image gallery / lightbox
 - Drag-and-drop upload
 
 ## 🔮 Future (Later)

@@ -58,12 +58,15 @@ src/
 │   │   │   └── UserPanel.svelte          # User avatar/name/role & sign-out
 │   │   ├── chat/
 │   │   │   ├── ChatArea.svelte           # Chat shell (header, feed, composer)
+│   │   │   ├── Composer.svelte           # Message input with send button
+│   │   │   ├── ImagePreview.svelte       # Full-screen image lightbox overlay
+│   │   │   ├── LinkPreviewCard.svelte    # Open Graph link preview embed card
+│   │   │   ├── LinkifiedText.svelte      # Auto-linked URLs in message body
 │   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping
 │   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped)
 │   │   │   ├── ReactionBar.svelte        # Reaction pills (emoji + count)
-│   │   │   ├── ReplyReference.svelte     # Inline reply context above message
 │   │   │   ├── ReplyComposerBar.svelte   # "Replying to" bar above composer
-│   │   │   ├── Composer.svelte           # Message input with send button
+│   │   │   ├── ReplyReference.svelte     # Inline reply context above message
 │   │   │   └── TypingIndicator.svelte    # Animated typing dots
 │   │   ├── friends/
 │   │   │   ├── FriendsPanel.svelte       # Friends view with tab navigation
@@ -111,10 +114,11 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
       │   └── TypingIndicator → getAppState()
       ├── MembersSidebar     → getAppState()
       │   └── MemberItem     (receives props, no context needed)
-      └── UserSettingsModal  → getAppState()  (shown when settingsOpen)
-          ├── SettingsSidebar  → getAppState()
-          ├── ProfileSettings  → getAppState()
-          └── AccountSettings  → getAppState()
+      ├── UserSettingsModal  → getAppState()  (shown when settingsOpen)
+      │   ├── SettingsSidebar  → getAppState()
+      │   ├── ProfileSettings  → getAppState()
+      │   └── AccountSettings  → getAppState()
+      └── ImagePreview       → getAppState()  (shown when lightboxImageUrl is set)
 ```
 
 **Layer Responsibilities:**
