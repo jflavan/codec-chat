@@ -2,10 +2,12 @@
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import type { Member } from '$lib/types/index.js';
 	import ReplyComposerBar from './ReplyComposerBar.svelte';
+	import ComposerOverlay from './ComposerOverlay.svelte';
 
 	const app = getAppState();
 	let inputEl: HTMLInputElement;
 	let fileInputEl: HTMLInputElement;
+	let overlayEl: HTMLDivElement;
 
 	/* ───── Mention autocomplete state ───── */
 	let showMentionPicker = $state(false);
@@ -101,6 +103,13 @@
 	function handleInput(): void {
 		app.handleComposerInput();
 		detectMentionTrigger();
+		syncOverlayScroll();
+	}
+
+	function syncOverlayScroll(): void {
+		if (overlayEl && inputEl) {
+			overlayEl.scrollLeft = inputEl.scrollLeft;
+		}
 	}
 
 	function handleFileSelect(e: Event) {
@@ -190,17 +199,20 @@
 				<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
 			</svg>
 		</button>
-		<input
-			bind:this={inputEl}
-			class="composer-input"
-			type="text"
-			placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
-			bind:value={app.messageBody}
-			disabled={!app.selectedChannelId || app.isSending}
-			oninput={handleInput}
-			onkeydown={handleKeydown}
-			onpaste={handlePaste}
-		/>
+		<div class="composer-input-wrapper">
+			<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} /></div>
+			<input
+				bind:this={inputEl}
+				class="composer-input"
+				type="text"
+				placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
+				bind:value={app.messageBody}
+				disabled={!app.selectedChannelId || app.isSending}
+				oninput={handleInput}
+				onkeydown={handleKeydown}
+				onpaste={handlePaste}
+			/>
+		</div>
 		<button
 			class="composer-send"
 			type="submit"
@@ -252,14 +264,40 @@
 		cursor: not-allowed;
 	}
 
-	.composer-input {
+	.composer-input-wrapper {
 		flex: 1;
-		padding: 12px 16px;
-		border: none;
+		position: relative;
 		background: var(--input-bg);
-		color: var(--text-normal);
+		overflow: hidden;
+	}
+
+	.composer-input-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		padding: 12px 16px;
 		font-size: 15px;
 		font-family: inherit;
+		line-height: 20px;
+		color: var(--text-normal);
+		pointer-events: none;
+		white-space: nowrap;
+		overflow: hidden;
+	}
+
+	.composer-input {
+		position: relative;
+		width: 100%;
+		padding: 12px 16px;
+		border: none;
+		background: transparent;
+		color: transparent;
+		caret-color: var(--text-normal);
+		font-size: 15px;
+		font-family: inherit;
+		line-height: 20px;
 		outline: none;
 		min-height: 20px;
 	}
@@ -268,11 +306,15 @@
 		color: var(--text-dim);
 	}
 
-	.composer-input:focus {
+	.composer-input::selection {
+		background: rgba(88, 101, 242, 0.3);
+	}
+
+	.composer-input-wrapper:focus-within {
 		box-shadow: 0 0 0 2px var(--accent);
 	}
 
-	.composer-input:disabled {
+	.composer-input-wrapper:has(.composer-input:disabled) {
 		opacity: 0.5;
 	}
 

@@ -6,6 +6,7 @@
 	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
 	import ReplyReference from '$lib/components/chat/ReplyReference.svelte';
 	import ReplyComposerBar from '$lib/components/chat/ReplyComposerBar.svelte';
+	import ComposerOverlay from '$lib/components/chat/ComposerOverlay.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -13,6 +14,7 @@
 	let container: HTMLDivElement;
 	let dmInputEl: HTMLInputElement;
 	let dmFileInputEl: HTMLInputElement;
+	let dmOverlayEl: HTMLDivElement;
 	let isLockedToBottom = $state(true);
 	let unreadCount = $state(0);
 
@@ -132,6 +134,17 @@
 		if (e.key === 'Escape' && app.replyingTo?.context === 'dm') {
 			e.preventDefault();
 			app.cancelReply();
+		}
+	}
+
+	function handleDmInput(): void {
+		app.handleDmComposerInput();
+		syncDmOverlayScroll();
+	}
+
+	function syncDmOverlayScroll(): void {
+		if (dmOverlayEl && dmInputEl) {
+			dmOverlayEl.scrollLeft = dmInputEl.scrollLeft;
 		}
 	}
 
@@ -360,17 +373,20 @@
 				<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
 			</svg>
 		</button>
-		<input
-			bind:this={dmInputEl}
-			class="composer-input"
-			type="text"
-			placeholder={app.activeDmParticipant ? `Message @${app.activeDmParticipant.displayName}` : 'Select a conversation…'}
-			bind:value={app.dmMessageBody}
-			disabled={!app.activeDmChannelId || app.isSendingDm}
-			oninput={() => app.handleDmComposerInput()}
-			onkeydown={handleDmKeydown}
-			onpaste={handleDmPaste}
-		/>
+		<div class="composer-input-wrapper">
+			<div class="composer-input-overlay" bind:this={dmOverlayEl} aria-hidden="true"><ComposerOverlay text={app.dmMessageBody} /></div>
+			<input
+				bind:this={dmInputEl}
+				class="composer-input"
+				type="text"
+				placeholder={app.activeDmParticipant ? `Message @${app.activeDmParticipant.displayName}` : 'Select a conversation…'}
+				bind:value={app.dmMessageBody}
+				disabled={!app.activeDmChannelId || app.isSendingDm}
+				oninput={handleDmInput}
+				onkeydown={handleDmKeydown}
+				onpaste={handleDmPaste}
+			/>
+		</div>
 		<button
 			class="composer-send"
 			type="submit"
@@ -717,21 +733,48 @@
 		cursor: not-allowed;
 	}
 
-	.composer-input {
+	.composer-input-wrapper {
 		flex: 1;
-		padding: 12px 16px;
-		border: none;
+		position: relative;
 		background: var(--input-bg);
-		color: var(--text-normal);
+		overflow: hidden;
+	}
+
+	.composer-input-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		padding: 12px 16px;
 		font-size: 15px;
 		font-family: inherit;
+		line-height: 20px;
+		color: var(--text-normal);
+		pointer-events: none;
+		white-space: nowrap;
+		overflow: hidden;
+	}
+
+	.composer-input {
+		position: relative;
+		width: 100%;
+		padding: 12px 16px;
+		border: none;
+		background: transparent;
+		color: transparent;
+		caret-color: var(--text-normal);
+		font-size: 15px;
+		font-family: inherit;
+		line-height: 20px;
 		outline: none;
 		min-height: 20px;
 	}
 
 	.composer-input::placeholder { color: var(--text-dim); }
-	.composer-input:focus { box-shadow: 0 0 0 2px var(--accent); }
-	.composer-input:disabled { opacity: 0.5; }
+	.composer-input::selection { background: rgba(88, 101, 242, 0.3); }
+	.composer-input-wrapper:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+	.composer-input-wrapper:has(.composer-input:disabled) { opacity: 0.5; }
 
 	.composer-send {
 		background: var(--input-bg);

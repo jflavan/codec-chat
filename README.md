@@ -81,6 +81,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR
 - ✅ **@mentions** — autocomplete member picker in composer, @here to notify everyone, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
 - ✅ **Message replies** — inline reply to any message in channels or DMs, reply context displayed above message body, click to scroll to original with highlight animation, Escape to cancel, graceful handling of deleted parent messages
+- ✅ **Text formatting** — bold (`*text*` or `**text**`) and italic (`_text_`) in messages, with live preview in composer input
 
 ## Documentation
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
