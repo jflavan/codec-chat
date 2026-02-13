@@ -87,6 +87,7 @@ export class AppState {
 	error = $state<string | null>(null);
 
 	/* ───── loading flags ───── */
+	isInitialLoading = $state(true);
 	isLoadingServers = $state(false);
 	isLoadingChannels = $state(false);
 	isLoadingMessages = $state(false);
@@ -225,6 +226,7 @@ export class AppState {
 			}
 		}
 		clearStoredSession();
+		this.isInitialLoading = false;
 		this.renderSignIn();
 	}
 
@@ -235,19 +237,24 @@ export class AppState {
 		});
 	}
 
-	handleCredential(token: string): void {
+	async handleCredential(token: string): Promise<void> {
 		this.idToken = token;
 		this.status = 'Signed in';
+		this.isInitialLoading = true;
 		persistToken(token);
-		this.loadMe();
-		this.loadServers();
-		this.startSignalR(token);
+		await Promise.all([
+			this.loadMe(),
+			this.loadServers(),
+			this.startSignalR(token)
+		]);
+		this.isInitialLoading = false;
 	}
 
 	async signOut(): Promise<void> {
 		await this.hub.stop();
 		clearStoredSession();
 
+		this.isInitialLoading = true;
 		this.idToken = null;
 		this.me = null;
 		this.status = 'Signed out';

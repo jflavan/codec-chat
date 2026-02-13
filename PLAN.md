@@ -79,6 +79,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Message replies feature implemented (inline reply to any message in channels or DMs, reply-to-message context in feed, scroll-to-original with highlight animation, Escape to cancel, orphaned reply handling)
 - Image preview lightbox implemented (full-size overlay on image click, Escape to close, open-original link, works in both server channels and DMs)
 - Text formatting implemented (bold with `*`/`**` and italic with `_`, live preview in composer overlay, works in both server channels and DMs)
+- Loading screen implemented (branded splash with animated progress bar, CRT scanlines, and glow; shown during initial data bootstrap after sign-in; `isInitialLoading` state flag in `AppState`; fades out via Svelte transition)
 
 ## Task breakdown: Session Persistence
 
@@ -400,6 +401,31 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Integrate overlay into `Composer.svelte` (channel composer)
 - [x] Integrate overlay into `DmChatArea.svelte` (DM composer)
 - [x] Scroll sync between input and overlay for long messages
+
+### Verification
+- [x] Frontend builds successfully (`npm run build`, 0 errors)
+
+## Task breakdown: Loading Screen
+
+### Web — State
+- [x] Add `isInitialLoading = $state(true)` flag to `AppState`
+- [x] Make `handleCredential()` async — await `loadMe()`, `loadServers()`, and `startSignalR()` in parallel via `Promise.all`, then set `isInitialLoading = false`
+- [x] Set `isInitialLoading = false` in `init()` when no stored session exists (sign-in UI path)
+- [x] Reset `isInitialLoading = true` on `signOut()` for next login cycle
+- [x] Set `isInitialLoading = false` on env-var error early returns in `onMount`
+
+### Web — UI component
+- [x] Create `LoadingScreen.svelte` — full-screen branded splash with CRT phosphor-green theme
+- [x] Animated `[CODEC]` logo with glow keyframes
+- [x] Sliding progress bar with accent color
+- [x] "Initializing..." status text with animated dots
+- [x] CRT scanline overlay (repeating gradient)
+- [x] `transition:fade` for smooth exit
+- [x] Respects `prefers-reduced-motion` media query
+
+### Web — Page integration
+- [x] Show `<LoadingScreen />` when `app.isSignedIn && app.isInitialLoading`
+- [x] Gate app shell, settings modal, and image preview behind `{#if !app.isInitialLoading}`
 
 ### Verification
 - [x] Frontend builds successfully (`npm run build`, 0 errors)

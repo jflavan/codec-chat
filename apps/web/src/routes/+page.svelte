@@ -11,6 +11,7 @@
 	import DmChatArea from '$lib/components/dm/DmChatArea.svelte';
 	import UserSettingsModal from '$lib/components/settings/UserSettingsModal.svelte';
 	import ImagePreview from '$lib/components/chat/ImagePreview.svelte';
+	import LoadingScreen from '$lib/components/LoadingScreen.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -20,10 +21,12 @@
 	onMount(() => {
 		if (!googleClientId) {
 			app.error = 'Missing PUBLIC_GOOGLE_CLIENT_ID.';
+			app.isInitialLoading = false;
 			return;
 		}
 		if (!apiBaseUrl) {
 			app.error = 'Missing PUBLIC_API_BASE_URL.';
+			app.isInitialLoading = false;
 			return;
 		}
 		app.init();
@@ -38,6 +41,11 @@
 	<title>Codec</title>
 </svelte:head>
 
+{#if app.isSignedIn && app.isInitialLoading}
+	<LoadingScreen />
+{/if}
+
+{#if !app.isInitialLoading}
 <div class="app-shell" class:home-mode={app.showFriendsPanel} class:dm-active={app.showFriendsPanel && app.activeDmChannelId}>
 	<ServerSidebar />
 	{#if app.showFriendsPanel}
@@ -59,6 +67,7 @@
 {/if}
 
 <ImagePreview />
+{/if}
 
 <style>
 	.app-shell {

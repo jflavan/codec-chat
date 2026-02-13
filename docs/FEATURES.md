@@ -126,6 +126,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Image preview with remove button above composer input
 - ✅ User panel pinned to bottom of channel sidebar (gear icon for settings + sign-out icon)
 - ✅ Members sidebar grouped by role (Owner, Admin, Member)
+- ✅ Loading screen — full-screen branded splash with animated progress bar, CRT scanlines, and glowing logo; shown during initial data bootstrap (servers, channels, messages) after sign-in; fades out smoothly once all data is loaded
 - ✅ Loading states for async operations
 - ✅ Error handling and display (transient overlay banner with fade-out animation)
 - ✅ Responsive breakpoints (mobile, tablet, desktop)
@@ -141,7 +142,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ SignalR service: `ChatHubService` for hub connection lifecycle
 - ✅ CSS design tokens (`tokens.css`) and global base styles (`global.css`)
 - ✅ Feature-grouped component directories (server-sidebar, channel-sidebar, chat, members, friends)
-- ✅ Thin page composition shell (`+page.svelte` ~75 lines)
+- ✅ Loading screen component (`LoadingScreen.svelte`) with `isInitialLoading` state flag
+- ✅ Thin page composition shell (`+page.svelte` ~85 lines)
 - ✅ Barrel exports via `$lib/index.ts`
 
 ### API Infrastructure
