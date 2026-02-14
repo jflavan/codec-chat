@@ -29,11 +29,10 @@ public class ChatHub(IUserService userService, CodecDbContext db) : Hub
             .Select(m => m.ServerId)
             .ToListAsync();
 
-        foreach (var serverId in serverIds)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}");
-        }
+        var groupJoinTasks = serverIds
+            .Select(serverId => Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}"));
 
+        await Task.WhenAll(groupJoinTasks);
         await base.OnConnectedAsync();
     }
 

@@ -194,10 +194,11 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             serverName
         });
 
-        // Notify remaining members so they can refresh their member list.
+        // Notify remaining members so they can update their member list.
         await hub.Clients.Group($"server-{serverId}").SendAsync("MemberLeft", new
         {
-            serverId
+            serverId,
+            userId = targetUserId
         });
 
         return NoContent();

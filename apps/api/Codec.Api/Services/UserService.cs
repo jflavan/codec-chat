@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Codec.Api.Data;
-using Codec.Api.Hubs;
 using Codec.Api.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +11,7 @@ namespace Codec.Api.Services;
 /// Resolves and manages application users from authentication claims.
 /// Handles concurrent user creation gracefully for PostgreSQL.
 /// </summary>
-public class UserService(CodecDbContext db, IHubContext<ChatHub> hub) : IUserService
+public class UserService(CodecDbContext db) : IUserService
 {
     /// <inheritdoc />
     public async Task<User> GetOrCreateUserAsync(ClaimsPrincipal principal)
@@ -77,14 +76,6 @@ public class UserService(CodecDbContext db, IHubContext<ChatHub> hub) : IUserSer
             return await db.Users.FirstAsync(u => u.GoogleSubject == subject);
         }
 
-        // Notify existing server members that a new member joined.
-        if (defaultServerExists)
-        {
-            await hub.Clients.Group($"server-{Server.DefaultServerId}").SendAsync("MemberJoined", new
-            {
-                serverId = Server.DefaultServerId
-            });
-        }
 
         return appUser;
     }
