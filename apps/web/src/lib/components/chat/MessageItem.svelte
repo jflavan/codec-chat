@@ -264,7 +264,7 @@
 
 	.emoji-picker {
 		position: absolute;
-		top: calc(100% + 4px);
+		bottom: calc(100% + 4px);
 		right: 0;
 		display: flex;
 		gap: 2px;
