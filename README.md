@@ -4,6 +4,8 @@
 
 Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core Web API. Users authenticate via Google Sign-In; the web client obtains an ID token and the API validates it on each request.
 
+> **Live deployment:** [ca-codec-prod-web.yellowwater-6acfd8af.centralus.azurecontainerapps.io](https://ca-codec-prod-web.yellowwater-6acfd8af.centralus.azurecontainerapps.io) (Azure Container Apps, Central US)
+
 > ⚠️ **Alpha status:** Codec is in active alpha development. APIs, data models, and UI may change without notice. Not recommended for production use.
 
 ## Repository Structure
@@ -14,7 +16,8 @@ codec/
 │   │   └── Codec.Api/
 │   └── web/          # SvelteKit web front-end
 ├── docs/             # Project documentation
-├── .github/          # Copilot agent guidance and CI workflows
+├── infra/            # Bicep IaC modules (Azure infrastructure)
+├── .github/          # Copilot agent guidance, CI/CD workflows
 └── scripts/          # Build and utility scripts
 ```
 
@@ -23,6 +26,7 @@ codec/
 ### 1. Install Prerequisites
 - **Node.js** 24+ and npm — [download](https://nodejs.org/)
 - **.NET SDK** 9.x — [download](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **Docker** — for local PostgreSQL via Docker Compose
 - **Google Cloud Console** project with OAuth 2.0 credentials
 
 ### 2. Configure Google Sign-In
@@ -31,19 +35,25 @@ codec/
    - `http://localhost:5174` (for development)
 3. Copy your Client ID for the next steps
 
-### 3. Start the API
+### 3. Start PostgreSQL
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+This starts PostgreSQL 16 on `localhost:5433` with database `codec_dev`, user `codec`, password `codec_dev_password`.
+
+### 4. Start the API
 ```bash
 cd apps/api/Codec.Api
-# Edit appsettings.json - set Google:ClientId and BaseUrl (http://localhost:5050 for local dev)
+# Edit appsettings.Development.json - set Google:ClientId
 dotnet run
 ```
 The API runs at `http://localhost:5050` by default.
 
-**Note:** The API will fail fast if `Google:ClientId` is missing. SQLite database migrations run automatically in development.
+**Note:** The API will fail fast if `Google:ClientId` is missing. PostgreSQL database migrations run automatically in development.
 
 > **macOS users:** Port 5000 is reserved by AirPlay Receiver. The API uses port 5050 to avoid this conflict.
 
-### 4. Start the Web App
+### 5. Start the Web App
 ```bash
 cd apps/web
 cp .env.example .env
@@ -86,7 +96,7 @@ The web app runs at `http://localhost:5174` by default.
 
 ## Documentation
 - [Deployment](docs/DEPLOYMENT.md) - Production deployment, rollback, and operations guide
-- [Azure Deployment Plan](docs/AZURE_DEPLOYMENT_PLAN.md) - Phased migration plan
+- [Azure Deployment Plan](docs/AZURE_DEPLOYMENT_PLAN.md) - Phased deployment plan (all 10 phases complete)
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
 - [Authentication](docs/AUTH.md) - How Google ID token validation works
 - [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints

@@ -1,5 +1,7 @@
 # Codec Alpha Deployment Plan
 
+> **⚠️ Superseded** — This was an early draft. The authoritative deployment plan is [AZURE_DEPLOYMENT_PLAN.md](AZURE_DEPLOYMENT_PLAN.md), which covers all 10 phases and reflects the actual completed deployment.
+
 ## Overview
 
 This document is the phased execution plan for deploying the Codec chat application to Azure (Central US region). Each phase is a self-contained unit of work that an agent can execute independently. Phases must be completed in order — each phase builds on the outputs of the previous one.
