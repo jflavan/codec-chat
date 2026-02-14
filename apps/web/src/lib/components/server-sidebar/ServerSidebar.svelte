@@ -159,6 +159,7 @@
 		flex-direction: column;
 		align-items: center;
 		padding: 12px 0 12px;
+		box-sizing: border-box;
 		z-index: 1;
 	}
 
