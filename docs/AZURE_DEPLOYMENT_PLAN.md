@@ -529,7 +529,7 @@ infra/
 
 ### 8.1 Set up Azure OIDC authentication
 
-- [x] Create a Microsoft Entra ID App Registration for GitHub Actions (`codec-github-actions`, App ID: `43fab7f2-e24e-4477-9522-bbe39a95fe6d`)
+- [x] Create a Microsoft Entra ID App Registration for GitHub Actions
 - [x] Configure **Federated Identity Credentials** for the `main` branch (`github-main-branch`) and `prod` environment (`github-prod-environment`)
 - [x] Add GitHub repository secrets:
   - `AZURE_CLIENT_ID` — App Registration client ID

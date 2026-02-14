@@ -43,7 +43,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
-- **Deployed to Azure** — live at `https://ca-codec-prod-web.yellowwater-6acfd8af.centralus.azurecontainerapps.io`
+- **Deployed to Azure** via Container Apps (Central US)
 - Database migrated from SQLite to PostgreSQL (Azure Database for PostgreSQL Flexible Server)
 - File storage migrated to Azure Blob Storage (avatars + images containers)
 - SvelteKit switched to `adapter-node` for containerized deployment
