@@ -148,7 +148,9 @@ jobs:
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
               postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
               apiContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}' \
-              webContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}'
+              webContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}' \
+              webCustomDomain='codec-chat.com' \
+              apiCustomDomain='api.codec-chat.com'
 
   smoke-test:
     runs-on: ubuntu-latest

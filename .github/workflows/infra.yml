@@ -39,7 +39,9 @@ jobs:
               location='centralus' \
               environmentName='prod' \
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
-              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
+              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              webCustomDomain='codec-chat.com' \
+              apiCustomDomain='api.codec-chat.com'
 
       - name: Deploy infrastructure
         run: |
@@ -50,7 +52,9 @@ jobs:
               location='centralus' \
               environmentName='prod' \
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
-              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
+              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              webCustomDomain='codec-chat.com' \
+              apiCustomDomain='api.codec-chat.com'
 
       - name: Show deployment outputs
         run: |

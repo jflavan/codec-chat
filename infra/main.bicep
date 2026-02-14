@@ -24,6 +24,12 @@ param apiContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Web container image (defaults to quickstart placeholder).')
 param webContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Custom domain for the web app (e.g., codec-chat.com). Leave empty to skip custom domain binding.')
+param webCustomDomain string = ''
+
+@description('Custom domain for the API (e.g., api.codec-chat.com). Leave empty to skip custom domain binding.')
+param apiCustomDomain string = ''
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -37,6 +43,10 @@ var keyVaultName = 'kv-${baseName}'
 var containerAppsEnvName = 'cae-${baseName}'
 var apiAppName = 'ca-${baseName}-api'
 var webAppName = 'ca-${baseName}-web'
+
+// Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
+var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
+var effectiveWebUrl = webCustomDomain != '' ? 'https://${webCustomDomain}' : 'https://${webAppName}.${containerAppsEnv.outputs.defaultDomain}'
 
 // --- Modules ---
 
@@ -102,6 +112,27 @@ module googleClientIdSecret 'modules/key-vault-secret.bicep' = {
   }
 }
 
+// Managed TLS certificates for custom domains
+module apiCert 'modules/managed-certificate.bicep' = if (apiCustomDomain != '') {
+  name: 'api-managed-cert'
+  params: {
+    environmentName: containerAppsEnv.outputs.name
+    location: location
+    domainName: apiCustomDomain
+    certificateName: 'cert-api'
+  }
+}
+
+module webCert 'modules/managed-certificate.bicep' = if (webCustomDomain != '') {
+  name: 'web-managed-cert'
+  params: {
+    environmentName: containerAppsEnv.outputs.name
+    location: location
+    domainName: webCustomDomain
+    certificateName: 'cert-web'
+  }
+}
+
 module apiApp 'modules/container-app-api.bicep' = {
   name: 'container-app-api'
   params: {
@@ -115,8 +146,10 @@ module apiApp 'modules/container-app-api.bicep' = {
     keyVaultUri: keyVault.outputs.uri
     storageAccountName: storageAccount.outputs.name
     storageBlobEndpoint: storageAccount.outputs.blobEndpoint
-    apiBaseUrl: 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
-    corsAllowedOrigins: 'https://${webAppName}.${containerAppsEnv.outputs.defaultDomain}'
+    apiBaseUrl: effectiveApiUrl
+    corsAllowedOrigins: effectiveWebUrl
+    customDomainName: apiCustomDomain
+    managedCertificateId: apiCustomDomain != '' ? apiCert.outputs.id : ''
   }
 }
 
@@ -129,8 +162,10 @@ module webApp 'modules/container-app-web.bicep' = {
     containerRegistryLoginServer: containerRegistry.outputs.loginServer
     containerRegistryName: containerRegistry.outputs.name
     containerImage: webContainerImage
-    publicApiBaseUrl: 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
+    publicApiBaseUrl: effectiveApiUrl
     publicGoogleClientId: googleClientId
+    customDomainName: webCustomDomain
+    managedCertificateId: webCustomDomain != '' ? webCert.outputs.id : ''
   }
 }
 
