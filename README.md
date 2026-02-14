@@ -75,7 +75,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Typing indicators (“X is typing…”)
 - ✅ User profile display
 - ✅ Custom avatar upload with server-specific overrides and fallback chain
-- ✅ Member lists for servers
+- ✅ Member lists for servers with real-time updates via SignalR (automatic refresh on member join/leave)
 - ✅ Friends system (send/accept/decline/cancel requests, friends list, remove friend)
 - ✅ User search for adding friends (by name or email)
 - ✅ Real-time friend request notifications via SignalR

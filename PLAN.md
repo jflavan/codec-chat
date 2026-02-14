@@ -43,6 +43,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
+- Real-time member list updates via SignalR server-scoped groups
 - **Deployed to Azure** via Container Apps (Central US)
 - Database migrated from SQLite to PostgreSQL (Azure Database for PostgreSQL Flexible Server)
 - File storage migrated to Azure Blob Storage (avatars + images containers)
@@ -406,6 +407,30 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ### Verification
 - [x] Frontend builds successfully (`npm run build`, 0 errors)
 
+## Task breakdown: Real-Time Member List Updates
+
+### API — SignalR server groups
+- [x] Add `server-{serverId}` group concept to `ChatHub`
+- [x] Auto-join all server groups on connect (`OnConnectedAsync` queries `ServerMembers`)
+- [x] Add `JoinServer(serverId)` hub method for joining a server group after invite join
+- [x] Add `LeaveServer(serverId)` hub method for leaving a server group after kick
+- [x] Broadcast `MemberJoined` event from `ServersController.JoinViaInvite`
+- [x] Broadcast `MemberLeft` event from `ServersController.KickMember`
+
+### Web — SignalR events & state
+- [x] Add `MemberJoinedEvent` and `MemberLeftEvent` types to `chat-hub.ts`
+- [x] Add `onMemberJoined` and `onMemberLeft` callbacks to `SignalRCallbacks`
+- [x] Register `MemberJoined` and `MemberLeft` handlers in `ChatHubService.start()`
+- [x] Add `joinServer(serverId)` and `leaveServer(serverId)` methods to `ChatHubService`
+- [x] Wire `onMemberJoined` callback in `AppState.startSignalR()` to reload member list
+- [x] Wire `onMemberLeft` callback in `AppState.startSignalR()` to reload member list
+- [x] Call `hub.joinServer()` after `joinViaInvite` succeeds
+- [x] Call `hub.leaveServer()` in `onKickedFromServer` handler
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`, 0 errors)
+- [x] Frontend type-checks with zero errors (`svelte-check`)
+
 ## Next steps
 - Custom domain (`codec-chat.com`) with Azure-managed TLS certificates
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
@@ -415,7 +440,6 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Channel editing/deletion
 - Message editing and deletion
 - Presence indicators (online/offline/away)
-- Real-time member list updates
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars
 - Comprehensive unit and integration tests

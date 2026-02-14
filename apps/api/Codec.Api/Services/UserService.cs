@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Codec.Api.Data;
 using Codec.Api.Models;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -74,6 +75,7 @@ public class UserService(CodecDbContext db) : IUserService
             db.Entry(appUser).State = EntityState.Detached;
             return await db.Users.FirstAsync(u => u.GoogleSubject == subject);
         }
+
 
         return appUser;
     }

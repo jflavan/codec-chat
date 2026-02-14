@@ -155,6 +155,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - **Key Features:**
   - Channel-scoped groups — clients join/leave groups per channel
   - User-scoped groups — clients auto-join `user-{userId}` on connect for friend events
+  - Server-scoped groups — clients auto-join `server-{serverId}` on connect for all joined servers; receives membership events (MemberJoined, MemberLeft)
   - DM channel groups — clients join `dm-{dmChannelId}` for DM-specific events
   - Real-time message broadcast on `POST /channels/{channelId}/messages`
   - DM message broadcast on `POST /dm/channels/{channelId}/messages`
@@ -295,6 +296,8 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 |--------|-----------|-------------|
 | `JoinChannel` | `channelId: string` | Join a channel group to receive real-time events |
 | `LeaveChannel` | `channelId: string` | Leave a channel group |
+| `JoinServer` | `serverId: string` | Join a server group to receive membership events (called after joining via invite) |
+| `LeaveServer` | `serverId: string` | Leave a server group (called after being kicked) |
 | `StartTyping` | `channelId: string, displayName: string` | Broadcast typing indicator to channel |
 | `StopTyping` | `channelId: string, displayName: string` | Clear typing indicator |
 | `JoinDmChannel` | `dmChannelId: string` | Join a DM channel group for real-time events |
@@ -319,6 +322,8 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
 | `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |
 | `KickedFromServer` | `{ serverId, serverName }` | User was kicked from a server (sent to kicked user's user group; displayed as transient overlay banner with 5s fade-out) |
+| `MemberJoined` | `{ serverId }` | A new member joined the server (sent to server group; triggers member list refresh) |
+| `MemberLeft` | `{ serverId }` | A member left or was kicked from the server (sent to server group; triggers member list refresh) |
 | `LinkPreviewsReady` | `{ messageId, channelId?, dmChannelId?, linkPreviews: [...] }` | Link preview metadata fetched — frontend patches the message's `linkPreviews` array |
 
 ### Request/Response Format

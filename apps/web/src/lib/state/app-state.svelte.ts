@@ -563,6 +563,7 @@ export class AppState {
 		this.isJoining = true;
 		try {
 			const result = await this.api.joinViaInvite(this.idToken, code);
+			await this.hub.joinServer(result.serverId);
 			await this.loadServers();
 			await this.selectServer(result.serverId);
 		} catch (e) {
@@ -1114,7 +1115,16 @@ export class AppState {
 				// A new DM conversation was opened by another user — refresh the list.
 				this.loadDmConversations();
 			},
-			onKickedFromServer: (event) => {
+			onKickedFromServer: async (event) => {
+				// Leave the server's SignalR group since we're no longer a member.
+				try {
+					await this.hub.leaveServer(event.serverId);
+				} catch (error) {
+					console.error('Failed to leave server after being kicked:', error);
+					// Proceed with local cleanup even if leaving the hub group fails.
+					this.setTransientError('There was a problem updating your connection after being kicked. Some data may be out of date.');
+				}
+
 				// Remove the server from the local list and navigate away if needed.
 				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
 				if (this.selectedServerId === event.serverId) {
@@ -1157,6 +1167,16 @@ export class AppState {
 				const next = new Map(this.channelMentionCounts);
 				next.set(event.channelId, (next.get(event.channelId) ?? 0) + 1);
 				this.channelMentionCounts = next;
+			},
+			onMemberJoined: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.loadMembers(event.serverId);
+				}
+			},
+			onMemberLeft: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.loadMembers(event.serverId);
+				}
 			}
 		});
 
