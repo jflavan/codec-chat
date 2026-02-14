@@ -75,9 +75,10 @@ jobs:
       - name: Install EF Core tools
         run: dotnet tool install --global dotnet-ef
 
-      - name: Build migration bundle
+      - name: Restore and build migration bundle
         working-directory: apps/api
         run: |
+          dotnet restore Codec.Api/Codec.Api.csproj
           dotnet ef migrations bundle \
             --project Codec.Api \
             --output ../../efbundle \
@@ -92,6 +93,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Open PostgreSQL firewall for runner
+        id: firewall
         run: |
           RUNNER_IP=$(curl -s https://api.ipify.org)
           az postgres flexible-server firewall-rule create \
@@ -100,6 +102,7 @@ jobs:
             --rule-name AllowGitHubRunner \
             --start-ip-address "$RUNNER_IP" \
             --end-ip-address "$RUNNER_IP"
+          echo "opened=true" >> "$GITHUB_OUTPUT"
 
       - name: Run migrations
         run: |
@@ -111,7 +114,7 @@ jobs:
           ./efbundle --connection "$CONNECTION_STRING"
 
       - name: Close PostgreSQL firewall rule
-        if: always()
+        if: always() && steps.firewall.outputs.opened == 'true'
         run: |
           az postgres flexible-server firewall-rule delete \
             --resource-group ${{ env.RESOURCE_GROUP }} \
