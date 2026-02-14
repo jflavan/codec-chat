@@ -151,7 +151,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Controller-based RESTful API design (`[ApiController]`)
 - ✅ Shared `UserService` for user resolution and membership checks
 - ✅ CORS configuration for local development
-- ✅ SQLite database with EF Core
+- ✅ PostgreSQL database with EF Core (Npgsql)
 - ✅ Automatic database migrations in dev
 - ✅ Seed data for development
 - ✅ SignalR hub (`/hubs/chat`) for real-time communication
@@ -225,9 +225,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ## Technical Debt & Improvements
 - [ ] Add comprehensive unit tests
 - [ ] Add integration tests
-- [ ] Implement proper logging (Serilog)
+- [x] Implement proper logging (Serilog → Azure Log Analytics)
 - [ ] Add API documentation (Swagger/OpenAPI)
-- [ ] Performance monitoring and metrics
-- [ ] Production database migration strategy
-- [ ] Container deployment (Docker)
-- [ ] CI/CD pipeline enhancements
+- [x] Performance monitoring and metrics (Log Analytics workspace, Serilog structured logging)
+- [x] Production database migration strategy (EF Core migration bundle in CD pipeline)
+- [x] Container deployment (Docker multi-stage builds, Azure Container Apps)
+- [x] CI/CD pipeline (GitHub Actions CI + CD with OIDC, Bicep IaC)

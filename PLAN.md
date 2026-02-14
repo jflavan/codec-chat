@@ -32,54 +32,30 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Auth: Frontend obtains Google ID token; API validates per request
 - Layout: apps/web + apps/api + docs + .github
 - Package manager: npm
-- Data: SQLite + EF Core
+- Data: PostgreSQL + EF Core (Npgsql); Azure Database for PostgreSQL Flexible Server in production
+- Hosting: Azure Container Apps (Consumption tier), Docker multi-stage builds
+- IaC: Bicep modules under `infra/`
+- CI/CD: GitHub Actions (CI, CD, Infrastructure pipelines)
+- Auth (Azure): OIDC federated credentials (no long-lived secrets)
+- Secrets: Azure Key Vault + GitHub Secrets
+- File storage: Azure Blob Storage (production), local disk (development)
+- Logging: Serilog with structured JSON → Log Analytics
 
 ## Current status
-- Scaffolding complete (docs, .github guidance)
-- .NET API skeleton with Google token validation
-- SvelteKit web shell with Google Sign-In UI
-- CI workflow added
-- SQLite data layer decided and documented
-- Initial EF Core migration created and applied
-- Controller-based API architecture (refactored from Minimal APIs)
-- Shared UserService for user resolution and membership checks
-- Read-only API endpoints for servers/channels/messages
-- Authenticated message posting endpoint
-- Web UI wired to API data
-- User identity mapping stored from Google subject
-- UI loading/error states added
-- Server membership and roles with join flow (invite-only)
-- Server member listing in API and UI
-- Server creation endpoint and UI
-- Channel creation endpoint and UI (Owner/Admin only)
-- Discord-inspired dark theme with three-column layout
-- Design spec documented in `docs/DESIGN.md`
-- Session persistence via localStorage (1-week sessions survive page reload)
-- Automatic token refresh via Google One Tap (`auto_select`)
-- SignalR hub (`/hubs/chat`) for real-time messaging and typing indicators
-- Real-time message broadcast on message post (via `IHubContext<ChatHub>`)
-- Typing indicators (UserTyping / UserStoppedTyping events)
-- WebSocket JWT authentication via `access_token` query parameter
-- camelCase JSON serialization for SignalR payloads
-- Client-side SignalR connection with automatic reconnect
-- Frontend architecture refactored to modular layers (types, API client, auth, services, state, components)
-- Central AppState class with Svelte 5 $state/$derived runes and context-based DI
-- CSS design tokens extracted to $lib/styles/tokens.css and global.css
-- Feature-grouped Svelte 5 components (server-sidebar, channel-sidebar, chat, members)
-- +page.svelte reduced to ~75-line thin composition shell
-- Sign-out button in user panel
-- Emoji reactions on messages (toggle, real-time sync via SignalR, floating action bar, reaction pills)
-- Friends feature fully implemented (friend requests, friends list, user search, real-time SignalR events, Friends panel UI, notification badge on Home icon)
-- Direct Messages feature fully implemented (1-on-1 private messaging between friends, DM conversations list, real-time delivery via SignalR, typing indicators, close/reopen conversations, start DM from friends list)
-- Kick member feature implemented (Owner/Admin can kick members, role hierarchy enforced, real-time notification via SignalR, frontend kick button with confirm step)
-- Server invites feature implemented (Owner/Admin create/list/revoke invite codes, any user joins via code, configurable expiry and max uses, frontend invite panel and join-by-code UI)
-- Image uploads feature implemented (upload from desktop, paste from clipboard, or drag-and-drop, PNG/JPEG/WebP/GIF support, 10 MB limit, image preview in composer, inline image display in messages, works in both server channels and DMs)
-- Link previews feature fully implemented (automatic URL detection, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR, clickable thumbnail images)
-- @mentions feature implemented (autocomplete member picker in composer, mention badge counts on server icons and channel names, badge clearing on channel navigation, mentioned message highlighting, @here to notify all channel members)
-- Message replies feature implemented (inline reply to any message in channels or DMs, reply-to-message context in feed, scroll-to-original with highlight animation, Escape to cancel, orphaned reply handling)
-- Image preview lightbox implemented (full-size overlay on image click, Escape to close, open-original link, works in both server channels and DMs)
-- Text formatting implemented (bold with `*`/`**` and italic with `_`, live preview in composer overlay, works in both server channels and DMs)
-- Loading screen implemented (branded splash with animated progress bar, CRT scanlines, and glow; shown during initial data bootstrap after sign-in; `isInitialLoading` state flag in `AppState`; fades out via Svelte transition)
+- **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
+- **Deployed to Azure** — live at `https://ca-codec-prod-web.yellowwater-6acfd8af.centralus.azurecontainerapps.io`
+- Database migrated from SQLite to PostgreSQL (Azure Database for PostgreSQL Flexible Server)
+- File storage migrated to Azure Blob Storage (avatars + images containers)
+- SvelteKit switched to `adapter-node` for containerized deployment
+- API hardened: health probes, Serilog structured logging, CORS, forwarded headers, rate limiting
+- Both apps containerized with optimized multi-stage Dockerfiles
+- Infrastructure as Code via Bicep modules under `infra/`
+- CI pipeline: build, lint, Docker image validation on every push/PR
+- CD pipeline: build → push to ACR → EF Core migration bundle → Bicep deploy → smoke tests
+- Infrastructure pipeline: Bicep what-if → deploy on push to `infra/` or manual dispatch
+- OIDC federated credentials for GitHub Actions → Azure (no long-lived secrets)
+- Content Security Policy with SvelteKit nonce-based inline script support
+- All health checks passing (API `/health/ready` 200, Web `/health` 200)
 
 ## Task breakdown: Session Persistence
 
@@ -431,12 +407,16 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Frontend builds successfully (`npm run build`, 0 errors)
 
 ## Next steps
+- Custom domain (`codec-chat.com`) with Azure-managed TLS certificates
+- Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
 - Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI
 - Server settings and configuration
 - Channel editing/deletion
+- Message editing and deletion
 - Presence indicators (online/offline/away)
 - Real-time member list updates
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars
-- Comprehensive unit and integration tests for frontend modules
+- Comprehensive unit and integration tests
+- Container image vulnerability scanning (Trivy or Microsoft Defender)

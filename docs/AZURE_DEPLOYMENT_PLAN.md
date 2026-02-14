@@ -472,7 +472,7 @@ infra/
 ### 6.11 Verify
 
 - [x] `az bicep build --file infra/main.bicep` — compiles with 0 errors
-- [ ] `az deployment group what-if` — review planned resource creation
+- [x] `az deployment group what-if` — review planned resource creation
 
 ---
 
@@ -529,15 +529,14 @@ infra/
 
 ### 8.1 Set up Azure OIDC authentication
 
-- [ ] Create a Microsoft Entra ID App Registration for GitHub Actions
-- [ ] Configure **Federated Identity Credentials** for the `main` branch and `prod` environment
-- [ ] Add GitHub repository secrets:
+- [x] Create a Microsoft Entra ID App Registration for GitHub Actions (`codec-github-actions`, App ID: `43fab7f2-e24e-4477-9522-bbe39a95fe6d`)
+- [x] Configure **Federated Identity Credentials** for the `main` branch (`github-main-branch`) and `prod` environment (`github-prod-environment`)
+- [x] Add GitHub repository secrets:
   - `AZURE_CLIENT_ID` — App Registration client ID
   - `AZURE_TENANT_ID` — Entra tenant ID
   - `AZURE_SUBSCRIPTION_ID` — Azure subscription ID
-- [ ] Document the OIDC setup process
-
-> Note: These are manual Azure portal / CLI steps that must be performed before running the workflow.
+- [x] Service Principal granted **Contributor**, **User Access Administrator**, **AcrPush**, and **Key Vault Secrets User** roles on `rg-codec-prod`
+- [x] 7 Azure resource providers registered (OperationalInsights, KeyVault, Storage, ContainerRegistry, App, DBforPostgreSQL, ManagedIdentity)
 
 ### 8.2 Create `infra.yml` workflow
 
@@ -559,10 +558,12 @@ infra/
 
 ### 8.4 Verify
 
-- [ ] Trigger workflow manually
-- [ ] `what-if` output shows expected resources
-- [ ] Deployment creates all resources successfully
-- [ ] Resources appear in Azure Portal under `rg-codec-prod`
+- [x] `infra.yml` runs successfully on `workflow_dispatch`
+- [x] All Azure resources created with correct names and SKUs
+- [x] Secrets (Google Client ID, PostgreSQL password) stored in Key Vault
+- [x] Container Apps show "Waiting for revision" (no images pushed yet)
+
+> Completed after 4 pipeline iterations (inline Bicep params fix, quickstart placeholder containers, dotnet restore + global.json .NET 9 pin).
 
 ---
 
@@ -638,12 +639,18 @@ infra/
 
 ### 9.7 Verify
 
-- [ ] Trigger deployment via push to `main`
-- [ ] Images pushed to ACR with correct tags
-- [ ] Database migration runs successfully
-- [ ] Container Apps update to new revisions
-- [ ] Smoke tests pass
-- [ ] Application accessible via Web Container App FQDN
+- [x] Trigger deployment via push to `main`
+- [x] Images pushed to ACR with correct tags (`${{ github.sha }}` and `latest`)
+- [x] Database migration runs successfully (EF Core migration bundle with temporary PostgreSQL firewall rule)
+- [x] Container Apps update to new revisions (via full Bicep re-deployment with image params)
+- [x] Smoke tests pass (API `/health/ready` → 200, Web `/health` → 200)
+- [x] Application accessible via Web Container App FQDN
+
+> **Issues resolved during CD pipeline setup:**
+> - Added `dotnet restore` before `dotnet ef migrations bundle` to fix missing `project.assets.json`
+> - Added `global.json` to pin .NET SDK to 9.0.x (GitHub runner had .NET 10 pre-installed)
+> - Created `DesignTimeDbContextFactory` so EF CLI doesn't need full app host startup (which validates `Google:ClientId`)
+> - Temporary PostgreSQL firewall rule pattern: open for runner IP → run bundle → close with `if: always()`
 
 ---
 
@@ -663,23 +670,23 @@ infra/
 ### 10.2 Security hardening
 
 - [ ] Enable HTTPS-only on both Container Apps (redirect HTTP → HTTPS)
-- [x] Configure Content Security Policy (CSP) headers in SvelteKit response hooks
+- [x] Configure Content Security Policy (CSP) headers in SvelteKit (`kit.csp` with nonce-based inline script support, dynamic directives merged in `hooks.server.ts`)
 - [x] Add rate limiting middleware to the API (`Microsoft.AspNetCore.RateLimiting`)
-- [ ] Verify Key Vault is the sole source of secrets in production
-- [ ] Verify Managed Identity is used for all Azure service-to-service auth (no connection strings for blob access)
-- [ ] Review CORS origins — only allow the production domain(s)
+- [x] Verify Key Vault is the sole source of secrets in production (connection string + Google Client ID stored as Key Vault secret references)
+- [x] Verify Managed Identity is used for all Azure service-to-service auth (AcrPull, Storage Blob Data Contributor, Key Vault Secrets User — no connection strings for blob/ACR access)
+- [x] Review CORS origins — configured via `Cors:AllowedOrigins` environment variable on API container
 - [ ] Integrate Trivy or Microsoft Defender for Containers in CI for image scanning
 - [x] Verify non-root user in both Dockerfiles
 
 ### 10.3 Monitoring & alerting
 
-- [ ] Verify Container Apps logs stream to Log Analytics
+- [x] Verify Container Apps logs stream to Log Analytics
 - [ ] Configure Azure Monitor alerts:
   - API container restarts
   - 5xx error rate > threshold
   - Database CPU > 80%
   - Replica scaling events
-- [ ] Verify Serilog structured JSON logs appear in Log Analytics
+- [x] Verify Serilog structured JSON logs appear in Log Analytics
 - [ ] Create basic Azure Monitor dashboard: request latency, error rate, replica count, CPU/memory
 
 ### 10.4 Database operations
