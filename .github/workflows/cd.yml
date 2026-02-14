@@ -137,7 +137,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy API Container App
+      - name: Deploy infrastructure (register hostnames and create certificates)
         run: |
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -150,7 +150,24 @@ jobs:
               apiContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}' \
               webContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}' \
               webCustomDomain='codec-chat.com' \
-              apiCustomDomain='api.codec-chat.com'
+              apiCustomDomain='api.codec-chat.com' \
+              bindCertificates=false
+
+      - name: Deploy infrastructure (bind certificates to custom domains)
+        run: |
+          az deployment group create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --parameters \
+              location='centralus' \
+              environmentName='prod' \
+              googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
+              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              apiContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}' \
+              webContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}' \
+              webCustomDomain='codec-chat.com' \
+              apiCustomDomain='api.codec-chat.com' \
+              bindCertificates=true
 
   smoke-test:
     runs-on: ubuntu-latest

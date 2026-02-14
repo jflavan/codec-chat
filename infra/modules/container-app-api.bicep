@@ -48,11 +48,16 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
         external: true
         targetPort: isQuickstart ? 80 : 8080
         transport: 'http'
-        customDomains: customDomainName != '' ? [
+        customDomains: customDomainName != '' && managedCertificateId != '' ? [
           {
             name: customDomainName
             certificateId: managedCertificateId
             bindingType: 'SniEnabled'
+          }
+        ] : customDomainName != '' ? [
+          {
+            name: customDomainName
+            bindingType: 'Disabled'
           }
         ] : []
         corsPolicy: {

@@ -30,6 +30,9 @@ param webCustomDomain string = ''
 @description('Custom domain for the API (e.g., api.codec-chat.com). Leave empty to skip custom domain binding.')
 param apiCustomDomain string = ''
 
+@description('Set to true on a second deployment pass to bind managed TLS certificates to custom domains. Requires a prior deployment with this set to false so that hostnames are registered first.')
+param bindCertificates bool = false
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -112,9 +115,11 @@ module googleClientIdSecret 'modules/key-vault-secret.bicep' = {
   }
 }
 
-// Managed TLS certificates for custom domains
+// Managed TLS certificates for custom domains.
+// These must deploy AFTER the container apps so the hostnames are already registered.
 module apiCert 'modules/managed-certificate.bicep' = if (apiCustomDomain != '') {
   name: 'api-managed-cert'
+  dependsOn: [apiApp]
   params: {
     environmentName: containerAppsEnv.outputs.name
     location: location
@@ -125,6 +130,7 @@ module apiCert 'modules/managed-certificate.bicep' = if (apiCustomDomain != '') 
 
 module webCert 'modules/managed-certificate.bicep' = if (webCustomDomain != '') {
   name: 'web-managed-cert'
+  dependsOn: [webApp]
   params: {
     environmentName: containerAppsEnv.outputs.name
     location: location
@@ -132,6 +138,11 @@ module webCert 'modules/managed-certificate.bicep' = if (webCustomDomain != '') 
     certificateName: 'cert-web'
   }
 }
+
+// Compute cert resource IDs deterministically to avoid implicit dependency from app → cert
+// (which would create a circular dependency with the cert → app dependsOn above).
+var apiCertId = bindCertificates && apiCustomDomain != '' ? '${containerAppsEnv.outputs.id}/managedCertificates/cert-api' : ''
+var webCertId = bindCertificates && webCustomDomain != '' ? '${containerAppsEnv.outputs.id}/managedCertificates/cert-web' : ''
 
 module apiApp 'modules/container-app-api.bicep' = {
   name: 'container-app-api'
@@ -149,7 +160,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     apiBaseUrl: effectiveApiUrl
     corsAllowedOrigins: effectiveWebUrl
     customDomainName: apiCustomDomain
-    managedCertificateId: apiCustomDomain != '' ? apiCert.outputs.id : ''
+    managedCertificateId: apiCertId
   }
 }
 
@@ -165,7 +176,7 @@ module webApp 'modules/container-app-web.bicep' = {
     publicApiBaseUrl: effectiveApiUrl
     publicGoogleClientId: googleClientId
     customDomainName: webCustomDomain
-    managedCertificateId: webCustomDomain != '' ? webCert.outputs.id : ''
+    managedCertificateId: webCertId
   }
 }
 
