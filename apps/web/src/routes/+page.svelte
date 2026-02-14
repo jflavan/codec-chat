@@ -141,7 +141,8 @@
 	/* ───── Mobile: single-column layout ───── */
 
 	@media (max-width: 899px) {
-		.app-shell {
+		.app-shell,
+		.app-shell.home-mode {
 			grid-template-columns: 1fr;
 			grid-template-rows: 1fr;
 		}
