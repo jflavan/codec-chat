@@ -25,3 +25,16 @@ body {
 		transition-duration: 0ms !important;
 	}
 }
+
+/* ===== Mobile-specific adjustments ===== */
+@media (max-width: 899px) {
+	/* Prevent horizontal overflow on mobile */
+	html, body {
+		overflow-x: hidden;
+	}
+
+	/* Respect safe area insets on notched devices */
+	body {
+		padding-bottom: env(safe-area-inset-bottom, 0);
+	}
+}

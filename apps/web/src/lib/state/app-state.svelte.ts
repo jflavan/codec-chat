@@ -116,6 +116,10 @@ export class AppState {
 	settingsOpen = $state(false);
 	settingsCategory = $state<'profile' | 'account'>('profile');
 
+	/* ───── mobile navigation ───── */
+	mobileNavOpen = $state(false);
+	mobileMembersOpen = $state(false);
+
 	/* ───── form fields ───── */
 	newServerName = $state('');
 	newChannelName = $state('');
@@ -393,6 +397,7 @@ export class AppState {
 		this.typingUsers = [];
 		this.pendingMentions = new Map();
 		this.replyingTo = null;
+		this.mobileNavOpen = false;
 
 		// Clear mention badge for this channel
 		const next = new Map(this.channelMentionCounts);
@@ -797,6 +802,7 @@ export class AppState {
 		this.channels = [];
 		this.messages = [];
 		this.members = [];
+		this.mobileNavOpen = false;
 		this.loadFriends();
 		this.loadFriendRequests();
 		this.loadDmConversations();
@@ -807,6 +813,7 @@ export class AppState {
 		this.showFriendsPanel = false;
 		this.showInvitePanel = false;
 		this.selectedServerId = serverId;
+		this.mobileNavOpen = false;
 		await this.loadChannels(serverId);
 		await this.loadMembers(serverId);
 	}
@@ -935,6 +942,7 @@ export class AppState {
 		this.dmTypingUsers = [];
 		this.dmMessageBody = '';
 		this.replyingTo = null;
+		this.mobileNavOpen = false;
 
 		// Clear unread for this conversation.
 		if (this.unreadDmCounts.has(dmChannelId)) {

@@ -17,6 +17,11 @@
 
 <div class="friends-panel">
 	<div class="friends-header">
+		<button class="mobile-nav-btn" onclick={() => { app.mobileNavOpen = true; }} aria-label="Open navigation">
+			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path d="M3 5h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2z"/>
+			</svg>
+		</button>
 		<h2 class="friends-title">Friends</h2>
 	</div>
 
@@ -58,6 +63,9 @@
 	}
 
 	.friends-header {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
@@ -68,6 +76,32 @@
 		font-size: 16px;
 		font-weight: 700;
 		color: var(--text-header);
+	}
+
+	/* ───── Mobile navigation button ───── */
+
+	.mobile-nav-btn {
+		display: none;
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.mobile-nav-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
+	}
+
+	@media (max-width: 899px) {
+		.mobile-nav-btn {
+			display: grid;
+		}
 	}
 
 	.tab-bar {

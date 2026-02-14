@@ -52,6 +52,11 @@
 	ondrop={handleDrop}
 >
 	<header class="chat-header">
+		<button class="mobile-nav-btn" onclick={() => { app.mobileNavOpen = true; }} aria-label="Open navigation">
+			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path d="M3 5h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2z"/>
+			</svg>
+		</button>
 		<div class="chat-header-left">
 			<svg class="channel-hash" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M5.88 21 7.1 14H3.5l.3-2h3.6l.9-5H4.8l.3-2h3.5L9.8 3h2l-1.2 2h5L16.8 3h2l-1.2 2H21l-.3 2h-3.5l-.9 5h3.5l-.3 2h-3.6L14.7 21h-2l1.2-7h-5L7.7 21h-2zm4.3-9h5l.9-5h-5l-.9 5z"/>
@@ -60,6 +65,11 @@
 				{app.selectedChannelName ?? 'Select a channel'}
 			</h1>
 		</div>
+		<button class="mobile-members-btn" onclick={() => { app.mobileMembersOpen = true; }} aria-label="Show members">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+			</svg>
+		</button>
 	</header>
 
 	{#if isDragOver && app.selectedChannelId}
@@ -100,12 +110,15 @@
 		padding: 0 16px;
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+		gap: 8px;
 	}
 
 	.chat-header-left {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		flex: 1;
+		min-width: 0;
 	}
 
 	.chat-channel-name {
@@ -113,12 +126,44 @@
 		font-size: 16px;
 		font-weight: 600;
 		color: var(--text-header);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.channel-hash {
 		flex-shrink: 0;
 		color: var(--text-muted);
 		opacity: 0.7;
+	}
+
+	/* ───── Mobile navigation buttons ───── */
+
+	.mobile-nav-btn,
+	.mobile-members-btn {
+		display: none;
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.mobile-nav-btn:hover,
+	.mobile-members-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
+	}
+
+	@media (max-width: 899px) {
+		.mobile-nav-btn,
+		.mobile-members-btn {
+			display: grid;
+		}
 	}
 
 	/* ───── Drop overlay ───── */
