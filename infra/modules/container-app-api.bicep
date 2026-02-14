@@ -4,8 +4,9 @@ param location string
 param environmentId string
 param containerRegistryLoginServer string
 param containerRegistryName string
-param imageName string = 'codec-api'
-param imageTag string = 'latest'
+param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+var isQuickstart = containerImage == 'mcr.microsoft.com/k8se/quickstart:latest'
 
 param keyVaultName string
 param keyVaultUri string
@@ -39,7 +40,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true
-        targetPort: 8080
+        targetPort: isQuickstart ? 80 : 8080
         transport: 'http'
         corsPolicy: {
           allowedOrigins: [corsAllowedOrigins]
@@ -48,7 +49,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           allowCredentials: true
         }
       }
-      secrets: [
+      secrets: isQuickstart ? [] : [
         {
           name: 'connection-string'
           keyVaultUrl: '${keyVaultUri}secrets/ConnectionStrings--Default'
@@ -60,7 +61,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: 'system'
         }
       ]
-      registries: [
+      registries: isQuickstart ? [] : [
         {
           server: containerRegistryLoginServer
           identity: 'system'
@@ -71,12 +72,12 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'api'
-          image: '${containerRegistryLoginServer}/${imageName}:${imageTag}'
+          image: containerImage
           resources: {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
+          env: isQuickstart ? [] : [
             {
               name: 'ASPNETCORE_ENVIRONMENT'
               value: 'Production'
@@ -106,7 +107,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: storageBlobEndpoint
             }
           ]
-          probes: [
+          probes: isQuickstart ? [] : [
             {
               type: 'Liveness'
               httpGet: {
