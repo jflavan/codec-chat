@@ -3,11 +3,14 @@ using System.Security.Cryptography;
 namespace Codec.Api.Services;
 
 /// <summary>
-/// Handles avatar image validation, disk storage, and URL resolution.
-/// Avatars are stored under a configurable root directory (default: <c>uploads/avatars</c>).
+/// Handles avatar image validation, storage, and URL resolution.
+/// Delegates file I/O to <see cref="IFileStorageService"/> for storage-provider independence.
 /// </summary>
-public class AvatarService : IAvatarService
+public class AvatarService(IFileStorageService fileStorage) : IAvatarService
 {
+    /// <summary>Blob container name for avatar uploads.</summary>
+    private const string ContainerName = "avatars";
+
     /// <summary>Maximum upload size in bytes (10 MB).</summary>
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -25,17 +28,6 @@ public class AvatarService : IAvatarService
     {
         ".jpg", ".jpeg", ".png", ".webp", ".gif"
     };
-
-    private readonly string _rootPath;
-    private readonly string _baseUrl;
-
-    /// <param name="rootPath">Absolute path to the avatar storage directory.</param>
-    /// <param name="baseUrl">Public base URL for serving avatar files (e.g. <c>/uploads/avatars</c>).</param>
-    public AvatarService(string rootPath, string baseUrl)
-    {
-        _rootPath = rootPath;
-        _baseUrl = baseUrl.TrimEnd('/');
-    }
 
     /// <inheritdoc />
     public string? Validate(IFormFile file)
@@ -67,73 +59,48 @@ public class AvatarService : IAvatarService
     /// <inheritdoc />
     public async Task<string> SaveUserAvatarAsync(Guid userId, IFormFile file)
     {
-        var directory = Path.Combine(_rootPath, userId.ToString());
-        return await SaveFileAsync(directory, "avatar", file);
+        var prefix = $"{userId}/avatar";
+        return await SaveFileAsync(prefix, file);
     }
 
     /// <inheritdoc />
     public async Task<string> SaveServerAvatarAsync(Guid userId, Guid serverId, IFormFile file)
     {
-        var directory = Path.Combine(_rootPath, userId.ToString());
-        var prefix = $"server-{serverId}";
-        return await SaveFileAsync(directory, prefix, file);
+        var prefix = $"{userId}/server-{serverId}";
+        return await SaveFileAsync(prefix, file);
     }
 
     /// <inheritdoc />
-    public void DeleteAvatar(string relativePath)
+    public async Task DeleteUserAvatarAsync(Guid userId)
     {
-        var fullPath = Path.GetFullPath(Path.Combine(_rootPath, relativePath));
-        if (!fullPath.StartsWith(Path.GetFullPath(_rootPath) + Path.DirectorySeparatorChar))
-        {
-            return;
-        }
-
-        if (File.Exists(fullPath))
-        {
-            File.Delete(fullPath);
-        }
+        await fileStorage.DeleteByPrefixAsync(ContainerName, $"{userId}/avatar");
     }
 
     /// <inheritdoc />
-    public string? ResolveUrl(string? relativePath)
+    public async Task DeleteServerAvatarAsync(Guid userId, Guid serverId)
     {
-        if (string.IsNullOrEmpty(relativePath))
-        {
-            return null;
-        }
-
-        // Ensure the relative path stays within the storage root.
-        var fullPath = Path.GetFullPath(Path.Combine(_rootPath, relativePath));
-        if (!fullPath.StartsWith(Path.GetFullPath(_rootPath) + Path.DirectorySeparatorChar))
-        {
-            return null;
-        }
-
-        return $"{_baseUrl}/{relativePath.Replace('\\', '/')}";
+        await fileStorage.DeleteByPrefixAsync(ContainerName, $"{userId}/server-{serverId}");
     }
+
+    /// <inheritdoc />
+    public string? ResolveUrl(string? storedUrl) => string.IsNullOrEmpty(storedUrl) ? null : storedUrl;
 
     /// <summary>
-    /// Writes the uploaded file to disk with a content-hash filename for cache busting.
-    /// Returns the relative path from the avatar storage root.
+    /// Uploads the file via <see cref="IFileStorageService"/> with a content-hash filename for cache busting.
+    /// Cleans previous files with the same prefix before uploading.
+    /// Returns the public URL of the uploaded file.
     /// </summary>
-    private static async Task<string> SaveFileAsync(string directory, string prefix, IFormFile file)
+    private async Task<string> SaveFileAsync(string prefix, IFormFile file)
     {
-        Directory.CreateDirectory(directory);
-
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var hash = await ComputeHashAsync(file);
-        var fileName = $"{prefix}-{hash}{extension}";
-        var fullPath = Path.Combine(directory, fileName);
+        var blobPath = $"{prefix}-{hash}{extension}";
 
-        // Remove any previous avatar with the same prefix in this directory.
-        CleanPreviousFiles(directory, prefix);
+        // Remove any previous avatar with the same prefix.
+        await fileStorage.DeleteByPrefixAsync(ContainerName, prefix);
 
-        await using var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write);
-        await file.CopyToAsync(stream);
-
-        // Return path relative to the storage root.
-        var directoryName = Path.GetFileName(directory);
-        return Path.Combine(directoryName, fileName);
+        using var stream = file.OpenReadStream();
+        return await fileStorage.UploadAsync(ContainerName, blobPath, stream, file.ContentType);
     }
 
     /// <summary>
@@ -144,21 +111,5 @@ public class AvatarService : IAvatarService
         using var stream = file.OpenReadStream();
         var hashBytes = await SHA256.HashDataAsync(stream);
         return Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
-    }
-
-    /// <summary>
-    /// Removes existing files matching the given prefix so only the latest upload remains.
-    /// </summary>
-    private static void CleanPreviousFiles(string directory, string prefix)
-    {
-        if (!Directory.Exists(directory))
-        {
-            return;
-        }
-
-        foreach (var existing in Directory.EnumerateFiles(directory, $"{prefix}-*"))
-        {
-            File.Delete(existing);
-        }
     }
 }

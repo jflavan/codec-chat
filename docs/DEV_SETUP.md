@@ -5,6 +5,7 @@ This guide walks through setting up the Codec development environment from scrat
 ## Prerequisites
 - **Node.js** 20+ and npm
 - **.NET SDK** 9.x
+- **Docker** (for local PostgreSQL via Docker Compose)
 - **Google Cloud Console** account for OAuth credentials
 
 ## Google OAuth Setup
@@ -22,16 +23,22 @@ This guide walks through setting up the Codec development environment from scrat
 
 ## API Setup
 
-1. Navigate to the API project:
+1. **Start PostgreSQL** using Docker Compose (from the repository root):
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d
+   ```
+   This starts a PostgreSQL 16 instance on `localhost:5433` with database `codec_dev`, user `codec`, password `codec_dev_password`.
+
+2. Navigate to the API project:
    ```bash
    cd apps/api/Codec.Api
    ```
 
-2. Update `appsettings.Development.json`:
+3. Update `appsettings.Development.json`:
    ```json
    {
      "ConnectionStrings": {
-       "Default": "Data Source=codec-dev.db"
+       "Default": "Host=localhost;Port=5433;Database=codec_dev;Username=codec;Password=codec_dev_password"
      },
      "Api": {
        "BaseUrl": "http://localhost:5050"
@@ -47,14 +54,14 @@ This guide walks through setting up the Codec development environment from scrat
    
    **Note:** `Google:ClientId` is required — the API will fail fast on startup if missing. `Api:BaseUrl` is used to generate public URLs for uploaded avatars and images.
 
-3. Run the API:
+4. Run the API:
    ```bash
    dotnet run
    ```
    
    The API will:
    - Run at `http://localhost:5050` by default
-   - Automatically apply database migrations
+   - Automatically apply database migrations (PostgreSQL)
    - Create the default "Codec HQ" server (with `general` and `announcements` channels) if it doesn't exist
    - Seed sample users and messages if the database is empty
 
@@ -165,8 +172,9 @@ dotnet ef migrations script
   - **Solution:** Ensure `http://localhost:5174` is in `Cors:AllowedOrigins` in API settings
 
 ### Database issues
-- Delete the database file and restart the API to reseed:
+- Reset the database and restart the API to reseed:
   ```bash
-  rm apps/api/Codec.Api/codec-dev.db
+  docker compose -f docker-compose.dev.yml down -v
+  docker compose -f docker-compose.dev.yml up -d
   cd apps/api/Codec.Api && dotnet run
   ```

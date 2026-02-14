@@ -1,7 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const projectRoot = path.resolve(new URL('.', import.meta.url).pathname, '..');
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const srcRoot = path.join(projectRoot, 'src');
 const eventDirectivePattern = /\bon:[a-zA-Z][\w-]*/g;
 

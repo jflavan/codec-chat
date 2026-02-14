@@ -1,14 +1,27 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.IdentityModel.Tokens;
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Serilog;
+using Serilog.Formatting.Compact;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.RateLimiting;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, config) => config
+    .ReadFrom.Configuration(ctx.Configuration)
+    .WriteTo.Console(new RenderedCompactJsonFormatter()));
 
 builder.Services.AddControllers();
 
@@ -20,7 +33,7 @@ builder.Services.AddSignalR()
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("dev", policy =>
+    options.AddPolicy("default", policy =>
     {
         var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
         policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
@@ -67,21 +80,45 @@ builder.Services.AddAuthorization();
 builder.Services.AddDbContext<CodecDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("Default");
-    options.UseSqlite(connectionString);
+    options.UseNpgsql(connectionString);
 });
 
 builder.Services.AddScoped<IUserService, UserService>();
 
-// Avatar storage configuration.
-var avatarStoragePath = Path.Combine(builder.Environment.ContentRootPath, "uploads", "avatars");
-Directory.CreateDirectory(avatarStoragePath);
-var apiBaseUrl = builder.Configuration["Api:BaseUrl"]?.TrimEnd('/') ?? "";
-builder.Services.AddSingleton<IAvatarService>(new AvatarService(avatarStoragePath, $"{apiBaseUrl}/uploads/avatars"));
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
 
-// Chat image storage configuration.
-var imageStoragePath = Path.Combine(builder.Environment.ContentRootPath, "uploads", "images");
-Directory.CreateDirectory(imageStoragePath);
-builder.Services.AddSingleton<IImageUploadService>(new ImageUploadService(imageStoragePath, $"{apiBaseUrl}/uploads/images"));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("fixed", limiter =>
+    {
+        limiter.PermitLimit = 100;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+});
+
+// File storage provider (Local or AzureBlob).
+var storageProvider = builder.Configuration["Storage:Provider"] ?? "Local";
+var uploadsPath = Path.Combine(builder.Environment.ContentRootPath, "uploads");
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"]?.TrimEnd('/') ?? "";
+
+if (storageProvider.Equals("AzureBlob", StringComparison.OrdinalIgnoreCase))
+{
+    var blobServiceUri = new Uri(builder.Configuration["Storage:AzureBlob:ServiceUri"]
+        ?? throw new InvalidOperationException("Storage:AzureBlob:ServiceUri is required when using AzureBlob provider."));
+    builder.Services.AddSingleton(new BlobServiceClient(blobServiceUri, new DefaultAzureCredential()));
+    builder.Services.AddSingleton<IFileStorageService, AzureBlobStorageService>();
+}
+else
+{
+    Directory.CreateDirectory(uploadsPath);
+    builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsPath, $"{apiBaseUrl}/uploads"));
+}
+
+builder.Services.AddSingleton<IAvatarService, AvatarService>();
+builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();
 
 // Link preview HttpClient with DNS rebinding protection, redirect limits, and no cookies.
 builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =>
@@ -169,25 +206,72 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseCors("dev");
+app.UseCors("default");
 
-// Serve uploaded avatar files as static content.
-app.UseStaticFiles(new StaticFileOptions
+// Trust forwarded headers from Azure Container Apps reverse proxy.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    FileProvider = new PhysicalFileProvider(avatarStoragePath),
-    RequestPath = "/uploads/avatars"
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
-// Serve uploaded chat images as static content.
-app.UseStaticFiles(new StaticFileOptions
+app.UseSerilogRequestLogging();
+
+app.UseRateLimiter();
+
+// Serve uploaded files as static content only when using local storage.
+if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
 {
-    FileProvider = new PhysicalFileProvider(imageStoragePath),
-    RequestPath = "/uploads/images"
-});
+    var avatarStoragePath = Path.Combine(uploadsPath, "avatars");
+    Directory.CreateDirectory(avatarStoragePath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(avatarStoragePath),
+        RequestPath = "/uploads/avatars"
+    });
+
+    var imageStoragePath = Path.Combine(uploadsPath, "images");
+    Directory.CreateDirectory(imageStoragePath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(imageStoragePath),
+        RequestPath = "/uploads/images"
+    });
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
+
+// Liveness probe: always 200 — proves the process is running.
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = WriteHealthResponse
+});
+
+// Readiness probe: includes DB connectivity check.
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponse
+});
+
+static Task WriteHealthResponse(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+    var result = new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(e => new
+        {
+            name = e.Key,
+            status = e.Value.Status.ToString(),
+            description = e.Value.Description
+        })
+    };
+
+    return context.Response.WriteAsJsonAsync(result);
+}
 
 app.Run();

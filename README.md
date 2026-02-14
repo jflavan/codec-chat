@@ -85,6 +85,8 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
 
 ## Documentation
+- [Deployment](docs/DEPLOYMENT.md) - Production deployment, rollback, and operations guide
+- [Azure Deployment Plan](docs/AZURE_DEPLOYMENT_PLAN.md) - Phased migration plan
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
 - [Authentication](docs/AUTH.md) - How Google ID token validation works
 - [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints
@@ -108,5 +110,6 @@ The web app runs at `http://localhost:5174` by default.
 - **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management
 - **Backend:** ASP.NET Core 9, Controller-based APIs
 - **Real-time:** SignalR (WebSockets)
-- **Database:** SQLite with Entity Framework Core
+- **Database:** PostgreSQL with Entity Framework Core 9 (Npgsql)
 - **Authentication:** Google Identity Services (ID tokens)
+- **Infrastructure:** Azure Container Apps, Bicep IaC, GitHub Actions CI/CD

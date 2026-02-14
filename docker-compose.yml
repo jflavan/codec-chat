@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: codec_dev
+      POSTGRES_USER: codec
+      POSTGRES_PASSWORD: codec_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codec -d codec_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: "azurite-blob --blobHost 0.0.0.0 --blobPort 10000"
+    ports:
+      - "10000:10000"
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "5050:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=codec_dev;Username=codec;Password=codec_dev_password"
+      Google__ClientId: "${GOOGLE_CLIENT_ID}"
+      Api__BaseUrl: "http://localhost:5050"
+      Cors__AllowedOrigins__0: "http://localhost:3000"
+      Storage__Provider: "AzureBlob"
+      Storage__AzureBlob__ServiceUri: "http://azurite:10000/devstoreaccount1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        PUBLIC_API_BASE_URL: "http://localhost:5050"
+        PUBLIC_GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+    ports:
+      - "3000:3000"
+    environment:
+      PUBLIC_API_BASE_URL: "http://localhost:5050"
+      PUBLIC_GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

@@ -1,6 +1,5 @@
 using Codec.Api.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Codec.Api.Data;
 
@@ -199,19 +198,5 @@ public class CodecDbContext : DbContext
             entity.ToTable(t => t.HasCheckConstraint("CK_LinkPreview_SingleParent",
                 "(\"MessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR (\"MessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)"));
         });
-
-        // SQLite does not natively support DateTimeOffset ordering.
-        // Store as ISO 8601 strings so ORDER BY works correctly.
-        var dateTimeOffsetConverter = new DateTimeOffsetToStringConverter();
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-        {
-            foreach (var property in entityType.GetProperties())
-            {
-                if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
-                {
-                    property.SetValueConverter(dateTimeOffsetConverter);
-                }
-            }
-        }
     }
 }

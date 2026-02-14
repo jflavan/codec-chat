@@ -1,0 +1,57 @@
+name: infra
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: infra-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Preview infrastructure changes
+        run: |
+          az deployment group what-if \
+            --resource-group rg-codec-prod \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --parameters googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
+            --parameters postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
+
+      - name: Deploy infrastructure
+        run: |
+          az deployment group create \
+            --resource-group rg-codec-prod \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --parameters googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
+            --parameters postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
+
+      - name: Show deployment outputs
+        run: |
+          az deployment group show \
+            --resource-group rg-codec-prod \
+            --name main \
+            --query properties.outputs \
+            --output table

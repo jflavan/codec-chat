@@ -7,9 +7,9 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
 - **Backend:** ASP.NET Core 9 Web API (Controller-based APIs)
 - **Real-time:** SignalR (WebSockets with automatic fallback)
-- **Database:** SQLite with Entity Framework Core 9
+- **Database:** PostgreSQL with Entity Framework Core 9 (Npgsql)
 - **Authentication:** Google Identity Services (ID token validation)
-- **Deployment:** Containerized (Docker support)
+- **Deployment:** Containerized on Azure Container Apps (Docker multi-stage builds)
 
 ## System Components
 
@@ -138,7 +138,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - **Location:** `apps/api/Codec.Api/`
 - **Framework:** ASP.NET Core 9 with Controller-based APIs
 - **Language:** C# 14 (.NET 9)
-- **Database:** SQLite via Entity Framework Core
+- **Database:** PostgreSQL via Entity Framework Core (Npgsql)
 - **Key Features:**
   - Stateless JWT validation
   - RESTful controller-based API design (`[ApiController]`)
@@ -165,7 +165,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 
 ### Data Layer
 - **ORM:** Entity Framework Core 9
-- **Database:** SQLite (development and initial production)
+- **Database:** PostgreSQL (local via Docker Compose, production via Azure Database for PostgreSQL)
 - **Migrations:** Code-first with automatic application
 - **Seeding:** Development data seeded on first run
 
@@ -529,7 +529,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
     "ClientId": "your_google_client_id"
   },
   "ConnectionStrings": {
-    "Default": "Data Source=codec-dev.db"
+    "Default": "Host=localhost;Port=5433;Database=codec_dev;Username=codec;Password=codec_dev_password"
   },
   "Cors": {
     "AllowedOrigins": ["http://localhost:5174"]
@@ -544,18 +544,22 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 - ✅ Audience validation (client ID)
 - ✅ Issuer validation (Google)
 - ✅ Token expiration checking
-- ✅ CORS restrictions
+- ✅ CORS restrictions (environment-driven)
 - ✅ User identity isolation (membership checks)
 - ✅ Controller-level `[Authorize]` attribute enforcement
+- ✅ Rate limiting (fixed window, 100 req/min)
+- ✅ Structured request logging (Serilog)
+- ✅ Content Security Policy (CSP) headers
+- ✅ Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
+- ✅ Forwarded headers for reverse proxy (Azure Container Apps)
+- ✅ SSRF protection on link preview fetching (private IP blocking, DNS rebinding prevention)
+- ✅ Secrets management via Azure Key Vault (production)
+- ✅ Managed Identity for all Azure service-to-service auth (no connection strings for blob/ACR)
 
 ### Production Requirements
-- 🔒 HTTPS enforcement
-- 🔒 Rate limiting
-- 🔒 Request logging and monitoring
-- 🔒 Secrets management (Azure Key Vault, etc.)
-- 🔒 Database encryption at rest
-- 🔒 Content Security Policy (CSP)
-- 🔒 Input sanitization and validation
+- 🔒 HTTPS enforcement (via Azure Container Apps)
+- 🔒 Database encryption at rest (Azure-managed)
+- 🔒 Container image vulnerability scanning
 
 ## Deployment Architecture
 
@@ -575,40 +579,51 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 │  └────────────┘  │
 │                  │
 │  ┌────────────┐  │
-│  │  SQLite    │  │
-│  │  codec-dev │  │
+│  │ PostgreSQL │  │
+│  │  (Docker)  │  │ :5432
 │  └────────────┘  │
 └──────────────────┘
 ```
 
-### Production (Future)
+### Production (Azure)
 ```
-┌──────────────┐       ┌──────────────┐
-│   CDN /      │       │  Container   │
-│   Static     │       │  Registry    │
-│   Hosting    │       └──────────────┘
-└──────┬───────┘              │
-       │                      │
-       v                      v
-┌────────────────────────────────┐
-│   Load Balancer / Ingress      │
-└────────┬───────────────────────┘
-         │
-    ┌────┴────┐
-    │         │
-    v         v
-┌────────┐ ┌────────┐
-│  Web   │ │  API   │
-│  SPA   │ │  Pod   │
-└────────┘ └───┬────┘
-               │
-               v
-        ┌──────────────┐
-        │  PostgreSQL  │
-        │  or Azure    │
-        │  SQL         │
-        └──────────────┘
+                     ┌─────────────────────────────────────────────────────┐
+                     │                Azure (Central US)                   │
+                     │                                                     │
+┌──────────┐  HTTPS  │  ┌──────────────────────────────────────────────┐   │
+│  Users /  │───────►│  │          Container Apps Environment           │   │
+│  Browser  │        │  │                                              │   │
+└──────────┘        │  │  ┌────────────────┐  ┌────────────────────┐  │   │
+                     │  │  │  Web App       │  │  API App           │  │   │
+                     │  │  │  SvelteKit     │──│  ASP.NET Core 9    │  │   │
+                     │  │  │  Node.js 20    │  │  SignalR WebSocket │  │   │
+                     │  │  │  Port 3000     │  │  Port 8080         │  │   │
+                     │  │  └────────────────┘  └────────┬───────────┘  │   │
+                     │  └────────────────────────────────┼──────────────┘   │
+                     │                                   │                  │
+                     │  ┌────────────────┐  ┌───────────┴──────────────┐   │
+                     │  │  Azure Blob    │  │  PostgreSQL Flexible     │   │
+                     │  │  Storage       │  │  Server (B1ms, 32 GB)    │   │
+                     │  │  (avatars,     │  └──────────────────────────┘   │
+                     │  │   images)      │                                 │
+                     │  └────────────────┘  ┌──────────────────────────┐   │
+                     │                      │  Key Vault (secrets)     │   │
+                     │  ┌────────────────┐  └──────────────────────────┘   │
+                     │  │  Container     │                                 │
+                     │  │  Registry      │  ┌──────────────────────────┐   │
+                     │  └────────────────┘  │  Log Analytics Workspace │   │
+                     │                      └──────────────────────────┘   │
+                     └─────────────────────────────────────────────────────┘
+
+                     ┌─────────────────────────────────────────────────────┐
+                     │                  GitHub Actions                     │
+                     │  CI → CD (build, push, migrate, deploy, smoke)      │
+                     │  Infra (Bicep what-if → deploy)                     │
+                     │  OIDC federated credentials (no long-lived secrets) │
+                     └─────────────────────────────────────────────────────┘
 ```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback procedures, and troubleshooting.
 
 ## Performance Considerations
 

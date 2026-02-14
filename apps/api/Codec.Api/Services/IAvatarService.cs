@@ -12,23 +12,28 @@ public interface IAvatarService
     string? Validate(IFormFile file);
 
     /// <summary>
-    /// Saves a user avatar to disk and returns the relative storage path.
+    /// Saves a user avatar and returns its public URL.
     /// </summary>
     Task<string> SaveUserAvatarAsync(Guid userId, IFormFile file);
 
     /// <summary>
-    /// Saves a server-specific avatar to disk and returns the relative storage path.
+    /// Saves a server-specific avatar and returns its public URL.
     /// </summary>
     Task<string> SaveServerAvatarAsync(Guid userId, Guid serverId, IFormFile file);
 
     /// <summary>
-    /// Deletes a previously uploaded avatar from disk.
+    /// Deletes all avatar files for the given user.
     /// </summary>
-    void DeleteAvatar(string relativePath);
+    Task DeleteUserAvatarAsync(Guid userId);
 
     /// <summary>
-    /// Resolves a relative avatar storage path to a publicly accessible URL.
-    /// Returns <c>null</c> when <paramref name="relativePath"/> is <c>null</c>.
+    /// Deletes the server-specific avatar for the given user and server.
     /// </summary>
-    string? ResolveUrl(string? relativePath);
+    Task DeleteServerAvatarAsync(Guid userId, Guid serverId);
+
+    /// <summary>
+    /// Returns the avatar URL stored in <paramref name="storedUrl"/>, or <c>null</c> when empty.
+    /// Exists for backward compatibility — the stored value is already a full URL.
+    /// </summary>
+    string? ResolveUrl(string? storedUrl);
 }

@@ -1,14 +1,14 @@
 using System.Security.Claims;
 using Codec.Api.Data;
 using Codec.Api.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Codec.Api.Services;
 
 /// <summary>
 /// Resolves and manages application users from authentication claims.
-/// Handles concurrent user creation gracefully for SQLite.
+/// Handles concurrent user creation gracefully for PostgreSQL.
 /// </summary>
 public class UserService(CodecDbContext db) : IUserService
 {
@@ -68,7 +68,7 @@ public class UserService(CodecDbContext db) : IUserService
         {
             await db.SaveChangesAsync();
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteErrorCode: 19 })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             // Another concurrent request already created this user. Detach and re-fetch.
             db.Entry(appUser).State = EntityState.Detached;

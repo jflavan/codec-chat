@@ -3,11 +3,14 @@ using System.Security.Cryptography;
 namespace Codec.Api.Services;
 
 /// <summary>
-/// Handles chat image validation, disk storage, and URL resolution.
-/// Images are stored under a configurable root directory (default: <c>uploads/images</c>).
+/// Handles chat image validation and storage.
+/// Delegates file I/O to <see cref="IFileStorageService"/> for storage-provider independence.
 /// </summary>
-public class ImageUploadService : IImageUploadService
+public class ImageUploadService(IFileStorageService fileStorage) : IImageUploadService
 {
+    /// <summary>Blob container name for chat image uploads.</summary>
+    private const string ContainerName = "images";
+
     /// <summary>Maximum upload size in bytes (10 MB).</summary>
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -25,17 +28,6 @@ public class ImageUploadService : IImageUploadService
     {
         ".jpg", ".jpeg", ".png", ".webp", ".gif"
     };
-
-    private readonly string _rootPath;
-    private readonly string _baseUrl;
-
-    /// <param name="rootPath">Absolute path to the image storage directory.</param>
-    /// <param name="baseUrl">Public base URL for serving image files (e.g. <c>http://localhost:5050/uploads/images</c>).</param>
-    public ImageUploadService(string rootPath, string baseUrl)
-    {
-        _rootPath = rootPath;
-        _baseUrl = baseUrl.TrimEnd('/');
-    }
 
     /// <inheritdoc />
     public string? Validate(IFormFile file)
@@ -67,19 +59,12 @@ public class ImageUploadService : IImageUploadService
     /// <inheritdoc />
     public async Task<string> SaveImageAsync(Guid userId, IFormFile file)
     {
-        var directory = Path.Combine(_rootPath, userId.ToString());
-        Directory.CreateDirectory(directory);
-
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var hash = await ComputeHashAsync(file);
-        var fileName = $"{hash}{extension}";
-        var fullPath = Path.Combine(directory, fileName);
+        var blobPath = $"{userId}/{hash}{extension}";
 
-        await using var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write);
-        await file.CopyToAsync(stream);
-
-        var relativePath = $"{userId}/{fileName}";
-        return $"{_baseUrl}/{relativePath}";
+        using var stream = file.OpenReadStream();
+        return await fileStorage.UploadAsync(ContainerName, blobPath, stream, file.ContentType);
     }
 
     /// <summary>

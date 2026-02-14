@@ -32,15 +32,15 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
         // Remove the previous custom avatar file if one exists.
         if (!string.IsNullOrEmpty(appUser.CustomAvatarPath))
         {
-            avatarService.DeleteAvatar(appUser.CustomAvatarPath);
+            await avatarService.DeleteUserAvatarAsync(appUser.Id);
         }
 
-        var relativePath = await avatarService.SaveUserAvatarAsync(appUser.Id, file);
-        appUser.CustomAvatarPath = relativePath;
+        var avatarUrl = await avatarService.SaveUserAvatarAsync(appUser.Id, file);
+        appUser.CustomAvatarPath = avatarUrl;
         appUser.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
 
-        return Ok(new { avatarUrl = avatarService.ResolveUrl(relativePath) });
+        return Ok(new { avatarUrl });
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
             return Ok(new { avatarUrl = appUser.AvatarUrl });
         }
 
-        avatarService.DeleteAvatar(appUser.CustomAvatarPath);
+        await avatarService.DeleteUserAvatarAsync(appUser.Id);
         appUser.CustomAvatarPath = null;
         appUser.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
@@ -89,14 +89,14 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
         // Remove the previous server avatar file if one exists.
         if (!string.IsNullOrEmpty(membership.CustomAvatarPath))
         {
-            avatarService.DeleteAvatar(membership.CustomAvatarPath);
+            await avatarService.DeleteServerAvatarAsync(appUser.Id, serverId);
         }
 
-        var relativePath = await avatarService.SaveServerAvatarAsync(appUser.Id, serverId, file);
-        membership.CustomAvatarPath = relativePath;
+        var avatarUrl = await avatarService.SaveServerAvatarAsync(appUser.Id, serverId, file);
+        membership.CustomAvatarPath = avatarUrl;
         await db.SaveChangesAsync();
 
-        return Ok(new { avatarUrl = avatarService.ResolveUrl(relativePath) });
+        return Ok(new { avatarUrl });
     }
 
     /// <summary>
@@ -117,15 +117,15 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
         if (string.IsNullOrEmpty(membership.CustomAvatarPath))
         {
             // No server avatar to delete; return the effective global avatar.
-            var effectiveUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
+            var effectiveUrl = appUser.CustomAvatarPath ?? appUser.AvatarUrl;
             return Ok(new { avatarUrl = effectiveUrl });
         }
 
-        avatarService.DeleteAvatar(membership.CustomAvatarPath);
+        await avatarService.DeleteServerAvatarAsync(appUser.Id, serverId);
         membership.CustomAvatarPath = null;
         await db.SaveChangesAsync();
 
-        var fallbackUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
+        var fallbackUrl = appUser.CustomAvatarPath ?? appUser.AvatarUrl;
         return Ok(new { avatarUrl = fallbackUrl });
     }
 }

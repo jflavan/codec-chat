@@ -4,31 +4,28 @@ This document describes Codec's data persistence strategy, database schema, and 
 
 ## Technology Choice
 
-**Decision:** Codec uses **SQLite** with **Entity Framework Core 9** for persistence.
+**Decision:** Codec uses **PostgreSQL** with **Entity Framework Core 9** (via the Npgsql provider) for persistence.
 
 ### Rationale
-- ✅ **Simple local setup** - No database server required for development
-- ✅ **Zero configuration** - File-based database (codec-dev.db)
-- ✅ **Fast iteration** - Quick schema changes during MVP phase
-- ✅ **EF Core support** - Full ORM capabilities with migrations
-- ✅ **Portable** - Easy to share development databases
-- ✅ **Production ready** - Suitable for small-to-medium deployments
+- ✅ **Production-grade** - Full ACID compliance, high concurrency, and mature ecosystem
+- ✅ **Native type support** - `uuid`, `timestamptz`, `jsonb`, full-text search built-in
+- ✅ **Azure ready** - Azure Database for PostgreSQL Flexible Server for production
+- ✅ **EF Core support** - Full ORM capabilities with Npgsql provider and migrations
+- ✅ **Docker for local dev** - Consistent environment via `docker-compose.dev.yml`
 
-### Production Considerations
-SQLite is suitable for initial production deployments with moderate traffic. For larger scale:
-- **PostgreSQL** - Best for high concurrency and complex queries
-- **Azure SQL** - For Azure-hosted deployments
-- **MySQL/MariaDB** - Alternative open-source option
+### Local Development Setup
+PostgreSQL runs locally via Docker Compose. From the repository root:
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+This starts PostgreSQL 16 on `localhost:5433` with database `codec_dev`, user `codec`, password `codec_dev_password`.
 
-EF Core migrations make database provider switches straightforward.
+## Database Instances
 
-## Database Files
-
-| Environment | File | Purpose |
-|------------|------|---------|
-| Production | `codec.db` | Main production database |
-| Development | `codec-dev.db` | Local development database |
-| Testing | `:memory:` | In-memory for tests |
+| Environment | Host | Database | Notes |
+|------------|------|----------|-------|
+| Development | `localhost:5433` (Docker) | `codec_dev` | Via `docker-compose.dev.yml` |
+| Production | Azure Database for PostgreSQL | `codec` | Managed service |
 
 ## Entity Model
 
@@ -468,25 +465,11 @@ public class CodecDbContext : DbContext
 
         // Configure relationships and indexes
         // ... (see actual implementation)
-
-        // SQLite does not natively support DateTimeOffset ordering.
-        // Store as ISO 8601 strings so ORDER BY works correctly.
-        var dateTimeOffsetConverter = new DateTimeOffsetToStringConverter();
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-        {
-            foreach (var property in entityType.GetProperties())
-            {
-                if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
-                {
-                    property.SetValueConverter(dateTimeOffsetConverter);
-                }
-            }
-        }
     }
 }
 ```
 
-> **SQLite DateTimeOffset Handling:** SQLite does not natively support `DateTimeOffset` in `ORDER BY` clauses. A `DateTimeOffsetToStringConverter` is applied to all `DateTimeOffset` properties, storing them as ISO 8601 strings. This ensures correct ordering and filtering without requiring raw SQL workarounds.
+> **PostgreSQL Type Mapping:** Npgsql maps .NET `Guid` to PostgreSQL `uuid` and `DateTimeOffset` to `timestamp with time zone` natively — no custom value converters are needed.
 
 ## Migrations
 
@@ -719,48 +702,42 @@ var messages = await db.Messages
 
 ### Development
 ```bash
-# Backup
-cp apps/api/Codec.Api/codec-dev.db codec-dev.backup.db
-
-# Restore
-cp codec-dev.backup.db apps/api/Codec.Api/codec-dev.db
+# Reset database (destroy and recreate)
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d
+cd apps/api/Codec.Api && dotnet run  # re-applies migrations and seeds
 ```
 
 ### Production
 
 **Automated backup strategy:**
-- SQLite: Use Litestream for continuous replication
-- PostgreSQL: Use pg_dump or cloud provider backups
-- Azure SQL: Built-in automated backups
+- Azure Database for PostgreSQL: Built-in automated backups with point-in-time restore
+- Manual: `pg_dump` for on-demand logical backups
 
 **Backup frequency:**
-- Full backup: Daily
-- Incremental: Hourly
-- Retention: 30 days minimum
+- Full backup: Daily (Azure automated)
+- Continuous WAL archiving: Enabled by default on Azure
+- Retention: 7–35 days (configurable)
 
 ## Connection String Configuration
 
 ```json
 {
   "ConnectionStrings": {
-    "Default": "Data Source=codec-dev.db"
+    "Default": "Host=localhost;Port=5433;Database=codec_dev;Username=codec;Password=codec_dev_password"
   }
 }
 ```
 
-**SQLite options:**
+**Production (Azure):**
 ```
-Data Source=codec.db;Cache=Shared;Mode=ReadWriteCreate;
-```
-
-**Future PostgreSQL:**
-```
-Host=localhost;Database=codec;Username=codecuser;Password=***;
+Host=<server>.postgres.database.azure.com;Port=5432;Database=codec;Username=<user>;Password=***;Ssl Mode=Require;
 ```
 
 ## References
 
 - [EF Core Documentation](https://learn.microsoft.com/en-us/ef/core/)
-- [SQLite Documentation](https://www.sqlite.org/docs.html)
+- [Npgsql EF Core Provider](https://www.npgsql.org/efcore/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [Migrations Overview](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/)
 - [Query Performance](https://learn.microsoft.com/en-us/ef/core/performance/)
