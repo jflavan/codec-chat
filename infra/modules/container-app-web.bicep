@@ -4,8 +4,9 @@ param location string
 param environmentId string
 param containerRegistryLoginServer string
 param containerRegistryName string
-param imageName string = 'codec-web'
-param imageTag string = 'latest'
+param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+var isQuickstart = containerImage == 'mcr.microsoft.com/k8se/quickstart:latest'
 
 param publicApiBaseUrl string
 param publicGoogleClientId string
@@ -26,10 +27,10 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true
-        targetPort: 3000
+        targetPort: isQuickstart ? 80 : 3000
         transport: 'http'
       }
-      registries: [
+      registries: isQuickstart ? [] : [
         {
           server: containerRegistryLoginServer
           identity: 'system'
@@ -40,12 +41,12 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'web'
-          image: '${containerRegistryLoginServer}/${imageName}:${imageTag}'
+          image: containerImage
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
-          env: [
+          env: isQuickstart ? [] : [
             {
               name: 'NODE_ENV'
               value: 'production'
@@ -59,7 +60,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: publicGoogleClientId
             }
           ]
-          probes: [
+          probes: isQuickstart ? [] : [
             {
               type: 'Liveness'
               httpGet: {
