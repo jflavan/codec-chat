@@ -35,18 +35,22 @@ jobs:
           az deployment group what-if \
             --resource-group rg-codec-prod \
             --template-file infra/main.bicep \
-            --parameters infra/main.bicepparam \
-            --parameters googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
-            --parameters postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
+            --parameters \
+              location='centralus' \
+              environmentName='prod' \
+              googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
+              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
 
       - name: Deploy infrastructure
         run: |
           az deployment group create \
             --resource-group rg-codec-prod \
             --template-file infra/main.bicep \
-            --parameters infra/main.bicepparam \
-            --parameters googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
-            --parameters postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
+            --parameters \
+              location='centralus' \
+              environmentName='prod' \
+              googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
+              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}'
 
       - name: Show deployment outputs
         run: |
