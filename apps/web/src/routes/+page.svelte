@@ -35,6 +35,14 @@
 	onDestroy(() => {
 		app.destroy();
 	});
+
+	function closeMobileNav(): void {
+		app.mobileNavOpen = false;
+	}
+
+	function closeMobileMembers(): void {
+		app.mobileMembersOpen = false;
+	}
 </script>
 
 <svelte:head>
@@ -61,6 +69,31 @@
 		<MembersSidebar />
 	{/if}
 </div>
+
+<!-- Mobile navigation drawer -->
+{#if app.mobileNavOpen}
+	<div class="mobile-drawer-backdrop" onclick={closeMobileNav} aria-hidden="true"></div>
+	<div class="mobile-drawer" aria-label="Navigation">
+		<div class="mobile-drawer-servers">
+			<ServerSidebar />
+		</div>
+		<div class="mobile-drawer-channels">
+			{#if app.showFriendsPanel}
+				<HomeSidebar />
+			{:else}
+				<ChannelSidebar />
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- Mobile members drawer -->
+{#if app.mobileMembersOpen}
+	<div class="mobile-drawer-backdrop" onclick={closeMobileMembers} aria-hidden="true"></div>
+	<aside class="mobile-members-drawer" aria-label="Members">
+		<MembersSidebar />
+	</aside>
+{/if}
 
 {#if app.settingsOpen}
 	<UserSettingsModal />
@@ -91,31 +124,121 @@
 		}
 	}
 
+	/* ───── Mobile: single-column layout ───── */
+
 	@media (max-width: 899px) {
 		.app-shell {
 			grid-template-columns: 1fr;
 			grid-template-rows: 1fr;
 		}
 
-		.app-shell > :global(:nth-child(1)) {
+		/* Hide server sidebar and channel/home sidebar from grid on mobile */
+		.app-shell > :global(:nth-child(1)),
+		.app-shell > :global(:nth-child(2)) {
 			display: none;
 		}
 
-		.app-shell:not(.home-mode) > :global(:nth-child(2)),
+		/* Hide members sidebar from grid on mobile (accessed via drawer) */
 		.app-shell:not(.home-mode) > :global(:nth-child(4)) {
 			display: none;
 		}
 
-		.app-shell:not(.home-mode) > :global(:nth-child(3)) {
+		/* Main content area fills viewport */
+		.app-shell:not(.home-mode) > :global(:nth-child(3)),
+		.app-shell.home-mode > :global(:nth-child(3)) {
 			height: 100vh;
 		}
+	}
 
-		.app-shell.home-mode:not(.dm-active) > :global(:nth-child(2)) {
-			display: none;
+	/* ───── Mobile drawer overlay ───── */
+
+	.mobile-drawer-backdrop {
+		display: none;
+	}
+
+	.mobile-drawer {
+		display: none;
+	}
+
+	.mobile-members-drawer {
+		display: none;
+	}
+
+	@media (max-width: 899px) {
+		.mobile-drawer-backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			background: rgba(0, 0, 0, 0.6);
+			z-index: 60;
 		}
 
-		.app-shell.home-mode.dm-active > :global(:nth-child(2)) {
-			display: none;
+		.mobile-drawer {
+			display: flex;
+			position: fixed;
+			top: 0;
+			left: 0;
+			bottom: 0;
+			width: 312px;
+			max-width: 85vw;
+			z-index: 61;
+			animation: slide-in-left 200ms ease;
+		}
+
+		.mobile-drawer-servers {
+			width: 72px;
+			flex-shrink: 0;
+			height: 100%;
+			overflow: hidden;
+		}
+
+		.mobile-drawer-servers > :global(*) {
+			height: 100%;
+		}
+
+		.mobile-drawer-channels {
+			flex: 1;
+			min-width: 0;
+			height: 100%;
+			overflow: hidden;
+		}
+
+		.mobile-drawer-channels > :global(*) {
+			height: 100%;
+		}
+
+		.mobile-members-drawer {
+			display: flex;
+			position: fixed;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			width: 260px;
+			max-width: 80vw;
+			z-index: 61;
+			animation: slide-in-right 200ms ease;
+		}
+
+		.mobile-members-drawer > :global(*) {
+			width: 100%;
+			height: 100%;
+		}
+	}
+
+	@keyframes slide-in-left {
+		from { transform: translateX(-100%); }
+		to { transform: translateX(0); }
+	}
+
+	@keyframes slide-in-right {
+		from { transform: translateX(100%); }
+		to { transform: translateX(0); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.mobile-drawer,
+		.mobile-members-drawer {
+			animation: none;
 		}
 	}
 </style>

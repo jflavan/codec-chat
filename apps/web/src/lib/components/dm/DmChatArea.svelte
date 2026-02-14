@@ -195,6 +195,11 @@
 	ondrop={handleDrop}
 >
 	<header class="dm-header">
+		<button class="mobile-nav-btn" onclick={() => { app.mobileNavOpen = true; }} aria-label="Open navigation">
+			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path d="M3 5h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2z"/>
+			</svg>
+		</button>
 		<div class="dm-header-left">
 			{#if app.activeDmParticipant?.avatarUrl}
 				<img class="header-avatar" src={app.activeDmParticipant.avatarUrl} alt="" />
@@ -449,12 +454,41 @@
 		padding: 0 16px;
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+		gap: 8px;
 	}
 
 	.dm-header-left {
 		display: flex;
 		align-items: center;
 		gap: 10px;
+		flex: 1;
+		min-width: 0;
+	}
+
+	/* ───── Mobile navigation button ───── */
+
+	.mobile-nav-btn {
+		display: none;
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.mobile-nav-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
+	}
+
+	@media (max-width: 899px) {
+		.mobile-nav-btn {
+			display: grid;
+		}
 	}
 
 	.header-avatar {
