@@ -815,6 +815,15 @@ export class AppState {
 		this.showInvitePanel = false;
 		this.selectedServerId = serverId;
 		this.mobileNavOpen = false;
+
+		// Clean up active DM state so incoming DMs correctly increment unread badges.
+		if (this.activeDmChannelId) {
+			await this.hub.leaveDmChannel(this.activeDmChannelId);
+			this.activeDmChannelId = null;
+			this.dmMessages = [];
+			this.dmTypingUsers = [];
+		}
+
 		await this.loadChannels(serverId);
 		await this.loadMembers(serverId);
 	}
@@ -1088,7 +1097,7 @@ export class AppState {
 				this.loadFriends();
 			},
 			onReceiveDm: (msg) => {
-				if (msg.dmChannelId === this.activeDmChannelId) {
+				if (this.showFriendsPanel && msg.dmChannelId === this.activeDmChannelId) {
 					if (!this.dmMessages.some((m) => m.id === msg.id)) {
 						this.dmMessages = [...this.dmMessages, { ...msg, linkPreviews: msg.linkPreviews ?? [], replyContext: msg.replyContext ?? null }];
 					}
