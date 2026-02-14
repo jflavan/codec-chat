@@ -1115,9 +1115,15 @@ export class AppState {
 				// A new DM conversation was opened by another user — refresh the list.
 				this.loadDmConversations();
 			},
-			onKickedFromServer: (event) => {
+			onKickedFromServer: async (event) => {
 				// Leave the server's SignalR group since we're no longer a member.
-				this.hub.leaveServer(event.serverId);
+				try {
+					await this.hub.leaveServer(event.serverId);
+				} catch (error) {
+					console.error('Failed to leave server after being kicked:', error);
+					// Proceed with local cleanup even if leaving the hub group fails.
+					this.setTransientError('There was a problem updating your connection after being kicked. Some data may be out of date.');
+				}
 
 				// Remove the server from the local list and navigate away if needed.
 				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
