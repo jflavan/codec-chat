@@ -496,6 +496,38 @@ Full-screen overlay for viewing images at full resolution. Triggered by clicking
 | 900–1199px   | Three-column: servers + channels + chat (members hidden/collapsed)  |
 | ≤ 899px      | Single-column: slide-out navigation, full-width chat                |
 
+### Mobile Layout (≤ 899px)
+
+On mobile viewports, the app uses a single-column layout with slide-out drawers for navigation and members, inspired by Discord's mobile UX patterns.
+
+#### Navigation Drawer (Left)
+
+- **Trigger**: Hamburger menu button (☰) in the chat/friends/DM header, visible only on mobile
+- **Content**: Server icon rail (72px) + Channel sidebar or Home sidebar (flexible width)
+- **Width**: 312px (capped at 85vw)
+- **Behavior**: slides in from the left with a semi-transparent backdrop overlay (z-index 60–61)
+- **Dismiss**: tap backdrop, or auto-closes on channel/server/DM selection and Home navigation
+- **Animation**: `slide-in-left` (200ms ease), respects `prefers-reduced-motion`
+- Provides full access to all servers, channels, DM conversations, friends navigation, user panel (sign-in/out, settings, avatar upload)
+
+#### Members Drawer (Right)
+
+- **Trigger**: Members icon button in the chat header (server mode only), visible only on mobile
+- **Content**: `MembersSidebar` with role-grouped member list
+- **Width**: 260px (capped at 80vw)
+- **Behavior**: slides in from the right with backdrop overlay
+- **Dismiss**: tap backdrop
+- **Animation**: `slide-in-right` (200ms ease), respects `prefers-reduced-motion`
+
+#### Mobile Header Buttons
+
+| Button | Location | Action |
+|--------|----------|--------|
+| Hamburger (☰) | Left of header | Opens navigation drawer |
+| Members (👥) | Right of header (server chat only) | Opens members drawer |
+
+All existing features remain accessible on mobile: channel/server navigation, sign in/out, DMs, friends, user settings, profile customization, chat (including replies, reactions, image upload, mentions).
+
 ## Accessibility
 
 - **Keyboard navigation**: all interactive elements focusable, logical tab order

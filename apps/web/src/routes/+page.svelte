@@ -43,7 +43,21 @@
 	function closeMobileMembers(): void {
 		app.mobileMembersOpen = false;
 	}
+
+	function handleKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Escape') {
+			if (app.mobileMembersOpen) {
+				app.mobileMembersOpen = false;
+				e.stopPropagation();
+			} else if (app.mobileNavOpen) {
+				app.mobileNavOpen = false;
+				e.stopPropagation();
+			}
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
 	<title>Codec</title>
