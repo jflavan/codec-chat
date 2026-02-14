@@ -30,7 +30,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ### Server Management
 - ✅ Server creation (authenticated user becomes Owner)
 - ✅ Server membership tracking
-- ✅ Server member list display
+- ✅ Server member list display with real-time updates (member list auto-refreshes when members join or leave via SignalR)
 - ✅ Role-based membership (Owner, Admin, Member)
 - ✅ Member display with avatar and role
 - ✅ Kick members (Owner can kick Admins and Members; Admins can kick Members only)
@@ -176,7 +176,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Real-time Features
 - Presence indicators (online/offline/away)
-- Real-time member list updates
 
 ### Server Management
 - Server settings/configuration
