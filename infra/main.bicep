@@ -18,6 +18,12 @@ param googleClientId string
 @secure()
 param postgresqlAdminPassword string
 
+@description('API container image (defaults to quickstart placeholder).')
+param apiContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Web container image (defaults to quickstart placeholder).')
+param webContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -104,6 +110,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     environmentId: containerAppsEnv.outputs.id
     containerRegistryLoginServer: containerRegistry.outputs.loginServer
     containerRegistryName: containerRegistry.outputs.name
+    containerImage: apiContainerImage
     keyVaultName: keyVault.outputs.name
     keyVaultUri: keyVault.outputs.uri
     storageAccountName: storageAccount.outputs.name
@@ -121,6 +128,7 @@ module webApp 'modules/container-app-web.bicep' = {
     environmentId: containerAppsEnv.outputs.id
     containerRegistryLoginServer: containerRegistry.outputs.loginServer
     containerRegistryName: containerRegistry.outputs.name
+    containerImage: webContainerImage
     publicApiBaseUrl: 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
     publicGoogleClientId: googleClientId
   }
