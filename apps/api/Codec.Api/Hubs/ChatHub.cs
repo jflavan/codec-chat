@@ -1,25 +1,57 @@
+using Codec.Api.Data;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Hubs;
 
 /// <summary>
 /// SignalR hub for real-time chat features including message delivery, typing indicators,
-/// and friend-related events. Clients join channel-scoped and user-scoped groups.
+/// and friend-related events. Clients join channel-scoped, user-scoped, and server-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
-    /// (<c>user-{userId}</c>) so they receive friend-related real-time events.
+    /// (<c>user-{userId}</c>) and all server-scoped groups (<c>server-{serverId}</c>)
+    /// so the client receives real-time membership events.
     /// </summary>
     public override async Task OnConnectedAsync()
     {
         var appUser = await userService.GetOrCreateUserAsync(Context.User!);
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{appUser.Id}");
+
+        var serverIds = await db.ServerMembers
+            .AsNoTracking()
+            .Where(m => m.UserId == appUser.Id)
+            .Select(m => m.ServerId)
+            .ToListAsync();
+
+        var groupJoinTasks = serverIds
+            .Select(serverId => Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}"));
+
+        await Task.WhenAll(groupJoinTasks);
         await base.OnConnectedAsync();
+    }
+
+    /// <summary>
+    /// Adds the caller to a server-scoped group so they receive membership events.
+    /// Called after joining a new server.
+    /// </summary>
+    public async Task JoinServer(string serverId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}");
+    }
+
+    /// <summary>
+    /// Removes the caller from a server-scoped group.
+    /// Called after being kicked or leaving a server.
+    /// </summary>
+    public async Task LeaveServer(string serverId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"server-{serverId}");
     }
     /// <summary>
     /// Adds the caller to a SignalR group scoped to <paramref name="channelId"/>
