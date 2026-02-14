@@ -327,6 +327,19 @@
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 	}
 
+	/* Mobile: Reposition popover to be visible on narrow screens */
+	@media (max-width: 899px) {
+		.server-create-popover {
+			position: fixed;
+			left: 50%;
+			bottom: 50%;
+			transform: translate(-50%, 50%);
+			width: calc(100vw - 32px);
+			max-width: 320px;
+			z-index: 70;
+		}
+	}
+
 	/* ── shared form styles (scoped) ── */
 	.inline-form {
 		display: flex;
