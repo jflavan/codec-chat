@@ -11,6 +11,12 @@ var isQuickstart = containerImage == 'mcr.microsoft.com/k8se/quickstart:latest'
 param publicApiBaseUrl string
 param publicGoogleClientId string
 
+@description('Custom domain name for the web app (e.g., codec-chat.com). Leave empty to skip.')
+param customDomainName string = ''
+
+@description('Resource ID of the managed certificate for the custom domain.')
+param managedCertificateId string = ''
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
   name: containerRegistryName
 }
@@ -29,6 +35,13 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
         external: true
         targetPort: isQuickstart ? 80 : 3000
         transport: 'http'
+        customDomains: customDomainName != '' ? [
+          {
+            name: customDomainName
+            certificateId: managedCertificateId
+            bindingType: 'SniEnabled'
+          }
+        ] : []
       }
       registries: isQuickstart ? [] : [
         {

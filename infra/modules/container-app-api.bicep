@@ -16,6 +16,12 @@ param storageBlobEndpoint string
 param corsAllowedOrigins string
 param apiBaseUrl string
 
+@description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
+param customDomainName string = ''
+
+@description('Resource ID of the managed certificate for the custom domain.')
+param managedCertificateId string = ''
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
   name: containerRegistryName
 }
@@ -42,6 +48,13 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
         external: true
         targetPort: isQuickstart ? 80 : 8080
         transport: 'http'
+        customDomains: customDomainName != '' ? [
+          {
+            name: customDomainName
+            certificateId: managedCertificateId
+            bindingType: 'SniEnabled'
+          }
+        ] : []
         corsPolicy: {
           allowedOrigins: [corsAllowedOrigins]
           allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']

@@ -660,12 +660,20 @@ infra/
 
 ### 10.1 Domain & DNS
 
-- [ ] Configure `codec-chat.com` DNS (registered via Squarespace Domains)
-- [ ] Point DNS to Azure Container Apps via CNAME or transfer DNS to Azure DNS
-- [ ] Map `codec-chat.com` → Web Container App (custom domain binding)
-- [ ] Map `api.codec-chat.com` → API Container App (custom domain binding)
-- [ ] Azure-managed TLS certificates via Container Apps managed certificates
-- [ ] Update Google OAuth console: add `https://codec-chat.com` and `https://api.codec-chat.com` as authorized JavaScript origins
+- [x] Configure `codec-chat.com` DNS (registered via Squarespace Domains)
+- [x] Point DNS to Azure Container Apps via CNAME records
+- [x] Add domain verification TXT records (`asuid` and `asuid.api`) for Azure Container Apps
+- [x] Create Bicep `managed-certificate.bicep` module for Azure-managed TLS certificates
+- [x] Add `customDomains` support to `container-app-api.bicep` and `container-app-web.bicep`
+- [x] Add `webCustomDomain` and `apiCustomDomain` parameters to `main.bicep`
+- [x] Update `corsAllowedOrigins` and `apiBaseUrl` to use custom domains when provided
+- [x] Update `main.bicepparam` with `codec-chat.com` and `api.codec-chat.com`
+- [x] Update `infra.yml` and `cd.yml` pipelines with custom domain parameters
+- [ ] Map `codec-chat.com` → Web Container App (custom domain binding via Bicep deployment)
+- [ ] Map `api.codec-chat.com` → API Container App (custom domain binding via Bicep deployment)
+- [ ] Azure-managed TLS certificates provisioned via Container Apps managed certificates
+- [ ] Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
+- [ ] Update `PUBLIC_API_BASE_URL` GitHub Secret to `https://api.codec-chat.com`
 
 ### 10.2 Security hardening
 
