@@ -41,9 +41,10 @@ jobs:
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
               postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
               webCustomDomain='codec-chat.com' \
-              apiCustomDomain='api.codec-chat.com'
+              apiCustomDomain='api.codec-chat.com' \
+              bindCertificates=true
 
-      - name: Deploy infrastructure
+      - name: Deploy infrastructure (register hostnames and create certificates)
         run: |
           az deployment group create \
             --resource-group rg-codec-prod \
@@ -54,7 +55,22 @@ jobs:
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
               postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
               webCustomDomain='codec-chat.com' \
-              apiCustomDomain='api.codec-chat.com'
+              apiCustomDomain='api.codec-chat.com' \
+              bindCertificates=false
+
+      - name: Deploy infrastructure (bind certificates to custom domains)
+        run: |
+          az deployment group create \
+            --resource-group rg-codec-prod \
+            --template-file infra/main.bicep \
+            --parameters \
+              location='centralus' \
+              environmentName='prod' \
+              googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
+              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              webCustomDomain='codec-chat.com' \
+              apiCustomDomain='api.codec-chat.com' \
+              bindCertificates=true
 
       - name: Show deployment outputs
         run: |
