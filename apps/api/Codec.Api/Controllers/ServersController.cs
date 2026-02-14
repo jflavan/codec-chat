@@ -194,6 +194,12 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             serverName
         });
 
+        // Notify remaining members so they can refresh their member list.
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberLeft", new
+        {
+            serverId
+        });
+
         return NoContent();
     }
 
@@ -468,6 +474,12 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         db.ServerMembers.Add(membership);
         invite.UseCount++;
         await db.SaveChangesAsync();
+
+        // Notify existing server members that a new member joined.
+        await hub.Clients.Group($"server-{invite.ServerId}").SendAsync("MemberJoined", new
+        {
+            serverId = invite.ServerId
+        });
 
         return Created($"/servers/{invite.ServerId}/members/{appUser.Id}", new
         {

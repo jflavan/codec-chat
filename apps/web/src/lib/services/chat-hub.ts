@@ -60,6 +60,14 @@ export type MentionReceivedEvent = {
 	body: string;
 };
 
+export type MemberJoinedEvent = {
+	serverId: string;
+};
+
+export type MemberLeftEvent = {
+	serverId: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -77,6 +85,8 @@ export type SignalRCallbacks = {
 	onKickedFromServer?: (event: KickedFromServerEvent) => void;
 	onLinkPreviewsReady?: (event: LinkPreviewsReadyEvent) => void;
 	onMentionReceived?: (event: MentionReceivedEvent) => void;
+	onMemberJoined?: (event: MemberJoinedEvent) => void;
+	onMemberLeft?: (event: MemberLeftEvent) => void;
 };
 
 /**
@@ -142,6 +152,12 @@ export class ChatHubService {
 		if (callbacks.onMentionReceived) {
 			connection.on('MentionReceived', callbacks.onMentionReceived);
 		}
+		if (callbacks.onMemberJoined) {
+			connection.on('MemberJoined', callbacks.onMemberJoined);
+		}
+		if (callbacks.onMemberLeft) {
+			connection.on('MemberLeft', callbacks.onMemberLeft);
+		}
 
 		try {
 			await connection.start();
@@ -172,6 +188,18 @@ export class ChatHubService {
 	async leaveChannel(channelId: string): Promise<void> {
 		if (this.isConnected) {
 			await this.connection!.invoke('LeaveChannel', channelId).catch(() => {});
+		}
+	}
+
+	async joinServer(serverId: string): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('JoinServer', serverId).catch(() => {});
+		}
+	}
+
+	async leaveServer(serverId: string): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('LeaveServer', serverId).catch(() => {});
 		}
 	}
 

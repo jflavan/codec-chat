@@ -563,6 +563,7 @@ export class AppState {
 		this.isJoining = true;
 		try {
 			const result = await this.api.joinViaInvite(this.idToken, code);
+			await this.hub.joinServer(result.serverId);
 			await this.loadServers();
 			await this.selectServer(result.serverId);
 		} catch (e) {
@@ -1115,6 +1116,9 @@ export class AppState {
 				this.loadDmConversations();
 			},
 			onKickedFromServer: (event) => {
+				// Leave the server's SignalR group since we're no longer a member.
+				this.hub.leaveServer(event.serverId);
+
 				// Remove the server from the local list and navigate away if needed.
 				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
 				if (this.selectedServerId === event.serverId) {
@@ -1157,6 +1161,16 @@ export class AppState {
 				const next = new Map(this.channelMentionCounts);
 				next.set(event.channelId, (next.get(event.channelId) ?? 0) + 1);
 				this.channelMentionCounts = next;
+			},
+			onMemberJoined: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.loadMembers(event.serverId);
+				}
+			},
+			onMemberLeft: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.loadMembers(event.serverId);
+				}
 			}
 		});
 
