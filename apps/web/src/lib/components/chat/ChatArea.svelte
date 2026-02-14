@@ -101,6 +101,7 @@
 		flex-direction: column;
 		overflow: hidden;
 		position: relative;
+		height: 100%;
 	}
 
 	.chat-header {
@@ -202,6 +203,14 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		min-height: 0;
+	}
+
+	/* Mobile: Ensure composer stays at bottom of viewport */
+	@media (max-width: 899px) {
+		.chat-main {
+			height: 100vh;
+		}
 	}
 
 	.error-banner {
