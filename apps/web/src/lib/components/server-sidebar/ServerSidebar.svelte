@@ -332,8 +332,8 @@
 		.server-create-popover {
 			position: fixed;
 			left: 50%;
-			bottom: 50%;
-			transform: translate(-50%, 50%);
+			top: 50%;
+			transform: translate(-50%, -50%);
 			width: calc(100vw - 32px);
 			max-width: 320px;
 			z-index: 70;
