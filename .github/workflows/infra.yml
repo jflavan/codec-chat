@@ -2,10 +2,6 @@ name: infra
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'infra/**'
 
 permissions:
   id-token: write

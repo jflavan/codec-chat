@@ -14,7 +14,7 @@ resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2024
   location: location
   properties: {
     subjectName: domainName
-    domainControlValidation: 'TXT'
+    domainControlValidation: 'HTTP'
   }
 }
 
