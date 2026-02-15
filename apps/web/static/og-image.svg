@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0B1A10"/>
+      <stop offset="100%" stop-color="#050B07"/>
+    </radialGradient>
+    <filter id="textGlow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Subtle scanline effect -->
+  <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+    <rect width="4" height="2" fill="rgba(0,255,102,0.03)"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#scanlines)"/>
+
+  <!-- Border accent -->
+  <rect x="20" y="20" width="1160" height="590" rx="16" fill="none" stroke="#00FF66" stroke-width="2" opacity="0.3"/>
+
+  <!-- Title -->
+  <text x="600" y="260" text-anchor="middle" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="96" font-weight="700" fill="#00FF66" filter="url(#textGlow)">CODEC</text>
+
+  <!-- Tagline -->
+  <text x="600" y="340" text-anchor="middle" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="32" font-weight="400" fill="#B0FFD0">Real-Time Chat — Open Source</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="400" text-anchor="middle" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="22" font-weight="400" fill="#5A8A6A">Servers · Channels · Direct Messages · Friends</text>
+
+  <!-- Bottom URL -->
+  <text x="600" y="560" text-anchor="middle" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="20" font-weight="500" fill="#00FF66" opacity="0.6">codec-chat.com</text>
+</svg>
