@@ -135,10 +135,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: migrate-database
     environment: prod
+    outputs:
+      api-revision: ${{ steps.deploy-api.outputs.revision }}
+      web-revision: ${{ steps.deploy-web.outputs.revision }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -146,37 +146,183 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy infrastructure (register hostnames and create certificates)
+      - name: Deploy API staging revision
+        id: deploy-api
         run: |
-          az deployment group create \
+          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
+          az containerapp update \
+            --name ${{ env.API_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --template-file infra/main.bicep \
-            --parameters \
-              location='centralus' \
-              environmentName='prod' \
-              googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
-              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
-              apiContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}' \
-              webContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}' \
-              webCustomDomain='codec-chat.com' \
-              apiCustomDomain='api.codec-chat.com' \
-              bindCertificates=false
+            --image ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }} \
+            --revision-suffix "$SUFFIX"
+          echo "revision=${{ env.API_APP_NAME }}--${SUFFIX}" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy infrastructure (bind certificates to custom domains)
+      - name: Deploy Web staging revision
+        id: deploy-web
         run: |
-          az deployment group create \
+          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
+          az containerapp update \
+            --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --template-file infra/main.bicep \
-            --parameters \
-              location='centralus' \
-              environmentName='prod' \
-              googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
-              postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
-              apiContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}' \
-              webContainerImage='${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}' \
-              webCustomDomain='codec-chat.com' \
-              apiCustomDomain='api.codec-chat.com' \
-              bindCertificates=true
+            --image ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }} \
+            --revision-suffix "$SUFFIX"
+          echo "revision=${{ env.WEB_APP_NAME }}--${SUFFIX}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for staging revisions to be ready
+        run: |
+          for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}"; do
+            APP_NAME=$(echo "$APP_REVISION" | sed 's/--.*$//')
+            echo "Waiting for revision $APP_REVISION..."
+            for i in $(seq 1 30); do
+              STATUS=$(az containerapp revision show \
+                --name "$APP_NAME" \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --revision "$APP_REVISION" \
+                --query properties.runningState -o tsv 2>/dev/null || echo "Unknown")
+              if [ "$STATUS" = "Running" ]; then
+                echo "Revision $APP_REVISION is running"
+                break
+              fi
+              if [ "$STATUS" = "Failed" ]; then
+                echo "Revision $APP_REVISION failed to start"
+                exit 1
+              fi
+              if [ "$i" = "30" ]; then
+                echo "Timed out waiting for revision $APP_REVISION (last status: $STATUS)"
+                exit 1
+              fi
+              echo "  Attempt $i/30 — status: $STATUS"
+              sleep 10
+            done
+          done
+
+      - name: Label staging revisions for health checking
+        run: |
+          az containerapp revision label remove \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --label staging 2>/dev/null || true
+          az containerapp revision label add \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --label staging \
+            --revision "${{ steps.deploy-api.outputs.revision }}"
+
+          az containerapp revision label remove \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --label staging 2>/dev/null || true
+          az containerapp revision label add \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --label staging \
+            --revision "${{ steps.deploy-web.outputs.revision }}"
+
+      - name: Health check staging revisions
+        run: |
+          API_FQDN=$(az containerapp show \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          STAGING_API_URL="https://staging---${API_FQDN}"
+
+          echo "Checking staging API at ${STAGING_API_URL}/health/ready"
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_API_URL}/health/ready" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "API staging health check passed (HTTP $STATUS)"
+              break
+            fi
+            if [ "$i" = "10" ]; then
+              echo "API staging health check failed (last status: $STATUS)"
+              exit 1
+            fi
+            echo "  Attempt $i/10 — HTTP $STATUS"
+            sleep 10
+          done
+
+          WEB_FQDN=$(az containerapp show \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          STAGING_WEB_URL="https://staging---${WEB_FQDN}"
+
+          echo "Checking staging Web at ${STAGING_WEB_URL}/health"
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_WEB_URL}/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Web staging health check passed (HTTP $STATUS)"
+              break
+            fi
+            if [ "$i" = "10" ]; then
+              echo "Web staging health check failed (last status: $STATUS)"
+              exit 1
+            fi
+            echo "  Attempt $i/10 — HTTP $STATUS"
+            sleep 10
+          done
+
+      - name: Switch traffic to new revisions
+        run: |
+          az containerapp ingress traffic set \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision-weight "${{ steps.deploy-api.outputs.revision }}=100"
+
+          az containerapp ingress traffic set \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision-weight "${{ steps.deploy-web.outputs.revision }}=100"
+
+      - name: Deactivate old revisions
+        run: |
+          OLD_API=$(az containerapp revision list \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[?name!='${{ steps.deploy-api.outputs.revision }}' && properties.active].name" -o tsv)
+          for rev in $OLD_API; do
+            echo "Deactivating API revision: $rev"
+            az containerapp revision deactivate \
+              --name ${{ env.API_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --revision "$rev"
+          done
+
+          OLD_WEB=$(az containerapp revision list \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[?name!='${{ steps.deploy-web.outputs.revision }}' && properties.active].name" -o tsv)
+          for rev in $OLD_WEB; do
+            echo "Deactivating Web revision: $rev"
+            az containerapp revision deactivate \
+              --name ${{ env.WEB_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --revision "$rev"
+          done
+
+      - name: Remove staging labels
+        if: always()
+        run: |
+          az containerapp revision label remove \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --label staging 2>/dev/null || true
+          az containerapp revision label remove \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --label staging 2>/dev/null || true
+
+      - name: Rollback — deactivate failed staging revisions
+        if: failure()
+        run: |
+          az containerapp revision deactivate \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision "${{ steps.deploy-api.outputs.revision }}" 2>/dev/null || true
+          az containerapp revision deactivate \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision "${{ steps.deploy-web.outputs.revision }}" 2>/dev/null || true
 
   smoke-test:
     runs-on: ubuntu-latest
