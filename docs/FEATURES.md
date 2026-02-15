@@ -180,7 +180,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ## 📋 Planned (Near-term)
 
 ### Messaging Features
-- Message editing and deletion
+- Message editing
 - Message search
 
 ### Real-time Features
