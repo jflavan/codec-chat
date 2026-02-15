@@ -12,7 +12,7 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-RUN adduser --disabled-password --no-create-home appuser
+RUN useradd --no-create-home --shell /bin/false appuser
 USER appuser
 
 COPY --from=build /app/publish .
