@@ -816,6 +816,38 @@ export class AppState {
 		}
 	}
 
+	/** Edit a channel message owned by the current user. */
+	async editMessage(messageId: string, newBody: string): Promise<void> {
+		if (!this.idToken || !this.selectedChannelId) return;
+		try {
+			await this.api.editMessage(this.idToken, this.selectedChannelId, messageId, newBody);
+			// Real-time update arrives via SignalR; fall back to local update if disconnected.
+			if (!this.hub.isConnected) {
+				this.messages = this.messages.map((m) =>
+					m.id === messageId ? { ...m, body: newBody, editedAt: new Date().toISOString() } : m
+				);
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Edit a DM message owned by the current user. */
+	async editDmMessage(messageId: string, newBody: string): Promise<void> {
+		if (!this.idToken || !this.activeDmChannelId) return;
+		try {
+			await this.api.editDmMessage(this.idToken, this.activeDmChannelId, messageId, newBody);
+			// Real-time update arrives via SignalR; fall back to local update if disconnected.
+			if (!this.hub.isConnected) {
+				this.dmMessages = this.dmMessages.map((m) =>
+					m.id === messageId ? { ...m, body: newBody, editedAt: new Date().toISOString() } : m
+				);
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
 	/* ═══════════════════ Replies ═══════════════════ */
 
 	/** Activate the reply composer bar for a given message. */
@@ -1230,6 +1262,20 @@ export class AppState {
 			onDmMessageDeleted: (event) => {
 				if (event.dmChannelId === this.activeDmChannelId) {
 					this.dmMessages = this.dmMessages.filter((m) => m.id !== event.messageId);
+				}
+			},
+			onMessageEdited: (event) => {
+				if (event.channelId === this.selectedChannelId) {
+					this.messages = this.messages.map((m) =>
+						m.id === event.messageId ? { ...m, body: event.body, editedAt: event.editedAt } : m
+					);
+				}
+			},
+			onDmMessageEdited: (event) => {
+				if (event.dmChannelId === this.activeDmChannelId) {
+					this.dmMessages = this.dmMessages.map((m) =>
+						m.id === event.messageId ? { ...m, body: event.body, editedAt: event.editedAt } : m
+					);
 				}
 			}
 		});

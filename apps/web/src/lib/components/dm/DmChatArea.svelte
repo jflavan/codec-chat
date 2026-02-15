@@ -66,6 +66,46 @@
 		app.startReply(message.id, message.authorName, message.body?.slice(0, 100) ?? '', 'dm');
 	}
 
+	/* ───── Inline message editing ───── */
+	let editingDmMessageId = $state<string | null>(null);
+	let editDmBody = $state('');
+
+	function startDmEdit(message: typeof app.dmMessages[0]): void {
+		editDmBody = message.body;
+		editingDmMessageId = message.id;
+	}
+
+	function cancelDmEdit(): void {
+		editingDmMessageId = null;
+		editDmBody = '';
+	}
+
+	async function saveDmEdit(): Promise<void> {
+		const trimmed = editDmBody.trim();
+		if (!trimmed || !editingDmMessageId) {
+			cancelDmEdit();
+			return;
+		}
+		const msg = app.dmMessages.find((m) => m.id === editingDmMessageId);
+		if (trimmed === msg?.body) {
+			cancelDmEdit();
+			return;
+		}
+		await app.editDmMessage(editingDmMessageId, trimmed);
+		editingDmMessageId = null;
+		editDmBody = '';
+	}
+
+	function handleDmEditKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			saveDmEdit();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			cancelDmEdit();
+		}
+	}
+
 	// Reset scroll on channel change
 	$effect(() => {
 		const channelId = app.activeDmChannelId;
@@ -250,6 +290,11 @@
 							</svg>
 						</button>
 						{#if message.authorUserId === app.me?.user.id}
+							<button class="dm-action-btn" aria-label="Edit message" onclick={() => startDmEdit(message)}>
+								<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+									<path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/>
+								</svg>
+							</button>
 							<button class="dm-action-btn dm-action-btn-danger" aria-label="Delete message" onclick={() => app.deleteDmMessage(message.id)}>
 								<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 									<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
@@ -276,8 +321,22 @@
 								<div class="message-header">
 									<strong class="message-author">{message.authorName}</strong>
 									<time class="message-time">{formatTime(message.createdAt)}</time>
+									{#if message.editedAt}
+										<span class="edited-label">(edited)</span>
+									{/if}
 								</div>
-							{#if message.body}
+							{#if editingDmMessageId === message.id}
+								<div class="edit-container">
+									<textarea
+										class="edit-input"
+										bind:value={editDmBody}
+										onkeydown={handleDmEditKeydown}
+									></textarea>
+									<div class="edit-actions">
+										<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelDmEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveDmEdit}>save</button></span>
+									</div>
+								</div>
+							{:else if message.body}
 								<p class="message-body"><LinkifiedText text={message.body} /></p>
 							{/if}
 							{#if message.imageUrl}
@@ -301,8 +360,24 @@
 							{#if message.replyContext}
 								<ReplyReference replyContext={message.replyContext} onClickGoToOriginal={() => scrollToMessage(message.replyContext!.messageId)} />
 							{/if}
-							{#if message.body}
-								<p class="message-body"><LinkifiedText text={message.body} /></p>
+							{#if editingDmMessageId === message.id}
+								<div class="edit-container">
+									<textarea
+										class="edit-input"
+										bind:value={editDmBody}
+										onkeydown={handleDmEditKeydown}
+									></textarea>
+									<div class="edit-actions">
+										<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelDmEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveDmEdit}>save</button></span>
+									</div>
+								</div>
+							{:else if message.body}
+								<p class="message-body">
+									<LinkifiedText text={message.body} />
+									{#if message.editedAt}
+										<span class="edited-label">(edited)</span>
+									{/if}
+								</p>
 							{/if}
 							{#if message.imageUrl}
 								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
@@ -924,6 +999,63 @@
 		flex-direction: column;
 		gap: 4px;
 		margin-top: 4px;
+	}
+
+	/* ───── Edited label ───── */
+
+	.edited-label {
+		font-size: 11px;
+		color: var(--text-muted);
+		margin-left: 4px;
+	}
+
+	/* ───── Inline edit mode ───── */
+
+	.edit-container {
+		margin-top: 2px;
+	}
+
+	.edit-input {
+		width: 100%;
+		min-height: 44px;
+		padding: 8px 12px;
+		border-radius: 8px;
+		border: 1px solid var(--accent);
+		background: var(--bg-primary);
+		color: var(--text-normal);
+		font-family: inherit;
+		font-size: 15px;
+		line-height: 1.375;
+		resize: vertical;
+	}
+
+	.edit-input:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.3);
+	}
+
+	.edit-actions {
+		margin-top: 4px;
+	}
+
+	.edit-hint {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	.edit-link-btn {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--accent);
+		font-size: 12px;
+		cursor: pointer;
+		font-family: inherit;
+	}
+
+	.edit-link-btn:hover {
+		text-decoration: underline;
 	}
 
 	/* ───── Reply action bar ───── */

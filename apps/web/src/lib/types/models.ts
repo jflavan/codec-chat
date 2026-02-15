@@ -52,6 +52,7 @@ export type Message = {
 	body: string;
 	imageUrl?: string | null;
 	createdAt: string;
+	editedAt?: string | null;
 	channelId: string;
 	authorUserId?: string | null;
 	authorAvatarUrl?: string | null;
@@ -150,6 +151,7 @@ export type DirectMessage = {
 	body: string;
 	imageUrl?: string | null;
 	createdAt: string;
+	editedAt?: string | null;
 	authorAvatarUrl?: string | null;
 	linkPreviews: LinkPreview[];
 	replyContext: ReplyContext | null;

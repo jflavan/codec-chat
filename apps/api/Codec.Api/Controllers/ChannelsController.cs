@@ -49,6 +49,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.Body,
                 message.ImageUrl,
                 message.CreatedAt,
+                message.EditedAt,
                 message.ChannelId,
                 message.ReplyToMessageId,
                 AuthorCustomAvatarPath = message.AuthorUser != null ? message.AuthorUser.CustomAvatarPath : null,
@@ -166,6 +167,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.Body,
                 message.ImageUrl,
                 message.CreatedAt,
+                message.EditedAt,
                 message.ChannelId,
                 AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
                 Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
@@ -282,6 +284,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             message.Body,
             message.ImageUrl,
             message.CreatedAt,
+            message.EditedAt,
             message.ChannelId,
             AuthorAvatarUrl = authorAvatarUrl,
             Reactions = Array.Empty<object>(),
@@ -451,6 +454,57 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         });
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Edits a message body. Only the author of the message can edit it. Requires server membership.
+    /// Sets the <c>EditedAt</c> timestamp to the current UTC time.
+    /// </summary>
+    [HttpPut("{channelId:guid}/messages/{messageId:guid}")]
+    public async Task<IActionResult> EditMessage(Guid channelId, Guid messageId, [FromBody] EditMessageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Body))
+        {
+            return BadRequest(new { error = "Message body is required." });
+        }
+
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
+        if (channel is null)
+        {
+            return NotFound(new { error = "Channel not found." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        if (!isMember)
+        {
+            return Forbid();
+        }
+
+        var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
+        if (message is null)
+        {
+            return NotFound(new { error = "Message not found." });
+        }
+
+        if (message.AuthorUserId != appUser.Id)
+        {
+            return StatusCode(403, new { error = "You can only edit your own messages." });
+        }
+
+        message.Body = request.Body.Trim();
+        message.EditedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        await chatHub.Clients.Group(channelId.ToString()).SendAsync("MessageEdited", new
+        {
+            MessageId = messageId,
+            ChannelId = channelId,
+            Body = message.Body,
+            EditedAt = message.EditedAt
+        });
+
+        return Ok(new { message.Id, message.Body, message.EditedAt });
     }
 
     /// <summary>

@@ -10,6 +10,7 @@ public class Message
     public string? ImageUrl { get; set; }
     public Guid? ReplyToMessageId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? EditedAt { get; set; }
     public User? AuthorUser { get; set; }
     public Channel? Channel { get; set; }
     public List<Reaction> Reactions { get; set; } = new();

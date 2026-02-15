@@ -214,6 +214,17 @@ export class ApiClient {
 		);
 	}
 
+	editMessage(token: string, channelId: string, messageId: string, body: string): Promise<{ id: string; body: string; editedAt: string }> {
+		return this.request(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ body })
+			}
+		);
+	}
+
 	/* ───── Reactions ───── */
 
 	toggleReaction(
@@ -334,6 +345,17 @@ export class ApiClient {
 		return this.requestVoid(
 			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
 			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	editDmMessage(token: string, channelId: string, messageId: string, body: string): Promise<{ id: string; body: string; editedAt: string }> {
+		return this.request(
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ body })
+			}
 		);
 	}
 

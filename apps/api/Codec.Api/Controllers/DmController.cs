@@ -240,6 +240,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.Body,
                 m.ImageUrl,
                 m.CreatedAt,
+                m.EditedAt,
                 m.ReplyToDirectMessageId,
                 AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                 AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
@@ -313,6 +314,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             m.Body,
             m.ImageUrl,
             m.CreatedAt,
+            m.EditedAt,
             AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl,
             LinkPreviews = linkPreviewLookup.TryGetValue(m.Id, out var previews)
                 ? previews
@@ -427,6 +429,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             message.Body,
             message.ImageUrl,
             message.CreatedAt,
+            message.EditedAt,
             AuthorAvatarUrl = authorAvatarUrl,
             LinkPreviews = Array.Empty<object>(),
             ReplyContext = replyContext
@@ -521,6 +524,70 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         });
 
         return Created($"/dm/channels/{channelId}/messages/{message.Id}", payload);
+    }
+
+    /// <summary>
+    /// Edits a direct message body. Only the author of the message can edit it.
+    /// Sets the <c>EditedAt</c> timestamp to the current UTC time.
+    /// </summary>
+    [HttpPut("channels/{channelId:guid}/messages/{messageId:guid}")]
+    public async Task<IActionResult> EditMessage(Guid channelId, Guid messageId, [FromBody] EditMessageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Body))
+        {
+            return BadRequest(new { error = "Message body is required." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        var isMember = await db.DmChannelMembers.AsNoTracking()
+            .AnyAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
+
+        if (!isMember)
+        {
+            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
+            return channelExists
+                ? StatusCode(403, new { error = "You are not a participant in this conversation." })
+                : NotFound(new { error = "DM channel not found." });
+        }
+
+        var message = await db.DirectMessages.FirstOrDefaultAsync(m => m.Id == messageId && m.DmChannelId == channelId);
+        if (message is null)
+        {
+            return NotFound(new { error = "Message not found." });
+        }
+
+        if (message.AuthorUserId != appUser.Id)
+        {
+            return StatusCode(403, new { error = "You can only edit your own messages." });
+        }
+
+        message.Body = request.Body.Trim();
+        message.EditedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        var otherUserId = await db.DmChannelMembers
+            .AsNoTracking()
+            .Where(m => m.DmChannelId == channelId && m.UserId != appUser.Id)
+            .Select(m => m.UserId)
+            .FirstOrDefaultAsync();
+
+        var editPayload = new
+        {
+            MessageId = messageId,
+            DmChannelId = channelId,
+            Body = message.Body,
+            EditedAt = message.EditedAt
+        };
+
+        await chatHub.Clients.Group($"dm-{channelId}").SendAsync("DmMessageEdited", editPayload);
+
+        if (otherUserId != Guid.Empty)
+        {
+            await chatHub.Clients.Group($"user-{otherUserId}").SendAsync("DmMessageEdited", editPayload);
+        }
+
+        return Ok(new { message.Id, message.Body, message.EditedAt });
     }
 
     /// <summary>

@@ -57,8 +57,42 @@
 
 	const isOwnMessage = $derived(currentUserId != null && message.authorUserId === currentUserId);
 
+	let isEditing = $state(false);
+	let editBody = $state('');
+
 	function handleDelete() {
 		app.deleteMessage(message.id);
+	}
+
+	function startEdit() {
+		editBody = message.body;
+		isEditing = true;
+	}
+
+	function cancelEdit() {
+		isEditing = false;
+		editBody = '';
+	}
+
+	async function saveEdit() {
+		const trimmed = editBody.trim();
+		if (!trimmed || trimmed === message.body) {
+			cancelEdit();
+			return;
+		}
+		await app.editMessage(message.id, trimmed);
+		isEditing = false;
+		editBody = '';
+	}
+
+	function handleEditKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			saveEdit();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			cancelEdit();
+		}
 	}
 </script>
 
@@ -88,6 +122,16 @@
 			</svg>
 		</button>
 		{#if isOwnMessage}
+			<button
+				class="action-btn"
+				onclick={startEdit}
+				title="Edit message"
+				aria-label="Edit message"
+			>
+				<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+					<path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/>
+				</svg>
+			</button>
 			<button
 				class="action-btn action-btn-danger"
 				onclick={handleDelete}
@@ -139,8 +183,22 @@
 			<div class="message-header">
 				<strong class="message-author">{message.authorName}</strong>
 				<time class="message-time">{formatTime(message.createdAt)}</time>
+				{#if message.editedAt}
+					<span class="edited-label">(edited)</span>
+				{/if}
 			</div>
-			{#if message.body}
+			{#if isEditing}
+				<div class="edit-container">
+					<textarea
+						class="edit-input"
+						bind:value={editBody}
+						onkeydown={handleEditKeydown}
+					></textarea>
+					<div class="edit-actions">
+						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
+					</div>
+				</div>
+			{:else if message.body}
 				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} /></p>
 			{/if}
 			{#if message.imageUrl}
@@ -174,8 +232,24 @@
 					onClickGoToOriginal={onScrollToMessage}
 				/>
 			{/if}
-			{#if message.body}
-				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} /></p>
+			{#if isEditing}
+				<div class="edit-container">
+					<textarea
+						class="edit-input"
+						bind:value={editBody}
+						onkeydown={handleEditKeydown}
+					></textarea>
+					<div class="edit-actions">
+						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
+					</div>
+				</div>
+			{:else if message.body}
+				<p class="message-body">
+					<LinkifiedText text={message.body} mentions={effectiveMentions} />
+					{#if message.editedAt}
+						<span class="edited-label">(edited)</span>
+					{/if}
+				</p>
 			{/if}
 			{#if message.imageUrl}
 				<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
@@ -418,5 +492,62 @@
 		flex-direction: column;
 		gap: 4px;
 		margin-top: 4px;
+	}
+
+	/* ───── Edited label ───── */
+
+	.edited-label {
+		font-size: 11px;
+		color: var(--text-muted);
+		margin-left: 4px;
+	}
+
+	/* ───── Inline edit mode ───── */
+
+	.edit-container {
+		margin-top: 2px;
+	}
+
+	.edit-input {
+		width: 100%;
+		min-height: 44px;
+		padding: 8px 12px;
+		border-radius: 8px;
+		border: 1px solid var(--accent);
+		background: var(--bg-primary);
+		color: var(--text-normal);
+		font-family: inherit;
+		font-size: 15px;
+		line-height: 1.375;
+		resize: vertical;
+	}
+
+	.edit-input:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.3);
+	}
+
+	.edit-actions {
+		margin-top: 4px;
+	}
+
+	.edit-hint {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	.edit-link-btn {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--accent);
+		font-size: 12px;
+		cursor: pointer;
+		font-family: inherit;
+	}
+
+	.edit-link-btn:hover {
+		text-decoration: underline;
 	}
 </style>

@@ -496,6 +496,46 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update `README.md` features list
 - [x] Update `PLAN.md` with message deletion task breakdown
 
+## Task breakdown: Message Editing
+
+### API — Data model & migration
+- [x] Add `EditedAt` nullable `DateTimeOffset` property to `Message` and `DirectMessage` entities
+- [x] Create `EditMessageRequest` DTO record (`Body` string)
+- [x] Create and apply EF Core migration (`AddEditedAt`)
+
+### API — Edit endpoints
+- [x] Add `PUT /channels/{channelId}/messages/{messageId}` endpoint to `ChannelsController`
+- [x] Verify server membership and message ownership before allowing edit (403 otherwise)
+- [x] Update message body and set `EditedAt` timestamp
+- [x] Broadcast `MessageEdited { messageId, channelId, body, editedAt }` via SignalR to channel group
+- [x] Include `EditedAt` in all GET/POST message projections
+- [x] Add `PUT /dm/channels/{channelId}/messages/{messageId}` endpoint to `DmController`
+- [x] Verify DM channel membership and message ownership before allowing edit (403 otherwise)
+- [x] Broadcast `DmMessageEdited { messageId, dmChannelId, body, editedAt }` via SignalR to DM group + other participant's user group
+- [x] Include `EditedAt` in all DM GET/POST message projections
+
+### Web — Types, API client & SignalR
+- [x] Add `editedAt` optional field to `Message` and `DirectMessage` types in `models.ts`
+- [x] Add `editMessage()` and `editDmMessage()` methods to `ApiClient`
+- [x] Add `MessageEditedEvent` and `DmMessageEditedEvent` types to `chat-hub.ts`
+- [x] Add `onMessageEdited` and `onDmMessageEdited` callbacks to `SignalRCallbacks`
+- [x] Register `MessageEdited` and `DmMessageEdited` handlers in `ChatHubService.start()`
+
+### Web — State & UI
+- [x] Add `editMessage(messageId, newBody)` action to `AppState` — calls API, falls back to local update if SignalR disconnected
+- [x] Add `editDmMessage(messageId, newBody)` action to `AppState` — calls API, falls back to local update if SignalR disconnected
+- [x] Wire `onMessageEdited` SignalR callback to update `messages` array (body + editedAt)
+- [x] Wire `onDmMessageEdited` SignalR callback to update `dmMessages` array (body + editedAt)
+- [x] Add edit button (pencil icon) to `MessageItem.svelte` floating action bar — visible only on own messages
+- [x] Add inline edit mode to `MessageItem.svelte` — textarea replaces message body, Enter to save, Escape to cancel
+- [x] Add "(edited)" label next to timestamp on edited messages in `MessageItem.svelte`
+- [x] Add edit button, inline edit mode, and "(edited)" label to `DmChatArea.svelte` for DM messages
+
+### Documentation
+- [x] Update `FEATURES.md` to mark message editing as implemented for channels and DMs
+- [x] Update `README.md` features list
+- [x] Update `PLAN.md` with message editing task breakdown
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
@@ -503,7 +543,6 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Add richer validation and error surfaces in UI
 - Server settings and configuration
 - Channel editing/deletion
-- Message editing
 - Presence indicators (online/offline/away)
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars

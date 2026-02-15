@@ -78,6 +78,20 @@ export type DmMessageDeletedEvent = {
 	dmChannelId: string;
 };
 
+export type MessageEditedEvent = {
+	messageId: string;
+	channelId: string;
+	body: string;
+	editedAt: string;
+};
+
+export type DmMessageEditedEvent = {
+	messageId: string;
+	dmChannelId: string;
+	body: string;
+	editedAt: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -99,6 +113,8 @@ export type SignalRCallbacks = {
 	onMemberLeft?: (event: MemberLeftEvent) => void;
 	onMessageDeleted?: (event: MessageDeletedEvent) => void;
 	onDmMessageDeleted?: (event: DmMessageDeletedEvent) => void;
+	onMessageEdited?: (event: MessageEditedEvent) => void;
+	onDmMessageEdited?: (event: DmMessageEditedEvent) => void;
 };
 
 /**
@@ -175,6 +191,12 @@ export class ChatHubService {
 		}
 		if (callbacks.onDmMessageDeleted) {
 			connection.on('DmMessageDeleted', callbacks.onDmMessageDeleted);
+		}
+		if (callbacks.onMessageEdited) {
+			connection.on('MessageEdited', callbacks.onMessageEdited);
+		}
+		if (callbacks.onDmMessageEdited) {
+			connection.on('DmMessageEdited', callbacks.onDmMessageEdited);
 		}
 
 		try {
