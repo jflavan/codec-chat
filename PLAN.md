@@ -9,7 +9,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
    - Initial README and docs
    - Copilot agent guidance files
 2. Backend skeleton
-   - .NET 9 Web API project
+   - .NET 10 Web API project
    - Health endpoint
    - Google ID token validation
 3. Frontend skeleton
@@ -28,7 +28,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ## Decisions
 - Web: SvelteKit
-- API: .NET 9
+- API: .NET 10
 - Auth: Frontend obtains Google ID token; API validates per request
 - Layout: apps/web + apps/api + docs + .github
 - Package manager: npm

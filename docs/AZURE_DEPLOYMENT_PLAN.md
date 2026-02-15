@@ -7,7 +7,7 @@ This document is the phased execution plan for deploying the Codec chat applicat
 | Component | Current (Dev) | Production Target |
 |-----------|--------------|-------------------|
 | Frontend | SvelteKit + Vite dev server (`adapter-auto`) | Containerized Node.js (`adapter-node`) on Azure Container Apps |
-| Backend | ASP.NET Core 9 on localhost:5050 | Containerized .NET 9 on Azure Container Apps |
+| Backend | ASP.NET Core 10 on localhost:5050 | Containerized .NET 10 on Azure Container Apps |
 | Database | SQLite file (`codec.db`) | Azure Database for PostgreSQL Flexible Server |
 | File Storage | Local filesystem (`uploads/avatars`, `uploads/images`) | Azure Blob Storage |
 | Real-time | SignalR over WebSocket (single instance) | SignalR on single Container Apps instance (Redis backplane deferred) |
@@ -329,8 +329,8 @@ Audit `Program.cs` and `appsettings.json` for anything that must change per envi
 ### 5.1 Create API Dockerfile (`apps/api/Dockerfile`)
 
 - [x] Multi-stage build:
-  - **Build stage:** `mcr.microsoft.com/dotnet/sdk:9.0` — restore, build, publish
-  - **Runtime stage:** `mcr.microsoft.com/dotnet/aspnet:9.0` — copy published output, set entrypoint
+  - **Build stage:** `mcr.microsoft.com/dotnet/sdk:10.0` — restore, build, publish
+  - **Runtime stage:** `mcr.microsoft.com/dotnet/aspnet:10.0` — copy published output, set entrypoint
 - [x] Expose port 8080 (`ASPNETCORE_URLS=http://+:8080`)
 - [x] Set `ASPNETCORE_ENVIRONMENT=Production` as default
 - [x] Run as non-root user for security
@@ -563,7 +563,7 @@ infra/
 - [x] Secrets (Google Client ID, PostgreSQL password) stored in Key Vault
 - [x] Container Apps show "Waiting for revision" (no images pushed yet)
 
-> Completed after 4 pipeline iterations (inline Bicep params fix, quickstart placeholder containers, dotnet restore + global.json .NET 9 pin).
+> Completed after 4 pipeline iterations (inline Bicep params fix, quickstart placeholder containers, dotnet restore + global.json .NET 10 pin).
 
 ---
 

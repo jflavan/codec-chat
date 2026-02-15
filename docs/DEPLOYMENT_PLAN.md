@@ -342,8 +342,8 @@ This document is the phased execution plan for deploying the Codec chat applicat
 #### 5.1 Create API Dockerfile
 
 - [ ] Create `apps/api/Dockerfile` with multi-stage build:
-  - **Build stage:** `mcr.microsoft.com/dotnet/sdk:9.0` — restore, build, publish
-  - **Runtime stage:** `mcr.microsoft.com/dotnet/aspnet:9.0` — copy published output, set entrypoint
+  - **Build stage:** `mcr.microsoft.com/dotnet/sdk:10.0` — restore, build, publish
+  - **Runtime stage:** `mcr.microsoft.com/dotnet/aspnet:10.0` — copy published output, set entrypoint
 - [ ] Expose port 8080 (ASP.NET Core default in containers)
 - [ ] Set `ASPNETCORE_ENVIRONMENT=Production` as default
 - [ ] Add `.dockerignore` in `apps/api/` to exclude `bin/`, `obj/`, `*.db`

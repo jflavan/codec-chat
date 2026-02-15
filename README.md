@@ -25,7 +25,7 @@ codec/
 
 ### 1. Install Prerequisites
 - **Node.js** 20+ and npm — [download](https://nodejs.org/)
-- **.NET SDK** 9.x — [download](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **.NET SDK** 10.x — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **Docker** — for local PostgreSQL via Docker Compose
 - **Google Cloud Console** project with OAuth 2.0 credentials
 

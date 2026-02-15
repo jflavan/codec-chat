@@ -8,7 +8,7 @@
 
 ## Tech stack
 - Web: SvelteKit, TypeScript, Vite
-- API: ASP.NET Core (.NET 9)
+- API: ASP.NET Core (.NET 10)
 - Data: EF Core, SQLite
 - Auth: Google Identity Services (ID tokens validated by the API)
 

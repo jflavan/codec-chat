@@ -20,6 +20,6 @@ This repo is designed for Copilot agent-based work. Each agent should be statele
 
 ## Agent rules
 - Always read PLAN.md first.
-- Confirm the stack: SvelteKit + TypeScript, ASP.NET Core (.NET 9), EF Core, SQLite, Google ID tokens.
+- Confirm the stack: SvelteKit + TypeScript, ASP.NET Core (.NET 10), EF Core, PostgreSQL, Google ID tokens.
 - Update docs when behavior or configuration changes.
 - Keep edits scoped to the current task.
