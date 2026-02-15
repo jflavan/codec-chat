@@ -203,7 +203,7 @@ jobs:
           for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}"; do
             APP_NAME=$(echo "$APP_REVISION" | sed 's/--.*$//')
             echo "Waiting for revision $APP_REVISION..."
-            for i in $(seq 1 30); do
+            for i in $(seq 1 60); do
               DETAIL=$(az containerapp revision show \
                 --name "$APP_NAME" \
                 --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -211,11 +211,8 @@ jobs:
                 --query '{runningState:properties.runningState,healthState:properties.healthState,replicas:properties.replicas,active:properties.active}' \
                 -o json 2>/dev/null || echo '{"runningState":"Unknown"}')
               STATUS=$(echo "$DETAIL" | jq -r '.runningState // "Unknown"')
-              echo "  Attempt $i/30 — $DETAIL"
-              if [ "$STATUS" = "Running" ] || [ "$STATUS" = "Degraded" ] || [ "$STATUS" = "RunningAtMaxScale" ]; then
-                echo "Revision $APP_REVISION is running (status: $STATUS)"
-                break
-              fi
+              HEALTH=$(echo "$DETAIL" | jq -r '.healthState // "Unknown"')
+              echo "  Attempt $i/60 — status=$STATUS health=$HEALTH detail=$DETAIL"
               if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Stopped" ]; then
                 echo "::error::Revision $APP_REVISION failed to start (status: $STATUS)"
                 echo "--- Full revision details ---"
@@ -230,8 +227,16 @@ jobs:
                   --tail 50 --type system 2>/dev/null || true
                 exit 1
               fi
-              if [ "$i" = "30" ]; then
-                echo "::error::Timed out waiting for revision $APP_REVISION (last status: $STATUS)"
+              # Accept any running state combined with a healthy (or undetermined) health state
+              if [ "$STATUS" = "Running" ] || [ "$STATUS" = "Degraded" ] || [ "$STATUS" = "RunningAtMaxScale" ]; then
+                if [ "$HEALTH" = "Healthy" ] || [ "$HEALTH" = "None" ]; then
+                  echo "Revision $APP_REVISION is ready (status: $STATUS, health: $HEALTH)"
+                  break
+                fi
+                echo "  Revision is running but health is $HEALTH, continuing to wait..."
+              fi
+              if [ "$i" = "60" ]; then
+                echo "::error::Timed out waiting for revision $APP_REVISION (last status: $STATUS, health: $HEALTH)"
                 echo "--- Full revision details ---"
                 az containerapp revision show \
                   --name "$APP_NAME" \
@@ -280,17 +285,19 @@ jobs:
           STAGING_API_URL="https://staging---${API_FQDN}"
 
           echo "Checking staging API at ${STAGING_API_URL}/health/ready"
-          for i in $(seq 1 10); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_API_URL}/health/ready" || echo "000")
+          for i in $(seq 1 15); do
+            RESPONSE=$(curl -s -w "\n%{http_code}" "${STAGING_API_URL}/health/ready" 2>&1 || true)
+            STATUS=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
             if [ "$STATUS" = "200" ]; then
               echo "API staging health check passed (HTTP $STATUS)"
               break
             fi
-            if [ "$i" = "10" ]; then
-              echo "API staging health check failed (last status: $STATUS)"
+            if [ "$i" = "15" ]; then
+              echo "API staging health check failed (last status: $STATUS, body: $BODY)"
               exit 1
             fi
-            echo "  Attempt $i/10 — HTTP $STATUS"
+            echo "  Attempt $i/15 — HTTP $STATUS (body: $BODY)"
             sleep 10
           done
 
@@ -301,17 +308,19 @@ jobs:
           STAGING_WEB_URL="https://staging---${WEB_FQDN}"
 
           echo "Checking staging Web at ${STAGING_WEB_URL}/health"
-          for i in $(seq 1 10); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_WEB_URL}/health" || echo "000")
+          for i in $(seq 1 15); do
+            RESPONSE=$(curl -s -w "\n%{http_code}" "${STAGING_WEB_URL}/health" 2>&1 || true)
+            STATUS=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
             if [ "$STATUS" = "200" ]; then
               echo "Web staging health check passed (HTTP $STATUS)"
               break
             fi
-            if [ "$i" = "10" ]; then
-              echo "Web staging health check failed (last status: $STATUS)"
+            if [ "$i" = "15" ]; then
+              echo "Web staging health check failed (last status: $STATUS, body: $BODY)"
               exit 1
             fi
-            echo "  Attempt $i/10 — HTTP $STATUS"
+            echo "  Attempt $i/15 — HTTP $STATUS (body: $BODY)"
             sleep 10
           done
 
