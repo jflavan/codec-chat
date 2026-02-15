@@ -157,29 +157,46 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --mode multiple
 
+      - name: Ensure container app registries
+        run: |
+          for APP in "${{ env.API_APP_NAME }}" "${{ env.WEB_APP_NAME }}"; do
+            echo "Ensuring ACR registry on $APP..."
+            az containerapp registry set \
+              --name "$APP" \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --server ${{ env.ACR_NAME }}.azurecr.io \
+              --identity system
+          done
+
       - name: Deploy API staging revision
         id: deploy-api
         run: |
           SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
-          az containerapp update \
+          RESULT=$(az containerapp update \
             --name ${{ env.API_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }} \
             --revision-suffix "$SUFFIX" \
-            --min-replicas 1
-          echo "revision=${{ env.API_APP_NAME }}--${SUFFIX}" >> "$GITHUB_OUTPUT"
+            --min-replicas 1 \
+            -o json)
+          REVISION_NAME=$(echo "$RESULT" | jq -r '.properties.latestRevisionName')
+          echo "Created revision: $REVISION_NAME"
+          echo "revision=$REVISION_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Web staging revision
         id: deploy-web
         run: |
           SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
-          az containerapp update \
+          RESULT=$(az containerapp update \
             --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }} \
             --revision-suffix "$SUFFIX" \
-            --min-replicas 1
-          echo "revision=${{ env.WEB_APP_NAME }}--${SUFFIX}" >> "$GITHUB_OUTPUT"
+            --min-replicas 1 \
+            -o json)
+          REVISION_NAME=$(echo "$RESULT" | jq -r '.properties.latestRevisionName')
+          echo "Created revision: $REVISION_NAME"
+          echo "revision=$REVISION_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Wait for staging revisions to be ready
         run: |
@@ -187,24 +204,46 @@ jobs:
             APP_NAME=$(echo "$APP_REVISION" | sed 's/--.*$//')
             echo "Waiting for revision $APP_REVISION..."
             for i in $(seq 1 30); do
-              STATUS=$(az containerapp revision show \
+              DETAIL=$(az containerapp revision show \
                 --name "$APP_NAME" \
                 --resource-group ${{ env.RESOURCE_GROUP }} \
                 --revision "$APP_REVISION" \
-                --query properties.runningState -o tsv 2>/dev/null || echo "Unknown")
+                --query '{runningState:properties.runningState,healthState:properties.healthState,replicas:properties.replicas,active:properties.active}' \
+                -o json 2>/dev/null || echo '{"runningState":"Unknown"}')
+              STATUS=$(echo "$DETAIL" | jq -r '.runningState // "Unknown"')
+              echo "  Attempt $i/30 — $DETAIL"
               if [ "$STATUS" = "Running" ] || [ "$STATUS" = "Degraded" ]; then
                 echo "Revision $APP_REVISION is running (status: $STATUS)"
                 break
               fi
               if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Stopped" ]; then
-                echo "Revision $APP_REVISION failed to start (status: $STATUS)"
+                echo "::error::Revision $APP_REVISION failed to start (status: $STATUS)"
+                echo "--- Full revision details ---"
+                az containerapp revision show \
+                  --name "$APP_NAME" \
+                  --resource-group ${{ env.RESOURCE_GROUP }} \
+                  --revision "$APP_REVISION" 2>/dev/null || true
+                echo "--- Recent container logs ---"
+                az containerapp logs show \
+                  --name "$APP_NAME" \
+                  --resource-group ${{ env.RESOURCE_GROUP }} \
+                  --tail 50 --type system 2>/dev/null || true
                 exit 1
               fi
               if [ "$i" = "30" ]; then
-                echo "Timed out waiting for revision $APP_REVISION (last status: $STATUS)"
+                echo "::error::Timed out waiting for revision $APP_REVISION (last status: $STATUS)"
+                echo "--- Full revision details ---"
+                az containerapp revision show \
+                  --name "$APP_NAME" \
+                  --resource-group ${{ env.RESOURCE_GROUP }} \
+                  --revision "$APP_REVISION" 2>/dev/null || true
+                echo "--- Recent container logs ---"
+                az containerapp logs show \
+                  --name "$APP_NAME" \
+                  --resource-group ${{ env.RESOURCE_GROUP }} \
+                  --tail 50 --type system 2>/dev/null || true
                 exit 1
               fi
-              echo "  Attempt $i/30 — status: $STATUS"
               sleep 10
             done
           done
