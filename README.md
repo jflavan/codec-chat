@@ -6,7 +6,7 @@ Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core W
 
 **Live:** [https://codec-chat.com](https://codec-chat.com)
 
-> ⚠️ **Alpha status:** Codec is in active alpha development. APIs, data models, and UI may change without notice. Not recommended for production use.
+> ⚠️ **Alpha status:** Codec is in active alpha development. APIs, data models, and UI may change without notice. Not recommended for production use. Found a bug? [Report it here](https://github.com/jflavan/codec-chat/issues/new?template=bug-report.yml).
 
 ## Repository Structure
 ```
@@ -93,6 +93,11 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Message replies** — inline reply to any message in channels or DMs, reply context displayed above message body, click to scroll to original with highlight animation, Escape to cancel, graceful handling of deleted parent messages
 - ✅ **Text formatting** — bold (`*text*` or `**text**`) and italic (`_text_`) in messages, with live preview in composer input
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
+- ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
+
+## Bug Reports
+
+Codec is in alpha — your feedback matters! Use the [Bug Report template](https://github.com/jflavan/codec-chat/issues/new?template=bug-report.yml) to report any issues you find. The app also shows a notification on every login with a direct link to file a report.
 
 ## Documentation
 - [Deployment](docs/DEPLOYMENT.md) - Production deployment, rollback, and operations guide

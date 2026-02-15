@@ -12,6 +12,7 @@
 	import UserSettingsModal from '$lib/components/settings/UserSettingsModal.svelte';
 	import ImagePreview from '$lib/components/chat/ImagePreview.svelte';
 	import LoadingScreen from '$lib/components/LoadingScreen.svelte';
+	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -114,6 +115,7 @@
 {/if}
 
 <ImagePreview />
+<AlphaNotification />
 {/if}
 
 <style>

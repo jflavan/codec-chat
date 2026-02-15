@@ -111,6 +111,13 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Responsive layout: two-column (≥ 900px), tabbed (< 900px)
 - ✅ Extensible for future categories (notifications, privacy, appearance)
 
+### Alpha Notification & Bug Reporting
+- ✅ Alpha notification modal shown on every login (ALPHA badge, welcome message, bug reporting guidance)
+- ✅ Direct link to GitHub bug report template from notification banner
+- ✅ Dismissable via "Got it" button or Escape key
+- ✅ GitHub Issues bug report template (`.github/ISSUE_TEMPLATE/bug-report.yml`) with structured fields (description, repro steps, expected/actual behavior, screenshots, browser, device)
+- ✅ Issues auto-labeled `bug` and `alpha-tester`
+
 ### UI/UX
 - ✅ CODEC CRT phosphor-green theme (CSS custom properties, design tokens)
 - ✅ Three-column layout: server icon rail, channel sidebar, chat area
