@@ -262,6 +262,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 #### Messaging
 - `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership; includes `imageUrl`, `replyContext`)
 - `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; accepts optional `imageUrl`, `replyToMessageId`; broadcasts via SignalR)
+- `DELETE /channels/{channelId}/messages/{messageId}` - Delete a channel message (author only; cascade-deletes reactions and link previews; broadcasts `MessageDeleted` via SignalR)
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership; broadcasts via SignalR)
 
 #### Friends
@@ -280,6 +281,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `GET /dm/channels` - List open DM conversations (sorted by most recent message, `IsOpen = true` only)
 - `GET /dm/channels/{channelId}/messages` - Get messages in a DM conversation (paginated via `before`/`limit`; includes `imageUrl`, `replyContext`)
 - `POST /dm/channels/{channelId}/messages` - Send a direct message (accepts optional `imageUrl`, `replyToDirectMessageId`; broadcasts `ReceiveDm` via SignalR; reopens closed conversations)
+- `DELETE /dm/channels/{channelId}/messages/{messageId}` - Delete a direct message (author only; cascade-deletes link previews; broadcasts `DmMessageDeleted` via SignalR)
 - `DELETE /dm/channels/{channelId}` - Close a DM conversation (sets `IsOpen = false` for current user; messages preserved)
 
 #### Image Uploads
@@ -312,12 +314,14 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 | `ReactionUpdated` | `{ messageId, channelId, reactions: [{ emoji, count, userIds }] }` | Reaction toggled on a message |
+| `MessageDeleted` | `{ messageId, channelId }` | A channel message was deleted by its author (sent to channel group) |
 | `FriendRequestReceived` | `{ requestId, requester: { id, displayName, avatarUrl }, createdAt }` | Friend request received (sent to recipient's user group) |
 | `FriendRequestAccepted` | `{ friendshipId, user: { id, displayName, avatarUrl }, since }` | Friend request accepted (sent to requester's user group) |
 | `FriendRequestDeclined` | `{ requestId }` | Friend request declined (sent to requester's user group) |
 | `FriendRequestCancelled` | `{ requestId }` | Friend request cancelled (sent to recipient's user group) |
 | `FriendRemoved` | `{ friendshipId, userId }` | Friend removed (sent to the other participant's user group) |
 | `ReceiveDm` | `{ id, dmChannelId, authorUserId, authorName, body, createdAt, imageUrl, linkPreviews, replyContext }` | New DM received (sent to DM channel group + recipient user group) |
+| `DmMessageDeleted` | `{ messageId, dmChannelId }` | A DM was deleted by its author (sent to DM channel group + other participant's user group) |
 | `DmTyping` | `{ dmChannelId, displayName }` | DM partner started typing |
 | `DmStoppedTyping` | `{ dmChannelId, displayName }` | DM partner stopped typing |
 | `DmConversationOpened` | `{ dmChannelId, participant: { id, displayName, avatarUrl } }` | A new DM conversation was opened (recipient's user group) |

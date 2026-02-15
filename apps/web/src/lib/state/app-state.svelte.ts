@@ -788,6 +788,34 @@ export class AppState {
 		}
 	}
 
+	/** Delete a channel message owned by the current user. */
+	async deleteMessage(messageId: string): Promise<void> {
+		if (!this.idToken || !this.selectedChannelId) return;
+		try {
+			await this.api.deleteMessage(this.idToken, this.selectedChannelId, messageId);
+			// Real-time update arrives via SignalR; fall back to local removal if disconnected.
+			if (!this.hub.isConnected) {
+				this.messages = this.messages.filter((m) => m.id !== messageId);
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Delete a DM message owned by the current user. */
+	async deleteDmMessage(messageId: string): Promise<void> {
+		if (!this.idToken || !this.activeDmChannelId) return;
+		try {
+			await this.api.deleteDmMessage(this.idToken, this.activeDmChannelId, messageId);
+			// Real-time update arrives via SignalR; fall back to local removal if disconnected.
+			if (!this.hub.isConnected) {
+				this.dmMessages = this.dmMessages.filter((m) => m.id !== messageId);
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
 	/* ═══════════════════ Replies ═══════════════════ */
 
 	/** Activate the reply composer bar for a given message. */
@@ -1192,6 +1220,16 @@ export class AppState {
 			onMemberLeft: (event) => {
 				if (event.serverId === this.selectedServerId) {
 					this.loadMembers(event.serverId);
+				}
+			},
+			onMessageDeleted: (event) => {
+				if (event.channelId === this.selectedChannelId) {
+					this.messages = this.messages.filter((m) => m.id !== event.messageId);
+				}
+			},
+			onDmMessageDeleted: (event) => {
+				if (event.dmChannelId === this.activeDmChannelId) {
+					this.dmMessages = this.dmMessages.filter((m) => m.id !== event.messageId);
 				}
 			}
 		});

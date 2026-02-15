@@ -54,6 +54,12 @@
 		const bodyPreview = message.body.length > 100 ? message.body.slice(0, 100) : message.body;
 		app.startReply(message.id, message.authorName, bodyPreview, 'channel');
 	}
+
+	const isOwnMessage = $derived(currentUserId != null && message.authorUserId === currentUserId);
+
+	function handleDelete() {
+		app.deleteMessage(message.id);
+	}
 </script>
 
 <article class="message" class:grouped class:mentioned={isMentioned}>
@@ -81,6 +87,19 @@
 				/>
 			</svg>
 		</button>
+		{#if isOwnMessage}
+			<button
+				class="action-btn action-btn-danger"
+				onclick={handleDelete}
+				title="Delete message"
+				aria-label="Delete message"
+			>
+				<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+					<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+					<path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+				</svg>
+			</button>
+		{/if}
 
 		{#if showPicker}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -254,6 +273,12 @@
 		color: var(--text-normal);
 		background: var(--bg-message-hover);
 		border-color: var(--text-dim);
+	}
+
+	.action-btn-danger:hover {
+		color: #ed4245;
+		background: rgba(237, 66, 69, 0.1);
+		border-color: #ed4245;
 	}
 
 	.picker-backdrop {

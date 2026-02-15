@@ -207,6 +207,13 @@ export class ApiClient {
 		});
 	}
 
+	deleteMessage(token: string, channelId: string, messageId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
 	/* ───── Reactions ───── */
 
 	toggleReaction(
@@ -320,6 +327,13 @@ export class ApiClient {
 				headers: this.headers(token, true),
 				body: JSON.stringify({ body, imageUrl: imageUrl ?? null, replyToDirectMessageId: replyToDirectMessageId ?? null })
 			}
+		);
+	}
+
+	deleteDmMessage(token: string, channelId: string, messageId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
 		);
 	}
 
