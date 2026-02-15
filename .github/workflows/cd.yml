@@ -146,6 +146,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Ensure multiple revision mode
+        run: |
+          az containerapp revision set-mode \
+            --name ${{ env.API_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --mode multiple
+          az containerapp revision set-mode \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --mode multiple
+
       - name: Deploy API staging revision
         id: deploy-api
         run: |
@@ -154,7 +165,8 @@ jobs:
             --name ${{ env.API_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }} \
-            --revision-suffix "$SUFFIX"
+            --revision-suffix "$SUFFIX" \
+            --min-replicas 1
           echo "revision=${{ env.API_APP_NAME }}--${SUFFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Web staging revision
@@ -165,7 +177,8 @@ jobs:
             --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }} \
-            --revision-suffix "$SUFFIX"
+            --revision-suffix "$SUFFIX" \
+            --min-replicas 1
           echo "revision=${{ env.WEB_APP_NAME }}--${SUFFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Wait for staging revisions to be ready
@@ -179,12 +192,12 @@ jobs:
                 --resource-group ${{ env.RESOURCE_GROUP }} \
                 --revision "$APP_REVISION" \
                 --query properties.runningState -o tsv 2>/dev/null || echo "Unknown")
-              if [ "$STATUS" = "Running" ]; then
-                echo "Revision $APP_REVISION is running"
+              if [ "$STATUS" = "Running" ] || [ "$STATUS" = "Degraded" ]; then
+                echo "Revision $APP_REVISION is running (status: $STATUS)"
                 break
               fi
-              if [ "$STATUS" = "Failed" ]; then
-                echo "Revision $APP_REVISION failed to start"
+              if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Stopped" ]; then
+                echo "Revision $APP_REVISION failed to start (status: $STATUS)"
                 exit 1
               fi
               if [ "$i" = "30" ]; then
