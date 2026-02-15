@@ -212,7 +212,7 @@ jobs:
                 -o json 2>/dev/null || echo '{"runningState":"Unknown"}')
               STATUS=$(echo "$DETAIL" | jq -r '.runningState // "Unknown"')
               echo "  Attempt $i/30 — $DETAIL"
-              if [ "$STATUS" = "Running" ] || [ "$STATUS" = "Degraded" ]; then
+              if [ "$STATUS" = "Running" ] || [ "$STATUS" = "Degraded" ] || [ "$STATUS" = "RunningAtMaxScale" ]; then
                 echo "Revision $APP_REVISION is running (status: $STATUS)"
                 break
               fi
