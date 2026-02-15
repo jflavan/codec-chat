@@ -86,10 +86,13 @@ jobs:
         run: |
           dotnet ef migrations bundle \
             --project Codec.Api \
+            --configuration Release \
+            --no-build \
             --output ../../efbundle \
             --self-contained \
             --target-runtime linux-x64 \
-            --force
+            --force \
+            --verbose
 
       - name: Login to Azure
         uses: azure/login@v2
