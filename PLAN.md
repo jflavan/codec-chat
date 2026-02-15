@@ -457,6 +457,45 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update FEATURES.md with alpha notification feature
 - [x] Update README.md with alpha notification and bug reporting details
 
+## Task breakdown: Message Deletion
+
+### API — Channel message deletion
+- [x] Add `DELETE /channels/{channelId}/messages/{messageId}` endpoint to `ChannelsController`
+- [x] Verify server membership before allowing deletion
+- [x] Verify message ownership — only the author can delete their own message (403 otherwise)
+- [x] Cascade-delete associated reactions and link previews via EF Core relationship configuration
+- [x] Replies referencing deleted message have `ReplyToMessageId` set to `null` automatically (ON DELETE SET NULL)
+- [x] Broadcast `MessageDeleted { messageId, channelId }` via SignalR to channel group
+
+### API — DM message deletion
+- [x] Add `DELETE /dm/channels/{channelId}/messages/{messageId}` endpoint to `DmController`
+- [x] Verify DM channel membership before allowing deletion
+- [x] Verify message ownership — only the author can delete their own message (403 otherwise)
+- [x] Cascade-delete associated link previews via EF Core relationship configuration
+- [x] Replies referencing deleted DM have `ReplyToDirectMessageId` set to `null` automatically (ON DELETE SET NULL)
+- [x] Broadcast `DmMessageDeleted { messageId, dmChannelId }` via SignalR to DM channel group + other participant's user group
+
+### Web — Types, API client & SignalR
+- [x] Add `MessageDeletedEvent` and `DmMessageDeletedEvent` types to `chat-hub.ts`
+- [x] Add `onMessageDeleted` and `onDmMessageDeleted` callbacks to `SignalRCallbacks`
+- [x] Register `MessageDeleted` and `DmMessageDeleted` handlers in `ChatHubService.start()`
+- [x] Add `deleteMessage()` and `deleteDmMessage()` methods to `ApiClient`
+
+### Web — State & UI
+- [x] Add `deleteMessage(messageId)` action to `AppState` — calls API, falls back to local removal if SignalR disconnected
+- [x] Add `deleteDmMessage(messageId)` action to `AppState` — calls API, falls back to local removal if SignalR disconnected
+- [x] Wire `onMessageDeleted` SignalR callback in `startSignalR()` to filter from `messages` array
+- [x] Wire `onDmMessageDeleted` SignalR callback in `startSignalR()` to filter from `dmMessages` array
+- [x] Add delete button (trash icon) to `MessageItem.svelte` floating action bar — visible only on own messages, red hover state
+- [x] Add delete button (trash icon) to `DmChatArea.svelte` action bar — visible only on own messages, red hover state
+
+### Documentation
+- [x] Update `ARCHITECTURE.md` with DELETE endpoints and new SignalR events
+- [x] Update `FEATURES.md` to mark message deletion as implemented for channels and DMs
+- [x] Update `DIRECT_MESSAGES.md` to mark message deletion as implemented (was deferred)
+- [x] Update `README.md` features list
+- [x] Update `PLAN.md` with message deletion task breakdown
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
@@ -464,7 +503,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Add richer validation and error surfaces in UI
 - Server settings and configuration
 - Channel editing/deletion
-- Message editing and deletion
+- Message editing
 - Presence indicators (online/offline/away)
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars

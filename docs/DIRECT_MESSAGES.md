@@ -440,5 +440,5 @@ A single EF Core migration (`AddDirectMessages`) will:
 1. **Group DMs:** Should the system support group DMs (3+ participants)? (Deferred — the current design supports exactly 2 participants. The `DmChannelMember` join table makes future expansion to group DMs possible without schema changes.)
 2. **DM Reactions:** Should emoji reactions be supported on DM messages from the initial release? (Recommendation: defer to a follow-up iteration to reduce scope. The data model supports it, but the UI integration can come later.)
 3. **Unfriending behavior:** If two users are in a DM conversation and one removes the other as a friend, should the DM conversation remain accessible? (Recommendation: keep existing messages accessible as read-only, but prevent new messages until friendship is re-established.)
-4. **Message deletion:** Should users be able to delete individual DM messages? (Deferred — consistent with the broader message editing/deletion feature listed in FEATURES.md.)
+4. **Message deletion:** ✅ Implemented — users can delete their own DM messages via the action bar. Cascade-deletes associated link previews and broadcasts `DmMessageDeleted` via SignalR for real-time removal.
 5. **Notifications:** Should DMs trigger push notifications or in-app badges? (Deferred to a future Notifications feature — for now, real-time delivery via SignalR is sufficient.)

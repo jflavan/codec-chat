@@ -249,6 +249,14 @@
 								<path d="M6.598 2.152a.5.5 0 0 1 .049.703L3.354 6.5H9.5A4.5 4.5 0 0 1 14 11v1a.5.5 0 0 1-1 0v-1A3.5 3.5 0 0 0 9.5 7.5H3.354l3.293 3.645a.5.5 0 0 1-.742.67l-4-4.43a.5.5 0 0 1 0-.67l4-4.43a.5.5 0 0 1 .703-.049z"/>
 							</svg>
 						</button>
+						{#if message.authorUserId === app.me?.user.id}
+							<button class="dm-action-btn dm-action-btn-danger" aria-label="Delete message" onclick={() => app.deleteDmMessage(message.id)}>
+								<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+									<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+									<path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+								</svg>
+							</button>
+						{/if}
 					</div>
 
 					{#if !isGrouped}
@@ -952,6 +960,11 @@
 	.dm-action-btn:hover {
 		background: var(--bg-message-hover);
 		color: var(--text-normal);
+	}
+
+	.dm-action-btn-danger:hover {
+		color: #ed4245;
+		background: rgba(237, 66, 69, 0.1);
 	}
 
 	/* ───── Reply highlight ───── */

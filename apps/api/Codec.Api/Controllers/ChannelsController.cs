@@ -410,6 +410,50 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     }
 
     /// <summary>
+    /// Deletes a message. Only the author of the message can delete it. Requires server membership.
+    /// Cascade-deletes associated reactions and link previews. Replies referencing this message
+    /// will have their <c>ReplyToMessageId</c> set to <c>null</c> automatically.
+    /// </summary>
+    [HttpDelete("{channelId:guid}/messages/{messageId:guid}")]
+    public async Task<IActionResult> DeleteMessage(Guid channelId, Guid messageId)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
+        if (channel is null)
+        {
+            return NotFound(new { error = "Channel not found." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        if (!isMember)
+        {
+            return Forbid();
+        }
+
+        var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
+        if (message is null)
+        {
+            return NotFound(new { error = "Message not found." });
+        }
+
+        if (message.AuthorUserId != appUser.Id)
+        {
+            return StatusCode(403, new { error = "You can only delete your own messages." });
+        }
+
+        db.Messages.Remove(message);
+        await db.SaveChangesAsync();
+
+        await chatHub.Clients.Group(channelId.ToString()).SendAsync("MessageDeleted", new
+        {
+            MessageId = messageId,
+            ChannelId = channelId
+        });
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Toggles an emoji reaction on a message. If the user has already reacted with
     /// the given emoji, it is removed; otherwise it is added. Requires server membership.
     /// </summary>

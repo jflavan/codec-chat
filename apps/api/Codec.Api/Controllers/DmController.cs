@@ -524,6 +524,63 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     }
 
     /// <summary>
+    /// Deletes a direct message. Only the author of the message can delete it.
+    /// Cascade-deletes associated link previews. Replies referencing this message
+    /// will have their <c>ReplyToDirectMessageId</c> set to <c>null</c> automatically.
+    /// </summary>
+    [HttpDelete("channels/{channelId:guid}/messages/{messageId:guid}")]
+    public async Task<IActionResult> DeleteMessage(Guid channelId, Guid messageId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        var isMember = await db.DmChannelMembers.AsNoTracking()
+            .AnyAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
+
+        if (!isMember)
+        {
+            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
+            return channelExists
+                ? StatusCode(403, new { error = "You are not a participant in this conversation." })
+                : NotFound(new { error = "DM channel not found." });
+        }
+
+        var message = await db.DirectMessages.FirstOrDefaultAsync(m => m.Id == messageId && m.DmChannelId == channelId);
+        if (message is null)
+        {
+            return NotFound(new { error = "Message not found." });
+        }
+
+        if (message.AuthorUserId != appUser.Id)
+        {
+            return StatusCode(403, new { error = "You can only delete your own messages." });
+        }
+
+        var otherUserId = await db.DmChannelMembers
+            .AsNoTracking()
+            .Where(m => m.DmChannelId == channelId && m.UserId != appUser.Id)
+            .Select(m => m.UserId)
+            .FirstOrDefaultAsync();
+
+        db.DirectMessages.Remove(message);
+        await db.SaveChangesAsync();
+
+        var deletePayload = new
+        {
+            MessageId = messageId,
+            DmChannelId = channelId
+        };
+
+        await chatHub.Clients.Group($"dm-{channelId}").SendAsync("DmMessageDeleted", deletePayload);
+
+        if (otherUserId != Guid.Empty)
+        {
+            await chatHub.Clients.Group($"user-{otherUserId}").SendAsync("DmMessageDeleted", deletePayload);
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Closes a DM conversation for the current user by setting <c>IsOpen = false</c>.
     /// Messages are preserved — the conversation can be re-opened.
     /// </summary>
