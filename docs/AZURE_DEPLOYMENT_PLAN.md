@@ -17,7 +17,7 @@ This document is the phased execution plan for deploying the Codec chat applicat
 | Secrets | `appsettings.json` / `.env` with empty values | Azure Key Vault + GitHub Secrets (OIDC federation) |
 | CORS | Hardcoded `localhost:5174` | Environment-driven configuration |
 | Health Checks | Basic `/health` endpoint | Liveness + readiness probes for Container Apps |
-| Domain/TLS | localhost | `codec-chat.com` with managed TLS via Azure Container Apps |
+| Domain/TLS | localhost | `codec-chat.com` with managed TLS via Azure Container Apps ✅ |
 
 ### Target Architecture
 
@@ -669,11 +669,12 @@ infra/
 - [x] Update `corsAllowedOrigins` and `apiBaseUrl` to use custom domains when provided
 - [x] Update `main.bicepparam` with `codec-chat.com` and `api.codec-chat.com`
 - [x] Update `infra.yml` and `cd.yml` pipelines with custom domain parameters
-- [ ] Map `codec-chat.com` → Web Container App (custom domain binding via Bicep deployment)
-- [ ] Map `api.codec-chat.com` → API Container App (custom domain binding via Bicep deployment)
-- [ ] Azure-managed TLS certificates provisioned via Container Apps managed certificates
+- [x] Map `codec-chat.com` → Web Container App (custom domain binding via two-phase Bicep deployment)
+- [x] Map `api.codec-chat.com` → API Container App (custom domain binding via two-phase Bicep deployment)
+- [x] Azure-managed TLS certificates provisioned via Container Apps managed certificates (HTTP validation)
+- [x] Two-phase deployment pattern: Phase 1 registers hostnames (`bindCertificates=false`), Phase 2 binds certificates (`bindCertificates=true`)
+- [x] Update `PUBLIC_API_BASE_URL` GitHub Secret to `https://api.codec-chat.com`
 - [ ] Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
-- [ ] Update `PUBLIC_API_BASE_URL` GitHub Secret to `https://api.codec-chat.com`
 
 ### 10.2 Security hardening
 

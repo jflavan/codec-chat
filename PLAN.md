@@ -57,6 +57,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - OIDC federated credentials for GitHub Actions → Azure (no long-lived secrets)
 - Content Security Policy with SvelteKit nonce-based inline script support
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
+- Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
+- `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
 
 ## Task breakdown: Session Persistence
 
@@ -432,9 +434,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Frontend type-checks with zero errors (`svelte-check`)
 
 ## Next steps
-- Custom domain (`codec-chat.com`) — DNS configured, Bicep modules updated, awaiting deployment
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
-- Update `PUBLIC_API_BASE_URL` GitHub Secret to `https://api.codec-chat.com`
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
 - Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI

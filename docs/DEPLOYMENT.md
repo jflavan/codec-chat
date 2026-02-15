@@ -76,6 +76,8 @@ Configure these secrets in the repository's Settings > Secrets and variables > A
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
 | `GOOGLE_CLIENT_ID` | Google OAuth 2.0 client ID |
 | `POSTGRESQL_ADMIN_PASSWORD` | Password for PostgreSQL admin user |
+| `PUBLIC_API_BASE_URL` | API URL baked into SvelteKit build (`https://api.codec-chat.com`) |
+| `PUBLIC_GOOGLE_CLIENT_ID` | Google client ID baked into SvelteKit build |
 
 ### GitHub Environment
 
@@ -90,8 +92,9 @@ Create a `prod` environment in Settings > Environments with:
 Provisions Azure resources via Bicep.
 
 **Triggers:**
-- Manual dispatch (`workflow_dispatch`)
-- Push to `main` when files in `infra/` change
+- Manual dispatch (`workflow_dispatch`) only
+
+> **Note:** The `infra.yml` push trigger on `infra/**` was removed to prevent deployment conflicts with `cd.yml`. Infrastructure changes should be deployed manually or via the CD pipeline.
 
 **Steps:**
 1. Login to Azure via OIDC
@@ -100,7 +103,7 @@ Provisions Azure resources via Bicep.
 
 **First-time provisioning:**
 ```bash
-# Or trigger manually from GitHub Actions UI
+# Trigger manually from GitHub Actions UI
 gh workflow run infra.yml
 ```
 
@@ -144,11 +147,27 @@ gh workflow run cd.yml
 
 ### Infrastructure Updates
 
-Edit files under `infra/`, push to `main`, and the `infra.yml` workflow deploys changes automatically. For first-time or manual runs:
+Edit files under `infra/` and push to `main`. Then trigger the `infra.yml` workflow manually:
 
 ```bash
 gh workflow run infra.yml
 ```
+
+> **Note:** The CD pipeline (`cd.yml`) also deploys infrastructure as part of its deploy job using a two-phase Bicep deployment (Phase 1: register hostnames, Phase 2: bind certificates). For most infrastructure changes, a normal push to `main` followed by the CD pipeline is sufficient.
+
+### Custom Domain
+
+Codec is served at `codec-chat.com` (web) and `api.codec-chat.com` (API) with Azure-managed TLS certificates. The CD pipeline handles custom domain binding automatically via a two-phase Bicep deployment:
+
+1. **Phase 1** (`bindCertificates=false`): Deploys container apps with custom hostnames registered but no certificate binding
+2. **Phase 2** (`bindCertificates=true`): Binds the provisioned managed certificates to the custom domains with SNI
+
+This two-phase approach is required because Azure Container Apps managed certificates can only be created after the hostname is registered on the container app.
+
+DNS records (managed via Squarespace Domains):
+- `codec-chat.com` — A record pointing to Container Apps static IP
+- `api.codec-chat.com` — CNAME record pointing to Container Apps Environment FQDN
+- `asuid` / `asuid.api` — TXT records for domain verification
 
 ## Rollback
 
@@ -238,7 +257,7 @@ cd ../..
 | `ASPNETCORE_ENVIRONMENT` | Env var | `Production` |
 | `ConnectionStrings__Default` | Key Vault secret ref | PostgreSQL connection string |
 | `Google__ClientId` | Key Vault secret ref | Google OAuth client ID |
-| `Api__BaseUrl` | Env var | Public API URL (e.g., `https://api.codec-chat.com`) |
+| `Api__BaseUrl` | Env var | Public API URL (`https://api.codec-chat.com`) |
 | `Cors__AllowedOrigins` | Env var | Allowed CORS origins JSON array |
 | `Storage__Provider` | Env var | `AzureBlob` |
 | `Storage__AzureBlob__ServiceUri` | Env var | Blob storage endpoint URL |

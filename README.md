@@ -4,6 +4,8 @@
 
 Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core Web API. Users authenticate via Google Sign-In; the web client obtains an ID token and the API validates it on each request.
 
+**Live:** [https://codec-chat.com](https://codec-chat.com)
+
 > ⚠️ **Alpha status:** Codec is in active alpha development. APIs, data models, and UI may change without notice. Not recommended for production use.
 
 ## Repository Structure
