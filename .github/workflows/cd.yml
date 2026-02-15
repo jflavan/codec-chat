@@ -224,6 +224,7 @@ jobs:
             --name ${{ env.API_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query properties.configuration.ingress.fqdn -o tsv)
+          # Azure Container Apps uses the `staging---<fqdn>` host pattern for label-based routing; the triple dash is required and intentional.
           STAGING_API_URL="https://staging---${API_FQDN}"
 
           echo "Checking staging API at ${STAGING_API_URL}/health/ready"
