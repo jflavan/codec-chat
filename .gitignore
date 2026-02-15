@@ -66,6 +66,10 @@ dist/
 *.db-shm
 *.db-wal
 
+# EF Core migration bundle
+efbundle
+efbundle.exe
+
 # Uploaded files
 uploads/
 
