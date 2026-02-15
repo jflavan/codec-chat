@@ -1017,6 +1017,7 @@
 
 	.edit-input {
 		width: 100%;
+		box-sizing: border-box;
 		min-height: 44px;
 		padding: 8px 12px;
 		border-radius: 8px;
