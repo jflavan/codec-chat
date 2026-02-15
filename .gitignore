@@ -69,6 +69,7 @@ dist/
 # EF Core migration bundle
 efbundle
 efbundle.exe
+efbundle-*
 
 # Uploaded files
 uploads/
