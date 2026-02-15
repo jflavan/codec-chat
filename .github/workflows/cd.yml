@@ -89,8 +89,7 @@ jobs:
             --output ../../efbundle \
             --self-contained \
             --target-runtime linux-x64 \
-            --force \
-            --verbose
+            --force
 
       - name: Login to Azure
         uses: azure/login@v2
