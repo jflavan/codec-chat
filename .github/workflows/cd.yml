@@ -253,75 +253,28 @@ jobs:
             done
           done
 
-      - name: Label staging revisions for health checking
+      - name: Verify staging revisions are healthy
         run: |
-          az containerapp revision label remove \
-            --name ${{ env.API_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --label staging 2>/dev/null || true
-          az containerapp revision label add \
-            --name ${{ env.API_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --label staging \
-            --revision "${{ steps.deploy-api.outputs.revision }}"
-
-          az containerapp revision label remove \
-            --name ${{ env.WEB_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --label staging 2>/dev/null || true
-          az containerapp revision label add \
-            --name ${{ env.WEB_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --label staging \
-            --revision "${{ steps.deploy-web.outputs.revision }}"
-
-      - name: Health check staging revisions
-        run: |
-          API_FQDN=$(az containerapp show \
-            --name ${{ env.API_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          # Azure Container Apps uses the `staging---<fqdn>` host pattern for label-based routing; the triple dash is required and intentional.
-          STAGING_API_URL="https://staging---${API_FQDN}"
-
-          echo "Checking staging API at ${STAGING_API_URL}/health/ready"
-          for i in $(seq 1 15); do
-            RESPONSE=$(curl -s -w "\n%{http_code}" "${STAGING_API_URL}/health/ready" 2>&1 || true)
-            STATUS=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            if [ "$STATUS" = "200" ]; then
-              echo "API staging health check passed (HTTP $STATUS)"
-              break
-            fi
-            if [ "$i" = "15" ]; then
-              echo "API staging health check failed (last status: $STATUS, body: $BODY)"
+          for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}"; do
+            APP_NAME=$(echo "$APP_REVISION" | sed 's/--.*$//')
+            DETAIL=$(az containerapp revision show \
+              --name "$APP_NAME" \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --revision "$APP_REVISION" \
+              --query '{runningState:properties.runningState,healthState:properties.healthState,replicas:properties.replicas,active:properties.active}' \
+              -o json)
+            echo "Pre-switch check for $APP_REVISION: $DETAIL"
+            HEALTH=$(echo "$DETAIL" | jq -r '.healthState // "Unknown"')
+            ACTIVE=$(echo "$DETAIL" | jq -r '.active // false')
+            if [ "$HEALTH" != "Healthy" ] && [ "$HEALTH" != "None" ]; then
+              echo "::error::Revision $APP_REVISION is not healthy (healthState: $HEALTH)"
               exit 1
             fi
-            echo "  Attempt $i/15 — HTTP $STATUS (body: $BODY)"
-            sleep 10
-          done
-
-          WEB_FQDN=$(az containerapp show \
-            --name ${{ env.WEB_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          STAGING_WEB_URL="https://staging---${WEB_FQDN}"
-
-          echo "Checking staging Web at ${STAGING_WEB_URL}/health"
-          for i in $(seq 1 15); do
-            RESPONSE=$(curl -s -w "\n%{http_code}" "${STAGING_WEB_URL}/health" 2>&1 || true)
-            STATUS=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            if [ "$STATUS" = "200" ]; then
-              echo "Web staging health check passed (HTTP $STATUS)"
-              break
-            fi
-            if [ "$i" = "15" ]; then
-              echo "Web staging health check failed (last status: $STATUS, body: $BODY)"
+            if [ "$ACTIVE" != "true" ]; then
+              echo "::error::Revision $APP_REVISION is not active"
               exit 1
             fi
-            echo "  Attempt $i/15 — HTTP $STATUS (body: $BODY)"
-            sleep 10
+            echo "Revision $APP_REVISION verified: healthy=$HEALTH active=$ACTIVE"
           done
 
       - name: Switch traffic to new revisions
@@ -361,18 +314,6 @@ jobs:
               --resource-group ${{ env.RESOURCE_GROUP }} \
               --revision "$rev"
           done
-
-      - name: Remove staging labels
-        if: always()
-        run: |
-          az containerapp revision label remove \
-            --name ${{ env.API_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --label staging 2>/dev/null || true
-          az containerapp revision label remove \
-            --name ${{ env.WEB_APP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --label staging 2>/dev/null || true
 
       - name: Rollback — deactivate failed staging revisions
         if: failure()
