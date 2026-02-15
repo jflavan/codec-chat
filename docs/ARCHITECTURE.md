@@ -585,7 +585,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 │                  │
 │  ┌────────────┐  │
 │  │ PostgreSQL │  │
-│  │  (Docker)  │  │ :5432
+│  │  (Docker)  │  │ :5433
 │  └────────────┘  │
 └──────────────────┘
 ```

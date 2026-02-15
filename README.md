@@ -24,7 +24,7 @@ codec/
 ## Quick Start
 
 ### 1. Install Prerequisites
-- **Node.js** 24+ and npm — [download](https://nodejs.org/)
+- **Node.js** 20+ and npm — [download](https://nodejs.org/)
 - **.NET SDK** 9.x — [download](https://dotnet.microsoft.com/download/dotnet/9.0)
 - **Docker** — for local PostgreSQL via Docker Compose
 - **Google Cloud Console** project with OAuth 2.0 credentials
@@ -95,12 +95,28 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
 - ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
 
+## Self-Hosting
+
+Codec is designed to be easy to self-host. The repository includes a production-ready `docker-compose.yml` that starts the API, web frontend, PostgreSQL, and a local blob storage emulator.
+
+```bash
+git clone https://github.com/jflavan/codec-chat.git
+cd codec-chat
+cp .env.example .env
+# Edit .env — set GOOGLE_CLIENT_ID
+docker compose up -d
+# Open http://localhost:3000
+```
+
+For full details — custom domains, HTTPS with Caddy/nginx/Traefik, external PostgreSQL, storage options, and production hardening — see the [Self-Hosting Guide](docs/SELF_HOSTING.md).
+
 ## Bug Reports
 
 Codec is in alpha — your feedback matters! Use the [Bug Report template](https://github.com/jflavan/codec-chat/issues/new?template=bug-report.yml) to report any issues you find. The app also shows a notification on every login with a direct link to file a report.
 
 ## Documentation
-- [Deployment](docs/DEPLOYMENT.md) - Production deployment, rollback, and operations guide
+- [Self-Hosting Guide](docs/SELF_HOSTING.md) - Deploy Codec on your own server with Docker Compose
+- [Deployment (Azure)](docs/DEPLOYMENT.md) - Azure Container Apps deployment, rollback, and operations
 - [Azure Deployment Plan](docs/AZURE_DEPLOYMENT_PLAN.md) - Phased deployment plan (all 10 phases complete)
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
 - [Authentication](docs/AUTH.md) - How Google ID token validation works

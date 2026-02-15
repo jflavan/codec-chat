@@ -154,6 +154,18 @@ dotnet ef migrations script
 - **Web:** `http://localhost:5174`
 - **API:** `http://localhost:5050`
 
+## Docker Compose (Full Stack)
+
+If you prefer running everything in Docker instead of running the API and web app natively, use the root `docker-compose.yml`:
+
+```bash
+cp .env.example .env
+# Edit .env — set GOOGLE_CLIENT_ID
+docker compose up -d
+```
+
+This starts PostgreSQL, Azurite (blob storage emulator), the API (port `5050`), and the web app (port `3000`). See the [Self-Hosting Guide](SELF_HOSTING.md) for more details.
+
 ## Troubleshooting
 
 ### API fails to start

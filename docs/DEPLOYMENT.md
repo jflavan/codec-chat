@@ -1,6 +1,8 @@
-# Deployment Guide
+# Deployment Guide (Azure)
 
-This document covers deploying Codec to Azure using the infrastructure and CI/CD pipelines defined in this repository.
+This document covers deploying Codec to **Azure Container Apps** using the infrastructure and CI/CD pipelines defined in this repository.
+
+> **Looking for self-hosting?** If you want to run Codec on your own server without Azure, see [SELF_HOSTING.md](SELF_HOSTING.md) for a Docker Compose–based deployment guide.
 
 ## Architecture Overview
 
