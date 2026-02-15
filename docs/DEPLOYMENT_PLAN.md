@@ -99,7 +99,7 @@ This document is the phased execution plan for deploying the Codec chat applicat
 #### 1.1 Update NuGet packages
 
 - [ ] Remove `Microsoft.EntityFrameworkCore.Sqlite` from `Codec.Api.csproj`
-- [ ] Add `Npgsql.EntityFrameworkCore.PostgreSQL` (latest stable for EF Core 9)
+- [ ] Add `Npgsql.EntityFrameworkCore.PostgreSQL` (latest stable for EF Core 10)
 - [ ] Keep `Microsoft.EntityFrameworkCore.Design` for migration tooling
 
 #### 1.2 Update `Program.cs` database configuration

@@ -30,9 +30,9 @@ This document is the phased execution plan for deploying the Codec chat applicat
 │  Browser  │───────►│  │                                              │   │
 └──────────┘        │  │  ┌────────────────┐  ┌────────────────────┐  │   │
                      │  │  │  Web App (ACA) │  │  API App (ACA)     │  │   │
-                     │  │  │  SvelteKit     │──│  ASP.NET Core 9    │  │   │
+                     │  │  │  SvelteKit     │──│  ASP.NET Core 10   │  │   │
                      │  │  │  Node.js 20    │  │  SignalR WebSocket │  │   │
-                     │  │  │  adapter-node  │  │  EF Core 9         │  │   │
+                     │  │  │  adapter-node  │  │  EF Core 10        │  │   │
                      │  │  └────────────────┘  └────────┬───────────┘  │   │
                      │  │                                │              │   │
                      │  └────────────────────────────────┼──────────────┘   │
@@ -96,7 +96,7 @@ This document is the phased execution plan for deploying the Codec chat applicat
 ### 1.1 Update NuGet packages
 
 - [x] Remove `Microsoft.EntityFrameworkCore.Sqlite` from `Codec.Api.csproj`
-- [x] Add `Npgsql.EntityFrameworkCore.PostgreSQL` (latest stable for EF Core 9)
+- [x] Add `Npgsql.EntityFrameworkCore.PostgreSQL` (latest stable for EF Core 10)
 - [x] Keep `Microsoft.EntityFrameworkCore.Design` for migration tooling
 
 ### 1.2 Update `Program.cs` database configuration
@@ -648,7 +648,7 @@ infra/
 
 > **Issues resolved during CD pipeline setup:**
 > - Added `dotnet restore` before `dotnet ef migrations bundle` to fix missing `project.assets.json`
-> - Added `global.json` to pin .NET SDK to 9.0.x (GitHub runner had .NET 10 pre-installed)
+> - Added `global.json` to pin .NET SDK to 10.0.x
 > - Created `DesignTimeDbContextFactory` so EF CLI doesn't need full app host startup (which validates `Google:ClientId`)
 > - Temporary PostgreSQL firewall rule pattern: open for runner IP → run bundle → close with `if: always()`
 

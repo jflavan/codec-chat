@@ -10,7 +10,7 @@ Thanks for your interest in contributing to Codec! This project is in early alph
 
 ## Development
 
-- **API:** ASP.NET Core 9 — see [apps/api/](apps/api/) and [Architecture docs](docs/ARCHITECTURE.md).
+- **API:** ASP.NET Core 10 — see [apps/api/](apps/api/) and [Architecture docs](docs/ARCHITECTURE.md).
 - **Web:** SvelteKit + Svelte 5 — see [apps/web/](apps/web/) and [web README](apps/web/README.md).
 - Run both the API and web app locally to test end-to-end changes.
 

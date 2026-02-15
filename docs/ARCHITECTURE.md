@@ -5,9 +5,9 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 
 ### Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
-- **Backend:** ASP.NET Core 9 Web API (Controller-based APIs)
+- **Backend:** ASP.NET Core 10 Web API (Controller-based APIs)
 - **Real-time:** SignalR (WebSockets with automatic fallback)
-- **Database:** PostgreSQL with Entity Framework Core 9 (Npgsql)
+- **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID token validation)
 - **Deployment:** Containerized on Azure Container Apps (Docker multi-stage builds)
 
@@ -165,7 +165,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
   - Automatic reconnect via `withAutomaticReconnect()`
 
 ### Data Layer
-- **ORM:** Entity Framework Core 9
+- **ORM:** Entity Framework Core 10
 - **Database:** PostgreSQL (local via Docker Compose, production via Azure Database for PostgreSQL)
 - **Migrations:** Code-first with automatic application
 - **Seeding:** Development data seeded on first run
@@ -600,7 +600,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 │  Browser  │        │  │                                              │   │
 └──────────┘        │  │  ┌────────────────┐  ┌────────────────────┐  │   │
                      │  │  │  Web App       │  │  API App           │  │   │
-                     │  │  │  SvelteKit     │──│  ASP.NET Core 9    │  │   │
+                     │  │  │  SvelteKit     │──│  ASP.NET Core 10   │  │   │
                      │  │  │  Node.js 20    │  │  SignalR WebSocket │  │   │
                      │  │  │  Port 3000     │  │  Port 8080         │  │   │
                      │  │  └────────────────┘  └────────┬───────────┘  │   │

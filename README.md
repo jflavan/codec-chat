@@ -12,7 +12,7 @@ Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core W
 ```
 codec/
 ├── apps/
-│   ├── api/          # ASP.NET Core 9 Web API
+│   ├── api/          # ASP.NET Core 10 Web API
 │   │   └── Codec.Api/
 │   └── web/          # SvelteKit web front-end
 ├── docs/             # Project documentation
@@ -139,8 +139,8 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 
 ## Technology Stack
 - **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management
-- **Backend:** ASP.NET Core 9, Controller-based APIs
+- **Backend:** ASP.NET Core 10, Controller-based APIs
 - **Real-time:** SignalR (WebSockets)
-- **Database:** PostgreSQL with Entity Framework Core 9 (Npgsql)
+- **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID tokens)
 - **Infrastructure:** Azure Container Apps, Bicep IaC, GitHub Actions CI/CD

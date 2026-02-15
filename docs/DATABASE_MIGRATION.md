@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Codec currently uses **SQLite** with **Entity Framework Core 9** — a pragmatic choice for rapid MVP iteration. As the application moves toward production readiness, SQLite introduces several limitations that make it unsuitable for an enterprise-grade, multi-user chat platform:
+Codec currently uses **SQLite** with **Entity Framework Core 10** — a pragmatic choice for rapid MVP iteration. As the application moves toward production readiness, SQLite introduces several limitations that make it unsuitable for an enterprise-grade, multi-user chat platform:
 
 | Concern | SQLite Limitation | PostgreSQL Advantage |
 |---------|-------------------|----------------------|

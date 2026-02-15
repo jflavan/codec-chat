@@ -15,7 +15,7 @@ This document covers deploying Codec to **Azure Container Apps** using the infra
                      │  │                                              │   │
                      │  │  ┌────────────────┐  ┌────────────────────┐  │   │
                      │  │  │  Web App       │  │  API App           │  │   │
-                     │  │  │  SvelteKit     │  │  ASP.NET Core 9    │  │   │
+                     │  │  │  SvelteKit     │  │  ASP.NET Core 10   │  │   │
                      │  │  │  Node.js 20    │──│  SignalR WebSocket │  │   │
                      │  │  │  Port 3000     │  │  Port 8080         │  │   │
                      │  │  └────────────────┘  └────────┬───────────┘  │   │

@@ -4,7 +4,7 @@ This document describes Codec's data persistence strategy, database schema, and 
 
 ## Technology Choice
 
-**Decision:** Codec uses **PostgreSQL** with **Entity Framework Core 9** (via the Npgsql provider) for persistence.
+**Decision:** Codec uses **PostgreSQL** with **Entity Framework Core 10** (via the Npgsql provider) for persistence.
 
 ### Rationale
 - ✅ **Production-grade** - Full ACID compliance, high concurrency, and mature ecosystem
