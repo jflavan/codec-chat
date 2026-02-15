@@ -75,15 +75,22 @@ jobs:
       - name: Install EF Core tools
         run: dotnet tool install --global dotnet-ef --version 10.0.3
 
-      - name: Restore and build migration bundle
+      - name: Restore and build
         working-directory: apps/api
         run: |
           dotnet restore Codec.Api/Codec.Api.csproj
+          dotnet build Codec.Api/Codec.Api.csproj -c Release --no-restore
+
+      - name: Build migration bundle
+        working-directory: apps/api
+        run: |
           dotnet ef migrations bundle \
             --project Codec.Api \
             --output ../../efbundle \
             --self-contained \
-            --force
+            --target-runtime linux-x64 \
+            --force \
+            --verbose
 
       - name: Login to Azure
         uses: azure/login@v2
