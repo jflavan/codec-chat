@@ -44,6 +44,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
 - Real-time member list updates via SignalR server-scoped groups
+- Alpha notification banner with GitHub bug report link shown on every login
+- GitHub Issues bug report template for alpha testers (`.github/ISSUE_TEMPLATE/bug-report.yml`)
 - **Deployed to Azure** via Container Apps (Central US)
 - Database migrated from SQLite to PostgreSQL (Azure Database for PostgreSQL Flexible Server)
 - File storage migrated to Azure Blob Storage (avatars + images containers)
@@ -432,6 +434,28 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ### Verification
 - [x] Backend builds successfully (`dotnet build`, 0 errors)
 - [x] Frontend type-checks with zero errors (`svelte-check`)
+
+## Task breakdown: Alpha Notification & Bug Reporting
+
+### GitHub — Issue template
+- [x] Create `.github/ISSUE_TEMPLATE/bug-report.yml` structured bug report template
+- [x] Include fields: description, steps to reproduce, expected/actual behavior, screenshots, browser, device type
+- [x] Auto-label issues with `bug` and `alpha-tester` labels
+
+### Web — Alpha notification banner
+- [x] Add `showAlphaNotification` flag to `AppState` (set `true` at end of `handleCredential`)
+- [x] Add `dismissAlphaNotification()` method to `AppState`
+- [x] Create `AlphaNotification.svelte` modal overlay component
+- [x] Display ALPHA badge, welcome message, and bug reporting guidance
+- [x] Link directly to GitHub bug report template (`/issues/new?template=bug-report.yml`)
+- [x] Dismissable via "Got it" button or Escape key
+- [x] Styled with existing CRT phosphor-green design tokens
+- [x] Mount in `+page.svelte` alongside other overlays
+
+### Documentation
+- [x] Update PLAN.md with alpha notification task breakdown
+- [x] Update FEATURES.md with alpha notification feature
+- [x] Update README.md with alpha notification and bug reporting details
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin

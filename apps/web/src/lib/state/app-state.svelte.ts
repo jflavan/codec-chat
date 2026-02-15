@@ -111,6 +111,7 @@ export class AppState {
 	showCreateChannel = $state(false);
 	showInvitePanel = $state(false);
 	showFriendsPanel = $state(false);
+	showAlphaNotification = $state(false);
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
@@ -218,6 +219,11 @@ export class AppState {
 		this.settingsOpen = false;
 	}
 
+	/** Dismiss the alpha notification banner. */
+	dismissAlphaNotification(): void {
+		this.showAlphaNotification = false;
+	}
+
 	/* ═══════════════════ Auth ═══════════════════ */
 
 	/** Bootstrap auth: restore session or show sign-in UI. */
@@ -252,6 +258,7 @@ export class AppState {
 			this.startSignalR(token)
 		]);
 		this.isInitialLoading = false;
+		this.showAlphaNotification = true;
 	}
 
 	async signOut(): Promise<void> {
