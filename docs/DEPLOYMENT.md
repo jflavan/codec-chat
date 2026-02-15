@@ -122,12 +122,19 @@ Runs on every push and pull request.
 
 ### CD Pipeline (`cd.yml`)
 
-Deploys to production after CI passes on `main`.
+Deploys to production after CI passes on `main` using a blue-green deployment strategy.
 
 **Jobs:**
 1. `build-and-push` — Build Docker images and push to ACR
 2. `migrate-database` — Run EF Core migration bundle against production PostgreSQL
-3. `deploy` — Update Container Apps with new image tags (requires `prod` environment approval)
+3. `deploy` — Blue-green deployment to Container Apps (requires `prod` environment approval):
+   - Ensure multiple revision mode and ACR registry configuration
+   - Deploy new staging revisions (with unique suffix per commit + attempt)
+   - Wait for revisions to reach a running state (`Running`, `Degraded`, or `RunningAtMaxScale`) with a healthy health state (`Healthy` or `None`)
+   - Verify staging revision health via Azure CLI before switching traffic
+   - Switch 100% traffic to the new revisions
+   - Deactivate old revisions
+   - On failure: rollback by deactivating the failed staging revisions
 4. `smoke-test` — Verify health endpoints respond with 200
 
 ## Deploying
@@ -137,8 +144,10 @@ Deploys to production after CI passes on `main`.
 1. Merge a PR to `main`
 2. CI pipeline runs automatically
 3. On CI success, CD pipeline triggers
-4. Review and approve the deployment in the `prod` environment
-5. Smoke tests verify the deployment
+4. Images are built and pushed to ACR, then database migrations run
+5. Review and approve the deployment in the `prod` environment
+6. New staging revisions are deployed and verified healthy before traffic is switched
+7. Smoke tests verify the deployment
 
 ### Manual Deployment
 
@@ -155,7 +164,7 @@ Edit files under `infra/` and push to `main`. Then trigger the `infra.yml` workf
 gh workflow run infra.yml
 ```
 
-> **Note:** The CD pipeline (`cd.yml`) also deploys infrastructure as part of its deploy job using a two-phase Bicep deployment (Phase 1: register hostnames, Phase 2: bind certificates). For most infrastructure changes, a normal push to `main` followed by the CD pipeline is sufficient.
+> **Note:** Infrastructure changes are managed separately via the `infra.yml` workflow. The CD pipeline (`cd.yml`) only handles application deployment (image updates and revision management), not infrastructure provisioning.
 
 ### Custom Domain
 

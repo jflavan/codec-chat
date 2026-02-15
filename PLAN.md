@@ -54,7 +54,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Both apps containerized with optimized multi-stage Dockerfiles
 - Infrastructure as Code via Bicep modules under `infra/`
 - CI pipeline: build, lint, Docker image validation on every push/PR
-- CD pipeline: build → push to ACR → EF Core migration bundle → Bicep deploy → smoke tests
+- CD pipeline: build → push to ACR → EF Core migration bundle → blue-green deploy (staging revisions → health verification → traffic switch) → smoke tests
 - Infrastructure pipeline: Bicep what-if → deploy on push to `infra/` or manual dispatch
 - OIDC federated credentials for GitHub Actions → Azure (no long-lived secrets)
 - Content Security Policy with SvelteKit nonce-based inline script support

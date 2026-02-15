@@ -606,21 +606,28 @@ infra/
 - [x] Depends on `migrate-database`
 - [x] GitHub Environment: `prod` (with manual approval)
 - [x] Login to Azure via OIDC
-- [x] Update API Container App:
+- [x] Ensure multiple revision mode on both Container Apps
+- [x] Ensure ACR registry configuration (system-assigned Managed Identity)
+- [x] Deploy new staging revisions with unique suffix per commit + attempt:
   ```bash
-  az containerapp update \\
-    --name ca-codec-api-prod \\
-    --resource-group rg-codec-prod \\
-    --image {acrName}.azurecr.io/codec-api:${{ github.sha }}
+  SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
+  az containerapp update \
+    --name ca-codec-prod-api \
+    --resource-group rg-codec-prod \
+    --image {acrName}.azurecr.io/codec-api:${{ github.sha }} \
+    --revision-suffix "$SUFFIX" \
+    --min-replicas 1 \
+    -o json
   ```
-- [x] Update Web Container App:
-  ```bash
-  az containerapp update \\
-    --name ca-codec-web-prod \\
-    --resource-group rg-codec-prod \\
-    --image {acrName}.azurecr.io/codec-web:${{ github.sha }}
-  ```
-- [x] Wait for revisions to become active
+- [x] Parse revision name from `az containerapp update` JSON output (not constructed from suffix)
+- [x] Wait for revisions to reach running + healthy state (60 iterations, 10s intervals):
+  - Accept `Running`, `Degraded`, or `RunningAtMaxScale` as valid running states
+  - Require `healthState` of `Healthy` or `None` before proceeding
+  - Output full diagnostics (revision details + container logs) on failure or timeout
+- [x] Verify staging revision health via Azure CLI (`az containerapp revision show`) before traffic switch
+- [x] Switch 100% traffic to new revisions (`az containerapp ingress traffic set`)
+- [x] Deactivate old revisions after successful traffic switch
+- [x] Rollback on failure: deactivate failed staging revisions
 
 ### 9.5 `smoke-test` job
 
@@ -651,6 +658,11 @@ infra/
 > - Added `global.json` to pin .NET SDK to 10.0.x
 > - Created `DesignTimeDbContextFactory` so EF CLI doesn't need full app host startup (which validates `Google:ClientId`)
 > - Temporary PostgreSQL firewall rule pattern: open for runner IP → run bundle → close with `if: always()`
+>
+> **Issues resolved during blue-green deployment rollout:**
+> - `RunningAtMaxScale` was not accepted as a valid running state (API has `maxReplicas: 1`, so Azure reports `RunningAtMaxScale` instead of `Running`)
+> - Wait step only checked `runningState` — added `healthState` verification (`Healthy` or `None`) to prevent premature promotion
+> - Label-based routing (`staging---<fqdn>`) returned HTTP 404 from Azure Container Apps infrastructure — replaced with direct Azure CLI health verification via `az containerapp revision show`
 
 ---
 
