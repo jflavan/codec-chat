@@ -32,7 +32,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			apiBase
 		].join(' '),
 		'connect-src': `'self' ${apiBase} ${wsBase} https://accounts.google.com`,
-		'frame-src': 'https://accounts.google.com'
+		'frame-src': 'https://accounts.google.com https://www.youtube-nocookie.com'
 	};
 
 	let csp = existing;
