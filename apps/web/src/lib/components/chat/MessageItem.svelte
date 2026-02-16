@@ -4,8 +4,10 @@
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
 	import LinkPreviewCard from './LinkPreviewCard.svelte';
+	import YouTubeEmbed from './YouTubeEmbed.svelte';
 	import ReplyReference from './ReplyReference.svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 
 	let {
 		message,
@@ -37,6 +39,22 @@
 			message.body?.toLowerCase().includes('<@here>')
 		)
 	);
+
+	/** YouTube URLs in the message body that have no matching backend link preview. */
+	const uncoveredYouTubeUrls = $derived.by(() => {
+		if (!message.body) return [];
+		const all = extractYouTubeUrls(message.body);
+		if (!all.length) return [];
+		const coveredIds = new Set(
+			(message.linkPreviews ?? [])
+				.map((lp) => {
+					const match = /[\w-]{11}/.exec(lp.url);
+					return match?.[0] ?? null;
+				})
+				.filter(Boolean)
+		);
+		return all.filter((yt) => !coveredIds.has(yt.videoId));
+	});
 
 	let showPicker = $state(false);
 	const quickEmojis = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '🚀', '💯'];
@@ -213,6 +231,13 @@
 					{/each}
 				</div>
 			{/if}
+			{#if uncoveredYouTubeUrls.length}
+				<div class="link-previews">
+					{#each uncoveredYouTubeUrls as yt}
+						<YouTubeEmbed videoId={yt.videoId} url={yt.url} />
+					{/each}
+				</div>
+			{/if}
 			{#if (message.reactions ?? []).length > 0}
 				<ReactionBar
 					reactions={message.reactions}
@@ -260,6 +285,13 @@
 				<div class="link-previews">
 					{#each message.linkPreviews as preview}
 						<LinkPreviewCard {preview} />
+					{/each}
+				</div>
+			{/if}
+			{#if uncoveredYouTubeUrls.length}
+				<div class="link-previews">
+					{#each uncoveredYouTubeUrls as yt}
+						<YouTubeEmbed videoId={yt.videoId} url={yt.url} />
 					{/each}
 				</div>
 			{/if}

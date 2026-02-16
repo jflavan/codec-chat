@@ -2,25 +2,27 @@
 	import type { LinkPreview } from '$lib/types/index.js';
 	import { youTubeEmbedUrl } from '$lib/utils/youtube.js';
 
-	let { preview, videoId }: { preview: LinkPreview; videoId: string } = $props();
+	let { preview, videoId, url }: { preview?: LinkPreview; videoId: string; url?: string } =
+		$props();
 
 	const embedSrc = $derived(youTubeEmbedUrl(videoId));
-	const href = $derived(preview.canonicalUrl ?? preview.url);
+	const href = $derived(preview?.canonicalUrl ?? preview?.url ?? url ?? '');
+	const title = $derived(preview?.title ?? 'YouTube video');
 </script>
 
 <aside class="youtube-embed">
-	{#if preview.siteName}
+	{#if preview?.siteName}
 		<span class="embed-site-name">{preview.siteName}</span>
 	{/if}
-	{#if preview.title}
+	{#if href}
 		<a class="embed-title" {href} target="_blank" rel="noopener noreferrer">
-			{preview.title}
+			{title}
 		</a>
 	{/if}
 	<div class="embed-player">
 		<iframe
 			src={embedSrc}
-			title={preview.title ?? 'YouTube video'}
+			title={title}
 
 			allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
 			allowfullscreen

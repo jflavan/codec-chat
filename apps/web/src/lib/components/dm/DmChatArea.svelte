@@ -4,9 +4,11 @@
 	import { formatTime } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
 	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
+	import YouTubeEmbed from '$lib/components/chat/YouTubeEmbed.svelte';
 	import ReplyReference from '$lib/components/chat/ReplyReference.svelte';
 	import ReplyComposerBar from '$lib/components/chat/ReplyComposerBar.svelte';
 	import ComposerOverlay from '$lib/components/chat/ComposerOverlay.svelte';
+	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -281,7 +283,10 @@
 			{:else}
 				{#each app.dmMessages as message, i}
 					{@const prev = i > 0 ? app.dmMessages[i - 1] : null}
-					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
+					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
+					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
+					{@const coveredIds = new Set((message.linkPreviews ?? []).map((lp) => { const m = /[\w-]{11}/.exec(lp.url); return m?.[0] ?? ''; }).filter(Boolean))}
+					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
 					<!-- Reply action bar -->
 					<div class="dm-message-actions">
 						<button class="dm-action-btn" aria-label="Reply" onclick={() => handleReply(message)}>
@@ -351,6 +356,13 @@
 									{/each}
 								</div>
 							{/if}
+							{#if uncoveredYt.length}
+								<div class="link-previews">
+									{#each uncoveredYt as yt}
+										<YouTubeEmbed videoId={yt.videoId} url={yt.url} />
+									{/each}
+								</div>
+							{/if}
 						</div>
 					{:else}
 						<div class="message-avatar-col">
@@ -388,6 +400,13 @@
 								<div class="link-previews">
 									{#each message.linkPreviews as preview}
 										<LinkPreviewCard {preview} />
+									{/each}
+								</div>
+							{/if}
+							{#if uncoveredYt.length}
+								<div class="link-previews">
+									{#each uncoveredYt as yt}
+										<YouTubeEmbed videoId={yt.videoId} url={yt.url} />
 									{/each}
 								</div>
 							{/if}
