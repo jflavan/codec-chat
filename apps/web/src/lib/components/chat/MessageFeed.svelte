@@ -5,6 +5,7 @@
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
+	const TOP_THRESHOLD = 200;
 
 	let container: HTMLDivElement;
 	let isLockedToBottom = $state(true);
@@ -36,12 +37,44 @@
 
 	function handleScroll(): void {
 		if (isAutoScrolling) return;
+
 		const atBottom = isAtBottom();
 		if (atBottom && !isLockedToBottom) {
 			isLockedToBottom = true;
 			unreadCount = 0;
 		} else if (!atBottom && isLockedToBottom) {
 			isLockedToBottom = false;
+		}
+
+		// Trigger loading older messages when scrolled near the top.
+		if (container && container.scrollTop < TOP_THRESHOLD && app.hasMoreMessages && !app.isLoadingOlderMessages) {
+			loadOlderAndPreserveScroll();
+		}
+	}
+
+	async function loadOlderAndPreserveScroll(): Promise<void> {
+		if (!container) return;
+
+		// Capture scroll position relative to the bottom of the scroll area
+		// so we can restore it after new content is prepended above.
+		const previousScrollHeight = container.scrollHeight;
+
+		await app.loadOlderMessages();
+
+		// Sync previousMessageCount so the auto-scroll effect doesn't
+		// misinterpret prepended older messages as new incoming messages.
+		previousMessageCount = app.messages.length;
+
+		await tick();
+
+		// Restore scroll position so the viewport stays on the same messages.
+		// Suppress the scroll handler during restoration to avoid re-triggering
+		// another fetch if scrollTop is still near the top.
+		if (container) {
+			isAutoScrolling = true;
+			const newScrollHeight = container.scrollHeight;
+			container.scrollTop += newScrollHeight - previousScrollHeight;
+			setTimeout(() => { isAutoScrolling = false; }, 50);
 		}
 	}
 
@@ -107,6 +140,9 @@
 		{:else if app.messages.length === 0}
 			<p class="muted feed-status">No messages yet. Start the conversation!</p>
 		{:else}
+			{#if app.isLoadingOlderMessages}
+				<p class="muted feed-status loading-older">Loading older messages…</p>
+			{/if}
 			{#each app.messages as message, i}
 				{@const prev = i > 0 ? app.messages[i - 1] : null}
 				{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
@@ -150,6 +186,11 @@
 	.feed-status {
 		padding: 16px;
 		text-align: center;
+	}
+
+	.loading-older {
+		padding: 8px;
+		font-size: 13px;
 	}
 
 	.muted {

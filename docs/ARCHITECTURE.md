@@ -262,7 +262,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `POST /invites/{code}` - Join a server via invite code (any authenticated user; validates expiry and max uses)
 
 #### Messaging
-- `GET /channels/{channelId}/messages` - Get messages in a channel (requires membership; includes `imageUrl`, `replyContext`)
+- `GET /channels/{channelId}/messages?before={timestamp}&limit={n}` - Get messages in a channel with cursor-based pagination (requires membership; `before` DateTimeOffset cursor and `limit` 1–200 default 100; returns `{ hasMore, messages }` with `imageUrl`, `replyContext`)
 - `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; accepts optional `imageUrl`, `replyToMessageId`; broadcasts via SignalR)
 - `DELETE /channels/{channelId}/messages/{messageId}` - Delete a channel message (author only; cascade-deletes reactions and link previews; broadcasts `MessageDeleted` via SignalR)
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership; broadcasts via SignalR)

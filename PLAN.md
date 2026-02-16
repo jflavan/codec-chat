@@ -536,6 +536,38 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update `README.md` features list
 - [x] Update `PLAN.md` with message editing task breakdown
 
+## Task breakdown: Progressive Message Loading
+
+### API — Cursor-based pagination
+- [x] Add `before` (DateTimeOffset) and `limit` (int) query parameters to `GET /channels/{channelId}/messages`
+- [x] Clamp `limit` to 1–200 range with default of 100
+- [x] Filter messages by `CreatedAt < before` when cursor is provided
+- [x] Fetch `limit + 1` rows to determine `hasMore` flag
+- [x] Return `{ hasMore, messages }` response instead of flat message array
+
+### Web — Types & API client
+- [x] Add `PaginatedMessages` type to `models.ts` (`{ hasMore: boolean; messages: Message[] }`)
+- [x] Export `PaginatedMessages` from barrel index
+- [x] Update `getMessages()` in `ApiClient` to accept optional `{ before?, limit? }` options and return `PaginatedMessages`
+
+### Web — State management
+- [x] Add `hasMoreMessages` and `isLoadingOlderMessages` reactive state fields to `AppState`
+- [x] Update `loadMessages()` to use paginated response and set `hasMoreMessages`
+- [x] Add `loadOlderMessages()` method — uses oldest message timestamp as cursor, prepends results
+- [x] Reset `hasMoreMessages` on sign-out, goHome, kicked, and channel deselection
+
+### Web — Scroll behavior
+- [x] Add `TOP_THRESHOLD` constant (200px) for scroll-near-top detection in `MessageFeed.svelte`
+- [x] Detect scroll near top in `handleScroll()` and trigger older message loading
+- [x] Implement `loadOlderAndPreserveScroll()` — captures `scrollHeight`, loads messages, preserves scroll position via `tick()`
+- [x] Sync `previousMessageCount` after prepending to prevent false unread badge
+- [x] Guard scroll restoration with `isAutoScrolling` flag to prevent re-trigger
+- [x] Add "Loading older messages…" indicator at top of feed
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`, 0 errors)
+- [x] Frontend type-checks with zero errors (`svelte-check`)
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
