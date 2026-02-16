@@ -62,6 +62,12 @@ export type Message = {
 	replyContext: ReplyContext | null;
 };
 
+/** Paginated message response from the API. */
+export type PaginatedMessages = {
+	hasMore: boolean;
+	messages: Message[];
+};
+
 /** Member of a server. */
 export type Member = {
 	userId: string;

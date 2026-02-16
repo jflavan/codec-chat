@@ -2,6 +2,7 @@ import type {
 	MemberServer,
 	Channel,
 	Message,
+	PaginatedMessages,
 	Reaction,
 	Member,
 	UserProfile,
@@ -236,8 +237,13 @@ export class ApiClient {
 
 	/* ───── Messages ───── */
 
-	getMessages(token: string, channelId: string): Promise<Message[]> {
-		return this.request(`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages`, {
+	getMessages(token: string, channelId: string, options?: { before?: string; limit?: number }): Promise<PaginatedMessages> {
+		const params = new URLSearchParams();
+		if (options?.before) params.set('before', options.before);
+		if (options?.limit) params.set('limit', String(options.limit));
+		const qs = params.toString();
+		const url = `${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages${qs ? `?${qs}` : ''}`;
+		return this.request(url, {
 			headers: this.headers(token)
 		});
 	}

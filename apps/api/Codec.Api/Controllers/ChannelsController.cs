@@ -19,11 +19,18 @@ namespace Codec.Api.Controllers;
 public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
 {
     /// <summary>
-    /// Returns messages for a channel, ordered by creation time. Requires server membership.
+    /// Returns messages for a channel, ordered by creation time (ascending).
+    /// Supports cursor-based pagination via the <c>before</c> and <c>limit</c> query parameters.
+    /// When <c>before</c> is supplied, only messages created before that timestamp are returned.
+    /// The response includes a <c>hasMore</c> flag indicating whether older messages exist.
+    /// Requires server membership.
     /// </summary>
     [HttpGet("{channelId:guid}/messages")]
-    public async Task<IActionResult> GetMessages(Guid channelId)
+    public async Task<IActionResult> GetMessages(Guid channelId, [FromQuery] DateTimeOffset? before = null, [FromQuery] int limit = 100)
     {
+        // Clamp limit to a safe range to prevent abuse.
+        limit = Math.Clamp(limit, 1, 200);
+
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
         if (channel is null)
         {
@@ -37,10 +44,19 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return Forbid();
         }
 
-        var messages = await db.Messages
+        var query = db.Messages
             .AsNoTracking()
-            .Where(message => message.ChannelId == channelId)
-            .OrderBy(message => message.CreatedAt)
+            .Where(message => message.ChannelId == channelId);
+
+        if (before.HasValue)
+        {
+            query = query.Where(message => message.CreatedAt < before.Value);
+        }
+
+        // Fetch one extra row to determine if more messages exist beyond this page.
+        var messages = await query
+            .OrderByDescending(message => message.CreatedAt)
+            .Take(limit + 1)
             .Select(message => new
             {
                 message.Id,
@@ -56,6 +72,15 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 AuthorGoogleAvatarUrl = message.AuthorUser != null ? message.AuthorUser.AvatarUrl : null
             })
             .ToListAsync();
+
+        var hasMore = messages.Count > limit;
+        if (hasMore)
+        {
+            messages = messages.Take(limit).ToList();
+        }
+
+        // Reverse to chronological order (oldest first) for the client.
+        messages.Reverse();
 
         var messageIds = messages.Select(message => message.Id).ToArray();
         var reactionLookup = new Dictionary<Guid, IReadOnlyList<ReactionSummary>>();
@@ -185,7 +210,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             };
         });
 
-        return Ok(response);
+        return Ok(new { hasMore, messages = response });
     }
 
     /// <summary>

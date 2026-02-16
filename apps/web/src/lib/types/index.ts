@@ -5,6 +5,7 @@ export type {
 	Mention,
 	ReplyContext,
 	Message,
+	PaginatedMessages,
 	Reaction,
 	Member,
 	UserProfile,

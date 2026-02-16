@@ -65,6 +65,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Message deletion — authors can delete their own messages via action bar; cascade-deletes reactions and link previews; real-time removal via SignalR
 - ✅ Message editing — authors can edit their own messages via inline edit mode; "(edited)" label displayed on modified messages; real-time sync via SignalR
 - ✅ Text formatting — bold (`*text*` or `**text**`) and italic (`_text_`) with live preview in composer
+- ✅ Progressive message loading — initially loads last 100 messages; older messages load seamlessly on scroll-up via cursor-based pagination (`before`/`limit` query params); scroll position preserved during prepend
 
 ### Friends ([detailed spec](FRIENDS.md))
 - ✅ Friend requests (send, accept, decline, cancel)
