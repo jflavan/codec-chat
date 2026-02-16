@@ -212,6 +212,9 @@ using (var scope = app.Services.CreateScope())
 
     await SeedData.EnsureDefaultServerAsync(db);
 
+    var globalAdminEmail = app.Configuration["GlobalAdmin:Email"];
+    await SeedData.EnsureGlobalAdminAsync(db, globalAdminEmail);
+
     if (app.Environment.IsDevelopment())
     {
         await SeedData.InitializeAsync(db);

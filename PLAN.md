@@ -38,11 +38,13 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - CI/CD: GitHub Actions (CI, CD, Infrastructure pipelines)
 - Auth (Azure): OIDC federated credentials (no long-lived secrets)
 - Secrets: Azure Key Vault + GitHub Secrets
+- Global admin: Configurable via `GlobalAdmin:Email` setting (Key Vault in production, appsettings in development); can delete any server, channel, or message and kick any member
 - File storage: Azure Blob Storage (production), local disk (development)
 - Logging: Serilog with structured JSON → Log Analytics
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
+- **Global admin role** — configurable global admin can delete any server, channel, or message and kick any member; seeded from `GlobalAdmin:Email` config; Key Vault integration for production
 - Real-time member list updates via SignalR server-scoped groups
 - Alpha notification banner with GitHub bug report link shown on every login
 - GitHub Issues bug report template for alpha testers (`.github/ISSUE_TEMPLATE/bug-report.yml`)
@@ -638,13 +640,71 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `<link rel="icon" href="%sveltekit.assets%/favicon.ico" />` to `app.html`
 - [x] Change YouTube embed border-left color from `var(--accent)` to `var(--danger)` in `YouTubeEmbed.svelte`
 
+## Task breakdown: Global Admin
+
+### API — Data model & migration
+- [x] Add `IsGlobalAdmin` boolean property to `User` entity (default `false`)
+- [x] Create and apply EF Core migration (`AddGlobalAdminRole`)
+
+### API — Server deletion endpoint
+- [x] Add `DELETE /servers/{serverId}` endpoint to `ServersController`
+- [x] Require Owner or global admin role (return 403 otherwise)
+- [x] Cascade-delete all related data (messages, reactions, link previews, channels, members, invites)
+- [x] Broadcast `ServerDeleted { serverId }` via SignalR to server group
+
+### API — Channel deletion endpoint
+- [x] Add `DELETE /servers/{serverId}/channels/{channelId}` endpoint to `ServersController`
+- [x] Allow server Owner, Admin, or global admin (return 403 otherwise)
+- [x] Cascade-delete all channel messages, reactions, and link previews
+- [x] Broadcast `ChannelDeleted { serverId, channelId }` via SignalR to server group
+
+### API — Message deletion bypass
+- [x] Update `DELETE /channels/{channelId}/messages/{messageId}` to allow global admin to delete any message (bypass author-only check)
+
+### API — Kick bypass
+- [x] Update `DELETE /servers/{serverId}/members/{userId}` to allow global admin to kick any non-Owner member (bypass membership/role check)
+
+### API — User profile
+- [x] Include `isGlobalAdmin` in `GET /me` response
+
+### API — Seed data & configuration
+- [x] Add `EnsureGlobalAdminAsync(db, email)` method to `SeedData`
+- [x] Read `GlobalAdmin:Email` from configuration in `Program.cs`
+- [x] Add `GlobalAdmin:Email` to `appsettings.json` (empty default) and `appsettings.Development.json`
+
+### Web — Types & API client
+- [x] Add `isGlobalAdmin` optional boolean to `UserProfile` type
+- [x] Add `deleteServer(serverId)` and `deleteChannel(serverId, channelId)` methods to `ApiClient`
+
+### Web — State management
+- [x] Add `isGlobalAdmin` derived state to `AppState`
+- [x] Add `canDeleteServer` and `canDeleteChannel` derived properties
+- [x] Add `canKickMembers` derived property (includes global admin)
+- [x] Add `deleteServer(serverId)` and `deleteChannel(serverId, channelId)` actions
+- [x] Add `onServerDeleted` and `onChannelDeleted` SignalR handlers
+
+### Web — UI
+- [x] Update `MessageItem.svelte` — delete button visible for own messages or global admin; edit restricted to own messages only
+- [x] Update `ServerSettings.svelte` — add danger zone with delete server button (Owner or global admin) and delete channel buttons (Owner/Admin/global admin) with confirmation dialogs
+
+### SignalR
+- [x] Add `ServerDeletedEvent` and `ChannelDeletedEvent` types to `chat-hub.ts`
+- [x] Register `ServerDeleted` and `ChannelDeleted` handlers in `ChatHubService.start()`
+
+### Infrastructure & CI/CD
+- [x] Add `global-admin-email` Key Vault secret reference in `container-app-api.bicep`
+- [x] Add `GlobalAdmin__Email` environment variable to API container app
+- [x] Add "Set GlobalAdmin email in Key Vault" step in `cd.yml`
+- [x] Add `GLOBAL_ADMIN_EMAIL` GitHub Actions repository secret
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`, 0 errors)
+- [x] Frontend type-checks with zero errors (`svelte-check`, 0 errors)
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
-- Introduce role-based authorization rules for additional operations
 - Add richer validation and error surfaces in UI
-- Server settings and configuration
-- Channel editing/deletion
 - Presence indicators (online/offline/away)
 - Light mode theme toggle
 - Mobile slide-out navigation for server/channel sidebars

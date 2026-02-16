@@ -189,25 +189,33 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Kicks a user from a server. Requires Owner or Admin role.
-    /// Owners can kick anyone except themselves; Admins can only kick Members.
+    /// Kicks a user from a server. Requires Owner, Admin, or global admin role.
+    /// Owners and global admins can kick anyone except themselves and the server owner;
+    /// Admins can only kick Members.
     /// </summary>
     [HttpDelete("{serverId:guid}/members/{targetUserId:guid}")]
     public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (callerMembership is null)
+        ServerRole? callerRole = null;
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var callerMembership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (callerMembership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (callerMembership is null)
+            {
+                return Forbid();
+            }
+
+            if (callerMembership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
+
+            callerRole = callerMembership.Role;
         }
 
         if (targetUserId == appUser.Id)
@@ -228,7 +236,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             return BadRequest(new { error = "Cannot kick the server owner." });
         }
 
-        if (callerMembership.Role is ServerRole.Admin && targetMembership.Role is ServerRole.Admin)
+        if (callerRole is ServerRole.Admin && targetMembership.Role is ServerRole.Admin)
         {
             return Forbid();
         }
@@ -601,6 +609,132 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             userId = appUser.Id,
             role = membership.Role.ToString()
         });
+    }
+
+    /// <summary>
+    /// Deletes a server and all associated data. Requires server Owner role or global admin privileges.
+    /// </summary>
+    [HttpDelete("{serverId:guid}")]
+    public async Task<IActionResult> DeleteServer(Guid serverId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        if (!appUser.IsGlobalAdmin)
+        {
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+            if (membership is null || membership.Role is not ServerRole.Owner)
+            {
+                return Forbid();
+            }
+        }
+
+        var server = await db.Servers
+            .Include(s => s.Channels)
+            .Include(s => s.Members)
+            .Include(s => s.Invites)
+            .FirstOrDefaultAsync(s => s.Id == serverId);
+
+        if (server is null)
+        {
+            return NotFound(new { error = "Server not found." });
+        }
+
+        // Delete all messages and their associated data in server channels.
+        var channelIds = server.Channels.Select(c => c.Id).ToList();
+        if (channelIds.Count > 0)
+        {
+            var linkPreviews = await db.LinkPreviews
+                .Where(lp => lp.MessageId != null && db.Messages.Any(m => channelIds.Contains(m.ChannelId) && m.Id == lp.MessageId))
+                .ToListAsync();
+            db.LinkPreviews.RemoveRange(linkPreviews);
+
+            var reactions = await db.Reactions
+                .Where(r => db.Messages.Any(m => channelIds.Contains(m.ChannelId) && m.Id == r.MessageId))
+                .ToListAsync();
+            db.Reactions.RemoveRange(reactions);
+
+            var messages = await db.Messages
+                .Where(m => channelIds.Contains(m.ChannelId))
+                .ToListAsync();
+            db.Messages.RemoveRange(messages);
+        }
+
+        db.Servers.Remove(server);
+        await db.SaveChangesAsync();
+
+        // Notify all connected clients that the server was deleted.
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ServerDeleted", new
+        {
+            serverId
+        });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes a channel within a server. Requires Owner/Admin role or global admin privileges.
+    /// Cascade-deletes all messages, reactions, and link previews in the channel.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/channels/{channelId:guid}")]
+    public async Task<IActionResult> DeleteChannel(Guid serverId, Guid channelId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        if (!appUser.IsGlobalAdmin)
+        {
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
+        }
+
+        var channel = await db.Channels
+            .FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+
+        if (channel is null)
+        {
+            return NotFound(new { error = "Channel not found." });
+        }
+
+        // Delete associated data before removing the channel.
+        var linkPreviews = await db.LinkPreviews
+            .Where(lp => lp.MessageId != null && db.Messages.Any(m => m.ChannelId == channelId && m.Id == lp.MessageId))
+            .ToListAsync();
+        db.LinkPreviews.RemoveRange(linkPreviews);
+
+        var reactions = await db.Reactions
+            .Where(r => db.Messages.Any(m => m.ChannelId == channelId && m.Id == r.MessageId))
+            .ToListAsync();
+        db.Reactions.RemoveRange(reactions);
+
+        var messages = await db.Messages
+            .Where(m => m.ChannelId == channelId)
+            .ToListAsync();
+        db.Messages.RemoveRange(messages);
+
+        db.Channels.Remove(channel);
+        await db.SaveChangesAsync();
+
+        // Notify all server members of the channel deletion via SignalR.
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", new
+        {
+            serverId,
+            channelId
+        });
+
+        return NoContent();
     }
 
     private static string GenerateInviteCode()

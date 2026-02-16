@@ -33,7 +33,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Server member list display with real-time updates (member list auto-refreshes when members join or leave via SignalR)
 - ✅ Role-based membership (Owner, Admin, Member)
 - ✅ Member display with avatar and role
-- ✅ Kick members (Owner can kick Admins and Members; Admins can kick Members only)
+- ✅ Kick members (Owner can kick Admins and Members; Admins can kick Members only; Global Admin can kick any non-Owner member)
 - ✅ Real-time kick notification via SignalR (kicked user is redirected automatically, transient overlay banner with 5-second fade-out)
 - ✅ Server invite codes (Owner/Admin create, list, revoke invites; any user can join via code)
 - ✅ Invite code generation (cryptographically random 8-character alphanumeric codes)
@@ -41,6 +41,8 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ **Server Settings UI** — gear icon in channel sidebar header opens server settings modal (Owner/Admin only)
 - ✅ **Server name editing** — change server name from Server Settings (Owner/Admin only; real-time sync via SignalR)
 - ✅ **Channel name editing** — rename channels from Server Settings (Owner/Admin only; real-time sync via SignalR)
+- ✅ **Channel deletion** — delete channels from Server Settings (Owner/Admin/Global Admin; cascade-deletes all messages, reactions, and link previews; real-time removal via SignalR)
+- ✅ **Server deletion** — delete entire server (Owner or Global Admin; cascade-deletes all channels, messages, members, invites; real-time removal via SignalR)
 
 ### Channel & Messaging
 - ✅ Channel list per server
@@ -62,7 +64,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Badge clearing on channel navigation (counts reset when user enters the mentioned channel)
 - ✅ Mentioned message highlighting (accent border and tinted background on messages that mention the current user or use @here)
 - ✅ Message replies — inline reply to any message with clickable reference preview, scroll-to-original with highlight animation, graceful handling of deleted parent messages
-- ✅ Message deletion — authors can delete their own messages via action bar; cascade-deletes reactions and link previews; real-time removal via SignalR
+- ✅ Message deletion — authors can delete their own messages via action bar; global admin can delete any message; cascade-deletes reactions and link previews; real-time removal via SignalR
 - ✅ Message editing — authors can edit their own messages via inline edit mode; "(edited)" label displayed on modified messages; real-time sync via SignalR
 - ✅ Text formatting — bold (`*text*` or `**text**`) and italic (`_text_`) with live preview in composer
 - ✅ Progressive message loading — initially loads last 100 messages; older messages load seamlessly on scroll-up via cursor-based pagination (`before`/`limit` query params); scroll position preserved during prepend; DM messages use same paginated `{ hasMore, messages }` response shape
@@ -122,6 +124,20 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Alpha Notification & Bug Reporting
 - ✅ Alpha notification modal shown on every login (ALPHA badge, welcome message, bug reporting guidance)
+
+### Global Admin
+- ✅ Configurable global admin role via `GlobalAdmin:Email` application setting
+- ✅ `IsGlobalAdmin` flag on User entity, seeded at application startup
+- ✅ Global admin can delete any server (cascade-deletes all channels, messages, members, invites)
+- ✅ Global admin can delete any channel (cascade-deletes all messages, reactions, link previews)
+- ✅ Global admin can delete any message in channels (bypasses author-only restriction)
+- ✅ Global admin can kick any non-Owner member from any server (bypasses membership/role check)
+- ✅ `isGlobalAdmin` flag exposed in `/me` API response and frontend state
+- ✅ Server Settings UI: danger zone with delete server and delete channel buttons (confirmation dialogs)
+- ✅ Message action bar: delete button visible for own messages and global admin; edit restricted to own messages only
+- ✅ Real-time `ServerDeleted` and `ChannelDeleted` SignalR events for all connected clients
+- ✅ Azure Key Vault integration for production (`GlobalAdmin--Email` secret)
+- ✅ CD pipeline sets global admin email in Key Vault from GitHub Actions secret
 - ✅ Direct link to GitHub bug report template from notification banner
 - ✅ Dismissable via "Got it" button or Escape key
 - ✅ GitHub Issues bug report template (`.github/ISSUE_TEMPLATE/bug-report.yml`) with structured fields (description, repro steps, expected/actual behavior, screenshots, browser, device)
@@ -205,7 +221,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Server settings/configuration
 - Server icons/avatars
 - Channel categories/organization
-- Channel editing and deletion
 
 ### Link Previews
 - Link preview caching
@@ -227,7 +242,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ### Moderation & Administration
 - User banning
 - Message moderation
-- Audit logs
+- Audit logs (global admin actions)
 - Report system
 - Custom role creation
 - Granular permissions

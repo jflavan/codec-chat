@@ -87,6 +87,7 @@ export type UserProfile = {
 		effectiveDisplayName: string;
 		email?: string;
 		avatarUrl?: string;
+		isGlobalAdmin?: boolean;
 	};
 };
 

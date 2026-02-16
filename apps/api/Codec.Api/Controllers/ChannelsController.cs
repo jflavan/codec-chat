@@ -466,7 +466,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Message not found." });
         }
 
-        if (message.AuthorUserId != appUser.Id)
+        if (message.AuthorUserId != appUser.Id && !appUser.IsGlobalAdmin)
         {
             return StatusCode(403, new { error = "You can only delete your own messages." });
         }

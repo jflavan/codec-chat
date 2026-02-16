@@ -5,7 +5,7 @@ The Server Settings feature provides a centralized UI for server Owners and Admi
 
 ## Access
 - **Location:** Gear icon (⚙) button in the channel sidebar header
-- **Permissions:** Only visible to users with Owner or Admin role in the current server
+- **Permissions:** Only visible to users with Owner or Admin role in the current server, or users with the Global Admin role
 - **Shortcut:** Click the gear icon or use ESC to close
 
 ## UI Components
@@ -36,6 +36,10 @@ The modal contains three main sections:
 - **Inline Rename:** Click "Edit" button next to any channel name
 - **Name Input:** Text input with 100-character limit
 - **Actions:** Save/Cancel buttons per channel
+- **Delete Channel:** Click "Delete" button next to any channel (Owner, Admin, or Global Admin)
+- **Confirmation:** Inline confirmation prompt with channel name displayed before deletion
+- **Cascade:** Deleting a channel removes all messages, reactions, and link previews
+- **Real-time:** Channel deletion broadcast to all server members via SignalR
 - **Keyboard Shortcuts:**
   - Enter: Save changes
   - Escape: Cancel edit mode
@@ -44,7 +48,15 @@ The modal contains three main sections:
 #### 3. Member Management
 - **Member Count:** Displays total number of server members
 - **Reference:** Links to the Members sidebar for detailed member management
-- **Note:** Kicking members is handled through the existing Members sidebar UI
+- **Note:** Kicking members is handled through the existing Members sidebar UI (Owner/Admin/Global Admin)
+
+#### 4. Danger Zone (Owner or Global Admin)
+- **Visibility:** Only displayed when the current user has the Owner role or Global Admin role
+- **Delete Server Button:** Large red button to permanently delete the entire server
+- **Warning Text:** Explains that deletion is permanent and cannot be undone
+- **Confirmation Dialog:** Two-step confirmation with confirm/cancel buttons
+- **Cascade:** Deleting a server removes all channels, messages, reactions, link previews, members, and invites
+- **Real-time:** Server deletion broadcast to all server members via SignalR; members are navigated away automatically
 
 ## API Endpoints
 
@@ -68,7 +80,7 @@ Content-Type: application/json
 ```
 
 **Authorization:**
-- Requires Owner or Admin role
+- Requires Owner or Admin role (or Global Admin for all operations)
 - Returns 403 Forbidden for non-admin members
 - Returns 404 Not Found if server doesn't exist
 
@@ -107,7 +119,7 @@ Content-Type: application/json
 ```
 
 **Authorization:**
-- Requires Owner or Admin role
+- Requires Owner or Admin role (or Global Admin)
 - Returns 403 Forbidden for non-admin members
 - Returns 404 Not Found if server or channel doesn't exist
 
@@ -126,6 +138,35 @@ Content-Type: application/json
 }
 ```
 
+### Delete Channel
+```http
+DELETE /servers/{serverId}/channels/{channelId}
+Authorization: Bearer {idToken}
+```
+
+**Authorization:**
+- Requires Owner, Admin, or Global Admin role
+- Returns 403 Forbidden for non-admin members
+
+**Behavior:**
+- Cascade-deletes all messages, reactions, and link previews in the channel
+- Broadcasts `ChannelDeleted` SignalR event to all server members
+
+### Delete Server
+```http
+DELETE /servers/{serverId}
+Authorization: Bearer {idToken}
+```
+
+**Authorization:**
+- Requires Owner or Global Admin role
+- Returns 403 Forbidden for users who are not the server Owner and do not have Global Admin privileges
+
+**Behavior:**
+- Cascade-deletes all channels, messages, reactions, link previews, members, and invites
+- Broadcasts `ServerDeleted` SignalR event to all server members
+- All connected members are navigated away from the deleted server
+
 ## Frontend State Management
 
 ### App State Properties
@@ -133,6 +174,9 @@ Content-Type: application/json
 serverSettingsOpen: boolean          // Modal visibility
 isUpdatingServerName: boolean        // Loading state for server name update
 isUpdatingChannelName: boolean       // Loading state for channel name update
+isGlobalAdmin: boolean               // Whether current user has global admin role
+canDeleteServer: boolean             // Derived: isGlobalAdmin || isOwner
+canDeleteChannel: boolean            // Derived: isGlobalAdmin || isOwner || isAdmin
 ```
 
 ### App State Methods
@@ -141,12 +185,16 @@ openServerSettings(): void           // Open the server settings modal
 closeServerSettings(): void          // Close the server settings modal
 updateServerName(name: string): Promise<void>      // Update server name
 updateChannelName(channelId: string, name: string): Promise<void>  // Update channel name
+deleteServer(serverId: string): Promise<void>       // Delete entire server (Owner or global admin)
+deleteChannel(serverId: string, channelId: string): Promise<void>  // Delete channel
 ```
 
 ### SignalR Event Handlers
 ```typescript
 onServerNameChanged(event: ServerNameChangedEvent): void
 onChannelNameChanged(event: ChannelNameChangedEvent): void
+onServerDeleted(event: ServerDeletedEvent): void
+onChannelDeleted(event: ChannelDeletedEvent): void
 ```
 
 These handlers update the local state to reflect name changes in real-time, ensuring all connected clients see the updates immediately.
@@ -172,6 +220,19 @@ When a channel name is updated:
    - Channel list in the channel sidebar
    - Chat area header (if the channel is currently selected)
    - Browser title (if the channel is currently selected)
+
+### Channel Deletion
+When a channel is deleted (Owner, Admin, or Global Admin):
+1. API validates permissions and cascade-deletes channel data (messages, reactions, link previews)
+2. API broadcasts `ChannelDeleted` event via SignalR to all members in the server group
+3. All connected clients receive the event and remove the channel from their local state
+4. If the deleted channel was currently selected, clients navigate to the first available channel
+
+### Server Deletion
+When a server is deleted (Owner or Global Admin):
+1. API validates Owner or global admin permission and cascade-deletes all server data (channels, messages, reactions, link previews, members, invites)
+2. API broadcasts `ServerDeleted` event via SignalR to all members in the server group
+3. All connected clients receive the event, remove the server from their server list, and navigate to Home
 
 ## Mobile Responsive Design
 
@@ -223,13 +284,11 @@ Potential expansions of the Server Settings feature:
 1. **Server Description:** Add a description field for servers
 2. **Server Icon:** Upload custom server icons/avatars
 3. **Channel Ordering:** Drag-and-drop to reorder channels
-4. **Channel Deletion:** Delete channels (with confirmation)
-5. **Channel Categories:** Group channels into categories
-6. **Permission System:** Granular permissions per role
-7. **Audit Log:** View history of server changes
-8. **Member Role Management:** Promote/demote members from settings
-9. **Server Deletion:** Delete entire server (with confirmation and ownership transfer)
-10. **Server Templates:** Create and apply server templates
+4. **Channel Categories:** Group channels into categories
+5. **Permission System:** Granular permissions per role
+6. **Audit Log:** View history of server changes (including global admin actions)
+7. **Member Role Management:** Promote/demote members from settings
+8. **Server Templates:** Create and apply server templates
 
 ## Related Documentation
 
