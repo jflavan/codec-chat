@@ -33,9 +33,8 @@ services:
       Google__ClientId: "${GOOGLE_CLIENT_ID}"
       Api__BaseUrl: "http://localhost:5050"
       Cors__AllowedOrigins__0: "http://localhost:3000"
-      #Storage__Provider: "AzureBlob"
-      #Storage__AzureBlob__ServiceUri: "http://azurite:10000/devstoreaccount1"
-      Storage__Provider: "Local"
+      Storage__Provider: "AzureBlob"
+      Storage__AzureBlob__ServiceUri: "http://azurite:10000/devstoreaccount1"
     depends_on:
       postgres:
         condition: service_healthy

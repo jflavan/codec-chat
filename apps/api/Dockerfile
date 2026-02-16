@@ -13,8 +13,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 RUN useradd --no-create-home --shell /bin/false appuser
-COPY --from=build /app/publish .
-RUN mkdir -p /app/uploads && chown -R appuser:appuser /app
 USER appuser
 
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Codec.Api.dll"]
