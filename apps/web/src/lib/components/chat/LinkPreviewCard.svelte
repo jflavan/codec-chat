@@ -15,7 +15,7 @@
 </script>
 
 {#if youTubeVideoId}
-	<YouTubeEmbed {preview} videoId={youTubeVideoId} />
+	<YouTubeEmbed videoId={youTubeVideoId} />
 {:else if preview.title}
 	<aside class="link-preview-card">
 		<div class="preview-text">
