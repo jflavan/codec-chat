@@ -246,9 +246,11 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 #### Server Management
 - `GET /servers` - List servers user is a member of
 - `POST /servers` - Create a new server (authenticated user becomes Owner)
+- `PATCH /servers/{serverId}` - Update server name (requires Owner or Admin role; broadcasts `ServerNameChanged` via SignalR)
 - `GET /servers/{serverId}/members` - List server members (requires membership)
 - `GET /servers/{serverId}/channels` - List channels in a server (requires membership)
 - `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner or Admin role)
+- `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name (requires Owner or Admin role; broadcasts `ChannelNameChanged` via SignalR)
 - `POST /servers/{serverId}/avatar` - Upload a server-specific avatar (multipart/form-data, overrides global avatar in this server)
 - `DELETE /servers/{serverId}/avatar` - Remove server-specific avatar, fall back to global avatar
 - `DELETE /servers/{serverId}/members/{userId}` - Kick a member from the server (requires Owner or Admin role; broadcasts `KickedFromServer` via SignalR)

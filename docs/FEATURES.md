@@ -38,6 +38,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Server invite codes (Owner/Admin create, list, revoke invites; any user can join via code)
 - ✅ Invite code generation (cryptographically random 8-character alphanumeric codes)
 - ✅ Configurable invite expiry (default 7 days, custom hours, or never) and max uses
+- ✅ **Server Settings UI** — gear icon in channel sidebar header opens server settings modal (Owner/Admin only)
+- ✅ **Server name editing** — change server name from Server Settings (Owner/Admin only; real-time sync via SignalR)
+- ✅ **Channel name editing** — rename channels from Server Settings (Owner/Admin only; real-time sync via SignalR)
 
 ### Channel & Messaging
 - ✅ Channel list per server
