@@ -1,6 +1,6 @@
 /**
  * Extracts a YouTube video ID from a URL, or returns null if the URL is not a
- * recognised YouTube link.
+ * recognized YouTube link.
  *
  * Supported formats:
  *  - https://www.youtube.com/watch?v=VIDEO_ID
