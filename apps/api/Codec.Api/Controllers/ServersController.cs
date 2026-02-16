@@ -84,6 +84,61 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
+    /// Updates a server's name. Requires Owner or Admin role.
+    /// </summary>
+    [HttpPatch("{serverId:guid}")]
+    public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { error = "Server name is required." });
+        }
+
+        if (request.Name.Trim().Length > 100)
+        {
+            return BadRequest(new { error = "Server name must be 100 characters or fewer." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (membership is null)
+        {
+            return Forbid();
+        }
+
+        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        {
+            return Forbid();
+        }
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null)
+        {
+            return NotFound(new { error = "Server not found." });
+        }
+
+        var oldName = server.Name;
+        server.Name = request.Name.Trim();
+        await db.SaveChangesAsync();
+
+        // Notify all server members of the name change via SignalR.
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ServerNameChanged", new
+        {
+            serverId,
+            name = server.Name
+        });
+
+        return Ok(new
+        {
+            server.Id,
+            server.Name
+        });
+    }
+
+    /// <summary>
     /// Lists the members of a server. Requires membership.
     /// </summary>
     [HttpGet("{serverId:guid}/members")]
@@ -273,6 +328,64 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/channels/{channel.Id}", new
+        {
+            channel.Id,
+            channel.Name,
+            channel.ServerId
+        });
+    }
+
+    /// <summary>
+    /// Updates a channel's name. Requires Owner or Admin role.
+    /// </summary>
+    [HttpPatch("{serverId:guid}/channels/{channelId:guid}")]
+    public async Task<IActionResult> UpdateChannel(Guid serverId, Guid channelId, [FromBody] UpdateChannelRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { error = "Channel name is required." });
+        }
+
+        if (request.Name.Trim().Length > 100)
+        {
+            return BadRequest(new { error = "Channel name must be 100 characters or fewer." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (membership is null)
+        {
+            return Forbid();
+        }
+
+        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        {
+            return Forbid();
+        }
+
+        var channel = await db.Channels
+            .FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+
+        if (channel is null)
+        {
+            return NotFound(new { error = "Channel not found." });
+        }
+
+        channel.Name = request.Name.Trim();
+        await db.SaveChangesAsync();
+
+        // Notify all server members of the channel name change via SignalR.
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelNameChanged", new
+        {
+            serverId,
+            channelId,
+            name = channel.Name
+        });
+
+        return Ok(new
         {
             channel.Id,
             channel.Name,
