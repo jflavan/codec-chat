@@ -30,12 +30,21 @@ public class UserService(CodecDbContext db) : IUserService
 
         if (existing is not null)
         {
-            existing.DisplayName = displayName;
-            existing.Email = email;
-            // Only update the Google avatar URL; preserve the custom upload path.
-            existing.AvatarUrl = avatarUrl;
-            existing.UpdatedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync();
+            // Only write to the database when profile data has actually changed.
+            var hasChanges = existing.DisplayName != displayName
+                          || existing.Email != email
+                          || existing.AvatarUrl != avatarUrl;
+
+            if (hasChanges)
+            {
+                existing.DisplayName = displayName;
+                existing.Email = email;
+                // Only update the Google avatar URL; preserve the custom upload path.
+                existing.AvatarUrl = avatarUrl;
+                existing.UpdatedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync();
+            }
+
             return existing;
         }
 

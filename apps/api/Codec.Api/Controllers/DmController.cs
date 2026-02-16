@@ -230,7 +230,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         var messages = await query
             .OrderByDescending(m => m.CreatedAt)
-            .Take(limit)
+            .Take(limit + 1)
             .Select(m => new
             {
                 m.Id,
@@ -246,6 +246,12 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
             })
             .ToListAsync();
+
+        var hasMore = messages.Count > limit;
+        if (hasMore)
+        {
+            messages = messages.Take(limit).ToList();
+        }
 
         // Reverse to chronological order for the client.
         messages.Reverse();
@@ -326,7 +332,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 : (ReplyContextDto?)null
         });
 
-        return Ok(response);
+        return Ok(new { hasMore, messages = response });
     }
 
     /// <summary>

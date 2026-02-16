@@ -128,6 +128,9 @@ export type SignalRCallbacks = {
 	onDmMessageEdited?: (event: DmMessageEditedEvent) => void;
 	onServerNameChanged?: (event: ServerNameChangedEvent) => void;
 	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
+	onReconnecting?: () => void;
+	onReconnected?: () => void;
+	onClose?: () => void;
 };
 
 /**
@@ -216,6 +219,16 @@ export class ChatHubService {
 		}
 		if (callbacks.onChannelNameChanged) {
 			connection.on('ChannelNameChanged', callbacks.onChannelNameChanged);
+		}
+
+		if (callbacks.onReconnecting) {
+			connection.onreconnecting(callbacks.onReconnecting);
+		}
+		if (callbacks.onReconnected) {
+			connection.onreconnected(callbacks.onReconnected);
+		}
+		if (callbacks.onClose) {
+			connection.onclose(callbacks.onClose);
 		}
 
 		try {

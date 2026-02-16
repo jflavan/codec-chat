@@ -186,44 +186,52 @@
 		<ReplyComposerBar authorName={app.replyingTo.authorName} bodyPreview={app.replyingTo.bodyPreview} onCancel={() => app.cancelReply()} />
 	{/if}
 
-	<div class="composer-row">
-		<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} />
-		<button
-			class="composer-attach"
-			type="button"
-			onclick={() => fileInputEl?.click()}
-			disabled={!app.selectedChannelId || app.isSending}
-			aria-label="Attach image"
-		>
-			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-				<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
-			</svg>
-		</button>
-		<div class="composer-input-wrapper">
-			<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} /></div>
-			<input
-				bind:this={inputEl}
-				class="composer-input"
-				type="text"
-				placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
-				bind:value={app.messageBody}
-				disabled={!app.selectedChannelId || app.isSending}
-				oninput={handleInput}
-				onkeydown={handleKeydown}
-				onpaste={handlePaste}
-			/>
+	{#if !app.isHubConnected}
+		<div class="composer-row">
+			<div class="composer-input-wrapper composer-disconnected">
+				<span class="connecting-message" aria-live="polite">Codec connecting<span class="animated-ellipsis"></span></span>
+			</div>
 		</div>
-		<button
-			class="composer-send"
-			type="submit"
-			disabled={!app.selectedChannelId || (!app.messageBody.trim() && !app.pendingImage) || app.isSending}
-			aria-label="Send message"
-		>
-			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-				<path d="M2.5 2.3a.75.75 0 0 1 .8-.05l14 7a.75.75 0 0 1 0 1.34l-14 7A.75.75 0 0 1 2.2 17l1.9-6.5a.5.5 0 0 1 .47-.35h4.68a.75.75 0 0 0 0-1.5H4.57a.5.5 0 0 1-.47-.35L2.2 1.8a.75.75 0 0 1 .3-.8z"/>
-			</svg>
-		</button>
-	</div>
+	{:else}
+		<div class="composer-row">
+			<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} />
+			<button
+				class="composer-attach"
+				type="button"
+				onclick={() => fileInputEl?.click()}
+				disabled={!app.selectedChannelId || app.isSending}
+				aria-label="Attach image"
+			>
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+					<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
+				</svg>
+			</button>
+			<div class="composer-input-wrapper">
+				<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} /></div>
+				<input
+					bind:this={inputEl}
+					class="composer-input"
+					type="text"
+					placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
+					bind:value={app.messageBody}
+					disabled={!app.selectedChannelId || app.isSending}
+					oninput={handleInput}
+					onkeydown={handleKeydown}
+					onpaste={handlePaste}
+				/>
+			</div>
+			<button
+				class="composer-send"
+				type="submit"
+				disabled={!app.selectedChannelId || (!app.messageBody.trim() && !app.pendingImage) || app.isSending}
+				aria-label="Send message"
+			>
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+					<path d="M2.5 2.3a.75.75 0 0 1 .8-.05l14 7a.75.75 0 0 1 0 1.34l-14 7A.75.75 0 0 1 2.2 17l1.9-6.5a.5.5 0 0 1 .47-.35h4.68a.75.75 0 0 0 0-1.5H4.57a.5.5 0 0 1-.47-.35L2.2 1.8a.75.75 0 0 1 .3-.8z"/>
+				</svg>
+			</button>
+		</div>
+	{/if}
 </form>
 
 <style>
@@ -338,6 +346,35 @@
 	.composer-send:disabled {
 		opacity: 0.3;
 		cursor: not-allowed;
+	}
+
+	/* ───── Disconnected state ───── */
+
+	.composer-disconnected {
+		border-radius: 8px;
+		opacity: 0.5;
+		display: flex;
+		align-items: center;
+	}
+
+	.connecting-message {
+		padding: 12px 16px;
+		font-size: 15px;
+		color: var(--text-dim);
+		line-height: 20px;
+		user-select: none;
+	}
+
+	.animated-ellipsis::after {
+		content: '';
+		animation: ellipsis-cycle 1.5s steps(4, end) infinite;
+	}
+
+	@keyframes ellipsis-cycle {
+		0%   { content: ''; }
+		25%  { content: '.'; }
+		50%  { content: '..'; }
+		75%  { content: '...'; }
 	}
 
 	/* ───── Image preview ───── */

@@ -3,6 +3,7 @@ import type {
 	Channel,
 	Message,
 	PaginatedMessages,
+	PaginatedDmMessages,
 	Reaction,
 	Member,
 	UserProfile,
@@ -383,7 +384,7 @@ export class ApiClient {
 		});
 	}
 
-	getDmMessages(token: string, channelId: string): Promise<DirectMessage[]> {
+	getDmMessages(token: string, channelId: string): Promise<PaginatedDmMessages> {
 		return this.request(
 			`${this.baseUrl}/dm/channels/${encodeURIComponent(channelId)}/messages`,
 			{ headers: this.headers(token) }
