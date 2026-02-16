@@ -1,9 +1,12 @@
 <script lang="ts">
 	import type { LinkPreview } from '$lib/types/index.js';
+	import { extractYouTubeVideoId } from '$lib/utils/youtube.js';
+	import YouTubeEmbed from './YouTubeEmbed.svelte';
 
 	let { preview }: { preview: LinkPreview } = $props();
 
 	const href = $derived(preview.canonicalUrl ?? preview.url);
+	const youTubeVideoId = $derived(extractYouTubeVideoId(preview.url));
 	const displayDescription = $derived(
 		preview.description && preview.description.length > 300
 			? preview.description.slice(0, 300) + '…'
@@ -11,7 +14,9 @@
 	);
 </script>
 
-{#if preview.title}
+{#if youTubeVideoId}
+	<YouTubeEmbed {preview} videoId={youTubeVideoId} />
+{:else if preview.title}
 	<aside class="link-preview-card">
 		<div class="preview-text">
 			{#if preview.siteName}

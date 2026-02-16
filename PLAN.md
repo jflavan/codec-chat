@@ -568,6 +568,24 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Backend builds successfully (`dotnet build`, 0 errors)
 - [x] Frontend type-checks with zero errors (`svelte-check`)
 
+## Task breakdown: YouTube Video Embeds
+
+### Web — YouTube URL detection utility
+- [x] Create `$lib/utils/youtube.ts` with `extractYouTubeVideoId(url)` — regex-based parser supporting `/watch?v=`, `/embed/`, `/shorts/`, `/live/`, and `youtu.be/` URL formats
+- [x] Add `youTubeEmbedUrl(videoId)` helper — builds privacy-enhanced embed URL using `youtube-nocookie.com`
+
+### Web — YouTubeEmbed component
+- [x] Create `YouTubeEmbed.svelte` — renders an inline 16:9 `<iframe>` video player with responsive aspect ratio
+- [x] Red left accent border (YouTube branding), site name and clickable title above player
+- [x] Privacy: uses `youtube-nocookie.com` domain, `referrerpolicy="no-referrer"`, `loading="lazy"`
+- [x] Security: `allow` attribute scoped to required permissions only (accelerometer, autoplay, clipboard-write, encrypted-media, gyroscope, picture-in-picture)
+
+### Web — Integration into LinkPreviewCard
+- [x] Update `LinkPreviewCard.svelte` to detect YouTube URLs via `extractYouTubeVideoId()`
+- [x] YouTube links render as `YouTubeEmbed` instead of the standard link preview card
+- [x] Non-YouTube links continue to render as standard link preview cards (no behavior change)
+- [x] Works in both server channels and DMs automatically (shared `LinkPreviewCard` component)
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
