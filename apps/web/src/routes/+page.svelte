@@ -10,6 +10,7 @@
 	import HomeSidebar from '$lib/components/dm/HomeSidebar.svelte';
 	import DmChatArea from '$lib/components/dm/DmChatArea.svelte';
 	import UserSettingsModal from '$lib/components/settings/UserSettingsModal.svelte';
+	import ServerSettingsModal from '$lib/components/server-settings/ServerSettingsModal.svelte';
 	import ImagePreview from '$lib/components/chat/ImagePreview.svelte';
 	import LoadingScreen from '$lib/components/LoadingScreen.svelte';
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
@@ -112,6 +113,10 @@
 
 {#if app.settingsOpen}
 	<UserSettingsModal />
+{/if}
+
+{#if app.serverSettingsOpen}
+	<ServerSettingsModal />
 {/if}
 
 <ImagePreview />

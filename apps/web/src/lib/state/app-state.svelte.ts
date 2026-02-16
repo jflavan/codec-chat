@@ -116,6 +116,9 @@ export class AppState {
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
 	settingsCategory = $state<'profile' | 'account'>('profile');
+	serverSettingsOpen = $state(false);
+	isUpdatingServerName = $state(false);
+	isUpdatingChannelName = $state(false);
 
 	/* ───── mobile navigation ───── */
 	mobileNavOpen = $state(false);
@@ -245,6 +248,14 @@ export class AppState {
 		this.settingsOpen = false;
 	}
 
+	openServerSettings(): void {
+		this.serverSettingsOpen = true;
+	}
+
+	closeServerSettings(): void {
+		this.serverSettingsOpen = false;
+	}
+
 	/** Dismiss the alpha notification banner. */
 	dismissAlphaNotification(): void {
 		this.showAlphaNotification = false;
@@ -321,6 +332,7 @@ export class AppState {
 		this.friendsTab = 'all';
 		this.friendSearchQuery = '';
 		this.settingsOpen = false;
+		this.serverSettingsOpen = false;
 		this.replyingTo = null;
 		this.lightboxImageUrl = null;
 
@@ -534,6 +546,42 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isCreatingChannel = false;
+		}
+	}
+
+	async updateServerName(name: string): Promise<void> {
+		if (!name.trim()) {
+			this.error = 'Server name is required.';
+			return;
+		}
+		if (!this.idToken || !this.selectedServerId) return;
+
+		this.isUpdatingServerName = true;
+		try {
+			await this.api.updateServer(this.idToken, this.selectedServerId, name.trim());
+			// Update will be reflected via SignalR event
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUpdatingServerName = false;
+		}
+	}
+
+	async updateChannelName(channelId: string, name: string): Promise<void> {
+		if (!name.trim()) {
+			this.error = 'Channel name is required.';
+			return;
+		}
+		if (!this.idToken || !this.selectedServerId) return;
+
+		this.isUpdatingChannelName = true;
+		try {
+			await this.api.updateChannel(this.idToken, this.selectedServerId, channelId, name.trim());
+			// Update will be reflected via SignalR event
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUpdatingChannelName = false;
 		}
 	}
 
@@ -1307,6 +1355,20 @@ export class AppState {
 				if (event.dmChannelId === this.activeDmChannelId) {
 					this.dmMessages = this.dmMessages.map((m) =>
 						m.id === event.messageId ? { ...m, body: event.body, editedAt: event.editedAt } : m
+					);
+				}
+			},
+			onServerNameChanged: (event) => {
+				// Update server name in the local list
+				this.servers = this.servers.map((s) =>
+					s.serverId === event.serverId ? { ...s, name: event.name } : s
+				);
+			},
+			onChannelNameChanged: (event) => {
+				// Update channel name in the local list if it's for the current server
+				if (event.serverId === this.selectedServerId) {
+					this.channels = this.channels.map((c) =>
+						c.id === event.channelId ? { ...c, name: event.name } : c
 					);
 				}
 			}

@@ -209,6 +209,31 @@ export class ApiClient {
 		});
 	}
 
+	updateServer(
+		token: string,
+		serverId: string,
+		name: string
+	): Promise<{ id: string; name: string }> {
+		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}`, {
+			method: 'PATCH',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ name })
+		});
+	}
+
+	updateChannel(
+		token: string,
+		serverId: string,
+		channelId: string,
+		name: string
+	): Promise<{ id: string; name: string; serverId: string }> {
+		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/channels/${encodeURIComponent(channelId)}`, {
+			method: 'PATCH',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ name })
+		});
+	}
+
 	/* ───── Messages ───── */
 
 	getMessages(token: string, channelId: string): Promise<Message[]> {

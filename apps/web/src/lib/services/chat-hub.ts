@@ -92,6 +92,17 @@ export type DmMessageEditedEvent = {
 	editedAt: string;
 };
 
+export type ServerNameChangedEvent = {
+	serverId: string;
+	name: string;
+};
+
+export type ChannelNameChangedEvent = {
+	serverId: string;
+	channelId: string;
+	name: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -115,6 +126,8 @@ export type SignalRCallbacks = {
 	onDmMessageDeleted?: (event: DmMessageDeletedEvent) => void;
 	onMessageEdited?: (event: MessageEditedEvent) => void;
 	onDmMessageEdited?: (event: DmMessageEditedEvent) => void;
+	onServerNameChanged?: (event: ServerNameChangedEvent) => void;
+	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
 };
 
 /**
@@ -197,6 +210,12 @@ export class ChatHubService {
 		}
 		if (callbacks.onDmMessageEdited) {
 			connection.on('DmMessageEdited', callbacks.onDmMessageEdited);
+		}
+		if (callbacks.onServerNameChanged) {
+			connection.on('ServerNameChanged', callbacks.onServerNameChanged);
+		}
+		if (callbacks.onChannelNameChanged) {
+			connection.on('ChannelNameChanged', callbacks.onChannelNameChanged);
 		}
 
 		try {
