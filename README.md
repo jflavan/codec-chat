@@ -95,6 +95,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Message deletion** — authors can delete their own messages in channels and DMs; cascade-deletes reactions and link previews; real-time removal via SignalR; replies to deleted messages handled gracefully
 - ✅ **Message editing** — authors can edit their own messages in channels and DMs; inline edit mode with Enter to save and Escape to cancel; "(edited)" label on modified messages; real-time sync via SignalR
 - ✅ **Text formatting** — bold (`*text*` or `**text**`) and italic (`_text_`) in messages, with live preview in composer input
+- ✅ **Progressive message loading** — initially loads last 100 messages per channel; older messages load seamlessly as the user scrolls up; cursor-based pagination with scroll position preservation
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
 - ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
 

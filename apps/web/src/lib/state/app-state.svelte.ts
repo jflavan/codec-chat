@@ -91,6 +91,8 @@ export class AppState {
 	isLoadingServers = $state(false);
 	isLoadingChannels = $state(false);
 	isLoadingMessages = $state(false);
+	isLoadingOlderMessages = $state(false);
+	hasMoreMessages = $state(false);
 	isLoadingMe = $state(false);
 	isLoadingMembers = $state(false);
 	isSending = $state(false);
@@ -309,6 +311,7 @@ export class AppState {
 		this.servers = [];
 		this.channels = [];
 		this.messages = [];
+		this.hasMoreMessages = false;
 		this.members = [];
 		this.friends = [];
 		this.incomingRequests = [];
@@ -402,6 +405,7 @@ export class AppState {
 				await this.loadMessages(this.selectedChannelId);
 			} else {
 				this.messages = [];
+				this.hasMoreMessages = false;
 			}
 		} catch (e) {
 			this.setError(e);
@@ -414,11 +418,34 @@ export class AppState {
 		if (!this.idToken) return;
 		this.isLoadingMessages = true;
 		try {
-			this.messages = await this.api.getMessages(this.idToken, channelId);
+			const result = await this.api.getMessages(this.idToken, channelId, { limit: 100 });
+			this.messages = result.messages;
+			this.hasMoreMessages = result.hasMore;
 		} catch (e) {
 			this.setError(e);
 		} finally {
 			this.isLoadingMessages = false;
+		}
+	}
+
+	/** Load older messages before the earliest currently loaded message. */
+	async loadOlderMessages(): Promise<void> {
+		if (!this.idToken || !this.selectedChannelId || !this.hasMoreMessages || this.isLoadingOlderMessages) return;
+		const oldest = this.messages[0];
+		if (!oldest) return;
+
+		this.isLoadingOlderMessages = true;
+		try {
+			const result = await this.api.getMessages(this.idToken, this.selectedChannelId, {
+				before: oldest.createdAt,
+				limit: 100
+			});
+			this.messages = [...result.messages, ...this.messages];
+			this.hasMoreMessages = result.hasMore;
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingOlderMessages = false;
 		}
 	}
 
@@ -943,6 +970,7 @@ export class AppState {
 		this.selectedChannelId = null;
 		this.channels = [];
 		this.messages = [];
+		this.hasMoreMessages = false;
 		this.members = [];
 		this.mobileNavOpen = false;
 		this.loadFriends();
@@ -1287,6 +1315,7 @@ export class AppState {
 					this.selectedServerId = this.servers[0]?.serverId ?? null;
 					this.channels = [];
 					this.messages = [];
+					this.hasMoreMessages = false;
 					this.members = [];
 					if (this.selectedServerId) {
 						this.loadChannels(this.selectedServerId);
