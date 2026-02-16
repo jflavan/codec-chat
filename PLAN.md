@@ -51,6 +51,12 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - File storage migrated to Azure Blob Storage (avatars + images containers)
 - SvelteKit switched to `adapter-node` for containerized deployment
 - API hardened: health probes, Serilog structured logging, CORS, forwarded headers, rate limiting
+- Response compression enabled (Brotli + Gzip) for faster API responses
+- User profile writes optimized — skips `SaveChangesAsync` when Google profile fields unchanged
+- Mention parsing cached per message batch to eliminate redundant regex execution
+- DM messages endpoint returns paginated `{ hasMore, messages }` response (matching channel pagination)
+- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect
+- SignalR reconnection lifecycle tracked via `isHubConnected` reactive state
 - Both apps containerized with optimized multi-stage Dockerfiles
 - Infrastructure as Code via Bicep modules under `infra/`
 - CI pipeline: build, lint, Docker image validation on every push/PR
@@ -587,6 +593,50 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] YouTube links render as `YouTubeEmbed` instead of the standard link preview card
 - [x] Non-YouTube links continue to render as standard link preview cards (no behavior change)
 - [x] Works in both server channels and DMs automatically (shared `LinkPreviewCard` component)
+
+## Task breakdown: Performance Optimizations
+
+### API — Response compression
+- [x] Add Brotli and Gzip response compression middleware to `Program.cs`
+- [x] Configure `CompressionLevel.Fastest` for minimal latency impact
+- [x] Include `application/json` in compressible MIME types
+- [x] Place `UseResponseCompression()` before `UseCors()` in middleware pipeline
+
+### API — Skip unnecessary database writes
+- [x] Update `UserService.GetOrCreateUserAsync` to compare incoming Google profile fields (DisplayName, Email, AvatarUrl) against stored values
+- [x] Skip `SaveChangesAsync` when no fields have actually changed — eliminates redundant writes on every authenticated request
+
+### API — Cached mention parsing
+- [x] Cache mention regex parsing results in `ChannelsController.GetMessages` using `ToDictionary` lookup
+- [x] Eliminates double regex execution per message (was parsing once for query, once for projection)
+
+### API — DM pagination `hasMore` flag
+- [x] Apply `limit + 1` fetch pattern to `DmController.GetMessages` (matching existing channel pagination)
+- [x] Return `{ hasMore, messages }` response shape instead of flat `DirectMessage[]` array
+- [x] Add `PaginatedDmMessages` type to frontend (`models.ts` + barrel export)
+- [x] Update `ApiClient.getDmMessages` return type to `Promise<PaginatedDmMessages>`
+- [x] Update `AppState.loadDmMessages` to destructure paginated response
+
+## Task breakdown: Connection Status Awareness
+
+### Web — SignalR reconnection callbacks
+- [x] Add `onReconnecting`, `onReconnected`, and `onClose` callbacks to `SignalRCallbacks` type in `chat-hub.ts`
+- [x] Wire `connection.onreconnecting()`, `connection.onreconnected()`, and `connection.onclose()` handlers in `ChatHubService.start()`
+
+### Web — Hub connection state
+- [x] Add `isHubConnected = $state(false)` reactive field to `AppState`
+- [x] Set `isHubConnected` to `true` after successful `hub.start()` and on `onReconnected`
+- [x] Set `isHubConnected` to `false` on `signOut()`, `onReconnecting`, and `onClose`
+
+### Web — Composer disconnected state
+- [x] Update `Composer.svelte` — when `!app.isHubConnected`, show "Codec connecting..." with animated CSS ellipsis instead of composer input
+- [x] Update `DmChatArea.svelte` — same disconnected state treatment for DM composer
+- [x] Add `.composer-disconnected`, `.connecting-message`, and `.animated-ellipsis` CSS styles
+
+## Task breakdown: Miscellaneous Fixes
+
+- [x] Add `<link rel="icon" href="%sveltekit.assets%/favicon.ico" />` to `app.html`
+- [x] Change YouTube embed border-left color from `var(--accent)` to `var(--danger)` in `YouTubeEmbed.svelte`
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin

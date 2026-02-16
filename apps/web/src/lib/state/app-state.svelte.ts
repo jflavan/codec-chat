@@ -144,6 +144,7 @@ export class AppState {
 
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
+	isHubConnected = $state(false);
 
 	/* ───── reply state ───── */
 	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
@@ -305,6 +306,7 @@ export class AppState {
 		clearStoredSession();
 
 		this.isInitialLoading = true;
+		this.isHubConnected = false;
 		this.idToken = null;
 		this.me = null;
 		this.status = 'Signed out';
@@ -1139,7 +1141,8 @@ export class AppState {
 		if (!this.idToken) return;
 		this.isLoadingDmMessages = true;
 		try {
-			this.dmMessages = await this.api.getDmMessages(this.idToken, dmChannelId);
+			const result = await this.api.getDmMessages(this.idToken, dmChannelId);
+			this.dmMessages = result.messages;
 		} catch (e) {
 			this.setError(e);
 		} finally {
@@ -1231,6 +1234,15 @@ export class AppState {
 				return fresh ?? '';
 			},
 			{
+			onReconnecting: () => {
+				this.isHubConnected = false;
+			},
+			onReconnected: () => {
+				this.isHubConnected = true;
+			},
+			onClose: () => {
+				this.isHubConnected = false;
+			},
 			onMessage: (msg) => {
 				if (msg.channelId === this.selectedChannelId) {
 					if (!this.messages.some((m) => m.id === msg.id)) {
@@ -1402,6 +1414,8 @@ export class AppState {
 				}
 			}
 		});
+
+		this.isHubConnected = this.hub.isConnected;
 
 		if (this.selectedChannelId) {
 			await this.hub.joinChannel(this.selectedChannelId);

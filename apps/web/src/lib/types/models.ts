@@ -148,6 +148,12 @@ export type DmConversation = {
 	sortDate: string;
 };
 
+/** Paginated DM message response from the API. */
+export type PaginatedDmMessages = {
+	hasMore: boolean;
+	messages: DirectMessage[];
+};
+
 /** Direct message in a DM conversation. */
 export type DirectMessage = {
 	id: string;
