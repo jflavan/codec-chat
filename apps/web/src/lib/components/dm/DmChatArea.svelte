@@ -281,7 +281,7 @@
 					No messages yet. Say hi to {app.activeDmParticipant?.displayName ?? 'your friend'}!
 				</p>
 			{:else}
-				{#each app.dmMessages as message, i}
+				{#each app.dmMessages as message, i (message.id)}
 					{@const prev = i > 0 ? app.dmMessages[i - 1] : null}
 					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
@@ -677,6 +677,7 @@
 		grid-template-columns: 56px 1fr;
 		padding: 2px 16px;
 		transition: background-color 150ms ease;
+		contain: content;
 	}
 
 	.message:hover { background: var(--bg-message-hover); }

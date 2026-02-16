@@ -53,14 +53,14 @@
 			}
 
 			const token = match[0];
+			const mentionMatch = MENTION_REGEX.exec(token);
 			if (HERE_REGEX.test(token)) {
 				rawSegments.push({
 					type: 'mention',
 					value: 'here',
 					displayName: 'here'
 				});
-			} else if (token.match(MENTION_REGEX)) {
-				const mentionMatch = token.match(MENTION_REGEX)!;
+			} else if (mentionMatch) {
 				const userId = mentionMatch[1].toLowerCase();
 				const resolved = mentions.find((m) => m.userId.toLowerCase() === userId);
 				rawSegments.push({

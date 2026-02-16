@@ -143,7 +143,7 @@
 			{#if app.isLoadingOlderMessages}
 				<p class="muted feed-status loading-older">Loading older messages…</p>
 			{/if}
-			{#each app.messages as message, i}
+			{#each app.messages as message, i (message.id)}
 				{@const prev = i > 0 ? app.messages[i - 1] : null}
 				{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>

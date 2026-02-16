@@ -313,6 +313,7 @@
 		grid-template-columns: 56px 1fr;
 		padding: 2px 16px;
 		transition: background-color 150ms ease;
+		contain: content;
 	}
 
 	.message:hover {
