@@ -125,8 +125,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         // Resolve mentions for all messages in a single batch query.
-        var allMentionedIds = messages
-            .SelectMany(m => ParseMentionUserIds(m.Body))
+        // Parse once and cache per message to avoid redundant regex work in the response projection.
+        var mentionsByMessage = messages.ToDictionary(m => m.Id, m => ParseMentionUserIds(m.Body));
+        var allMentionedIds = mentionsByMessage.Values
+            .SelectMany(ids => ids)
             .Distinct()
             .ToList();
 
@@ -178,7 +180,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var response = messages.Select(message =>
         {
-            var mentionIds = ParseMentionUserIds(message.Body);
+            var mentionIds = mentionsByMessage.TryGetValue(message.Id, out var cached) ? cached : [];
             var mentions = mentionIds
                 .Where(id => mentionUserLookup.ContainsKey(id))
                 .Select(id => mentionUserLookup[id])

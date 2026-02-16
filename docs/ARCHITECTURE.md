@@ -281,7 +281,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 #### Direct Messages
 - `POST /dm/channels` - Start or resume a DM conversation with a friend (returns existing or creates new)
 - `GET /dm/channels` - List open DM conversations (sorted by most recent message, `IsOpen = true` only)
-- `GET /dm/channels/{channelId}/messages` - Get messages in a DM conversation (paginated via `before`/`limit`; includes `imageUrl`, `replyContext`)
+- `GET /dm/channels/{channelId}/messages` - Get messages in a DM conversation (paginated via `before`/`limit`; returns `{ hasMore, messages }` with `imageUrl`, `replyContext`)
 - `POST /dm/channels/{channelId}/messages` - Send a direct message (accepts optional `imageUrl`, `replyToDirectMessageId`; broadcasts `ReceiveDm` via SignalR; reopens closed conversations)
 - `DELETE /dm/channels/{channelId}/messages/{messageId}` - Delete a direct message (author only; cascade-deletes link previews; broadcasts `DmMessageDeleted` via SignalR)
 - `DELETE /dm/channels/{channelId}` - Close a DM conversation (sets `IsOpen = false` for current user; messages preserved)
@@ -641,10 +641,14 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 ### Current Optimizations
 - Async/await throughout API
 - Efficient EF Core queries (AsNoTracking)
+- Response compression (Brotli + Gzip, `CompressionLevel.Fastest`) for `application/json` payloads
+- Optimized user profile writes — `UserService.GetOrCreateUserAsync` skips `SaveChangesAsync` when Google profile fields are unchanged
+- Cached mention parsing — regex results cached per message batch via `ToDictionary` to eliminate redundant execution
 - Vite build optimization
 - Tree-shaking and code splitting
 - SignalR for real-time message delivery and typing indicators (eliminates polling)
 - Channel-scoped SignalR groups (targeted broadcasts, not global fan-out)
+- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends
 
 ### Future Improvements
 - Response caching
