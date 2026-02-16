@@ -72,6 +72,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Channel creation (Owner/Admin only)
 - ✅ Kick members from servers (Owner/Admin only, with real-time overlay notification and fade-out)
 - ✅ Server invites — Owner/Admin can generate invite codes; any user can join via code
+- ✅ **Server Settings** — gear icon in channel sidebar opens server settings modal for Owners/Admins; edit server name, rename channels, view member count; real-time sync via SignalR
 - ✅ Channel browsing within servers
 - ✅ Real-time message posting and viewing via SignalR (WebSockets)
 - ✅ Typing indicators (“X is typing…”)
