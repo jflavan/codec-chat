@@ -113,7 +113,7 @@
 		{#if app.canDeleteServer}
 			<div class="danger-zone">
 				{#if confirmDeleteServer}
-					<p class="danger-warning">Are you sure? This will permanently delete the server and all its channels and messages.</p>
+					<p class="danger-warning">Are you sure? This will permanently delete the server and all its channels, messages, members, and invites.</p>
 					<div class="inline-actions">
 						<button type="button" class="btn-danger" onclick={handleDeleteServer}>Delete</button>
 						<button type="button" class="btn-secondary" onclick={() => (confirmDeleteServer = false)}>Cancel</button>

@@ -128,10 +128,16 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ### Global Admin
 - ✅ Configurable global admin role via `GlobalAdmin:Email` application setting
 - ✅ `IsGlobalAdmin` flag on User entity, seeded at application startup
+- ✅ **Full access to all servers** — global admin sees every server in the sidebar regardless of membership; role is `null` for servers the admin has not joined
+- ✅ Global admin can read messages, post messages, edit own messages, delete any message, and toggle reactions in any channel (bypasses membership check)
+- ✅ Global admin can manage channels in any server — create, rename, and delete channels (bypasses Owner/Admin role check)
+- ✅ Global admin can manage invites in any server — create, list, and revoke invite codes (bypasses Owner/Admin role check)
+- ✅ Global admin can update server settings (rename) for any server (bypasses Owner/Admin role check)
 - ✅ Global admin can delete any server (cascade-deletes all channels, messages, members, invites)
 - ✅ Global admin can delete any channel (cascade-deletes all messages, reactions, link previews)
 - ✅ Global admin can delete any message in channels (bypasses author-only restriction)
 - ✅ Global admin can kick any non-Owner member from any server (bypasses membership/role check)
+- ✅ SignalR: global admin auto-joins all server groups on connect (receives real-time updates for every server)
 - ✅ `isGlobalAdmin` flag exposed in `/me` API response and frontend state
 - ✅ Server Settings UI: danger zone with delete server and delete channel buttons (confirmation dialogs)
 - ✅ Message action bar: delete button visible for own messages and global admin; edit restricted to own messages only

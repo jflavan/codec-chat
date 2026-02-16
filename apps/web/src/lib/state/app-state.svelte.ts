@@ -159,7 +159,7 @@ export class AppState {
 	);
 
 	readonly canManageChannels = $derived(
-		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
 	readonly canKickMembers = $derived(
@@ -167,7 +167,7 @@ export class AppState {
 	);
 
 	readonly canManageInvites = $derived(
-		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
 	readonly canDeleteServer = $derived(

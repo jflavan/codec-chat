@@ -20,11 +20,35 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
 {
     /// <summary>
     /// Lists servers the current user is a member of.
+    /// Global admins see all servers.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetMyServers()
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
+
+        if (appUser.IsGlobalAdmin)
+        {
+            var allServers = await db.Servers
+                .AsNoTracking()
+                .Select(s => new { s.Id, s.Name })
+                .ToListAsync();
+
+            var myMemberships = await db.ServerMembers
+                .AsNoTracking()
+                .Where(m => m.UserId == appUser.Id)
+                .ToDictionaryAsync(m => m.ServerId, m => m.Role.ToString());
+
+            var result = allServers.Select(s => new
+            {
+                ServerId = s.Id,
+                s.Name,
+                Role = myMemberships.TryGetValue(s.Id, out var role) ? role : (string?)null
+            });
+
+            return Ok(result);
+        }
+
         var servers = await db.ServerMembers
             .AsNoTracking()
             .Where(member => member.UserId == appUser.Id)
@@ -84,7 +108,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Updates a server's name. Requires Owner or Admin role.
+    /// Updates a server's name. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPatch("{serverId:guid}")]
     public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerRequest request)
@@ -100,18 +124,22 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership is null)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
         }
 
         var server = await db.Servers.FindAsync(serverId);
@@ -139,13 +167,13 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Lists the members of a server. Requires membership.
+    /// Lists the members of a server. Requires membership or global admin.
     /// </summary>
     [HttpGet("{serverId:guid}/members")]
     public async Task<IActionResult> GetMembers(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(serverId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(serverId, appUser.Id);
         if (!isMember)
         {
             return Forbid();
@@ -268,13 +296,13 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Lists channels within a server. Requires membership.
+    /// Lists channels within a server. Requires membership or global admin.
     /// </summary>
     [HttpGet("{serverId:guid}/channels")]
     public async Task<IActionResult> GetChannels(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(serverId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(serverId, appUser.Id);
         if (!isMember)
         {
             return Forbid();
@@ -290,7 +318,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Creates a channel within a server. Requires Owner or Admin role.
+    /// Creates a channel within a server. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPost("{serverId:guid}/channels")]
     public async Task<IActionResult> CreateChannel(Guid serverId, [FromBody] CreateChannelRequest request)
@@ -312,18 +340,22 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership is null)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
         }
 
         var channel = new Channel
@@ -344,7 +376,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Updates a channel's name. Requires Owner or Admin role.
+    /// Updates a channel's name. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPatch("{serverId:guid}/channels/{channelId:guid}")]
     public async Task<IActionResult> UpdateChannel(Guid serverId, Guid channelId, [FromBody] UpdateChannelRequest request)
@@ -360,18 +392,22 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership is null)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
         }
 
         var channel = await db.Channels
@@ -404,24 +440,28 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     /* ═══════════════════ Server Invites ═══════════════════ */
 
     /// <summary>
-    /// Creates a new invite code for a server. Requires Owner or Admin role.
+    /// Creates a new invite code for a server. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPost("{serverId:guid}/invites")]
     public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership is null)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
         }
 
         var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
@@ -467,24 +507,28 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Lists active invite codes for a server. Requires Owner or Admin role.
+    /// Lists active invite codes for a server. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpGet("{serverId:guid}/invites")]
     public async Task<IActionResult> GetInvites(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership is null)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -510,24 +554,28 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
-    /// Revokes (deletes) an invite code. Requires Owner or Admin role.
+    /// Revokes (deletes) an invite code. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpDelete("{serverId:guid}/invites/{inviteId:guid}")]
     public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership is null)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
-        }
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        {
-            return Forbid();
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
         }
 
         var invite = await db.ServerInvites

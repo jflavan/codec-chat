@@ -5,7 +5,7 @@ The Server Settings feature provides a centralized UI for server Owners and Admi
 
 ## Access
 - **Location:** Gear icon (⚙) button in the channel sidebar header
-- **Permissions:** Only visible to users with Owner or Admin role in the current server, or users with the Global Admin role
+- **Permissions:** Only visible to users with Owner or Admin role in the current server, or users with the Global Admin role (Global Admin can access settings for any server, even if not a member)
 - **Shortcut:** Click the gear icon or use ESC to close
 
 ## UI Components
@@ -265,9 +265,10 @@ The Server Settings modal adapts to smaller screens (< 900px):
 
 ### Authorization
 - All endpoints enforce role-based access control (RBAC)
-- Only Owners and Admins can access server settings
-- Frontend hides the settings gear icon for non-admin members
+- Only Owners, Admins, and Global Admins can access server settings
+- Frontend hides the settings gear icon for non-admin members (shown for Global Admin)
 - Backend validates permissions on every request
+- Global Admin bypasses membership and role checks for all server settings operations
 
 ### Input Validation
 - Server and channel names are trimmed and validated

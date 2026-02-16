@@ -38,13 +38,13 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - CI/CD: GitHub Actions (CI, CD, Infrastructure pipelines)
 - Auth (Azure): OIDC federated credentials (no long-lived secrets)
 - Secrets: Azure Key Vault + GitHub Secrets
-- Global admin: Configurable via `GlobalAdmin:Email` setting (Key Vault in production, appsettings in development); can delete any server, channel, or message and kick any member
+- Global admin: Configurable via `GlobalAdmin:Email` setting (Key Vault in production, appsettings in development); has full access to all servers — can see all servers, read/post/react in any channel, manage channels and invites, rename servers, delete any server/channel/message, and kick any member
 - File storage: Azure Blob Storage (production), local disk (development)
 - Logging: Serilog with structured JSON → Log Analytics
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
-- **Global admin role** — configurable global admin can delete any server, channel, or message and kick any member; seeded from `GlobalAdmin:Email` config; Key Vault integration for production
+- **Global admin role** — configurable global admin with full access to all servers (see all servers, read/post/react in any channel, manage channels/invites, rename servers, delete any server/channel/message, kick any member); seeded from `GlobalAdmin:Email` config; Key Vault integration for production
 - Real-time member list updates via SignalR server-scoped groups
 - Alpha notification banner with GitHub bug report link shown on every login
 - GitHub Issues bug report template for alpha testers (`.github/ISSUE_TEMPLATE/bug-report.yml`)
@@ -700,6 +700,45 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ### Verification
 - [x] Backend builds successfully (`dotnet build`, 0 errors)
 - [x] Frontend type-checks with zero errors (`svelte-check`, 0 errors)
+
+## Task breakdown: Global Admin — Full Server Access
+
+### API — Server access bypasses
+- [x] Update `GET /servers` to return all servers for global admin (with `role = null` for non-member servers)
+- [x] Update `GET /servers/{serverId}/channels` to bypass membership check for global admin
+- [x] Update `GET /servers/{serverId}/members` to bypass membership check for global admin
+- [x] Update `PATCH /servers/{serverId}` to bypass Owner/Admin role check for global admin
+- [x] Update `POST /servers/{serverId}/channels` to bypass Owner/Admin role check for global admin
+- [x] Update `PATCH /servers/{serverId}/channels/{channelId}` to bypass Owner/Admin role check for global admin
+- [x] Update `POST /servers/{serverId}/invites` to bypass Owner/Admin role check for global admin
+- [x] Update `GET /servers/{serverId}/invites` to bypass Owner/Admin role check for global admin
+- [x] Update `DELETE /servers/{serverId}/invites/{inviteId}` to bypass Owner/Admin role check for global admin
+
+### API — Channel messaging bypasses
+- [x] Update `GET /channels/{channelId}/messages` to bypass membership check for global admin
+- [x] Update `POST /channels/{channelId}/messages` to bypass membership check for global admin
+- [x] Update `DELETE /channels/{channelId}/messages/{messageId}` membership bypass (already had author bypass)
+- [x] Update `PUT /channels/{channelId}/messages/{messageId}` to bypass membership check for global admin
+- [x] Update `POST /channels/{channelId}/messages/{messageId}/reactions` to bypass membership check for global admin
+
+### API — SignalR
+- [x] Update `ChatHub.OnConnectedAsync` to join all server groups for global admin (not just member servers)
+
+### Web — Frontend
+- [x] Update `MemberServer.role` type from `string` to `string | null` to accommodate non-member servers
+- [x] Update `canManageChannels` derived state to include `isGlobalAdmin`
+- [x] Update `canManageInvites` derived state to include `isGlobalAdmin`
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`, 0 errors, 0 warnings)
+- [x] Frontend type-checks with zero errors (`svelte-check`)
+
+### Documentation
+- [x] Update FEATURES.md with expanded global admin capabilities
+- [x] Update ARCHITECTURE.md endpoint descriptions (membership/role requirements)
+- [x] Update SERVER_SETTINGS.md permissions descriptions
+- [x] Update PLAN.md with task breakdown
+- [x] Update README.md global admin description
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin

@@ -38,7 +38,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
         if (!isMember)
         {
             return Forbid();
@@ -233,7 +233,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
         if (!isMember)
         {
             return Forbid();
@@ -454,7 +454,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
         if (!isMember)
         {
             return Forbid();
@@ -502,7 +502,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
         if (!isMember)
         {
             return Forbid();
@@ -555,7 +555,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = await userService.IsMemberAsync(channel.ServerId, appUser.Id);
+        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
         if (!isMember)
         {
             return Forbid();

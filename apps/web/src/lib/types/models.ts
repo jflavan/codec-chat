@@ -1,8 +1,8 @@
-/** Server the current user is a member of. */
+/** Server the current user is a member of (or visible to global admins). */
 export type MemberServer = {
 	serverId: string;
 	name: string;
-	role: string;
+	role: string | null;
 };
 
 /** Text channel within a server. */
