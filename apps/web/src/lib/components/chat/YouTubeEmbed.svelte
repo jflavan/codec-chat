@@ -13,6 +13,7 @@
 		max-width: 520px;
 		margin-top: 8px;
 		border-radius: 8px;
+		border-left: 3px solid var(--accent);
 		overflow: hidden;
 	}
 </style>
