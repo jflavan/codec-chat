@@ -30,7 +30,14 @@ export class ApiError extends Error {
  * Throws `ApiError` on non-2xx responses.
  */
 export class ApiClient {
-	constructor(private readonly baseUrl: string) {}
+	private onUnauthorized?: () => Promise<string | null>;
+
+	constructor(
+		private readonly baseUrl: string,
+		onUnauthorized?: () => Promise<string | null>
+	) {
+		this.onUnauthorized = onUnauthorized;
+	}
 
 	/* ───── helpers ───── */
 
@@ -41,7 +48,18 @@ export class ApiClient {
 	}
 
 	private async request<T>(url: string, init: RequestInit): Promise<T> {
-		const response = await fetch(url, init);
+		let response = await fetch(url, init);
+
+		// On 401, attempt a silent token refresh and retry the request once.
+		if (response.status === 401 && this.onUnauthorized) {
+			const freshToken = await this.onUnauthorized();
+			if (freshToken) {
+				const retryHeaders = new Headers(init.headers);
+				retryHeaders.set('Authorization', `Bearer ${freshToken}`);
+				response = await fetch(url, { ...init, headers: retryHeaders });
+			}
+		}
+
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
 			throw new ApiError(response.status, body?.error);
@@ -50,7 +68,18 @@ export class ApiClient {
 	}
 
 	private async requestVoid(url: string, init: RequestInit): Promise<void> {
-		const response = await fetch(url, init);
+		let response = await fetch(url, init);
+
+		// On 401, attempt a silent token refresh and retry the request once.
+		if (response.status === 401 && this.onUnauthorized) {
+			const freshToken = await this.onUnauthorized();
+			if (freshToken) {
+				const retryHeaders = new Headers(init.headers);
+				retryHeaders.set('Authorization', `Bearer ${freshToken}`);
+				response = await fetch(url, { ...init, headers: retryHeaders });
+			}
+		}
+
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
 			throw new ApiError(response.status, body?.error);
