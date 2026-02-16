@@ -133,9 +133,9 @@ export class ChatHubService {
 		return this.connection?.state === HubConnectionState.Connected;
 	}
 
-	async start(token: string, callbacks: SignalRCallbacks): Promise<void> {
+	async start(accessTokenFactory: () => string | Promise<string>, callbacks: SignalRCallbacks): Promise<void> {
 		const connection = new HubConnectionBuilder()
-			.withUrl(this.hubUrl, { accessTokenFactory: () => token })
+			.withUrl(this.hubUrl, { accessTokenFactory })
 			.withAutomaticReconnect()
 			.build();
 

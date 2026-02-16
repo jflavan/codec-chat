@@ -23,7 +23,7 @@ import {
 	isTokenExpired,
 	isSessionExpired
 } from '$lib/auth/session.js';
-import { initGoogleIdentity, renderGoogleButton } from '$lib/auth/google.js';
+import { initGoogleIdentity, renderGoogleButton, requestFreshToken } from '$lib/auth/google.js';
 
 const CTX_KEY = Symbol('app-state');
 
@@ -199,13 +199,39 @@ export class AppState {
 	/* ───── internals ───── */
 	private api: ApiClient;
 	private hub: ChatHubService;
+	private refreshPromise: Promise<string | null> | null = null;
 
 	constructor(
 		private readonly apiBaseUrl: string,
 		private readonly googleClientId: string
 	) {
-		this.api = new ApiClient(apiBaseUrl);
+		this.api = new ApiClient(apiBaseUrl, () => this.refreshToken());
 		this.hub = new ChatHubService(`${apiBaseUrl}/hubs/chat`);
+	}
+
+	/**
+	 * Attempt to silently refresh the Google ID token.
+	 * Concurrent calls are deduplicated so only one refresh runs at a time.
+	 * Signs the user out if the refresh fails.
+	 */
+	private async refreshToken(): Promise<string | null> {
+		if (this.refreshPromise) return this.refreshPromise;
+
+		this.refreshPromise = (async () => {
+			try {
+				const freshToken = await requestFreshToken();
+				this.idToken = freshToken;
+				persistToken(freshToken);
+				return freshToken;
+			} catch {
+				await this.signOut();
+				return null;
+			} finally {
+				this.refreshPromise = null;
+			}
+		})();
+
+		return this.refreshPromise;
 	}
 
 	/* ═══════════════════ Settings ═══════════════════ */
@@ -255,7 +281,7 @@ export class AppState {
 		await Promise.all([
 			this.loadMe(),
 			this.loadServers(),
-			this.startSignalR(token)
+			this.startSignalR()
 		]);
 		this.isInitialLoading = false;
 		this.showAlphaNotification = true;
@@ -1121,8 +1147,14 @@ export class AppState {
 
 	/* ═══════════════════ SignalR ═══════════════════ */
 
-	private async startSignalR(token: string): Promise<void> {
-		await this.hub.start(token, {
+	private async startSignalR(): Promise<void> {
+		await this.hub.start(
+			async () => {
+				if (this.idToken && !isTokenExpired(this.idToken)) return this.idToken;
+				const fresh = await this.refreshToken();
+				return fresh ?? '';
+			},
+			{
 			onMessage: (msg) => {
 				if (msg.channelId === this.selectedChannelId) {
 					if (!this.messages.some((m) => m.id === msg.id)) {
