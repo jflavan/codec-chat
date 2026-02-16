@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import MessageItem from './MessageItem.svelte';
 
@@ -95,6 +95,17 @@
 			}, 1500);
 		}
 	}
+
+	// Ensure the feed scrolls to the bottom on initial mount.
+	// The auto-scroll effect may fire before the browser has completed layout
+	// for freshly rendered content, so we wait for the first animation frame.
+	onMount(() => {
+		if (!app.isLoadingMessages && app.messages.length > 0) {
+			tick().then(() => {
+				requestAnimationFrame(() => scrollToBottom(true));
+			});
+		}
+	});
 
 	// Reset scroll state on channel change
 	$effect(() => {

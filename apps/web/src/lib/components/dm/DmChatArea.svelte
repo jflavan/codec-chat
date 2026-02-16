@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
@@ -107,6 +107,15 @@
 			cancelDmEdit();
 		}
 	}
+
+	// Ensure the DM feed scrolls to the bottom on initial mount.
+	onMount(() => {
+		if (!app.isLoadingDmMessages && app.dmMessages.length > 0) {
+			tick().then(() => {
+				requestAnimationFrame(() => scrollToBottom(true));
+			});
+		}
+	});
 
 	// Reset scroll on channel change
 	$effect(() => {
