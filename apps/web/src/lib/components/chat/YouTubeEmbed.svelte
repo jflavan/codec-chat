@@ -5,7 +5,7 @@
 </script>
 
 <aside class="youtube-embed">
-	<Youtube id={videoId} />
+	<Youtube id={videoId} thumbnail={undefined} play_button={undefined} />
 </aside>
 
 <style>
