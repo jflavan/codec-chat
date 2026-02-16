@@ -577,7 +577,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ### Web — YouTubeEmbed component
 - [x] Create `YouTubeEmbed.svelte` — renders an inline 16:9 `<iframe>` video player with responsive aspect ratio
 - [x] Red left accent border (YouTube branding), site name and clickable title above player
-- [x] Privacy: uses `youtube-nocookie.com` domain, `referrerpolicy="no-referrer"`, `loading="lazy"`
+- [x] Privacy: uses `youtube-nocookie.com` domain, `referrerpolicy="strict-origin"`, `loading="lazy"`
 - [x] Security: `allow` attribute scoped to required permissions only (accelerometer, autoplay, clipboard-write, encrypted-media, gyroscope, picture-in-picture)
 
 ### Web — Integration into LinkPreviewCard
