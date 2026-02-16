@@ -89,7 +89,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Image lightbox** — click any inline image to view it full-size in an overlay with keyboard dismiss and open-original link
 - ✅ **Nicknames** — user-chosen display name that overrides Google name across all surfaces (messages, member lists, friends, typing indicators)
 - ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove) and account info
-- ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR
+- ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR; YouTube links render as inline video players
 - ✅ **@mentions** — autocomplete member picker in composer, @here to notify everyone, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
 - ✅ **Message replies** — inline reply to any message in channels or DMs, reply context displayed above message body, click to scroll to original with highlight animation, Escape to cancel, graceful handling of deleted parent messages
 - ✅ **Message deletion** — authors can delete their own messages in channels and DMs; cascade-deletes reactions and link previews; real-time removal via SignalR; replies to deleted messages handled gracefully

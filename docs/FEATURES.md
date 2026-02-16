@@ -99,6 +99,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ SSRF protection (private IP blocking, DNS rebinding prevention, redirect limits)
 - ✅ Clickable hyperlinks in message body text
 - ✅ Responsive card layout (side-by-side ≥ 600px, stacked < 600px)
+- ✅ YouTube video embeds — YouTube links render as inline video players with 16:9 responsive iframe (privacy-enhanced via `youtube-nocookie.com`)
 
 ### Nicknames ([detailed spec](NICKNAMES.md))
 - ✅ User-chosen display name that overrides Google-provided name
@@ -200,7 +201,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ### Link Previews
 - Link preview caching
 - Image proxying for `og:image` URLs
-- Video embeds for YouTube/Vimeo
+- Video embeds for Vimeo
 
 ### File & Media
 - File uploads (documents, other media)
