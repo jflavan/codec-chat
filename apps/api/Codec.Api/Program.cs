@@ -1,7 +1,9 @@
+using System.IO.Compression;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
@@ -98,6 +100,16 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueLimit = 0;
     });
 });
+
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/json"]);
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
 
 // File storage provider (Local or AzureBlob).
 var storageProvider = builder.Configuration["Storage:Provider"] ?? "Local";
@@ -206,6 +218,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseResponseCompression();
 app.UseCors("default");
 
 // Trust forwarded headers from Azure Container Apps reverse proxy.

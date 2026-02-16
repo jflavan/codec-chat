@@ -54,6 +54,20 @@ public sealed class LinkPreviewService : ILinkPreviewService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Strips control characters from a URL to prevent log injection (CRLF, etc.).
+    /// </summary>
+    private static string SanitizeForLog(string value)
+    {
+        return string.Create(value.Length, value, static (span, src) =>
+        {
+            for (var i = 0; i < src.Length; i++)
+            {
+                span[i] = char.IsControl(src[i]) ? '_' : src[i];
+            }
+        });
+    }
+
     /// <inheritdoc />
     public IReadOnlyList<string> ExtractUrls(string body, int maxUrls = 5)
     {
@@ -74,7 +88,7 @@ public sealed class LinkPreviewService : ILinkPreviewService
     {
         if (!IsAllowedUrl(url))
         {
-            _logger.LogDebug("Blocked URL for link preview (SSRF check): {Url}", url);
+            _logger.LogDebug("Blocked URL for link preview (SSRF check): {Url}", SanitizeForLog(url));
             return null;
         }
 
@@ -106,12 +120,12 @@ public sealed class LinkPreviewService : ILinkPreviewService
         }
         catch (OperationCanceledException)
         {
-            _logger.LogDebug("Timeout fetching link preview for {Url}", url);
+            _logger.LogDebug("Timeout fetching link preview for {Url}", SanitizeForLog(url));
             return null;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogDebug(ex, "HTTP error fetching link preview for {Url}", url);
+            _logger.LogDebug(ex, "HTTP error fetching link preview for {Url}", SanitizeForLog(url));
             return null;
         }
     }

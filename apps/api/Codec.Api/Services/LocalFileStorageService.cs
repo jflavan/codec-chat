@@ -21,7 +21,14 @@ public class LocalFileStorageService : IFileStorageService
     public async Task<string> UploadAsync(string containerName, string blobPath, Stream stream, string contentType, CancellationToken cancellationToken = default)
     {
         var fullPath = GetSafePath(containerName, blobPath);
-        var directory = Path.GetDirectoryName(fullPath)!;
+        var directory = Path.GetFullPath(Path.GetDirectoryName(fullPath)!);
+        var containerPath = Path.GetFullPath(Path.Combine(_rootPath, containerName));
+
+        if (!directory.StartsWith(containerPath + Path.DirectorySeparatorChar) && directory != containerPath)
+        {
+            throw new InvalidOperationException("Path traversal detected.");
+        }
+
         Directory.CreateDirectory(directory);
 
         await using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write);

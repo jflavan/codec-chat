@@ -65,7 +65,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Message deletion — authors can delete their own messages via action bar; cascade-deletes reactions and link previews; real-time removal via SignalR
 - ✅ Message editing — authors can edit their own messages via inline edit mode; "(edited)" label displayed on modified messages; real-time sync via SignalR
 - ✅ Text formatting — bold (`*text*` or `**text**`) and italic (`_text_`) with live preview in composer
-- ✅ Progressive message loading — initially loads last 100 messages; older messages load seamlessly on scroll-up via cursor-based pagination (`before`/`limit` query params); scroll position preserved during prepend
+- ✅ Progressive message loading — initially loads last 100 messages; older messages load seamlessly on scroll-up via cursor-based pagination (`before`/`limit` query params); scroll position preserved during prepend; DM messages use same paginated `{ hasMore, messages }` response shape
 
 ### Friends ([detailed spec](FRIENDS.md))
 - ✅ Friend requests (send, accept, decline, cancel)
@@ -149,6 +149,12 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Accessibility: focus-visible outlines, prefers-reduced-motion, semantic HTML, ARIA labels
 - ✅ Design specification documented in `docs/DESIGN.md`
 
+### Connection Status
+- ✅ SignalR reconnection lifecycle tracking (`onReconnecting`, `onReconnected`, `onClose` callbacks)
+- ✅ `isHubConnected` reactive state in `AppState` — tracks real-time connection health
+- ✅ Composer disconnected state — shows "Codec connecting..." with animated ellipsis when SignalR is not connected (both server channels and DMs)
+- ✅ Automatic restoration of full composer input on reconnection
+
 ### Frontend Architecture
 - ✅ Modular layered architecture (types, API client, auth, services, state, components)
 - ✅ Central `AppState` class with Svelte 5 `$state` / `$derived` runes
@@ -173,6 +179,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ SignalR hub (`/hubs/chat`) for real-time communication
 - ✅ WebSocket JWT authentication via query string
 - ✅ camelCase JSON serialization for SignalR payloads
+- ✅ Response compression (Brotli + Gzip, `CompressionLevel.Fastest`) for `application/json` payloads
+- ✅ Optimized user profile writes — skips `SaveChangesAsync` when Google profile fields are unchanged
+- ✅ Cached mention parsing — regex results cached per message batch to eliminate redundant execution
 
 ## 🚧 In Progress
 
