@@ -234,7 +234,7 @@
 			{#if uncoveredYouTubeUrls.length}
 				<div class="link-previews">
 					{#each uncoveredYouTubeUrls as yt}
-						<YouTubeEmbed videoId={yt.videoId} url={yt.url} />
+						<YouTubeEmbed videoId={yt.videoId} />
 					{/each}
 				</div>
 			{/if}
@@ -291,7 +291,7 @@
 			{#if uncoveredYouTubeUrls.length}
 				<div class="link-previews">
 					{#each uncoveredYouTubeUrls as yt}
-						<YouTubeEmbed videoId={yt.videoId} url={yt.url} />
+						<YouTubeEmbed videoId={yt.videoId} />
 					{/each}
 				</div>
 			{/if}

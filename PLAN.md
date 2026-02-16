@@ -572,13 +572,15 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ### Web — YouTube URL detection utility
 - [x] Create `$lib/utils/youtube.ts` with `extractYouTubeVideoId(url)` — regex-based parser supporting `/watch?v=`, `/embed/`, `/shorts/`, `/live/`, and `youtu.be/` URL formats
-- [x] Add `youTubeEmbedUrl(videoId)` helper — builds privacy-enhanced embed URL using `youtube-nocookie.com`
+- [x] Add `youTubeEmbedUrl(videoId)` helper — removed; embed handled by `svelte-youtube-embed` package
 
 ### Web — YouTubeEmbed component
-- [x] Create `YouTubeEmbed.svelte` — renders an inline 16:9 `<iframe>` video player with responsive aspect ratio
-- [x] Red left accent border (YouTube branding), site name and clickable title above player
-- [x] Privacy: uses `youtube-nocookie.com` domain, `referrerpolicy="strict-origin"`, `loading="lazy"`
-- [x] Security: `allow` attribute scoped to required permissions only (accelerometer, autoplay, clipboard-write, encrypted-media, gyroscope, picture-in-picture)
+- [x] Create `YouTubeEmbed.svelte` — wraps `svelte-youtube-embed` package for click-to-play YouTube embeds
+- [x] Package fetches video title via YouTube oEmbed API and displays it on the thumbnail
+- [x] Click-to-play pattern: shows thumbnail with play button, loads iframe only on user interaction
+- [x] Privacy: uses `youtube-nocookie.com` domain for iframe embeds
+- [x] Security: CSP `frame-src` allows `youtube-nocookie.com`, `connect-src` allows `youtube.com` for oEmbed
+- [x] Client-side YouTube URL detection from message body (independent of backend link preview system)
 
 ### Web — Integration into LinkPreviewCard
 - [x] Update `LinkPreviewCard.svelte` to detect YouTube URLs via `extractYouTubeVideoId()`

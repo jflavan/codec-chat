@@ -41,7 +41,4 @@ export function extractYouTubeUrls(text: string): { url: string; videoId: string
 	return results;
 }
 
-/** Build a privacy-enhanced embed URL for a YouTube video. */
-export function youTubeEmbedUrl(videoId: string): string {
-	return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`;
-}
+

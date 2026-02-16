@@ -99,7 +99,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ SSRF protection (private IP blocking, DNS rebinding prevention, redirect limits)
 - ✅ Clickable hyperlinks in message body text
 - ✅ Responsive card layout (side-by-side ≥ 600px, stacked < 600px)
-- ✅ YouTube video embeds — YouTube links render as inline video players with 16:9 responsive iframe (privacy-enhanced via `youtube-nocookie.com`)
+- ✅ YouTube video embeds — YouTube links render as click-to-play inline video players via `svelte-youtube-embed` package (thumbnail preview with title from oEmbed API, iframe loads on click, privacy-enhanced via `youtube-nocookie.com`)
 
 ### Nicknames ([detailed spec](NICKNAMES.md))
 - ✅ User-chosen display name that overrides Google-provided name
