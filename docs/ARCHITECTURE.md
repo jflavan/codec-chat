@@ -558,7 +558,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 }
 ```
 
-> **Note:** `GlobalAdmin:Email` designates a user as the platform-wide admin at startup. In production, this is stored in Azure Key Vault as the `GlobalAdmin--Email` secret and injected as the `GlobalAdmin__Email` environment variable.
+> **Note:** `GlobalAdmin:Email` designates a user as the platform-wide admin at startup. In production, this is stored in Azure Key Vault as the `GlobalAdmin--Email` secret (provisioned via Bicep infrastructure) and injected as the `GlobalAdmin__Email` environment variable.
 
 ## Security Considerations
 

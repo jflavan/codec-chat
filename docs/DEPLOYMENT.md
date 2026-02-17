@@ -130,7 +130,7 @@ Deploys to production after CI passes on `main` using a blue-green deployment st
 2. `migrate-database` — Run EF Core migration bundle against production PostgreSQL
 3. `deploy` — Blue-green deployment to Container Apps (requires `prod` environment approval):
    - Ensure multiple revision mode and ACR registry configuration
-   - Deploy new staging revisions (with unique suffix per commit + attempt)
+   - Deploy new staging revisions (with unique suffix per commit + run number)
    - Wait for revisions to reach a running state (`Running`, `Degraded`, or `RunningAtMaxScale`) with a healthy health state (`Healthy` or `None`)
    - Verify staging revision health via Azure CLI before switching traffic
    - Switch 100% traffic to the new revisions

@@ -608,9 +608,9 @@ infra/
 - [x] Login to Azure via OIDC
 - [x] Ensure multiple revision mode on both Container Apps
 - [x] Ensure ACR registry configuration (system-assigned Managed Identity)
-- [x] Deploy new staging revisions with unique suffix per commit + attempt:
+- [x] Deploy new staging revisions with unique suffix per commit + run number:
   ```bash
-  SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
+  SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)n${{ github.run_number }}"
   az containerapp update \
     --name ca-codec-prod-api \
     --resource-group rg-codec-prod \
@@ -663,6 +663,11 @@ infra/
 > - `RunningAtMaxScale` was not accepted as a valid running state (API has `maxReplicas: 1`, so Azure reports `RunningAtMaxScale` instead of `Running`)
 > - Wait step only checked `runningState` — added `healthState` verification (`Healthy` or `None`) to prevent premature promotion
 > - Label-based routing (`staging---<fqdn>`) returned HTTP 404 from Azure Container Apps infrastructure — replaced with direct Azure CLI health verification via `az containerapp revision show`
+>
+> **Issues resolved during infra/CD pipeline hardening:**
+> - `GlobalAdmin--Email` Key Vault secret moved from CD pipeline (`az keyvault secret set`) to Bicep infrastructure — the CD service principal only has `Key Vault Secrets User` (read) access, not write access. The secret is now managed alongside `ConnectionStrings--Default` and `Google--ClientId` as a Bicep `key-vault-secret` module.
+> - Removed the `isQuickstart` conditional from container app Bicep files. The infra pipeline runs without a container image parameter (defaults to quickstart), which caused `isQuickstart = true` to wipe secrets, env vars, registries, probes, and set `targetPort` to 80. Container apps now always use production configuration regardless of the container image.
+> - Changed revision suffix from `r${{ github.run_attempt }}` to `n${{ github.run_number }}` to prevent collisions when multiple CD runs (e.g., `workflow_run` and `workflow_dispatch`) target the same commit SHA.
 
 ---
 

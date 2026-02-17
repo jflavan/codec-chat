@@ -1,5 +1,7 @@
 # Infrastructure Workflow Fix - Revision Deactivation
 
+> **Update (June 2025):** The `isQuickstart` conditional pattern described below has been **fully removed** from both container app Bicep files. Secrets, environment variables, `targetPort`, probes, and registries are now always set to production values regardless of the container image. The revision deactivation step in `infra.yml` remains as a defensive measure but the original root cause (quickstart-mode wiping configuration) no longer applies.
+
 ## Issue Summary
 
 The `infra` GitHub Actions workflow was failing during infrastructure deployment with the following errors:
