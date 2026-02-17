@@ -99,7 +99,8 @@
 		gap: 0.5rem;
 		color: var(--bg-tertiary);
 		background: var(--accent);
-		padding: 0.6rem 1.25rem;
+		padding: 0.75rem 1.25rem;
+		min-height: 44px;
 		border-radius: 6px;
 		text-decoration: none;
 		font-weight: 600;
@@ -118,7 +119,8 @@
 		background: transparent;
 		border: 1px solid var(--border);
 		color: var(--text-muted);
-		padding: 0.55rem 1rem;
+		padding: 0.75rem 1rem;
+		min-height: 44px;
 		border-radius: 6px;
 		font-size: 0.85rem;
 		cursor: pointer;

@@ -204,6 +204,8 @@
 		padding: 16px 0 8px;
 		scrollbar-width: thin;
 		scrollbar-color: var(--border) transparent;
+		-webkit-overflow-scrolling: touch;
+		overscroll-behavior-y: contain;
 	}
 
 	.feed-status {
@@ -284,6 +286,14 @@
 		.reply-highlight {
 			animation: none;
 			background-color: rgba(88, 101, 242, 0.1);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.jump-to-bottom {
+			padding: 10px 18px;
+			font-size: 14px;
+			min-height: 44px;
 		}
 	}
 </style>

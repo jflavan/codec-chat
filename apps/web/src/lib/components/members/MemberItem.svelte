@@ -59,7 +59,8 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 6px 8px;
+		padding: 8px 8px;
+		min-height: 44px;
 		border-radius: 4px;
 		cursor: default;
 		transition: background-color 150ms ease;
@@ -105,7 +106,8 @@
 
 	.kick-btn {
 		margin-left: auto;
-		padding: 2px 8px;
+		padding: 6px 10px;
+		min-height: 36px;
 		font-size: 11px;
 		font-weight: 600;
 		border: 1px solid var(--text-muted);
@@ -137,6 +139,12 @@
 
 	.kick-cancel {
 		opacity: 1;
-		padding: 2px 5px;
+		padding: 6px 8px;
+	}
+
+	@media (max-width: 768px) {
+		.kick-btn {
+			opacity: 1;
+		}
 	}
 </style>

@@ -93,7 +93,8 @@
 			border-left: none;
 			border-bottom: 3px solid transparent;
 			border-radius: 4px 4px 0 0;
-			padding: 8px 16px;
+			padding: 12px 16px;
+			min-height: 44px;
 			justify-content: center;
 		}
 

@@ -348,12 +348,12 @@
 	}
 
 	.inline-form input {
-		padding: 8px 10px;
+		padding: 10px 10px;
 		border-radius: 4px;
 		border: none;
 		background: var(--input-bg);
 		color: var(--text-normal);
-		font-size: 14px;
+		font-size: 16px;
 		font-family: inherit;
 		outline: none;
 	}
@@ -374,11 +374,12 @@
 	.btn-primary {
 		border: none;
 		border-radius: 3px;
-		padding: 6px 14px;
+		padding: 10px 14px;
+		min-height: 44px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		font-weight: 600;
-		font-size: 13px;
+		font-size: 14px;
 		cursor: pointer;
 		font-family: inherit;
 		transition: background-color 150ms ease;
@@ -396,11 +397,12 @@
 	.btn-secondary {
 		border: none;
 		border-radius: 3px;
-		padding: 6px 14px;
+		padding: 10px 14px;
+		min-height: 44px;
 		background: transparent;
 		color: var(--text-muted);
 		font-weight: 500;
-		font-size: 13px;
+		font-size: 14px;
 		cursor: pointer;
 		font-family: inherit;
 		transition: color 150ms ease;
