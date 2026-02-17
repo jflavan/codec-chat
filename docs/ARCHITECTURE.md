@@ -82,6 +82,8 @@ src/
 │   │   │   ├── SettingsSidebar.svelte     # Category navigation sidebar
 │   │   │   ├── ProfileSettings.svelte     # Nickname + avatar management
 │   │   │   └── AccountSettings.svelte     # Read-only info + sign out
+│   │   ├── server-settings/
+│   │   │   └── ServerSettings.svelte      # Server management + global admin danger zone
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
 │   │       └── MemberItem.svelte         # Single member card
@@ -155,7 +157,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - **Key Features:**
   - Channel-scoped groups — clients join/leave groups per channel
   - User-scoped groups — clients auto-join `user-{userId}` on connect for friend events
-  - Server-scoped groups — clients auto-join `server-{serverId}` on connect for all joined servers; receives membership events (MemberJoined, MemberLeft)
+  - Server-scoped groups — clients auto-join `server-{serverId}` on connect for all joined servers (global admin joins all server groups); receives membership events (MemberJoined, MemberLeft)
   - DM channel groups — clients join `dm-{dmChannelId}` for DM-specific events
   - Real-time message broadcast on `POST /channels/{channelId}/messages`
   - DM message broadcast on `POST /dm/channels/{channelId}/messages`
@@ -244,28 +246,30 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `DELETE /me/avatar` - Remove custom avatar, revert to Google profile picture
 
 #### Server Management
-- `GET /servers` - List servers user is a member of
+- `GET /servers` - List servers user is a member of (global admin sees all servers; `role` is `null` for non-member servers)
 - `POST /servers` - Create a new server (authenticated user becomes Owner)
-- `PATCH /servers/{serverId}` - Update server name (requires Owner or Admin role; broadcasts `ServerNameChanged` via SignalR)
-- `GET /servers/{serverId}/members` - List server members (requires membership)
-- `GET /servers/{serverId}/channels` - List channels in a server (requires membership)
-- `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner or Admin role)
-- `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name (requires Owner or Admin role; broadcasts `ChannelNameChanged` via SignalR)
+- `PATCH /servers/{serverId}` - Update server name (requires Owner, Admin, or Global Admin role; broadcasts `ServerNameChanged` via SignalR)
+- `GET /servers/{serverId}/members` - List server members (requires membership or Global Admin)
+- `GET /servers/{serverId}/channels` - List channels in a server (requires membership or Global Admin)
+- `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner, Admin, or Global Admin role)
+- `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name (requires Owner, Admin, or Global Admin role; broadcasts `ChannelNameChanged` via SignalR)
 - `POST /servers/{serverId}/avatar` - Upload a server-specific avatar (multipart/form-data, overrides global avatar in this server)
 - `DELETE /servers/{serverId}/avatar` - Remove server-specific avatar, fall back to global avatar
-- `DELETE /servers/{serverId}/members/{userId}` - Kick a member from the server (requires Owner or Admin role; broadcasts `KickedFromServer` via SignalR)
+- `DELETE /servers/{serverId}/members/{userId}` - Kick a member from the server (requires Owner, Admin, or Global Admin role; broadcasts `KickedFromServer` via SignalR)
+- `DELETE /servers/{serverId}` - Delete a server and all associated data (requires Owner or Global Admin; cascade-deletes channels, messages, reactions, link previews, members, invites; broadcasts `ServerDeleted` via SignalR)
+- `DELETE /servers/{serverId}/channels/{channelId}` - Delete a channel and all associated data (requires Owner, Admin, or Global Admin; cascade-deletes messages, reactions, link previews; broadcasts `ChannelDeleted` via SignalR)
 
 #### Server Invites
-- `POST /servers/{serverId}/invites` - Create an invite code (requires Owner or Admin role; generates 8-char alphanumeric code)
-- `GET /servers/{serverId}/invites` - List active invites (requires Owner or Admin role; filters expired invites)
-- `DELETE /servers/{serverId}/invites/{inviteId}` - Revoke an invite code (requires Owner or Admin role)
+- `POST /servers/{serverId}/invites` - Create an invite code (requires Owner, Admin, or Global Admin role; generates 8-char alphanumeric code)
+- `GET /servers/{serverId}/invites` - List active invites (requires Owner, Admin, or Global Admin role; filters expired invites)
+- `DELETE /servers/{serverId}/invites/{inviteId}` - Revoke an invite code (requires Owner, Admin, or Global Admin role)
 - `POST /invites/{code}` - Join a server via invite code (any authenticated user; validates expiry and max uses)
 
 #### Messaging
-- `GET /channels/{channelId}/messages?before={timestamp}&limit={n}` - Get messages in a channel with cursor-based pagination (requires membership; `before` DateTimeOffset cursor and `limit` 1–200 default 100; returns `{ hasMore, messages }` with `imageUrl`, `replyContext`)
-- `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership; accepts optional `imageUrl`, `replyToMessageId`; broadcasts via SignalR)
-- `DELETE /channels/{channelId}/messages/{messageId}` - Delete a channel message (author only; cascade-deletes reactions and link previews; broadcasts `MessageDeleted` via SignalR)
-- `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership; broadcasts via SignalR)
+- `GET /channels/{channelId}/messages?before={timestamp}&limit={n}` - Get messages in a channel with cursor-based pagination (requires membership or Global Admin; `before` DateTimeOffset cursor and `limit` 1–200 default 100; returns `{ hasMore, messages }` with `imageUrl`, `replyContext`)
+- `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership or Global Admin; accepts optional `imageUrl`, `replyToMessageId`; broadcasts via SignalR)
+- `DELETE /channels/{channelId}/messages/{messageId}` - Delete a channel message (author or Global Admin; cascade-deletes reactions and link previews; broadcasts `MessageDeleted` via SignalR)
+- `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership or Global Admin; broadcasts via SignalR)
 
 #### Friends
 - `GET /friends` - List confirmed friends (returns the other user + friendship date)
@@ -316,7 +320,9 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 | `ReactionUpdated` | `{ messageId, channelId, reactions: [{ emoji, count, userIds }] }` | Reaction toggled on a message |
-| `MessageDeleted` | `{ messageId, channelId }` | A channel message was deleted by its author (sent to channel group) |
+| `MessageDeleted` | `{ messageId, channelId }` | A channel message was deleted by its author or a Global Admin (sent to channel group) |
+| `ServerDeleted` | `{ serverId }` | A server was deleted by its Owner or a Global Admin (sent to server group; clients navigate away and remove from server list) |
+| `ChannelDeleted` | `{ serverId, channelId }` | A channel was deleted by an Owner, Admin, or Global Admin (sent to server group; clients remove from channel list and navigate if active) |
 | `FriendRequestReceived` | `{ requestId, requester: { id, displayName, avatarUrl }, createdAt }` | Friend request received (sent to recipient's user group) |
 | `FriendRequestAccepted` | `{ friendshipId, user: { id, displayName, avatarUrl }, since }` | Friend request accepted (sent to requester's user group) |
 | `FriendRequestDeclined` | `{ requestId }` | Friend request declined (sent to requester's user group) |
@@ -459,8 +465,9 @@ DirectMessage ─┘
 #### User
 - Internal representation of authenticated users
 - Linked to Google identity via `GoogleSubject`
-- Fields: Id, GoogleSubject, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath
+- Fields: Id, GoogleSubject, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath, IsGlobalAdmin
 - Effective display name: `Nickname ?? DisplayName`
+- `IsGlobalAdmin` grants platform-wide privileges (full access to all servers — read, post, react, manage channels/invites, delete any server/channel/message, kick any member)
 
 #### Server
 - Top-level organizational unit (like Discord servers)
@@ -544,9 +551,14 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
   },
   "Cors": {
     "AllowedOrigins": ["http://localhost:5174"]
+  },
+  "GlobalAdmin": {
+    "Email": "your_global_admin_email@example.com"
   }
 }
 ```
+
+> **Note:** `GlobalAdmin:Email` designates a user as the platform-wide admin at startup. In production, this is stored in Azure Key Vault as the `GlobalAdmin--Email` secret and injected as the `GlobalAdmin__Email` environment variable.
 
 ## Security Considerations
 
@@ -558,6 +570,7 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 - ✅ CORS restrictions (environment-driven)
 - ✅ User identity isolation (membership checks)
 - ✅ Controller-level `[Authorize]` attribute enforcement
+- ✅ Global admin role with configurable email (Key Vault in production)
 - ✅ Rate limiting (fixed window, 100 req/min)
 - ✅ Structured request logging (Serilog)
 - ✅ Content Security Policy (CSP) headers

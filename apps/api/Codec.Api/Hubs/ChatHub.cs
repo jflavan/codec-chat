@@ -23,11 +23,22 @@ public class ChatHub(IUserService userService, CodecDbContext db) : Hub
         var appUser = await userService.GetOrCreateUserAsync(Context.User!);
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{appUser.Id}");
 
-        var serverIds = await db.ServerMembers
-            .AsNoTracking()
-            .Where(m => m.UserId == appUser.Id)
-            .Select(m => m.ServerId)
-            .ToListAsync();
+        List<Guid> serverIds;
+        if (appUser.IsGlobalAdmin)
+        {
+            serverIds = await db.Servers
+                .AsNoTracking()
+                .Select(s => s.Id)
+                .ToListAsync();
+        }
+        else
+        {
+            serverIds = await db.ServerMembers
+                .AsNoTracking()
+                .Where(m => m.UserId == appUser.Id)
+                .Select(m => m.ServerId)
+                .ToListAsync();
+        }
 
         var groupJoinTasks = serverIds
             .Select(serverId => Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}"));

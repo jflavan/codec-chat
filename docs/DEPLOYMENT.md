@@ -80,6 +80,7 @@ Configure these secrets in the repository's Settings > Secrets and variables > A
 | `POSTGRESQL_ADMIN_PASSWORD` | Password for PostgreSQL admin user |
 | `PUBLIC_API_BASE_URL` | API URL baked into SvelteKit build (`https://api.codec-chat.com`) |
 | `PUBLIC_GOOGLE_CLIENT_ID` | Google client ID baked into SvelteKit build |
+| `GLOBAL_ADMIN_EMAIL` | Email address of the platform-wide global admin |
 
 ### GitHub Environment
 
@@ -272,6 +273,7 @@ cd ../..
 | `Cors__AllowedOrigins` | Env var | Allowed CORS origins JSON array |
 | `Storage__Provider` | Env var | `AzureBlob` |
 | `Storage__AzureBlob__ServiceUri` | Env var | Blob storage endpoint URL |
+| `GlobalAdmin__Email` | Key Vault secret ref | Email of the global admin user |
 
 ### Web Container App
 
@@ -287,6 +289,7 @@ cd ../..
 |-------------|-------------|
 | `ConnectionStrings--Default` | PostgreSQL connection string |
 | `Google--ClientId` | Google OAuth 2.0 client ID |
+| `GlobalAdmin--Email` | Email address of the platform-wide global admin |
 
 ## Monitoring
 
