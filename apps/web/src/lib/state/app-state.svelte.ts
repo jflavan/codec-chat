@@ -302,9 +302,16 @@ export class AppState {
 		this.status = 'Signed in';
 		this.isInitialLoading = true;
 		persistToken(token);
+		
+		// Load user profile first to ensure user is created and auto-joined to default server
+		await this.loadMe();
+		
+		// Then load all other data in parallel
 		await Promise.all([
-			this.loadMe(),
 			this.loadServers(),
+			this.loadFriends(),
+			this.loadFriendRequests(),
+			this.loadDmConversations(),
 			this.startSignalR()
 		]);
 		this.isInitialLoading = false;
