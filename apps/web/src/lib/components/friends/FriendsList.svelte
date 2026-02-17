@@ -78,6 +78,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 8px 12px;
+		min-height: 44px;
 		border-radius: 4px;
 		transition: background-color 150ms ease;
 	}
@@ -146,11 +147,15 @@
 		color: var(--text-muted);
 		font-size: 16px;
 		cursor: pointer;
-		padding: 4px 8px;
+		padding: 8px 10px;
+		min-width: 44px;
+		min-height: 44px;
 		border-radius: 4px;
 		transition: background-color 150ms ease, color 150ms ease;
 		flex-shrink: 0;
 		font-family: inherit;
+		display: grid;
+		place-items: center;
 	}
 
 	.btn-danger:hover {

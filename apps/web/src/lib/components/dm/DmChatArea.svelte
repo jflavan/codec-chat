@@ -507,6 +507,8 @@
 					bind:this={dmInputEl}
 					class="composer-input"
 					type="text"
+					inputmode="text"
+					autocomplete="off"
 					placeholder={app.activeDmParticipant ? `Message @${app.activeDmParticipant.displayName}` : 'Select a conversation…'}
 					bind:value={app.dmMessageBody}
 					disabled={!app.activeDmChannelId || app.isSendingDm}
@@ -612,6 +614,8 @@
 	@media (max-width: 899px) {
 		.mobile-nav-btn {
 			display: grid;
+			min-width: 44px;
+			min-height: 44px;
 		}
 	}
 
@@ -1186,6 +1190,30 @@
 		:global(.reply-highlight) {
 			animation: none;
 			background: color-mix(in srgb, var(--accent) 10%, transparent);
+		}
+	}
+
+	/* ───── Mobile adjustments ───── */
+
+	@media (max-width: 768px) {
+		.dm-action-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.dm-chat .composer-input {
+			font-size: 16px;
+			min-height: 44px;
+		}
+
+		.dm-chat .composer-attach,
+		.dm-chat .composer-send {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.dm-chat .composer {
+			padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0));
 		}
 	}
 </style>

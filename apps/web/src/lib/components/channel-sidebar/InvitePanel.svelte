@@ -110,8 +110,8 @@
 		display: grid;
 		place-items: center;
 		border-radius: 3px;
-		width: 20px;
-		height: 20px;
+		width: 44px;
+		height: 44px;
 	}
 
 	.close-btn:hover {
@@ -160,11 +160,12 @@
 	.copy-btn {
 		border: none;
 		border-radius: 3px;
-		padding: 3px 8px;
+		padding: 8px 12px;
+		min-height: 36px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		font-weight: 600;
-		font-size: 11px;
+		font-size: 12px;
 		cursor: pointer;
 		font-family: inherit;
 		transition: background-color 150ms ease;
@@ -177,11 +178,12 @@
 	.revoke-btn {
 		border: none;
 		border-radius: 3px;
-		padding: 3px 8px;
+		padding: 8px 12px;
+		min-height: 36px;
 		background: transparent;
 		color: var(--danger);
 		font-weight: 600;
-		font-size: 11px;
+		font-size: 12px;
 		cursor: pointer;
 		font-family: inherit;
 		transition: color 150ms ease;
@@ -203,11 +205,12 @@
 	.btn-primary {
 		border: none;
 		border-radius: 3px;
-		padding: 6px 14px;
+		padding: 10px 14px;
+		min-height: 44px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		font-weight: 600;
-		font-size: 13px;
+		font-size: 14px;
 		cursor: pointer;
 		font-family: inherit;
 		transition: background-color 150ms ease;

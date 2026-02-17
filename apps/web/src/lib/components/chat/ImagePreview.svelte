@@ -76,6 +76,7 @@
 		display: grid;
 		place-items: center;
 		background: rgba(0, 0, 0, 0.85);
+		overflow: hidden;
 	}
 
 	.lightbox-content {
@@ -100,8 +101,8 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 36px;
-		height: 36px;
+		width: 44px;
+		height: 44px;
 		border-radius: 8px;
 		border: none;
 		background: rgba(255, 255, 255, 0.1);
@@ -117,8 +118,8 @@
 	}
 
 	.close-btn {
-		width: 40px;
-		height: 40px;
+		width: 44px;
+		height: 44px;
 	}
 
 	.lightbox-image {

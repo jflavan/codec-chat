@@ -108,6 +108,8 @@
 		display: grid;
 		place-items: center;
 		flex-shrink: 0;
+		min-width: 44px;
+		min-height: 44px;
 		transition: color 150ms ease, background-color 150ms ease;
 	}
 
@@ -126,6 +128,8 @@
 		display: grid;
 		place-items: center;
 		flex-shrink: 0;
+		min-width: 44px;
+		min-height: 44px;
 		transition: color 150ms ease, background-color 150ms ease;
 	}
 

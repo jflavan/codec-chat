@@ -85,12 +85,12 @@
 
 	.search-input {
 		width: 100%;
-		padding: 10px 12px;
+		padding: 12px 12px;
 		border-radius: 4px;
 		border: none;
 		background: var(--input-bg);
 		color: var(--text-normal);
-		font-size: 14px;
+		font-size: 16px;
 		font-family: inherit;
 		outline: none;
 		box-sizing: border-box;
@@ -125,6 +125,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 8px 12px;
+		min-height: 44px;
 		border-radius: 4px;
 		transition: background-color 150ms ease;
 	}
@@ -187,11 +188,12 @@
 	.btn-send {
 		border: none;
 		border-radius: 3px;
-		padding: 6px 12px;
+		padding: 10px 12px;
+		min-height: 44px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		font-weight: 600;
-		font-size: 12px;
+		font-size: 13px;
 		cursor: pointer;
 		font-family: inherit;
 		transition: background-color 150ms ease;

@@ -127,6 +127,17 @@
 		75% { content: '...'; }
 	}
 
+	@media (max-width: 768px) {
+		.logo {
+			font-size: 32px;
+			letter-spacing: 4px;
+		}
+
+		.loader {
+			width: 160px;
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		.loader-bar {
 			animation: none;

@@ -263,7 +263,8 @@
 		background: none;
 		border: 1px solid var(--danger);
 		color: var(--danger);
-		padding: 6px 12px;
+		padding: 10px 12px;
+		min-height: 44px;
 		border-radius: 4px;
 		font-size: 13px;
 		cursor: pointer;
@@ -318,12 +319,12 @@
 
 	.nickname-input {
 		width: 100%;
-		padding: 8px 56px 8px 12px;
+		padding: 10px 56px 10px 12px;
 		background: var(--input-bg);
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		color: var(--text-normal);
-		font-size: 14px;
+		font-size: 16px;
 		font-family: inherit;
 		outline: none;
 		transition: border-color 150ms ease, box-shadow 150ms ease;
@@ -351,7 +352,8 @@
 	}
 
 	.save-btn {
-		padding: 8px 16px;
+		padding: 10px 16px;
+		min-height: 44px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		border: none;
