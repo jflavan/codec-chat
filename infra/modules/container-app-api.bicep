@@ -67,7 +67,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           allowCredentials: true
         }
       }
-      secrets: isQuickstart ? [] : [
+      secrets: [
         {
           name: 'connection-string'
           keyVaultUrl: '${keyVaultUri}secrets/ConnectionStrings--Default'
@@ -100,7 +100,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: isQuickstart ? [] : [
+          env: [
             {
               name: 'ASPNETCORE_ENVIRONMENT'
               value: 'Production'
