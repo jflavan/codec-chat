@@ -18,6 +18,10 @@ param googleClientId string
 @secure()
 param postgresqlAdminPassword string
 
+@description('Email address of the global admin user.')
+@secure()
+param globalAdminEmail string
+
 @description('API container image (defaults to quickstart placeholder).')
 param apiContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
@@ -112,6 +116,16 @@ module googleClientIdSecret 'modules/key-vault-secret.bicep' = {
     keyVaultName: keyVault.outputs.name
     secretName: 'Google--ClientId'
     secretValue: googleClientId
+  }
+}
+
+// Store Global Admin Email in Key Vault
+module globalAdminEmailSecret 'modules/key-vault-secret.bicep' = {
+  name: 'global-admin-email-secret'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'GlobalAdmin--Email'
+    secretValue: globalAdminEmail
   }
 }
 
