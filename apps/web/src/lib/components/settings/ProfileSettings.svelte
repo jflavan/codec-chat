@@ -265,7 +265,7 @@
 		color: var(--danger);
 		padding: 10px 12px;
 		min-height: 44px;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 13px;
 		cursor: pointer;
 		transition: background-color 150ms ease, color 150ms ease;
@@ -357,12 +357,12 @@
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		border: none;
-		border-radius: 8px;
+		border-radius: 3px;
 		font-size: 14px;
 		font-weight: 600;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: opacity 150ms ease;
+		transition: background-color 150ms ease;
 	}
 
 	.save-btn:disabled {
@@ -371,7 +371,7 @@
 	}
 
 	.save-btn:hover:not(:disabled) {
-		opacity: 0.9;
+		background: var(--accent-hover);
 	}
 
 	.reset-link {

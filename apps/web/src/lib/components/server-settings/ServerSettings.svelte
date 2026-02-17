@@ -307,17 +307,17 @@
 	.btn-primary {
 		padding: 8px 16px;
 		background: var(--accent);
-		color: white;
+		color: var(--bg-tertiary);
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 14px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: opacity 150ms ease;
+		transition: background-color 150ms ease;
 	}
 
 	.btn-primary:hover:not(:disabled) {
-		opacity: 0.9;
+		background: var(--accent-hover);
 	}
 
 	.btn-primary:disabled {
@@ -327,18 +327,18 @@
 
 	.btn-secondary {
 		padding: 8px 16px;
-		background: var(--bg-secondary);
+		background: transparent;
 		color: var(--text-normal);
-		border: 1px solid var(--border);
-		border-radius: 4px;
+		border: none;
+		border-radius: 3px;
 		font-size: 14px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: background-color 150ms ease;
+		transition: color 150ms ease;
 	}
 
 	.btn-secondary:hover:not(:disabled) {
-		background: var(--bg-message-hover);
+		color: var(--text-header);
 	}
 
 	.btn-secondary:disabled {
@@ -351,7 +351,7 @@
 		background: none;
 		color: var(--accent);
 		border: 1px solid var(--accent);
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 13px;
 		font-weight: 500;
 		cursor: pointer;
@@ -360,7 +360,7 @@
 
 	.btn-edit:hover {
 		background: var(--accent);
-		color: white;
+		color: var(--bg-tertiary);
 	}
 
 	.channel-list {
@@ -406,7 +406,7 @@
 	}
 
 	.danger-warning {
-		color: #f04747;
+		color: var(--danger);
 		font-size: 14px;
 		margin-bottom: 10px;
 		line-height: 1.4;
@@ -414,42 +414,42 @@
 
 	.btn-danger {
 		padding: 8px 16px;
-		background: #f04747;
-		color: white;
+		background: var(--danger);
+		color: #fff;
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 14px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: background-color 150ms ease;
+		transition: opacity 150ms ease;
 	}
 
 	.btn-danger:hover {
-		background: #d83c3c;
+		opacity: 0.9;
 	}
 
 	.btn-danger-sm {
 		padding: 4px 10px;
-		background: #f04747;
-		color: white;
+		background: var(--danger);
+		color: #fff;
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 12px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: background-color 150ms ease;
+		transition: opacity 150ms ease;
 	}
 
 	.btn-danger-sm:hover {
-		background: #d83c3c;
+		opacity: 0.9;
 	}
 
 	.btn-secondary-sm {
 		padding: 4px 10px;
-		background: var(--bg-secondary);
+		background: transparent;
 		color: var(--text-normal);
-		border: 1px solid var(--border);
-		border-radius: 4px;
+		border: none;
+		border-radius: 3px;
 		font-size: 12px;
 		font-weight: 500;
 		cursor: pointer;

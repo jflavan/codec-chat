@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { onMount } from 'svelte';
+	import { renderGoogleButton } from '$lib/auth/google.js';
 	import MessageFeed from './MessageFeed.svelte';
 	import TypingIndicator from './TypingIndicator.svelte';
 	import Composer from './Composer.svelte';
@@ -8,6 +10,12 @@
 
 	let isDragOver = $state(false);
 	let dragCounter = 0;
+
+	onMount(() => {
+		if (!app.isSignedIn) {
+			renderGoogleButton('mobile-google-button');
+		}
+	});
 
 	function handleDragEnter(e: DragEvent): void {
 		if (!e.dataTransfer?.types.includes('Files')) return;
@@ -86,6 +94,13 @@
 	<div class="chat-body">
 		{#if app.error}
 			<div class="error-banner" role="alert">{app.error}</div>
+		{/if}
+
+		{#if !app.isSignedIn}
+			<div class="mobile-sign-in">
+				<p class="mobile-sign-in-text">Sign in to start chatting</p>
+				<div id="mobile-google-button"></div>
+			</div>
 		{/if}
 
 		<MessageFeed />
@@ -214,6 +229,30 @@
 	@media (max-width: 899px) {
 		.chat-main {
 			height: 100vh;
+		}
+	}
+
+	/* ───── Mobile sign-in prompt ───── */
+
+	.mobile-sign-in {
+		display: none;
+	}
+
+	@media (max-width: 899px) {
+		.mobile-sign-in {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 16px;
+			padding: 32px 16px;
+		}
+
+		.mobile-sign-in-text {
+			margin: 0;
+			font-size: 16px;
+			font-weight: 600;
+			color: var(--text-header);
 		}
 	}
 

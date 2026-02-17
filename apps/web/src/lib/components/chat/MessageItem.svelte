@@ -323,13 +323,13 @@
 	}
 
 	.message.mentioned {
-		background: rgba(88, 101, 242, 0.08);
+		background: rgba(var(--accent-rgb, 0, 255, 102), 0.08);
 		border-left: 3px solid var(--accent);
 		padding-left: 13px;
 	}
 
 	.message.mentioned:hover {
-		background: rgba(88, 101, 242, 0.12);
+		background: rgba(var(--accent-rgb, 0, 255, 102), 0.12);
 	}
 
 	.message:not(.grouped) {
@@ -385,9 +385,9 @@
 	}
 
 	.action-btn-danger:hover {
-		color: #ed4245;
-		background: rgba(237, 66, 69, 0.1);
-		border-color: #ed4245;
+		color: var(--danger);
+		background: rgba(var(--danger-rgb, 255, 59, 59), 0.1);
+		border-color: var(--danger);
 	}
 
 	.picker-backdrop {
@@ -561,7 +561,7 @@
 	.edit-input:focus {
 		outline: none;
 		border-color: var(--accent);
-		box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.3);
+		box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 0, 255, 102), 0.3);
 	}
 
 	.edit-actions {
