@@ -43,7 +43,8 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		padding: 2px 8px;
+		padding: 4px 10px;
+		min-height: 36px;
 		border-radius: 12px;
 		border: 1px solid var(--border);
 		background: var(--bg-secondary);

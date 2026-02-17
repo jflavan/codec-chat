@@ -55,6 +55,8 @@
 		overflow-y: auto;
 		scrollbar-width: thin;
 		scrollbar-color: var(--border) transparent;
+		-webkit-overflow-scrolling: touch;
+		overscroll-behavior-y: contain;
 	}
 
 	.sidebar-status {

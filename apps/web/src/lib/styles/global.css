@@ -27,14 +27,35 @@ body {
 }
 
 /* ===== Mobile-specific adjustments ===== */
-@media (max-width: 899px) {
+@media (max-width: 768px) {
+	/* 16px body font prevents iOS auto-zoom on input focus */
+	body {
+		font-size: 16px;
+	}
+
 	/* Prevent horizontal overflow on mobile */
 	html, body {
 		overflow-x: hidden;
+		overscroll-behavior-x: none;
 	}
 
-	/* Respect safe area insets on notched devices */
+	/* Respect safe area insets on notched / dynamic island devices */
 	body {
+		padding-top: env(safe-area-inset-top, 0);
 		padding-bottom: env(safe-area-inset-bottom, 0);
+		padding-left: env(safe-area-inset-left, 0);
+		padding-right: env(safe-area-inset-right, 0);
+	}
+
+	/* Visible active/pressed state for all interactive elements */
+	button:active,
+	a:active,
+	[role="button"]:active,
+	[role="tab"]:active,
+	[role="menuitem"]:active {
+		transform: scale(0.97);
+		opacity: 0.85;
 	}
 }
+
+/* Keep the wider breakpoint rules for elements that already use 899px */

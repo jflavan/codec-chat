@@ -205,6 +205,7 @@
 			max-width: 85vw;
 			z-index: 61;
 			animation: slide-in-left 200ms ease;
+			overscroll-behavior: contain;
 		}
 
 		.mobile-drawer-servers {
@@ -239,6 +240,7 @@
 			max-width: 80vw;
 			z-index: 61;
 			animation: slide-in-right 200ms ease;
+			overscroll-behavior: contain;
 		}
 
 		.mobile-members-drawer > :global(*) {

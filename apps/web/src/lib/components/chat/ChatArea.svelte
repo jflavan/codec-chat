@@ -166,6 +166,8 @@
 		.mobile-nav-btn,
 		.mobile-members-btn {
 			display: grid;
+			min-width: 44px;
+			min-height: 44px;
 		}
 	}
 

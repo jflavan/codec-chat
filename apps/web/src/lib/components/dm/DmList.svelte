@@ -111,6 +111,7 @@
 		background: none;
 		border: none;
 		padding: 8px 4px;
+		min-height: 44px;
 		cursor: pointer;
 		min-width: 0;
 		text-align: left;
@@ -171,7 +172,9 @@
 		color: var(--text-muted);
 		font-size: 14px;
 		cursor: pointer;
-		padding: 4px 6px;
+		padding: 8px 8px;
+		min-width: 36px;
+		min-height: 36px;
 		border-radius: 4px;
 		flex-shrink: 0;
 		opacity: 0;
@@ -181,6 +184,12 @@
 
 	.dm-item:hover .close-btn {
 		opacity: 1;
+	}
+
+	@media (max-width: 768px) {
+		.close-btn {
+			opacity: 1;
+		}
 	}
 
 	.close-btn:hover {

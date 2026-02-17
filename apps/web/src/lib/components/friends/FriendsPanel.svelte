@@ -101,6 +101,8 @@
 	@media (max-width: 899px) {
 		.mobile-nav-btn {
 			display: grid;
+			min-width: 44px;
+			min-height: 44px;
 		}
 	}
 
@@ -127,6 +129,14 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+	}
+
+	@media (max-width: 768px) {
+		.tab-button {
+			min-height: 44px;
+			padding: 8px 14px;
+			font-size: 14px;
+		}
 	}
 
 	.tab-button:hover {
