@@ -122,13 +122,6 @@ jobs:
           chmod +x ./efbundle
           ./efbundle --connection "$CONNECTION_STRING"
 
-      - name: Set GlobalAdmin email in Key Vault
-        run: |
-          az keyvault secret set \
-            --vault-name kv-codec-prod \
-            --name GlobalAdmin--Email \
-            --value "${{ secrets.GLOBAL_ADMIN_EMAIL }}"
-
       - name: Close PostgreSQL firewall rule
         if: always() && steps.firewall.outputs.opened == 'true'
         run: |
