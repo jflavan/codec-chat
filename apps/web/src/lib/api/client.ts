@@ -185,6 +185,22 @@ export class ApiClient {
 		});
 	}
 
+	/** Delete a server (requires Owner role or global admin). */
+	deleteServer(token: string, serverId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/** Delete a channel from a server (requires Owner/Admin role or global admin). */
+	deleteChannel(token: string, serverId: string, channelId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/channels/${encodeURIComponent(channelId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
 	getMembers(token: string, serverId: string): Promise<Member[]> {
 		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members`, {
 			headers: this.headers(token)

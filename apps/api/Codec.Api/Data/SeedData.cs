@@ -27,6 +27,26 @@ public static class SeedData
     }
 
     /// <summary>
+    /// Promotes the user with the specified email address to global admin.
+    /// Safe to call repeatedly; only writes when the flag is not already set.
+    /// Skips silently when <paramref name="email"/> is null or empty.
+    /// </summary>
+    public static async Task EnsureGlobalAdminAsync(CodecDbContext db, string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return;
+        }
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user is not null && !user.IsGlobalAdmin)
+        {
+            user.IsGlobalAdmin = true;
+            await db.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
     /// Seeds development-only sample users, memberships, and messages.
     /// </summary>
     public static async Task InitializeAsync(CodecDbContext db)

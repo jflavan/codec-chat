@@ -7,6 +7,8 @@
 	let isEditingServerName = $state(false);
 	let channelEditId = $state<string | null>(null);
 	let channelEditName = $state('');
+	let confirmDeleteServer = $state(false);
+	let confirmDeleteChannelId = $state<string | null>(null);
 
 	function startEditingServerName() {
 		serverNameEdit = app.selectedServerName;
@@ -40,6 +42,17 @@
 		await app.updateChannelName(channelId, channelEditName);
 		channelEditId = null;
 		channelEditName = '';
+	}
+
+	async function handleDeleteServer() {
+		if (!app.selectedServerId) return;
+		await app.deleteServer(app.selectedServerId);
+		confirmDeleteServer = false;
+	}
+
+	async function handleDeleteChannel(channelId: string) {
+		await app.deleteChannel(channelId);
+		confirmDeleteChannelId = null;
 	}
 </script>
 
@@ -96,6 +109,20 @@
 				</div>
 			{/if}
 		</div>
+
+		{#if app.canDeleteServer}
+			<div class="danger-zone">
+				{#if confirmDeleteServer}
+					<p class="danger-warning">Are you sure? This will permanently delete the server and all its channels, messages, members, and invites.</p>
+					<div class="inline-actions">
+						<button type="button" class="btn-danger" onclick={handleDeleteServer}>Delete</button>
+						<button type="button" class="btn-secondary" onclick={() => (confirmDeleteServer = false)}>Cancel</button>
+					</div>
+				{:else}
+					<button type="button" class="btn-danger" onclick={() => (confirmDeleteServer = true)}>Delete Server</button>
+				{/if}
+			</div>
+		{/if}
 	</section>
 
 	<!-- Channel Management Section -->
@@ -149,6 +176,14 @@
 								>
 									Edit
 								</button>
+							{/if}
+							{#if app.canDeleteChannel}
+								{#if confirmDeleteChannelId === channel.id}
+									<button type="button" class="btn-danger-sm" onclick={() => handleDeleteChannel(channel.id)}>Confirm</button>
+									<button type="button" class="btn-secondary-sm" onclick={() => (confirmDeleteChannelId = null)}>Cancel</button>
+								{:else}
+									<button type="button" class="btn-danger-sm" onclick={() => (confirmDeleteChannelId = channel.id)}>Delete</button>
+								{/if}
 							{/if}
 						</div>
 					{/if}
@@ -362,6 +397,62 @@
 		border-radius: 4px;
 		color: var(--text-normal);
 		font-size: 14px;
+	}
+
+	.danger-zone {
+		margin-top: 20px;
+		padding-top: 16px;
+		border-top: 1px solid var(--border);
+	}
+
+	.danger-warning {
+		color: #f04747;
+		font-size: 14px;
+		margin-bottom: 10px;
+		line-height: 1.4;
+	}
+
+	.btn-danger {
+		padding: 8px 16px;
+		background: #f04747;
+		color: white;
+		border: none;
+		border-radius: 4px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background-color 150ms ease;
+	}
+
+	.btn-danger:hover {
+		background: #d83c3c;
+	}
+
+	.btn-danger-sm {
+		padding: 4px 10px;
+		background: #f04747;
+		color: white;
+		border: none;
+		border-radius: 4px;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background-color 150ms ease;
+	}
+
+	.btn-danger-sm:hover {
+		background: #d83c3c;
+	}
+
+	.btn-secondary-sm {
+		padding: 4px 10px;
+		background: var(--bg-secondary);
+		color: var(--text-normal);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
 	}
 
 	@media (max-width: 899px) {

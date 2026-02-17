@@ -78,6 +78,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUri}secrets/Google--ClientId'
           identity: 'system'
         }
+        {
+          name: 'global-admin-email'
+          keyVaultUrl: '${keyVaultUri}secrets/GlobalAdmin--Email'
+          identity: 'system'
+        }
       ]
       registries: isQuickstart ? [] : [
         {
@@ -123,6 +128,10 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Storage__AzureBlob__ServiceUri'
               value: storageBlobEndpoint
+            }
+            {
+              name: 'GlobalAdmin__Email'
+              secretRef: 'global-admin-email'
             }
           ]
           probes: isQuickstart ? [] : [
