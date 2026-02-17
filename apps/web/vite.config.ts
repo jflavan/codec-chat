@@ -93,7 +93,7 @@ export default defineConfig({
 				handle_links: 'preferred'
 			} as Record<string, unknown>,
 			workbox: {
-				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest}'],
+				globPatterns: ['client/**/*.{html,js,css,ico,png,svg,webp,webmanifest}'],
 				navigateFallback: '/offline.html',
 				navigateFallbackDenylist: [/^\/api\//, /^\/health/],
 				cleanupOutdatedCaches: true,
