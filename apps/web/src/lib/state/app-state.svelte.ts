@@ -305,6 +305,9 @@ export class AppState {
 		await Promise.all([
 			this.loadMe(),
 			this.loadServers(),
+			this.loadFriends(),
+			this.loadFriendRequests(),
+			this.loadDmConversations(),
 			this.startSignalR()
 		]);
 		this.isInitialLoading = false;
