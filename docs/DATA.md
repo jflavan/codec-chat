@@ -41,6 +41,7 @@ This starts PostgreSQL 16 on `localhost:5433` with database `codec_dev`, user `c
 │ Nickname    │    │
 │ Email       │    │
 │ AvatarUrl   │    │
+│ IsGlobalAdm │    │
 │ CreatedAt   │    │
 └─────────────┘    │
                    │
@@ -161,6 +162,7 @@ Represents an authenticated user in the system.
 | `Email` | string | User's email address |
 | `AvatarUrl` | string? | Google profile picture URL |
 | `CustomAvatarPath` | string? | Relative path to a user-uploaded avatar file |
+| `IsGlobalAdmin` | bool | Platform-wide admin flag (default: `false`). Grants ability to delete any server, channel, or message |
 | `CreatedAt` | DateTimeOffset | Account creation timestamp |
 | `UpdatedAt` | DateTimeOffset | Last profile update timestamp |
 
@@ -180,6 +182,7 @@ Represents an authenticated user in the system.
 - `Nickname` is user-chosen and persists across sign-ins; effective display name resolves as `Nickname ?? DisplayName`
 - `AvatarUrl` is the Google profile picture (always updated on sign-in)
 - `CustomAvatarPath` is `null` when using the default Google avatar; non-null when the user uploads a custom avatar
+- `IsGlobalAdmin` is set to `true` at application startup for the user matching `GlobalAdmin:Email` configuration; defaults to `false` for all other users
 - The effective avatar URL uses the fallback chain: custom upload → Google profile picture
 
 #### Server
@@ -579,6 +582,21 @@ if (app.Environment.IsDevelopment())
 ```
 
 **Note:** Seed data only runs if `db.Servers.AnyAsync()` returns false.
+
+### Global Admin Seed
+
+In addition to the default seed data, the application promotes a user to global admin on every startup based on the `GlobalAdmin:Email` configuration setting:
+
+```csharp
+// In Program.cs - runs on every startup (both development and production)
+var globalAdminEmail = app.Configuration["GlobalAdmin:Email"];
+if (!string.IsNullOrWhiteSpace(globalAdminEmail))
+{
+    await SeedData.EnsureGlobalAdminAsync(db, globalAdminEmail);
+}
+```
+
+This sets `IsGlobalAdmin = true` for the matching user. The user must have signed in at least once before the flag takes effect.
 
 ## Indexes and Performance
 

@@ -103,6 +103,15 @@ export type ChannelNameChangedEvent = {
 	name: string;
 };
 
+export type ServerDeletedEvent = {
+	serverId: string;
+};
+
+export type ChannelDeletedEvent = {
+	serverId: string;
+	channelId: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -128,6 +137,8 @@ export type SignalRCallbacks = {
 	onDmMessageEdited?: (event: DmMessageEditedEvent) => void;
 	onServerNameChanged?: (event: ServerNameChangedEvent) => void;
 	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
+	onServerDeleted?: (event: ServerDeletedEvent) => void;
+	onChannelDeleted?: (event: ChannelDeletedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: () => void;
@@ -219,6 +230,12 @@ export class ChatHubService {
 		}
 		if (callbacks.onChannelNameChanged) {
 			connection.on('ChannelNameChanged', callbacks.onChannelNameChanged);
+		}
+		if (callbacks.onServerDeleted) {
+			connection.on('ServerDeleted', callbacks.onServerDeleted);
+		}
+		if (callbacks.onChannelDeleted) {
+			connection.on('ChannelDeleted', callbacks.onChannelDeleted);
 		}
 
 		if (callbacks.onReconnecting) {

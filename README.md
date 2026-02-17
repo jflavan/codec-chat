@@ -70,9 +70,9 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ Server creation and membership
 - ✅ Server membership and roles (Owner, Admin, Member)
 - ✅ Channel creation (Owner/Admin only)
-- ✅ Kick members from servers (Owner/Admin only, with real-time overlay notification and fade-out)
+- ✅ Kick members from servers (Owner/Admin/Global Admin, with real-time overlay notification and fade-out)
 - ✅ Server invites — Owner/Admin can generate invite codes; any user can join via code
-- ✅ **Server Settings** — gear icon in channel sidebar opens server settings modal for Owners/Admins; edit server name, rename channels, view member count; real-time sync via SignalR
+- ✅ **Server Settings** — gear icon in channel sidebar opens server settings modal for Owners/Admins; edit server name, rename channels, delete channels, delete server, view member count; real-time sync via SignalR
 - ✅ Channel browsing within servers
 - ✅ Real-time message posting and viewing via SignalR (WebSockets)
 - ✅ Typing indicators (“X is typing…”)
@@ -92,7 +92,8 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR; YouTube links render as click-to-play inline video players via `svelte-youtube-embed`
 - ✅ **@mentions** — autocomplete member picker in composer, @here to notify everyone, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
 - ✅ **Message replies** — inline reply to any message in channels or DMs, reply context displayed above message body, click to scroll to original with highlight animation, Escape to cancel, graceful handling of deleted parent messages
-- ✅ **Message deletion** — authors can delete their own messages in channels and DMs; cascade-deletes reactions and link previews; real-time removal via SignalR; replies to deleted messages handled gracefully
+- ✅ **Global Admin** — configurable global admin role with full access to all servers (see all servers, read/post/react in any channel, manage channels and invites, delete any server/channel/message, kick any member) regardless of membership; configured via `GlobalAdmin:Email` application setting (Key Vault in production) and seeded at startup
+- ✅ **Message deletion** — authors can delete their own messages in channels and DMs; global admin can delete any channel message; cascade-deletes reactions and link previews; real-time removal via SignalR; replies to deleted messages handled gracefully
 - ✅ **Message editing** — authors can edit their own messages in channels and DMs; inline edit mode with Enter to save and Escape to cancel; "(edited)" label on modified messages; real-time sync via SignalR
 - ✅ **Text formatting** — bold (`*text*` or `**text**`) and italic (`_text_`) in messages, with live preview in composer input
 - ✅ **Progressive message loading** — initially loads last 100 messages per channel and DM; older messages load seamlessly as the user scrolls up; cursor-based pagination with `hasMore` flag and scroll position preservation
