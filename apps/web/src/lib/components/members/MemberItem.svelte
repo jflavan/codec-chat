@@ -125,16 +125,16 @@
 	}
 
 	.kick-btn:hover {
-		background: var(--danger, #ed4245);
+		background: var(--danger);
 		color: #fff;
-		border-color: var(--danger, #ed4245);
+		border-color: var(--danger);
 	}
 
 	.kick-confirm {
 		opacity: 1;
-		background: var(--danger, #ed4245);
+		background: var(--danger);
 		color: #fff;
-		border-color: var(--danger, #ed4245);
+		border-color: var(--danger);
 	}
 
 	.kick-cancel {

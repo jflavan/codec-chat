@@ -175,7 +175,7 @@
 		padding: 8px 8px;
 		min-width: 36px;
 		min-height: 36px;
-		border-radius: 4px;
+		border-radius: 3px;
 		flex-shrink: 0;
 		opacity: 0;
 		transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
