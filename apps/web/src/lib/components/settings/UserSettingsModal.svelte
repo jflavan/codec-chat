@@ -122,6 +122,8 @@
 		cursor: pointer;
 		display: grid;
 		place-items: center;
+		min-width: 44px;
+		min-height: 44px;
 		transition: color 150ms ease, background-color 150ms ease;
 	}
 
@@ -144,7 +146,12 @@
 
 		.settings-content-col {
 			max-width: 100%;
-			padding: 24px 16px 32px;
+			padding: 24px 16px calc(32px + env(safe-area-inset-bottom, 0));
+		}
+
+		.close-btn {
+			top: 8px;
+			right: 8px;
 		}
 	}
 </style>

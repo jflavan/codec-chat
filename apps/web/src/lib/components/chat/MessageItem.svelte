@@ -586,4 +586,35 @@
 	.edit-link-btn:hover {
 		text-decoration: underline;
 	}
+
+	/* ───── Mobile adjustments ───── */
+
+	@media (max-width: 768px) {
+		/* Show action bar on tap via :focus-within instead of hover */
+		.message:focus-within .message-actions,
+		.message-actions.picker-open {
+			opacity: 1;
+			pointer-events: auto;
+		}
+
+		.action-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.emoji-option {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.message-time-inline {
+			font-size: 10px;
+		}
+
+		/* Show inline time on grouped messages (no hover on mobile) */
+		.message .message-time-inline {
+			color: var(--text-muted);
+			opacity: 0.5;
+		}
+	}
 </style>

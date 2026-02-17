@@ -212,6 +212,8 @@
 					bind:this={inputEl}
 					class="composer-input"
 					type="text"
+					inputmode="text"
+					autocomplete="off"
 					placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
 					bind:value={app.messageBody}
 					disabled={!app.selectedChannelId || app.isSending}
@@ -503,5 +505,34 @@
 		background: var(--danger, #ed4245);
 		font-weight: 700;
 		font-size: 14px;
+	}
+
+	/* ───── Mobile adjustments ───── */
+
+	@media (max-width: 768px) {
+		.composer {
+			padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0));
+		}
+
+		.composer-attach,
+		.composer-send {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.composer-input {
+			font-size: 16px;
+			min-height: 44px;
+			padding: 12px 16px;
+		}
+
+		.composer-input-overlay {
+			font-size: 16px;
+		}
+
+		.mention-option {
+			padding: 10px 8px;
+			min-height: 44px;
+		}
 	}
 </style>
