@@ -26,6 +26,46 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Deactivate old container app revisions
+        run: |
+          # Deactivate all old revisions before infrastructure update to prevent conflicts
+          # with secrets and registries being removed during the quickstart phase
+          echo "Checking for active revisions on ca-codec-prod-api..."
+          ACTIVE_API_REVISIONS=$(az containerapp revision list \
+            --name ca-codec-prod-api \
+            --resource-group rg-codec-prod \
+            --query "[?properties.active].name" -o tsv 2>/dev/null || echo "")
+          
+          if [ -n "$ACTIVE_API_REVISIONS" ]; then
+            for rev in $ACTIVE_API_REVISIONS; do
+              echo "Deactivating API revision: $rev"
+              az containerapp revision deactivate \
+                --name ca-codec-prod-api \
+                --resource-group rg-codec-prod \
+                --revision "$rev" || echo "Failed to deactivate $rev (may not exist)"
+            done
+          else
+            echo "No active API revisions found or container app doesn't exist yet"
+          fi
+
+          echo "Checking for active revisions on ca-codec-prod-web..."
+          ACTIVE_WEB_REVISIONS=$(az containerapp revision list \
+            --name ca-codec-prod-web \
+            --resource-group rg-codec-prod \
+            --query "[?properties.active].name" -o tsv 2>/dev/null || echo "")
+          
+          if [ -n "$ACTIVE_WEB_REVISIONS" ]; then
+            for rev in $ACTIVE_WEB_REVISIONS; do
+              echo "Deactivating Web revision: $rev"
+              az containerapp revision deactivate \
+                --name ca-codec-prod-web \
+                --resource-group rg-codec-prod \
+                --revision "$rev" || echo "Failed to deactivate $rev (may not exist)"
+            done
+          else
+            echo "No active Web revisions found or container app doesn't exist yet"
+          fi
+
       - name: Preview infrastructure changes
         run: |
           az deployment group what-if \
