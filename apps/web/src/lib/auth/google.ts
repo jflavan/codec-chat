@@ -18,7 +18,6 @@ export function initGoogleIdentity(
 	script.src = 'https://accounts.google.com/gsi/client';
 	script.async = true;
 	script.defer = true;
-	script.crossOrigin = 'anonymous';
 
 	script.onload = () => {
 		const google = (window as unknown as { google?: any }).google;
