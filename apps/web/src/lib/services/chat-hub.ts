@@ -141,7 +141,7 @@ export type SignalRCallbacks = {
 	onChannelDeleted?: (event: ChannelDeletedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
-	onClose?: () => void;
+	onClose?: (error?: Error) => void;
 };
 
 /**
@@ -245,7 +245,7 @@ export class ChatHubService {
 			connection.onreconnected(callbacks.onReconnected);
 		}
 		if (callbacks.onClose) {
-			connection.onclose(callbacks.onClose);
+			connection.onclose((error) => callbacks.onClose!(error));
 		}
 
 		try {

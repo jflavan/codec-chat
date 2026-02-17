@@ -97,7 +97,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Message editing** — authors can edit their own messages in channels and DMs; inline edit mode with Enter to save and Escape to cancel; "(edited)" label on modified messages; real-time sync via SignalR
 - ✅ **Text formatting** — bold (`*text*` or `**text**`) and italic (`_text_`) in messages, with live preview in composer input
 - ✅ **Progressive message loading** — initially loads last 100 messages per channel and DM; older messages load seamlessly as the user scrolls up; cursor-based pagination with `hasMore` flag and scroll position preservation
-- ✅ **Connection status awareness** — composer shows "Codec connecting..." with animated ellipsis when the SignalR connection is lost; automatically restores full input when reconnected
+- ✅ **Connection status awareness** — composer shows "Codec connecting..." with animated ellipsis when the SignalR connection is lost; automatically restores full input when reconnected; auto-refreshes the page if the WebSocket cannot reconnect within 5 seconds
 - ✅ **Response compression** — API responses compressed with Brotli and Gzip for faster load times
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
 - ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting

@@ -122,8 +122,20 @@
 	$effect(() => {
 		const count = app.messages.length;
 		const loading = app.isLoadingMessages;
+		const loadingOlder = app.isLoadingOlderMessages;
 
-		if (loading || count === 0) {
+		// While messages are being fetched, the array still holds stale data from
+		// the previous channel. Don't sync previousMessageCount here — the reset
+		// effect already set it to 0 for the new channel.
+		if (loading) return;
+
+		if (count === 0) {
+			previousMessageCount = 0;
+			return;
+		}
+
+		// Older messages were prepended — sync the count without treating them as new
+		if (loadingOlder) {
 			previousMessageCount = count;
 			return;
 		}

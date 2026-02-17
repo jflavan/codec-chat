@@ -176,6 +176,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ `isHubConnected` reactive state in `AppState` — tracks real-time connection health
 - ✅ Composer disconnected state — shows "Codec connecting..." with animated ellipsis when SignalR is not connected (both server channels and DMs)
 - ✅ Automatic restoration of full composer input on reconnection
+- ✅ Auto-refresh on persistent disconnect — if SignalR cannot reconnect within 5 seconds, or if the WebSocket closes with an error (e.g. status code 1006), the page refreshes automatically
 
 ### Frontend Architecture
 - ✅ Modular layered architecture (types, API client, auth, services, state, components)
