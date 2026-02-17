@@ -171,7 +171,7 @@ jobs:
       - name: Deploy API staging revision
         id: deploy-api
         run: |
-          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
+          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)n${{ github.run_number }}"
           RESULT=$(az containerapp update \
             --name ${{ env.API_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -186,7 +186,7 @@ jobs:
       - name: Deploy Web staging revision
         id: deploy-web
         run: |
-          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)r${{ github.run_attempt }}"
+          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)n${{ github.run_number }}"
           RESULT=$(az containerapp update \
             --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
