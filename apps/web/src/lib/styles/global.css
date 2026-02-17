@@ -59,8 +59,3 @@ body {
 }
 
 /* Keep the wider breakpoint rules for elements that already use 899px */
-@media (max-width: 899px) {
-	html, body {
-		overflow-x: hidden;
-	}
-}

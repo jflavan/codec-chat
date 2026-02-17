@@ -348,7 +348,7 @@
 	}
 
 	.inline-form input {
-		padding: 10px 10px;
+		padding: 10px;
 		border-radius: 4px;
 		border: none;
 		background: var(--input-bg);
