@@ -36,7 +36,8 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
                 EffectiveDisplayName = effectiveDisplayName,
                 appUser.Email,
                 AvatarUrl = effectiveAvatarUrl,
-                appUser.GoogleSubject
+                appUser.GoogleSubject,
+                appUser.IsGlobalAdmin
             },
             claims
         });

@@ -152,20 +152,30 @@ export class AppState {
 	/* ───── derived ───── */
 	readonly isSignedIn = $derived(Boolean(this.idToken));
 
+	readonly isGlobalAdmin = $derived(Boolean(this.me?.user.isGlobalAdmin));
+
 	readonly currentServerRole = $derived(
 		this.servers.find((s) => s.serverId === this.selectedServerId)?.role ?? null
 	);
 
 	readonly canManageChannels = $derived(
-		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
 	readonly canKickMembers = $derived(
-		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
 	readonly canManageInvites = $derived(
-		this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+	);
+
+	readonly canDeleteServer = $derived(
+		this.isGlobalAdmin || this.currentServerRole === 'Owner'
+	);
+
+	readonly canDeleteChannel = $derived(
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
 	readonly selectedServerName = $derived(
@@ -611,6 +621,41 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isUpdatingChannelName = false;
+		}
+	}
+
+	/** Delete a server. Requires Owner role or global admin privileges. */
+	async deleteServer(serverId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			await this.api.deleteServer(this.idToken, serverId);
+			this.servers = this.servers.filter((s) => s.serverId !== serverId);
+			if (this.selectedServerId === serverId) {
+				this.goHome();
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Delete a channel from the current server. Requires Owner/Admin role or global admin privileges. */
+	async deleteChannel(channelId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.deleteChannel(this.idToken, this.selectedServerId, channelId);
+			this.channels = this.channels.filter((c) => c.id !== channelId);
+			if (this.selectedChannelId === channelId) {
+				const firstChannel = this.channels[0];
+				if (firstChannel) {
+					this.selectedChannelId = firstChannel.id;
+					await this.loadMessages(firstChannel.id);
+				} else {
+					this.selectedChannelId = null;
+					this.messages = [];
+				}
+			}
+		} catch (e) {
+			this.setError(e);
 		}
 	}
 
@@ -1411,6 +1456,26 @@ export class AppState {
 					this.channels = this.channels.map((c) =>
 						c.id === event.channelId ? { ...c, name: event.name } : c
 					);
+				}
+			},
+			onServerDeleted: (event) => {
+				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
+				if (this.selectedServerId === event.serverId) {
+					this.selectedServerId = null;
+					this.selectedChannelId = null;
+					this.channels = [];
+					this.messages = [];
+					this.members = [];
+				}
+			},
+			onChannelDeleted: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.channels = this.channels.filter((c) => c.id !== event.channelId);
+					if (this.selectedChannelId === event.channelId) {
+						const next = this.channels[0];
+						this.selectedChannelId = next?.id ?? null;
+						this.messages = [];
+					}
 				}
 			}
 		});

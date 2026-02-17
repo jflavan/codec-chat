@@ -21,6 +21,12 @@ public class User
     /// </summary>
     public string? CustomAvatarPath { get; set; }
 
+    /// <summary>
+    /// Indicates whether this user has global admin privileges, allowing them to
+    /// delete any server, channel, or message regardless of ownership.
+    /// </summary>
+    public bool IsGlobalAdmin { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
