@@ -3,9 +3,11 @@
 :root {
 	--bg-primary: #0B1A10;
 	--bg-secondary: #07110A;
+	--bg-secondary-rgb: 7, 17, 10;
 	--bg-tertiary: #050B07;
 	--bg-message-hover: #102417;
 	--accent: #00FF66;
+	--accent-rgb: 0, 255, 102;
 	--accent-hover: #33FFB2;
 	--text-normal: #86FF6B;
 	--text-muted: #3ED44E;
@@ -13,6 +15,7 @@
 	--text-dim: #2D7A3A;
 	--warn: #FFB000;
 	--danger: #FF3B3B;
+	--danger-rgb: 255, 59, 59;
 	--success: #00FF66;
 	--border: #1E3A26;
 	--grid: #14301F;

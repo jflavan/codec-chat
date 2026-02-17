@@ -317,7 +317,7 @@
 	}
 
 	.composer-input::selection {
-		background: rgba(88, 101, 242, 0.3);
+		background: rgba(var(--accent-rgb, 0, 255, 102), 0.3);
 	}
 
 	.composer-input-wrapper:focus-within {
@@ -502,7 +502,7 @@
 	}
 
 	.here-icon {
-		background: var(--danger, #ed4245);
+		background: var(--danger);
 		font-weight: 700;
 		font-size: 14px;
 	}

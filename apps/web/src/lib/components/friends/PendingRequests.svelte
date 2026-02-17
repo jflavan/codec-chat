@@ -202,7 +202,7 @@
 		padding: 8px 10px;
 		min-width: 44px;
 		min-height: 44px;
-		border-radius: 4px;
+		border-radius: 3px;
 		transition: background-color 150ms ease, color 150ms ease;
 		font-family: inherit;
 		display: grid;
@@ -223,7 +223,7 @@
 		padding: 8px 10px;
 		min-width: 44px;
 		min-height: 44px;
-		border-radius: 4px;
+		border-radius: 3px;
 		transition: background-color 150ms ease, color 150ms ease;
 		font-family: inherit;
 		display: grid;

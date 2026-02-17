@@ -935,7 +935,7 @@
 	}
 
 	.composer-input::placeholder { color: var(--text-dim); }
-	.composer-input::selection { background: rgba(88, 101, 242, 0.3); }
+	.composer-input::selection { background: rgba(var(--accent-rgb, 0, 255, 102), 0.3); }
 	.composer-input-wrapper:focus-within { box-shadow: 0 0 0 2px var(--accent); }
 	.composer-input-wrapper:has(.composer-input:disabled) { opacity: 0.5; }
 
@@ -1108,7 +1108,7 @@
 	.edit-input:focus {
 		outline: none;
 		border-color: var(--accent);
-		box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.3);
+		box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 0, 255, 102), 0.3);
 	}
 
 	.edit-actions {
@@ -1158,7 +1158,7 @@
 		width: 28px;
 		height: 28px;
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		background: transparent;
 		color: var(--text-muted);
 		cursor: pointer;
@@ -1171,8 +1171,8 @@
 	}
 
 	.dm-action-btn-danger:hover {
-		color: #ed4245;
-		background: rgba(237, 66, 69, 0.1);
+		color: var(--danger);
+		background: rgba(var(--danger-rgb, 255, 59, 59), 0.1);
 	}
 
 	/* ───── Reply highlight ───── */

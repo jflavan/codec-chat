@@ -80,7 +80,7 @@
 		background: var(--danger);
 		color: #fff;
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 14px;
 		font-weight: 600;
 		cursor: pointer;

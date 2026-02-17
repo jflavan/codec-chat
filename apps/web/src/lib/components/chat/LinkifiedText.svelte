@@ -115,7 +115,7 @@
 	}
 
 	.mention-badge {
-		background: rgba(88, 101, 242, 0.3);
+		background: rgba(var(--accent-rgb, 0, 255, 102), 0.3);
 		color: var(--accent);
 		border-radius: 3px;
 		padding: 0 2px;
@@ -124,7 +124,7 @@
 	}
 
 	.mention-badge:hover {
-		background: rgba(88, 101, 242, 0.5);
+		background: rgba(var(--accent-rgb, 0, 255, 102), 0.5);
 	}
 
 	.format-bold {
