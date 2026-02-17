@@ -178,6 +178,15 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Automatic restoration of full composer input on reconnection
 - ✅ Auto-refresh on persistent disconnect — if SignalR cannot reconnect within 5 seconds, or if the WebSocket closes with an error (e.g. status code 1006), the page refreshes automatically
 
+### Progressive Web App (PWA)
+- ✅ Installable PWA via `@vite-pwa/sveltekit` plugin (Workbox `generateSW` strategy)
+- ✅ Web app manifest with branded icons (192x192, 512x512) derived from favicon.ico
+- ✅ Apple touch icon (180x180) for iOS home screen
+- ✅ Offline-capable service worker with precached static assets
+- ✅ User-prompted update flow — toast notification when new version is available ("Reload" / "Close")
+- ✅ Periodic service worker update check (hourly)
+- ✅ `ReloadPrompt.svelte` component styled with CRT phosphor-green theme
+
 ### Frontend Architecture
 - ✅ Modular layered architecture (types, API client, auth, services, state, components)
 - ✅ Central `AppState` class with Svelte 5 `$state` / `$derived` runes

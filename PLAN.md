@@ -66,6 +66,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Infrastructure pipeline: Bicep what-if → deploy on push to `infra/` or manual dispatch
 - OIDC federated credentials for GitHub Actions → Azure (no long-lived secrets)
 - Content Security Policy with SvelteKit nonce-based inline script support
+- Progressive Web App (PWA) — installable via `@vite-pwa/sveltekit`, Workbox service worker with precached assets, user-prompted update toast, branded icons from favicon.ico
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
@@ -741,6 +742,36 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update SERVER_SETTINGS.md permissions descriptions
 - [x] Update PLAN.md with task breakdown
 - [x] Update README.md global admin description
+
+## Task breakdown: Progressive Web App (PWA)
+
+### Web — Plugin & configuration
+- [x] Install `@vite-pwa/sveltekit` and `workbox-window` dev dependencies
+- [x] Configure `SvelteKitPWA` plugin in `vite.config.ts` with `registerType: 'prompt'`
+- [x] Set web app manifest: name, short_name, theme_color, background_color, display: standalone
+- [x] Configure Workbox `generateSW` strategy with `globPatterns` for client assets
+- [x] Disable SvelteKit built-in service worker registration in `svelte.config.js`
+- [x] Add `worker-src: ['self']` to CSP directives in `svelte.config.js`
+
+### Web — Icons
+- [x] Generate `pwa-192x192.png` from existing `favicon.ico` (256x256 frame)
+- [x] Generate `pwa-512x512.png` from existing `favicon.ico` (256x256 frame)
+- [x] Generate `apple-touch-icon.png` (180x180) from existing `favicon.ico`
+- [x] Add `<link rel="apple-touch-icon">` to `app.html`
+- [x] Configure icon entries in manifest (192x192 any, 512x512 any, 512x512 maskable)
+
+### Web — Type declarations & manifest injection
+- [x] Add `/// <reference types="vite-plugin-pwa/svelte" />` and `vite-plugin-pwa/info` to `app.d.ts`
+- [x] Import `pwaInfo` in `+layout.svelte` and inject web manifest link via `{@html}`
+
+### Web — Update prompt UI
+- [x] Create `ReloadPrompt.svelte` component with CRT phosphor-green styling
+- [x] User-prompted update flow: toast with "Reload" and "Close" buttons
+- [x] Periodic service worker update check (hourly via `setInterval`)
+- [x] Mount `ReloadPrompt` in `+layout.svelte`
+
+### Verification
+- [x] Frontend builds successfully (`npm run build`, PWA v1.2.0, precache 31 entries)
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
