@@ -12,7 +12,7 @@ let pendingRefreshResolver: ((token: string) => void) | null = null;
 export function initGoogleIdentity(
 	clientId: string,
 	onCredential: (token: string) => void,
-	opts?: { renderButtonId?: string; autoSelect?: boolean }
+	opts?: { renderButtonId?: string; renderButtonIds?: string[]; autoSelect?: boolean }
 ): void {
 	const script = document.createElement('script');
 	script.src = 'https://accounts.google.com/gsi/client';
@@ -38,12 +38,16 @@ export function initGoogleIdentity(
 			}
 		});
 
-		const buttonEl = opts?.renderButtonId
-			? document.getElementById(opts.renderButtonId)
-			: null;
-
-		if (buttonEl) {
-			google.accounts.id.renderButton(buttonEl, { theme: 'outline', size: 'large' });
+		const ids = opts?.renderButtonIds ?? (opts?.renderButtonId ? [opts.renderButtonId] : []);
+		let rendered = false;
+		for (const id of ids) {
+			const el = document.getElementById(id);
+			if (el) {
+				google.accounts.id.renderButton(el, { theme: 'outline', size: 'large' });
+				rendered = true;
+			}
+		}
+		if (rendered) {
 			google.accounts.id.prompt();
 		}
 	};
