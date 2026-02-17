@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#050B07" />
+		<title>Codec — Offline</title>
+		<style>
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+				background-color: #050b07;
+				color: #86ff6b;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 100dvh;
+				padding: 1.5rem;
+			}
+
+			.offline-container {
+				text-align: center;
+				max-width: 28rem;
+			}
+
+			.offline-icon {
+				font-size: 4rem;
+				margin-bottom: 1.5rem;
+				opacity: 0.7;
+			}
+
+			h1 {
+				font-size: 1.75rem;
+				font-weight: 700;
+				margin-bottom: 0.75rem;
+				color: #00ff66;
+			}
+
+			p {
+				font-size: 1rem;
+				line-height: 1.6;
+				opacity: 0.8;
+				margin-bottom: 1.5rem;
+			}
+
+			button {
+				padding: 0.65rem 1.5rem;
+				border: 1px solid #00ff66;
+				border-radius: 6px;
+				background: transparent;
+				color: #00ff66;
+				font-family: inherit;
+				font-size: 0.95rem;
+				cursor: pointer;
+				transition: background-color 0.15s, color 0.15s;
+			}
+
+			button:hover {
+				background: #00ff66;
+				color: #050b07;
+			}
+
+			button:focus-visible {
+				outline: 2px solid #00ff66;
+				outline-offset: 2px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="offline-container">
+			<div class="offline-icon" aria-hidden="true">&#x1F50C;</div>
+			<h1>You're offline</h1>
+			<p>Codec needs an internet connection for real-time chat. Check your connection and try again.</p>
+			<button onclick="window.location.reload()">Retry</button>
+		</div>
+	</body>
+</html>
