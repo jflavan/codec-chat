@@ -2,12 +2,16 @@
 	import '$lib/styles/global.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
+	import { pwaInfo } from 'virtual:pwa-info';
+	import ReloadPrompt from '$lib/components/ReloadPrompt.svelte';
 
 	let { children } = $props();
 
 	const description = 'Codec is an open-source, real-time chat app inspired by Discord — built with SvelteKit and ASP.NET Core. Create servers, channels, and DMs with friends.';
 	const ogTitle = 'Codec — Real-Time Chat';
 	const ogImagePath = '/og-image.png';
+
+	const webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 </script>
 
 <svelte:head>
@@ -43,6 +47,10 @@
 	<meta name="twitter:title" content={ogTitle} />
 	<meta name="twitter:description" content={description} />
 	<meta name="twitter:image" content="{page.url.origin}{ogImagePath}" />
+
+	<!-- PWA Web Manifest -->
+	{@html webManifestLink}
 </svelte:head>
 
 {@render children()}
+<ReloadPrompt />
