@@ -36,6 +36,7 @@ jobs:
               environmentName='prod' \
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
               postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              globalAdminEmail='${{ secrets.GLOBAL_ADMIN_EMAIL }}' \
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
               bindCertificates=true
@@ -50,6 +51,7 @@ jobs:
               environmentName='prod' \
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
               postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              globalAdminEmail='${{ secrets.GLOBAL_ADMIN_EMAIL }}' \
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
               bindCertificates=false
@@ -64,6 +66,7 @@ jobs:
               environmentName='prod' \
               googleClientId='${{ secrets.GOOGLE_CLIENT_ID }}' \
               postgresqlAdminPassword='${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}' \
+              globalAdminEmail='${{ secrets.GLOBAL_ADMIN_EMAIL }}' \
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
               bindCertificates=true
