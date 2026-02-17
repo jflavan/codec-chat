@@ -692,9 +692,9 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Register `ServerDeleted` and `ChannelDeleted` handlers in `ChatHubService.start()`
 
 ### Infrastructure & CI/CD
-- [x] Add `global-admin-email` Key Vault secret reference in `container-app-api.bicep`
-- [x] Add `GlobalAdmin__Email` environment variable to API container app
-- [x] Add "Set GlobalAdmin email in Key Vault" step in `cd.yml`
+- [x] Add `GlobalAdmin--Email` Key Vault secret provisioned via Bicep (`key-vault-secret` module in `main.bicep`)
+- [x] Add `GlobalAdmin__Email` environment variable to API container app (unconditional in `container-app-api.bicep`)
+- [x] Add `globalAdminEmail` parameter to `infra.yml` Bicep deployment commands
 - [x] Add `GLOBAL_ADMIN_EMAIL` GitHub Actions repository secret
 
 ### Verification
