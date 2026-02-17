@@ -25,6 +25,9 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
   - Reactive state management with Svelte 5 runes (`$state`, `$derived`)
   - Type-safe API client
   - Modular component architecture with context-based dependency injection
+  - Offline fallback page with branded "You're offline" experience
+  - Runtime font caching (Google Fonts, CacheFirst strategy)
+  - Share target, app shortcuts, and custom protocol handler (`web+codec://`)
 
 #### Frontend Architecture
 
@@ -662,7 +665,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 - Cached mention parsing — regex results cached per message batch via `ToDictionary` to eliminate redundant execution
 - Vite build optimization
 - Tree-shaking and code splitting
-- PWA with Workbox service worker — precaches static assets for faster repeat visits and offline-capable shell
+- PWA with Workbox service worker — precaches static assets (HTML, JS, CSS, images) for faster repeat visits and offline-capable shell; runtime caching for Google Fonts; offline fallback page when network is unavailable
 - SignalR for real-time message delivery and typing indicators (eliminates polling)
 - Channel-scoped SignalR groups (targeted broadcasts, not global fan-out)
 - Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends; auto-refreshes on persistent failure

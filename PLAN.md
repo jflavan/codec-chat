@@ -749,7 +749,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Install `@vite-pwa/sveltekit` and `workbox-window` dev dependencies
 - [x] Configure `SvelteKitPWA` plugin in `vite.config.ts` with `registerType: 'prompt'`
 - [x] Set web app manifest: name, short_name, theme_color, background_color, display: standalone
-- [x] Configure Workbox `generateSW` strategy with `globPatterns` for client assets
+- [x] Configure Workbox `generateSW` strategy with `globPatterns` for client assets (HTML, JS, CSS, images)
 - [x] Disable SvelteKit built-in service worker registration in `svelte.config.js`
 - [x] Add `worker-src: ['self']` to CSP directives in `svelte.config.js`
 
@@ -770,8 +770,23 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Periodic service worker update check (hourly via `setInterval`)
 - [x] Mount `ReloadPrompt` in `+layout.svelte`
 
+### Web — PWA enhancements (PWABuilder compliance)
+- [x] Add `offline.html` fallback page with branded "You're offline" experience and retry button
+- [x] Configure `navigateFallback` and `navigateFallbackDenylist` in Workbox config
+- [x] Add desktop (1280x720) and mobile (390x1024) screenshots to manifest
+- [x] Add `display_override` stack (`standalone` → `minimal-ui`)
+- [x] Add manifest fields: `id`, `lang`, `dir`, `orientation`, `categories`
+- [x] Add app shortcut: "Direct Messages" for quick OS launcher access
+- [x] Add `share_target` for receiving shared links/text from OS share sheet
+- [x] Add `protocol_handlers` for `web+codec://` custom protocol
+- [x] Add `launch_handler` (`navigate-existing`) and `edge_side_panel` support
+- [x] Add runtime caching for Google Fonts (CacheFirst, 1-year TTL)
+- [x] Add Google Fonts origins to CSP `connect-src` in `hooks.server.ts`
+- [x] Set `prefer_related_applications: false` and `handle_links: 'preferred'`
+
 ### Verification
 - [x] Frontend builds successfully (`npm run build`, PWA v1.2.0, precache 31 entries)
+- [x] PWABuilder action items addressed (manifest, service worker, app capabilities)
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
