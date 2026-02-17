@@ -100,8 +100,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Connection status awareness** — composer shows "Codec connecting..." with animated ellipsis when the SignalR connection is lost; automatically restores full input when reconnected; auto-refreshes the page if the WebSocket cannot reconnect within 5 seconds
 - ✅ **Response compression** — API responses compressed with Brotli and Gzip for faster load times
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
-- ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
-
+- ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting- ✅ **Progressive Web App (PWA)** — installable on desktop and mobile via browser "Add to Home Screen"; Workbox service worker precaches static assets for fast repeat visits; user-prompted update toast when a new version is available
 ## Self-Hosting
 
 Codec is designed to be easy to self-host. The repository includes a production-ready `docker-compose.yml` that starts the API, web frontend, PostgreSQL, and a local blob storage emulator.
@@ -145,7 +144,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - [Security Policy](SECURITY.md) - How to report vulnerabilities responsibly
 
 ## Technology Stack
-- **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management
+- **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management; installable PWA via `@vite-pwa/sveltekit`
 - **Backend:** ASP.NET Core 10, Controller-based APIs
 - **Real-time:** SignalR (WebSockets)
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)

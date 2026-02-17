@@ -18,6 +18,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Framework:** SvelteKit 2.x with Svelte 5 runes
 - **Language:** TypeScript (ES2022 target)
 - **Build Tool:** Vite 7
+- **PWA:** `@vite-pwa/sveltekit` with Workbox `generateSW` strategy
 - **Key Features:**
   - Server-side rendering (SSR) capable
   - Client-side Google Sign-In integration
@@ -84,6 +85,7 @@ src/
 │   │   │   └── AccountSettings.svelte     # Read-only info + sign out
 │   │   ├── server-settings/
 │   │   │   └── ServerSettings.svelte      # Server management + global admin danger zone
+│   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
 │   │       └── MemberItem.svelte         # Single member card
@@ -660,6 +662,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 - Cached mention parsing — regex results cached per message batch via `ToDictionary` to eliminate redundant execution
 - Vite build optimization
 - Tree-shaking and code splitting
+- PWA with Workbox service worker — precaches static assets for faster repeat visits and offline-capable shell
 - SignalR for real-time message delivery and typing indicators (eliminates polling)
 - Channel-scoped SignalR groups (targeted broadcasts, not global fan-out)
 - Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends; auto-refreshes on persistent failure
