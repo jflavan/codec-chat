@@ -182,10 +182,18 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Installable PWA via `@vite-pwa/sveltekit` plugin (Workbox `generateSW` strategy)
 - ✅ Web app manifest with branded icons (192x192, 512x512) derived from favicon.ico
 - ✅ Apple touch icon (180x180) for iOS home screen
-- ✅ Offline-capable service worker with precached static assets
+- ✅ Offline-capable service worker with precached static assets (HTML, JS, CSS, images)
+- ✅ Offline fallback page — branded "You're offline" page with retry button when network is unavailable
 - ✅ User-prompted update flow — toast notification when new version is available ("Reload" / "Close")
 - ✅ Periodic service worker update check (hourly)
 - ✅ `ReloadPrompt.svelte` component styled with CRT phosphor-green theme
+- ✅ Desktop and mobile screenshots in manifest for enhanced install experience
+- ✅ App shortcuts — "Direct Messages" shortcut for quick access from OS launcher
+- ✅ Share target — receive shared links and text from the OS share sheet
+- ✅ Protocol handler — registered `web+codec://` custom protocol
+- ✅ Runtime caching for Google Fonts (CacheFirst strategy, 1-year TTL)
+- ✅ Display override stack (`standalone` → `minimal-ui`) and `launch_handler` for navigate-existing
+- ✅ Edge Side Panel support (`preferred_width: 400`)
 
 ### Frontend Architecture
 - ✅ Modular layered architecture (types, API client, auth, services, state, components)
