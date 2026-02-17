@@ -62,7 +62,7 @@
 		padding: 4px 8px;
 		margin-bottom: 4px;
 		border-radius: 4px;
-		background: rgba(var(--bg-secondary-rgb, 30, 31, 34), 0.5);
+		background: rgba(var(--bg-secondary-rgb, 7, 17, 10), 0.5);
 		cursor: pointer;
 		font-size: 13px;
 		line-height: 1.2;
@@ -70,7 +70,7 @@
 	}
 
 	.reply-reference:hover:not(.deleted) {
-		background: rgba(var(--bg-secondary-rgb, 30, 31, 34), 0.8);
+		background: rgba(var(--bg-secondary-rgb, 7, 17, 10), 0.8);
 	}
 
 	.reply-reference:focus-visible {

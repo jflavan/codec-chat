@@ -278,14 +278,14 @@
 	}
 
 	@keyframes reply-highlight-fade {
-		0% { background-color: rgba(88, 101, 242, 0.15); }
+		0% { background-color: rgba(var(--accent-rgb, 0, 255, 102), 0.15); }
 		100% { background-color: transparent; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.reply-highlight {
 			animation: none;
-			background-color: rgba(88, 101, 242, 0.1);
+			background-color: rgba(var(--accent-rgb, 0, 255, 102), 0.1);
 		}
 	}
 
