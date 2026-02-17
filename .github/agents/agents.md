@@ -17,6 +17,12 @@ This repo is designed for Copilot agent-based work. Each agent should be statele
 - api-architect.agent.md
 - github-actions-expert.agent.md
 - playwright-tester.agent.md
+- postgresql-dba.agent.md
+- accessibility.agent.md
+- debug.agent.md
+- code-tour.agent.md
+- csharp-dotnet-janitor.agent.md
+- se-security-reviewer.agent.md
 
 ## Agent rules
 - Always read PLAN.md first.

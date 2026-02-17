@@ -40,3 +40,8 @@ These skills are reusable tasks for agents.
 - webapp-testing
 - web-design-reviewer
 - refactor
+- git-commit
+- github-issues
+- nuget-manager
+- gh-cli
+- azure-deployment-preflight

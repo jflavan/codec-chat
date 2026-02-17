@@ -20,6 +20,14 @@
 - dotnet-architecture-good-practices.instructions.md
 - security-and-owasp.instructions.md
 - github-actions-ci-cd-best-practices.instructions.md
+- containerization-docker-best-practices.instructions.md
+- bicep-code-best-practices.instructions.md
+- a11y.instructions.md
+- performance-optimization.instructions.md
+- code-review-generic.instructions.md
+- markdown.instructions.md
+- playwright-typescript.instructions.md
+- html-css-style-color-guide.instructions.md
 
 ## Conventions
 - Keep public env vars in apps/web/.env.example
