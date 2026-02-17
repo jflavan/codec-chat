@@ -133,8 +133,13 @@
 		const count = app.dmMessages.length;
 		const loading = app.isLoadingDmMessages;
 
-		if (loading || count === 0) {
-			previousMessageCount = count;
+		// While messages are being fetched, the array still holds stale data from
+		// the previous conversation. Don't sync previousMessageCount here — the
+		// reset effect already set it to 0 for the new conversation.
+		if (loading) return;
+
+		if (count === 0) {
+			previousMessageCount = 0;
 			return;
 		}
 

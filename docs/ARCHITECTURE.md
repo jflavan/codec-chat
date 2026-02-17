@@ -165,6 +165,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
   - DM typing indicators (`DmTyping` / `DmStoppedTyping` events)
   - Friend-related event delivery (request received/accepted/declined/cancelled, friend removed)
   - Automatic reconnect via `withAutomaticReconnect()`
+  - Auto-refresh fallback — page reloads if reconnection fails within 5 seconds or WebSocket closes with an error
 
 ### Data Layer
 - **ORM:** Entity Framework Core 10
@@ -661,7 +662,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 - Tree-shaking and code splitting
 - SignalR for real-time message delivery and typing indicators (eliminates polling)
 - Channel-scoped SignalR groups (targeted broadcasts, not global fan-out)
-- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends
+- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends; auto-refreshes on persistent failure
 
 ### Future Improvements
 - Response caching

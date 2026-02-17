@@ -57,7 +57,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - User profile writes optimized — skips `SaveChangesAsync` when Google profile fields unchanged
 - Mention parsing cached per message batch to eliminate redundant regex execution
 - DM messages endpoint returns paginated `{ hasMore, messages }` response (matching channel pagination)
-- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect
+- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect; auto-refreshes the page on persistent WebSocket failure
 - SignalR reconnection lifecycle tracked via `isHubConnected` reactive state
 - Both apps containerized with optimized multi-stage Dockerfiles
 - Infrastructure as Code via Bicep modules under `infra/`
@@ -629,6 +629,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `isHubConnected = $state(false)` reactive field to `AppState`
 - [x] Set `isHubConnected` to `true` after successful `hub.start()` and on `onReconnected`
 - [x] Set `isHubConnected` to `false` on `signOut()`, `onReconnecting`, and `onClose`
+- [x] Auto-refresh page via `window.location.reload()` if WebSocket cannot reconnect within 5 seconds (reconnect timer in `onReconnecting`, cleared in `onReconnected`)
+- [x] Immediate page refresh on `onClose` with error (e.g. WebSocket status code 1006)
 
 ### Web — Composer disconnected state
 - [x] Update `Composer.svelte` — when `!app.isHubConnected`, show "Codec connecting..." with animated CSS ellipsis instead of composer input

@@ -134,6 +134,8 @@
 
 	.channel-hash {
 		flex-shrink: 0;
+		width: 24px;
+		height: 24px;
 		color: var(--text-muted);
 		opacity: 0.7;
 	}

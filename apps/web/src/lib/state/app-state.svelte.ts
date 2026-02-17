@@ -216,6 +216,7 @@ export class AppState {
 	private api: ApiClient;
 	private hub: ChatHubService;
 	private refreshPromise: Promise<string | null> | null = null;
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		private readonly apiBaseUrl: string,
@@ -1288,12 +1289,25 @@ export class AppState {
 			{
 			onReconnecting: () => {
 				this.isHubConnected = false;
+				if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+				this.reconnectTimer = setTimeout(() => {
+					if (!this.isHubConnected) window.location.reload();
+				}, 5000);
 			},
 			onReconnected: () => {
 				this.isHubConnected = true;
+				if (this.reconnectTimer) {
+					clearTimeout(this.reconnectTimer);
+					this.reconnectTimer = null;
+				}
 			},
-			onClose: () => {
+			onClose: (error) => {
 				this.isHubConnected = false;
+				if (this.reconnectTimer) {
+					clearTimeout(this.reconnectTimer);
+					this.reconnectTimer = null;
+				}
+				if (error) window.location.reload();
 			},
 			onMessage: (msg) => {
 				if (msg.channelId === this.selectedChannelId) {
