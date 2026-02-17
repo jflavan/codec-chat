@@ -6,8 +6,6 @@ param containerRegistryLoginServer string
 param containerRegistryName string
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
-var isQuickstart = containerImage == 'mcr.microsoft.com/k8se/quickstart:latest'
-
 param keyVaultName string
 param keyVaultUri string
 param storageAccountName string
@@ -46,7 +44,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Multiple'
       ingress: {
         external: true
-        targetPort: isQuickstart ? 80 : 8080
+        targetPort: 8080
         transport: 'http'
         customDomains: customDomainName != '' && managedCertificateId != '' ? [
           {
@@ -84,7 +82,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: 'system'
         }
       ]
-      registries: isQuickstart ? [] : [
+      registries: [
         {
           server: containerRegistryLoginServer
           identity: 'system'
@@ -134,7 +132,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               secretRef: 'global-admin-email'
             }
           ]
-          probes: isQuickstart ? [] : [
+          probes: [
             {
               type: 'Liveness'
               httpGet: {

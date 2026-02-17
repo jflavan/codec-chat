@@ -6,8 +6,6 @@ param containerRegistryLoginServer string
 param containerRegistryName string
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
-var isQuickstart = containerImage == 'mcr.microsoft.com/k8se/quickstart:latest'
-
 param publicApiBaseUrl string
 param publicGoogleClientId string
 
@@ -33,7 +31,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Multiple'
       ingress: {
         external: true
-        targetPort: isQuickstart ? 80 : 3000
+        targetPort: 3000
         transport: 'http'
         customDomains: customDomainName != '' && managedCertificateId != '' ? [
           {
@@ -48,7 +46,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ] : []
       }
-      registries: isQuickstart ? [] : [
+      registries: [
         {
           server: containerRegistryLoginServer
           identity: 'system'
@@ -78,7 +76,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: publicGoogleClientId
             }
           ]
-          probes: isQuickstart ? [] : [
+          probes: [
             {
               type: 'Liveness'
               httpGet: {
