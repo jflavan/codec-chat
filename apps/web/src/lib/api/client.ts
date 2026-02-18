@@ -231,12 +231,38 @@ export class ApiClient {
 		token: string,
 		serverId: string,
 		name: string
-	): Promise<{ id: string; name: string }> {
+	): Promise<{ id: string; name: string; iconUrl?: string | null }> {
 		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}`, {
 			method: 'PATCH',
 			headers: this.headers(token, true),
 			body: JSON.stringify({ name })
 		});
+	}
+
+	/** Upload or update a server icon image. */
+	async uploadServerIcon(
+		token: string,
+		serverId: string,
+		file: File
+	): Promise<{ iconUrl: string }> {
+		const form = new FormData();
+		form.append('file', file);
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/icon`,
+			{
+				method: 'POST',
+				headers: { Authorization: `Bearer ${token}` },
+				body: form
+			}
+		);
+	}
+
+	/** Remove the server icon. */
+	async deleteServerIcon(token: string, serverId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/icon`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
 	}
 
 	updateChannel(

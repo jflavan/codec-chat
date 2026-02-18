@@ -32,6 +32,16 @@ public interface IAvatarService
     Task DeleteServerAvatarAsync(Guid userId, Guid serverId);
 
     /// <summary>
+    /// Saves a server icon image and returns its public URL.
+    /// </summary>
+    Task<string> SaveServerIconAsync(Guid serverId, IFormFile file);
+
+    /// <summary>
+    /// Deletes the icon image for the given server.
+    /// </summary>
+    Task DeleteServerIconAsync(Guid serverId);
+
+    /// <summary>
     /// Returns the avatar URL stored in <paramref name="storedUrl"/>, or <c>null</c> when empty.
     /// Exists for backward compatibility — the stored value is already a full URL.
     /// </summary>
