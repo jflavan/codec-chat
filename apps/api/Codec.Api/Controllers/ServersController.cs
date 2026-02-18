@@ -80,6 +80,16 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             return BadRequest(new { error = "Server list cannot be empty." });
         }
 
+        if (request.ServerIds.Count > 1000)
+        {
+            return BadRequest(new { error = "Maximum 1000 servers allowed in reorder request." });
+        }
+
+        if (request.ServerIds.Count != request.ServerIds.Distinct().Count())
+        {
+            return BadRequest(new { error = "Duplicate server IDs are not allowed." });
+        }
+
         var appUser = await userService.GetOrCreateUserAsync(User);
 
         var memberships = await db.ServerMembers
