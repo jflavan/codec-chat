@@ -66,11 +66,16 @@
 					<button
 						class="server-icon"
 						class:active={server.serverId === app.selectedServerId}
+						class:has-icon={Boolean(server.iconUrl)}
 						onclick={() => app.selectServer(server.serverId)}
 						aria-label="Server: {server.name}"
 						title={server.name}
 					>
-						{server.name.slice(0, 1).toUpperCase()}
+						{#if server.iconUrl}
+							<img src={server.iconUrl} alt="" class="server-icon-img" />
+						{:else}
+							{server.name.slice(0, 1).toUpperCase()}
+						{/if}
 						{#if mentionCount > 0}
 							<span class="notification-badge" aria-label="{mentionCount} mentions">
 								{mentionCount}
@@ -239,6 +244,23 @@
 		border-radius: 16px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
+	}
+
+	.server-icon.has-icon {
+		padding: 0;
+		overflow: hidden;
+	}
+
+	.server-icon.has-icon:hover,
+	.server-icon.has-icon.active {
+		background: transparent;
+	}
+
+	.server-icon-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
 	}
 
 	.home-icon {

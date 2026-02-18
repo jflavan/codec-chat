@@ -83,6 +83,19 @@ public class AvatarService(IFileStorageService fileStorage) : IAvatarService
     }
 
     /// <inheritdoc />
+    public async Task<string> SaveServerIconAsync(Guid serverId, IFormFile file)
+    {
+        var prefix = $"server-icons/{serverId}";
+        return await SaveFileAsync(prefix, file);
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteServerIconAsync(Guid serverId)
+    {
+        await fileStorage.DeleteByPrefixAsync(ContainerName, $"server-icons/{serverId}");
+    }
+
+    /// <inheritdoc />
     public string? ResolveUrl(string? storedUrl) => string.IsNullOrEmpty(storedUrl) ? null : storedUrl;
 
     /// <summary>
