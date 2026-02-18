@@ -4,6 +4,7 @@ export type MemberServer = {
 	name: string;
 	iconUrl?: string | null;
 	role: string | null;
+	sortOrder: number;
 };
 
 /** Text channel within a server. */
