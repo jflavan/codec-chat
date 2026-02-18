@@ -121,6 +121,7 @@ export class AppState {
 	serverSettingsOpen = $state(false);
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
+	isUploadingServerIcon = $state(false);
 
 	/* ───── mobile navigation ───── */
 	mobileNavOpen = $state(false);
@@ -180,6 +181,10 @@ export class AppState {
 
 	readonly selectedServerName = $derived(
 		this.servers.find((s) => s.serverId === this.selectedServerId)?.name ?? 'Codec'
+	);
+
+	readonly selectedServerIconUrl = $derived(
+		this.servers.find((s) => s.serverId === this.selectedServerId)?.iconUrl ?? null
 	);
 
 	readonly effectiveDisplayName = $derived(
@@ -612,6 +617,36 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isUpdatingServerName = false;
+		}
+	}
+
+	/** Upload or update the server icon image. */
+	async uploadServerIcon(file: File): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+
+		this.isUploadingServerIcon = true;
+		try {
+			await this.api.uploadServerIcon(this.idToken, this.selectedServerId, file);
+			// Update will be reflected via SignalR event
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingServerIcon = false;
+		}
+	}
+
+	/** Remove the server icon. */
+	async removeServerIcon(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+
+		this.isUploadingServerIcon = true;
+		try {
+			await this.api.deleteServerIcon(this.idToken, this.selectedServerId);
+			// Update will be reflected via SignalR event
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingServerIcon = false;
 		}
 	}
 
@@ -1470,6 +1505,12 @@ export class AppState {
 				// Update server name in the local list
 				this.servers = this.servers.map((s) =>
 					s.serverId === event.serverId ? { ...s, name: event.name } : s
+				);
+			},
+			onServerIconChanged: (event) => {
+				// Update server icon in the local list
+				this.servers = this.servers.map((s) =>
+					s.serverId === event.serverId ? { ...s, iconUrl: event.iconUrl } : s
 				);
 			},
 			onChannelNameChanged: (event) => {

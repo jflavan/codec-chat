@@ -9,6 +9,7 @@
 	let channelEditName = $state('');
 	let confirmDeleteServer = $state(false);
 	let confirmDeleteChannelId = $state<string | null>(null);
+	let iconFileInput = $state<HTMLInputElement>();
 
 	function startEditingServerName() {
 		serverNameEdit = app.selectedServerName;
@@ -54,6 +55,22 @@
 		await app.deleteChannel(channelId);
 		confirmDeleteChannelId = null;
 	}
+
+	function triggerIconUpload() {
+		iconFileInput?.click();
+	}
+
+	async function handleIconFileChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		await app.uploadServerIcon(file);
+		input.value = '';
+	}
+
+	async function handleRemoveIcon() {
+		await app.removeServerIcon();
+	}
 </script>
 
 <div class="server-settings">
@@ -62,6 +79,53 @@
 	<!-- Server Overview Section -->
 	<section class="settings-section">
 		<h2 class="section-title">Server Overview</h2>
+
+		<!-- Server Icon -->
+		<div class="form-group">
+			<span class="label" id="server-icon-label">Server Icon</span>
+			<div class="icon-upload-area" role="group" aria-labelledby="server-icon-label">
+				<div class="icon-preview">
+					{#if app.selectedServerIconUrl}
+						<img
+							src={app.selectedServerIconUrl}
+							alt="{app.selectedServerName} icon"
+							class="icon-image"
+						/>
+					{:else}
+						<span class="icon-placeholder">{app.selectedServerName.slice(0, 1).toUpperCase()}</span>
+					{/if}
+				</div>
+				{#if app.canManageChannels}
+					<div class="icon-actions">
+						<button
+							type="button"
+							class="btn-primary"
+							disabled={app.isUploadingServerIcon}
+							onclick={triggerIconUpload}
+						>
+							{app.isUploadingServerIcon ? 'Uploading…' : app.selectedServerIconUrl ? 'Change Icon' : 'Upload Icon'}
+						</button>
+						{#if app.selectedServerIconUrl}
+							<button
+								type="button"
+								class="btn-secondary"
+								disabled={app.isUploadingServerIcon}
+								onclick={handleRemoveIcon}
+							>
+								Remove
+							</button>
+						{/if}
+						<input
+							bind:this={iconFileInput}
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/gif"
+							class="hidden-file-input"
+							onchange={handleIconFileChange}
+						/>
+					</div>
+				{/if}
+			</div>
+		</div>
 		
 		<div class="form-group">
 			<label for="server-name" class="label">Server Name</label>
@@ -243,6 +307,45 @@
 		font-size: 14px;
 		margin-bottom: 12px;
 		line-height: 1.5;
+	}
+
+	.icon-upload-area {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+
+	.icon-preview {
+		width: 80px;
+		height: 80px;
+		border-radius: 16px;
+		background: var(--bg-secondary);
+		display: grid;
+		place-items: center;
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+
+	.icon-image {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.icon-placeholder {
+		font-size: 32px;
+		font-weight: 600;
+		color: var(--text-header);
+	}
+
+	.icon-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.hidden-file-input {
+		display: none;
 	}
 
 	.form-group {
