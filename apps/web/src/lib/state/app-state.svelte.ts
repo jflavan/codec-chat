@@ -323,7 +323,7 @@ export class AppState {
 		await this.hub.stop();
 		clearStoredSession();
 
-		this.isInitialLoading = true;
+		this.isInitialLoading = false;
 		this.isHubConnected = false;
 		this.idToken = null;
 		this.me = null;
