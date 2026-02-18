@@ -13,6 +13,7 @@
 	import ServerSettingsModal from '$lib/components/server-settings/ServerSettingsModal.svelte';
 	import ImagePreview from '$lib/components/chat/ImagePreview.svelte';
 	import LoadingScreen from '$lib/components/LoadingScreen.svelte';
+	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
@@ -122,12 +123,8 @@
 <ImagePreview />
 <AlphaNotification />
 
-<!-- Mobile sign-in prompt (page-level, always visible on mobile when signed out) -->
 {#if !app.isSignedIn}
-	<div class="mobile-sign-in-overlay">
-		<p class="mobile-sign-in-text">Sign in to start chatting</p>
-		<div id="mobile-google-button"></div>
-	</div>
+	<LoginScreen />
 {/if}
 {/if}
 
@@ -271,33 +268,6 @@
 		.mobile-drawer,
 		.mobile-members-drawer {
 			animation: none;
-		}
-	}
-
-	/* ───── Mobile sign-in overlay ───── */
-
-	.mobile-sign-in-overlay {
-		display: none;
-	}
-
-	@media (max-width: 899px) {
-		.mobile-sign-in-overlay {
-			display: flex;
-			position: fixed;
-			inset: 0;
-			z-index: 50;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			gap: 16px;
-			background: var(--bg-primary);
-		}
-
-		.mobile-sign-in-text {
-			margin: 0;
-			font-size: 18px;
-			font-weight: 600;
-			color: var(--text-header);
 		}
 	}
 </style>
