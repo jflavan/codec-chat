@@ -293,7 +293,7 @@ export class AppState {
 
 	private renderSignIn(): void {
 		initGoogleIdentity(this.googleClientId, (token) => this.handleCredential(token), {
-			renderButtonIds: ['google-button', 'mobile-google-button'],
+			renderButtonIds: ['google-button', 'login-google-button'],
 			autoSelect: true
 		});
 	}
@@ -361,7 +361,7 @@ export class AppState {
 
 		await tick();
 		renderGoogleButton('google-button');
-		renderGoogleButton('mobile-google-button');
+		renderGoogleButton('login-google-button');
 	}
 
 	/* ═══════════════════ Data loading ═══════════════════ */
