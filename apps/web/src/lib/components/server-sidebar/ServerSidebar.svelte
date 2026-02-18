@@ -9,6 +9,51 @@
 	let createWrapperEl = $state<HTMLElement>();
 	let joinWrapperEl = $state<HTMLElement>();
 
+	/* ───── drag-and-drop reorder state ───── */
+	let dragSourceId = $state<string | null>(null);
+	let dragOverId = $state<string | null>(null);
+
+	function handleDragStart(e: DragEvent, serverId: string) {
+		dragSourceId = serverId;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', serverId);
+		}
+	}
+
+	function handleDragOver(e: DragEvent, serverId: string) {
+		if (!dragSourceId || dragSourceId === serverId) return;
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverId = serverId;
+	}
+
+	function handleDragLeave(serverId: string) {
+		if (dragOverId === serverId) dragOverId = null;
+	}
+
+	function handleDrop(e: DragEvent, targetServerId: string) {
+		e.preventDefault();
+		dragOverId = null;
+		if (!dragSourceId || dragSourceId === targetServerId) return;
+
+		const fromIdx = app.servers.findIndex((s) => s.serverId === dragSourceId);
+		const toIdx = app.servers.findIndex((s) => s.serverId === targetServerId);
+		if (fromIdx === -1 || toIdx === -1) return;
+
+		const reordered = [...app.servers];
+		const [moved] = reordered.splice(fromIdx, 1);
+		reordered.splice(toIdx, 0, moved);
+
+		app.reorderServers(reordered.map((s) => s.serverId));
+		dragSourceId = null;
+	}
+
+	function handleDragEnd() {
+		dragSourceId = null;
+		dragOverId = null;
+	}
+
 	function handleWindowClick(e: MouseEvent) {
 		const target = e.target as Node;
 		if (app.showCreateServer && createWrapperEl && !createWrapperEl.contains(target)) {
@@ -61,7 +106,17 @@
 		{:else}
 			{#each app.servers as server}
 				{@const mentionCount = app.serverMentionCount(server.serverId)}
-				<div class="server-pill-wrapper">
+				<div
+					class="server-pill-wrapper"
+					class:drag-over={dragOverId === server.serverId}
+					draggable="true"
+					ondragstart={(e) => handleDragStart(e, server.serverId)}
+					ondragover={(e) => handleDragOver(e, server.serverId)}
+					ondragleave={() => handleDragLeave(server.serverId)}
+					ondrop={(e) => handleDrop(e, server.serverId)}
+					ondragend={handleDragEnd}
+					role="listitem"
+				>
 					<div class="server-pill" class:active={server.serverId === app.selectedServerId}></div>
 					<button
 						class="server-icon"
@@ -199,6 +254,11 @@
 		align-items: center;
 		justify-content: center;
 		width: 100%;
+		transition: opacity 150ms ease;
+	}
+
+	.server-pill-wrapper.drag-over {
+		box-shadow: 0 -2px 0 0 var(--accent);
 	}
 
 	.server-pill {
