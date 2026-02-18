@@ -2,6 +2,7 @@
 export type MemberServer = {
 	serverId: string;
 	name: string;
+	iconUrl?: string | null;
 	role: string | null;
 };
 

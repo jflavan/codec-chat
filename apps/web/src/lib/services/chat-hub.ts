@@ -97,6 +97,11 @@ export type ServerNameChangedEvent = {
 	name: string;
 };
 
+export type ServerIconChangedEvent = {
+	serverId: string;
+	iconUrl: string | null;
+};
+
 export type ChannelNameChangedEvent = {
 	serverId: string;
 	channelId: string;
@@ -136,6 +141,7 @@ export type SignalRCallbacks = {
 	onMessageEdited?: (event: MessageEditedEvent) => void;
 	onDmMessageEdited?: (event: DmMessageEditedEvent) => void;
 	onServerNameChanged?: (event: ServerNameChangedEvent) => void;
+	onServerIconChanged?: (event: ServerIconChangedEvent) => void;
 	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
 	onServerDeleted?: (event: ServerDeletedEvent) => void;
 	onChannelDeleted?: (event: ChannelDeletedEvent) => void;
@@ -227,6 +233,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onServerNameChanged) {
 			connection.on('ServerNameChanged', callbacks.onServerNameChanged);
+		}
+		if (callbacks.onServerIconChanged) {
+			connection.on('ServerIconChanged', callbacks.onServerIconChanged);
 		}
 		if (callbacks.onChannelNameChanged) {
 			connection.on('ChannelNameChanged', callbacks.onChannelNameChanged);

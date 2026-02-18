@@ -31,7 +31,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         {
             var allServers = await db.Servers
                 .AsNoTracking()
-                .Select(s => new { s.Id, s.Name })
+                .Select(s => new { s.Id, s.Name, s.IconUrl })
                 .ToListAsync();
 
             var myMemberships = await db.ServerMembers
@@ -43,6 +43,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             {
                 ServerId = s.Id,
                 s.Name,
+                s.IconUrl,
                 Role = myMemberships.TryGetValue(s.Id, out var role) ? role : (string?)null
             });
 
@@ -56,6 +57,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             {
                 member.ServerId,
                 Name = member.Server!.Name,
+                IconUrl = member.Server!.IconUrl,
                 Role = member.Role.ToString()
             })
             .ToListAsync();
@@ -103,6 +105,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         {
             server.Id,
             server.Name,
+            server.IconUrl,
             role = membership.Role.ToString()
         });
     }
@@ -162,7 +165,8 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         return Ok(new
         {
             server.Id,
-            server.Name
+            server.Name,
+            server.IconUrl
         });
     }
 
@@ -781,6 +785,114 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             serverId,
             channelId
         });
+
+        return NoContent();
+    }
+
+    /* ═══════════════════ Server Icon ═══════════════════ */
+
+    /// <summary>
+    /// Uploads or updates the server icon image. Requires Owner, Admin, or global admin role.
+    /// Accepts JPG, JPEG, PNG, WebP, or GIF files up to 10 MB.
+    /// </summary>
+    [HttpPost("{serverId:guid}/icon")]
+    public async Task<IActionResult> UploadServerIcon(Guid serverId, IFormFile file)
+    {
+        var validationError = avatarService.Validate(file);
+        if (validationError is not null)
+        {
+            return BadRequest(new { error = validationError });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        if (!appUser.IsGlobalAdmin)
+        {
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
+        }
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null)
+        {
+            return NotFound(new { error = "Server not found." });
+        }
+
+        // Remove the previous icon file if one exists.
+        if (!string.IsNullOrEmpty(server.IconUrl))
+        {
+            await avatarService.DeleteServerIconAsync(serverId);
+        }
+
+        var iconUrl = await avatarService.SaveServerIconAsync(serverId, file);
+        server.IconUrl = iconUrl;
+        await db.SaveChangesAsync();
+
+        // Notify all server members of the icon change via SignalR.
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ServerIconChanged", new
+        {
+            serverId,
+            iconUrl
+        });
+
+        return Ok(new { iconUrl });
+    }
+
+    /// <summary>
+    /// Removes the server icon. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/icon")]
+    public async Task<IActionResult> DeleteServerIcon(Guid serverId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        if (!appUser.IsGlobalAdmin)
+        {
+            var membership = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+            if (membership is null)
+            {
+                return Forbid();
+            }
+
+            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            {
+                return Forbid();
+            }
+        }
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null)
+        {
+            return NotFound(new { error = "Server not found." });
+        }
+
+        if (!string.IsNullOrEmpty(server.IconUrl))
+        {
+            await avatarService.DeleteServerIconAsync(serverId);
+            server.IconUrl = null;
+            await db.SaveChangesAsync();
+
+            // Notify all server members of the icon removal via SignalR.
+            await hub.Clients.Group($"server-{serverId}").SendAsync("ServerIconChanged", new
+            {
+                serverId,
+                iconUrl = (string?)null
+            });
+        }
 
         return NoContent();
     }
