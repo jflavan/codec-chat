@@ -879,6 +879,7 @@
 	.composer-attach {
 		background: var(--input-bg);
 		border: none;
+		box-sizing: border-box;
 		padding: 12px 10px;
 		border-radius: 8px 0 0 8px;
 		color: var(--text-muted);
@@ -922,6 +923,7 @@
 	.composer-input {
 		position: relative;
 		width: 100%;
+		box-sizing: border-box;
 		padding: 12px 16px;
 		border: none;
 		background: transparent;
@@ -942,6 +944,7 @@
 	.composer-send {
 		background: var(--input-bg);
 		border: none;
+		box-sizing: border-box;
 		padding: 12px;
 		border-radius: 0 8px 8px 0;
 		color: var(--text-muted);
