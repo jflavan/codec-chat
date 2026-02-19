@@ -580,6 +580,26 @@ export class AppState {
 		}
 	}
 
+	/** Persist a new server display order for the current user. */
+	async reorderServers(serverIds: string[]): Promise<void> {
+		if (!this.idToken) return;
+		// Optimistically reorder the local list.
+		const ordered: typeof this.servers = [];
+		for (let i = 0; i < serverIds.length; i++) {
+			const s = this.servers.find((srv) => srv.serverId === serverIds[i]);
+			if (s) ordered.push({ ...s, sortOrder: i });
+		}
+		this.servers = ordered;
+
+		try {
+			await this.api.reorderServers(this.idToken, serverIds);
+		} catch (e) {
+			this.setError(e);
+			// Reload original order on failure.
+			await this.loadServers();
+		}
+	}
+
 	async createChannel(): Promise<void> {
 		const name = this.newChannelName.trim();
 		if (!name) {
