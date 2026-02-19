@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '$lib/styles/global.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/favicon.png';
 	import { page } from '$app/state';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import ReloadPrompt from '$lib/components/ReloadPrompt.svelte';
