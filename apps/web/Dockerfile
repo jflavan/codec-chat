@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ ENV PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
 ENV PUBLIC_GOOGLE_CLIENT_ID=${PUBLIC_GOOGLE_CLIENT_ID}
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 EXPOSE 3000
 ENV NODE_ENV=production

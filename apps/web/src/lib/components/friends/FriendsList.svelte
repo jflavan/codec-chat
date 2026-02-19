@@ -158,8 +158,13 @@
 		place-items: center;
 	}
 
-	.btn-danger:hover {
+	.btn-danger:hover:not(:disabled) {
 		background: var(--danger);
 		color: #fff;
+	}
+
+	.btn-danger:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

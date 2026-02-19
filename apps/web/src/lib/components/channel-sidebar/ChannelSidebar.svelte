@@ -322,7 +322,7 @@
 		padding: 10px 14px;
 		min-height: 44px;
 		background: transparent;
-		color: var(--text-muted);
+		color: var(--text-normal);
 		font-weight: 500;
 		font-size: 14px;
 		cursor: pointer;
@@ -332,6 +332,11 @@
 
 	.btn-secondary:hover:not(:disabled) {
 		color: var(--text-header);
+	}
+
+	.btn-secondary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.muted {

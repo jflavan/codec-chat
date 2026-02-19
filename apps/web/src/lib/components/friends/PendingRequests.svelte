@@ -209,9 +209,14 @@
 		place-items: center;
 	}
 
-	.btn-accept:hover {
+	.btn-accept:hover:not(:disabled) {
 		background: var(--accent);
 		color: var(--bg-tertiary);
+	}
+
+	.btn-accept:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.btn-decline {
@@ -230,8 +235,13 @@
 		place-items: center;
 	}
 
-	.btn-decline:hover {
+	.btn-decline:hover:not(:disabled) {
 		background: var(--danger);
 		color: #fff;
+	}
+
+	.btn-decline:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>
