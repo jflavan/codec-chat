@@ -201,8 +201,13 @@
 		white-space: nowrap;
 	}
 
-	.btn-send:hover {
+	.btn-send:hover:not(:disabled) {
 		background: var(--accent-hover);
+	}
+
+	.btn-send:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.status-badge {
