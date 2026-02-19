@@ -7,7 +7,7 @@ export default defineConfig({
 		sveltekit(),
 		SvelteKitPWA({
 			registerType: 'prompt',
-			includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'og-image.png'],
+			includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'og-image.png'],
 			manifest: {
 				name: 'Codec — Real-Time Chat',
 				short_name: 'Codec',
@@ -42,6 +42,16 @@ export default defineConfig({
 						sizes: '512x512',
 						type: 'image/png',
 						purpose: 'maskable'
+					},
+					{
+						src: 'android-chrome-192x192.png',
+						sizes: '192x192',
+						type: 'image/png'
+					},
+					{
+						src: 'android-chrome-512x512.png',
+						sizes: '512x512',
+						type: 'image/png'
 					}
 				],
 				screenshots: [
