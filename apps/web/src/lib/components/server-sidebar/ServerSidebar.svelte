@@ -6,6 +6,7 @@
 	let showJoinByCode = $state(false);
 	let inviteCode = $state('');
 
+	let sidebarEl = $state<HTMLElement>();
 	let createWrapperEl = $state<HTMLElement>();
 	let joinWrapperEl = $state<HTMLElement>();
 
@@ -55,6 +56,9 @@
 	}
 
 	function handleWindowClick(e: MouseEvent) {
+		// Skip if this instance is hidden (e.g. the app-shell copy when the mobile drawer is open)
+		if (!sidebarEl || sidebarEl.offsetParent === null) return;
+
 		const target = e.target as Node;
 		if (app.showCreateServer && createWrapperEl && !createWrapperEl.contains(target)) {
 			app.showCreateServer = false;
@@ -77,7 +81,7 @@
 
 <svelte:window onclick={handleWindowClick} />
 
-<nav class="server-sidebar" aria-label="Servers">
+<nav class="server-sidebar" bind:this={sidebarEl} aria-label="Servers">
 	<div class="server-list">
 		<!-- Home icon -->
 		<button
@@ -157,6 +161,7 @@
 					</svg>
 				</button>
 				{#if app.showCreateServer}
+					<div class="popover-mobile-backdrop" aria-hidden="true"></div>
 					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); app.createServer(); }}>
 							<input
@@ -189,6 +194,7 @@
 					</svg>
 				</button>
 				{#if showJoinByCode}
+					<div class="popover-mobile-backdrop" aria-hidden="true"></div>
 					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); handleJoinByCode(); }}>
 							<input
@@ -419,6 +425,19 @@
 			width: calc(100vw - 32px);
 			max-width: 320px;
 			z-index: 70;
+		}
+	}
+
+	.popover-mobile-backdrop {
+		display: none;
+	}
+
+	@media (max-width: 899px) {
+		.popover-mobile-backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 65;
 		}
 	}
 
