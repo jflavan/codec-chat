@@ -10,14 +10,14 @@ Codec offers two main ways to communicate by voice: **voice channels** within se
 
 **Direct calls** are initiated from a DM conversation. These function like traditional phone calls — the recipient gets a ring notification and can accept or decline. Once connected, the same audio controls apply.
 
-Both voice channels and calls share common capabilities: mute/unmute, deafen/undeafen, per-user volume adjustment, noise suppression (powered by Krisp), and push-to-talk as an alternative to open-mic voice activation.
+Both voice channels and calls share common capabilities: mute/unmute, deafen/undeafen, per-user volume adjustment, and push-to-talk as an alternative to open-mic voice activation.
 
 ## Goals
 
 - Enable real-time voice communication through persistent voice channels within servers
 - Enable 1-on-1 voice calls between users from existing DM conversations
 - Provide familiar audio controls (mute, deafen, per-user volume adjustment)
-- Support noise suppression and push-to-talk as voice input modes
+- Support push-to-talk as an alternative to open-mic voice activation
 - Reuse existing real-time infrastructure (SignalR for signaling) and extend it with WebRTC for peer-to-peer audio streaming
 - Deliver a seamless, low-latency audio experience consistent with the existing CODEC CRT visual theme
 
@@ -32,12 +32,12 @@ Both voice channels and calls share common capabilities: mute/unmute, deafen/und
 | **Deafen** | Disabling the user's audio output so they hear nothing (implicitly mutes as well) |
 | **Push-to-Talk (PTT)** | A voice activation mode where the microphone is only active while a designated key is held |
 | **Voice Activity Detection (VAD)** | The default open-mic mode where audio is transmitted whenever the user speaks |
-| **Noise Suppression** | AI-powered background noise filtering (powered by Krisp) |
+| **Noise Suppression** | Background noise filtering using the browser's built-in WebRTC noise suppression constraint |
 | **Signaling** | The process of exchanging WebRTC connection metadata (SDP offers/answers, ICE candidates) between peers via SignalR |
-| **SFU (Selective Forwarding Unit)** | A media server that receives audio streams from each participant and forwards them selectively, used for voice channels with 3+ participants |
+| **SFU (Selective Forwarding Unit)** | A custom-built media server that receives audio streams from each participant and forwards them selectively, used for voice channels with 3+ participants |
 | **Peer-to-Peer (P2P)** | Direct WebRTC connection between two users, used for direct calls and small voice channels |
 | **ICE Candidate** | Network address information exchanged during WebRTC connection setup |
-| **TURN Server** | A relay server used when direct P2P connections cannot be established (e.g., behind restrictive firewalls/NATs) |
+| **TURN Server** | A custom-built relay server used when direct P2P connections cannot be established (e.g., behind restrictive firewalls/NATs) |
 | **STUN Server** | A server that helps discover the public IP address of a client behind a NAT |
 
 ## Architecture
@@ -48,9 +48,9 @@ Both voice channels and calls share common capabilities: mute/unmute, deafen/und
 |---------|-----------|-----------|
 | Audio transport | WebRTC (`RTCPeerConnection`) | Industry standard for real-time audio/video in browsers; low-latency, peer-to-peer capable |
 | Signaling | SignalR (existing hub) | Already in use for chat; reliable WebSocket channel for exchanging SDP offers/answers and ICE candidates |
-| NAT traversal | STUN/TURN servers | Required for WebRTC connectivity across NATs and firewalls |
-| Audio processing | Web Audio API + Krisp SDK | Noise suppression, gain control, and push-to-talk gating |
-| Voice channels (3+ users) | SFU media server | Scales better than full-mesh P2P for group voice; each client sends one stream, receives N-1 |
+| NAT traversal | Custom STUN/TURN server | Self-hosted for full control over NAT traversal and relay infrastructure |
+| Audio processing | Web Audio API | Gain control, push-to-talk gating, and browser-native noise suppression via WebRTC constraints |
+| Voice channels (3+ users) | Custom SFU media server | Self-hosted for full control; scales better than full-mesh P2P for group voice; each client sends one stream, receives N-1 |
 | Direct calls (1-on-1) | P2P via WebRTC | Lowest latency for two-party calls; no media server needed |
 | Codec | Opus | WebRTC default audio codec; excellent quality at low bitrates (48 kHz, variable bitrate) |
 
@@ -61,8 +61,8 @@ Both voice channels and calls share common capabilities: mute/unmute, deafen/und
 │                        Voice Channels (3+ users)                    │
 │                                                                     │
 │   User A ──audio──►┌─────────┐──audio──► User B                    │
-│   User B ──audio──►│   SFU   │──audio──► User A                    │
-│   User C ──audio──►│  Server │──audio──► User A                    │
+│   User B ──audio──►│  Custom │──audio──► User A                    │
+│   User C ──audio──►│   SFU   │──audio──► User A                    │
 │                    └─────────┘──audio──► User B                    │
 │                         ▲                                           │
 │                         │ signaling via SignalR                     │
@@ -89,7 +89,7 @@ Both voice channels and calls share common capabilities: mute/unmute, deafen/und
 
 ### Signaling Flow (WebRTC via SignalR)
 
-All WebRTC session negotiation travels through the existing SignalR hub. No audio data passes through the API server (except when relayed via TURN).
+All WebRTC session negotiation travels through the existing SignalR hub. No audio data passes through the API server (except when relayed via the custom TURN server).
 
 **Voice Channel Join:**
 
@@ -168,9 +168,6 @@ Caller                         SignalR Hub                    Callee
 
 #### Adjusting User Volume
 > As a voice user, I want to adjust the volume of individual users so I can hear everyone at a comfortable level.
-
-#### Toggling Noise Suppression
-> As a voice user, I want to toggle noise suppression on or off to filter out background noise from my microphone.
 
 #### Using Push-to-Talk
 > As a voice user, I want to use push-to-talk mode so that my microphone is only active while I hold a designated key.
@@ -688,7 +685,7 @@ During an active call, a compact call interface appears in the DM chat area.
 │                                                    │
 │        Connected • 05:23                           │
 │                                                    │
-│  [🎤 Mute] [🎧 Deafen] [🔇 Noise] [🔴 End Call]  │
+│  [🎤 Mute] [🎧 Deafen] [🔴 End Call]              │
 │                                                    │
 └──────────────────────────────────────────────────┘
 ```
@@ -700,7 +697,6 @@ During an active call, a compact call interface appears in the DM chat area.
 | Speaking indicator | Pulsing `--accent` ring around avatar when user's audio is active |
 | Timer | 14px, `--text-muted`, `MM:SS` format |
 | Control buttons | 44×44px each, `--bg-message-hover` background, icon `--text-normal`, toggle state changes icon color to `--danger` |
-| Noise suppression toggle | 🔇 icon, `--accent` when active, `--text-normal` when off |
 | End Call button | `--danger` background, white phone-down icon, wider (80×44px) |
 
 ### Audio Controls Panel
@@ -745,9 +741,6 @@ A new "Voice & Audio" category is added to the User Settings modal.
 │  │                  │  Push-to-Talk Shortcut                 │
 │  │                  │  [Click to record keybind]             │
 │  │                  │                                        │
-│  │                  │  Noise Suppression (Krisp)             │
-│  │                  │  [━━━━━━━━━━○] On                      │
-│  │                  │                                        │
 │  │                  │  Input Sensitivity                     │
 │  │                  │  ──────●──────── -40 dB                │
 │  │                  │  [Live meter ████████░░░░░]            │
@@ -762,7 +755,6 @@ A new "Voice & Audio" category is added to the User Settings modal.
 | Output Device | Dropdown | Select speaker/headphones output device |
 | Input Mode | Radio | Choose between Voice Activity Detection (open mic) and Push-to-Talk |
 | Push-to-Talk Shortcut | Keybind recorder | Capture the key combination for PTT (default: unset) |
-| Noise Suppression | Toggle | Enable/disable Krisp-powered noise filtering |
 | Input Sensitivity | Slider + live meter | Threshold for voice activity detection; shows real-time microphone input level |
 
 Voice settings are persisted to `localStorage` on the client. They are not stored server-side.
@@ -789,14 +781,13 @@ Microphone Input
 │  AudioContext    │
 │  ├─ Gain Node   │  ◄── Input sensitivity / volume control
 │  ├─ Analyser    │  ◄── Voice activity detection (VAD) meter
-│  ├─ Krisp Node  │  ◄── Noise suppression (when enabled)
 │  └─ PTT Gate    │  ◄── Push-to-talk mute gate (when PTT mode active)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │  RTCPeerConn    │
-│  addTrack()     │  ──── Opus-encoded audio ────► Peer(s) / SFU
+│  addTrack()     │  ──── Opus-encoded audio ────► Peer(s) / Custom SFU
 └─────────────────┘
 ```
 
@@ -891,27 +882,22 @@ Microphone Input
 - [ ] Volume adjustments are local-only (not broadcast to others)
 - [ ] A "Mute User" option completely silences that user locally
 
-### AC-13: Noise Suppression
-- [ ] A noise suppression toggle is available in the call controls and Voice & Audio settings
-- [ ] When enabled, background noise is filtered from the user's microphone input
-- [ ] The setting persists across sessions via `localStorage`
-
-### AC-14: Push-to-Talk
+### AC-13: Push-to-Talk
 - [ ] Users can switch between Voice Activity and Push-to-Talk input modes in settings
 - [ ] In PTT mode, the microphone is only active while the configured key is held
 - [ ] A keybind recorder allows setting the PTT key
 - [ ] The PTT key state is visually indicated in the voice connected bar
 - [ ] The setting persists across sessions via `localStorage`
 
-### AC-15: Voice & Audio Settings
+### AC-14: Voice & Audio Settings
 - [ ] A "Voice & Audio" category appears in the User Settings modal
 - [ ] Users can select input and output audio devices from dropdown lists
 - [ ] An input sensitivity slider with a live audio level meter is provided
 - [ ] All voice settings persist to `localStorage`
 
-### AC-16: WebRTC Connection Resilience
+### AC-15: WebRTC Connection Resilience
 - [ ] ICE candidate exchange completes successfully through SignalR
-- [ ] TURN relay is used when direct P2P connection fails
+- [ ] Custom TURN server relay is used when direct P2P connection fails
 - [ ] Audio quality adapts to available bandwidth (Opus bitrate adjustment)
 - [ ] Temporary network interruptions are handled gracefully with automatic reconnection attempts
 
@@ -920,9 +906,8 @@ Microphone Input
 - **Prerequisite:** Existing Channel and Server infrastructure for voice channels
 - **Prerequisite:** Existing DM channel infrastructure for direct calls (see [DIRECT_MESSAGES.md](DIRECT_MESSAGES.md))
 - **Prerequisite:** Existing SignalR hub for signaling (see [ARCHITECTURE.md](ARCHITECTURE.md))
-- **External:** STUN/TURN server infrastructure for NAT traversal (e.g., Twilio STUN/TURN, Metered, or self-hosted coturn)
-- **External:** Krisp SDK for noise suppression (or alternative: RNNoise as open-source fallback)
-- **External (future):** SFU media server for voice channels with many participants (e.g., mediasoup, Janus, or LiveKit)
+- **Custom infrastructure:** Custom STUN/TURN server for NAT traversal and relay (self-hosted, full control)
+- **Custom infrastructure:** Custom SFU media server for voice channels with many participants (self-hosted, full control)
 - **Reuses:** Existing User Panel, channel sidebar, DM chat area components
 - **Reuses:** Existing User Settings modal with new "Voice & Audio" category
 - **Related:** Presence indicators (future) — showing online/offline status complements voice state
@@ -1000,14 +985,32 @@ A single EF Core migration (`AddVoiceChannels`) will:
 - [ ] Add "Voice & Audio" category to User Settings modal
 - [ ] Create `VoiceSettings.svelte` with input/output device selection, input mode, sensitivity slider
 - [ ] Implement push-to-talk keybind recorder and PTT gate logic
-- [ ] Integrate Krisp SDK (or RNNoise fallback) for noise suppression toggle
 - [ ] Implement voice activity detection with `AnalyserNode` and speaking indicator
 - [ ] Persist voice settings to `localStorage`
 
-### Phase 4: Polish & Resilience
+### Phase 4: Custom Infrastructure (SFU & TURN)
+
+#### SFU Media Server
+- [ ] Design custom SFU architecture for multi-participant voice channels
+- [ ] Implement SFU signaling protocol (WebRTC negotiation with each participant)
+- [ ] Implement selective audio stream forwarding (receive one stream per participant, forward N-1)
+- [ ] Handle participant join/leave with dynamic stream renegotiation
+- [ ] Add SFU health monitoring and connection metrics
+- [ ] Deploy and configure SFU server infrastructure
+- [ ] Integrate SFU with the existing SignalR signaling flow
+
+#### TURN Server
+- [ ] Design and build custom TURN server for NAT traversal relay
+- [ ] Implement STUN binding for public IP discovery
+- [ ] Implement TURN relay allocation and channel data forwarding
+- [ ] Add authentication for TURN credentials (time-limited, per-session)
+- [ ] Deploy and configure TURN server infrastructure
+- [ ] Integrate TURN server credentials into WebRTC `RTCPeerConnection` ICE configuration
+
+### Phase 5: Polish & Resilience
 
 - [ ] Handle WebRTC connection failures with retry logic
-- [ ] Implement TURN server fallback configuration
+- [ ] Implement custom TURN server fallback configuration
 - [ ] Handle browser tab close / navigation (clean up voice state via `beforeunload`)
 - [ ] Add `prefers-reduced-motion` support for speaking indicator animations
 - [ ] Add accessibility labels and keyboard navigation for all voice controls
@@ -1022,9 +1025,6 @@ A single EF Core migration (`AddVoiceChannels`) will:
 
 ## Open Questions
 
-- **SFU provider:** Which SFU should be used for voice channels with many participants? (Options: mediasoup, Janus, LiveKit, Cloudflare Calls. Recommendation: start with P2P for ≤4 users, add SFU for 5+.)
-- **STUN/TURN provider:** Should Codec self-host coturn or use a managed service? (Recommendation: start with free STUN servers like Google's `stun.l.google.com:19302` + a managed TURN provider like Metered or Twilio for relay.)
-- **Krisp licensing:** Krisp SDK requires a commercial license. Should Codec use the open-source RNNoise library as an initial alternative? (Recommendation: start with RNNoise via a WebAssembly module, evaluate Krisp for a future premium tier.)
 - **Voice channel user limit:** Should voice channels have a configurable maximum user limit? (Recommendation: defer — allow unlimited initially, add configurable limits in a later iteration.)
 - **Call history:** Should ended calls be surfaced in the DM conversation as system messages (e.g., "Missed call from Alice at 3:45 PM")? (Recommendation: yes, add as a follow-up after core call functionality is implemented.)
 - **Screen sharing:** Should screen sharing be bundled with voice channels and calls? (Recommendation: defer to a separate feature spec — it introduces video tracks and significantly increases scope.)
