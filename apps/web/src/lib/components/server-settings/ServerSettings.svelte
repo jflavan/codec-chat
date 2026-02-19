@@ -527,8 +527,13 @@
 		transition: opacity 150ms ease;
 	}
 
-	.btn-danger:hover {
+	.btn-danger:hover:not(:disabled) {
 		opacity: 0.9;
+	}
+
+	.btn-danger:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.btn-danger-sm {
@@ -543,8 +548,13 @@
 		transition: opacity 150ms ease;
 	}
 
-	.btn-danger-sm:hover {
+	.btn-danger-sm:hover:not(:disabled) {
 		opacity: 0.9;
+	}
+
+	.btn-danger-sm:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.btn-secondary-sm {
@@ -556,6 +566,11 @@
 		font-size: 12px;
 		font-weight: 500;
 		cursor: pointer;
+		transition: color 150ms ease;
+	}
+
+	.btn-secondary-sm:hover:not(:disabled) {
+		color: var(--text-header);
 	}
 
 	@media (max-width: 899px) {
