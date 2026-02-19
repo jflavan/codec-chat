@@ -177,6 +177,15 @@ export class ApiClient {
 		});
 	}
 
+	/** Persist the user's custom server display order. */
+	reorderServers(token: string, serverIds: string[]): Promise<void> {
+		return this.requestVoid(`${this.baseUrl}/servers/reorder`, {
+			method: 'PUT',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ serverIds })
+		});
+	}
+
 	createServer(token: string, name: string): Promise<{ id: string; name: string; role: string }> {
 		return this.request(`${this.baseUrl}/servers`, {
 			method: 'POST',

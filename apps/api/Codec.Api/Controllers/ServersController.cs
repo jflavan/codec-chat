@@ -37,15 +37,16 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             var myMemberships = await db.ServerMembers
                 .AsNoTracking()
                 .Where(m => m.UserId == appUser.Id)
-                .ToDictionaryAsync(m => m.ServerId, m => m.Role.ToString());
+                .ToDictionaryAsync(m => m.ServerId, m => new { Role = m.Role.ToString(), m.SortOrder });
 
             var result = allServers.Select(s => new
             {
                 ServerId = s.Id,
                 s.Name,
                 s.IconUrl,
-                Role = myMemberships.TryGetValue(s.Id, out var role) ? role : (string?)null
-            });
+                Role = myMemberships.TryGetValue(s.Id, out var info) ? info.Role : (string?)null,
+                SortOrder = myMemberships.TryGetValue(s.Id, out var sortInfo) ? sortInfo.SortOrder : int.MaxValue
+            }).OrderBy(s => s.SortOrder);
 
             return Ok(result);
         }
@@ -53,16 +54,60 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var servers = await db.ServerMembers
             .AsNoTracking()
             .Where(member => member.UserId == appUser.Id)
+            .OrderBy(member => member.SortOrder)
             .Select(member => new
             {
                 member.ServerId,
                 Name = member.Server!.Name,
                 IconUrl = member.Server!.IconUrl,
-                Role = member.Role.ToString()
+                Role = member.Role.ToString(),
+                member.SortOrder
             })
             .ToListAsync();
 
         return Ok(servers);
+    }
+
+    /// <summary>
+    /// Persists the user's custom server display order. Only affects the
+    /// authenticated user's sidebar; other users are not impacted.
+    /// </summary>
+    [HttpPut("reorder")]
+    public async Task<IActionResult> ReorderServers([FromBody] ReorderServersRequest request)
+    {
+        if (request.ServerIds.Count == 0)
+        {
+            return BadRequest(new { error = "Server list cannot be empty." });
+        }
+
+        if (request.ServerIds.Count > 1000)
+        {
+            return BadRequest(new { error = "Maximum 1000 servers allowed in reorder request." });
+        }
+
+        if (request.ServerIds.Count != request.ServerIds.Distinct().Count())
+        {
+            return BadRequest(new { error = "Duplicate server IDs are not allowed." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        var memberships = await db.ServerMembers
+            .Where(m => m.UserId == appUser.Id && request.ServerIds.Contains(m.ServerId))
+            .ToListAsync();
+
+        for (var i = 0; i < request.ServerIds.Count; i++)
+        {
+            var membership = memberships.FirstOrDefault(m => m.ServerId == request.ServerIds[i]);
+            if (membership is not null)
+            {
+                membership.SortOrder = i;
+            }
+        }
+
+        await db.SaveChangesAsync();
+
+        return NoContent();
     }
 
     /// <summary>

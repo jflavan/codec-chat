@@ -11,6 +11,12 @@ public class ServerMember
     public DateTimeOffset JoinedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
+    /// User-specific display order in the server list sidebar.
+    /// Lower values appear first. Defaults to 0.
+    /// </summary>
+    public int SortOrder { get; set; }
+
+    /// <summary>
     /// Relative path to a server-specific avatar uploaded by the user.
     /// When set, this overrides the user's global avatar within this server.
     /// </summary>
