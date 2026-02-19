@@ -87,7 +87,12 @@
 		transition: opacity 150ms ease;
 	}
 
-	.sign-out-btn:hover {
+	.sign-out-btn:hover:not(:disabled) {
 		opacity: 0.9;
+	}
+
+	.sign-out-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

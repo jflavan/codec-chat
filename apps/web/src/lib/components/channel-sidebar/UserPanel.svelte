@@ -67,7 +67,7 @@
 			</svg>
 		</button>
 		<button class="sign-out-btn" onclick={() => app.signOut()} aria-label="Sign out" title="Sign out">
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M5 5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7v-2H5V5zm16 7-4-4v3H9v2h8v3l4-4z"/>
 			</svg>
 		</button>
