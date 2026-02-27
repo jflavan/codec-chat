@@ -27,8 +27,12 @@ param containerRegistryName string
 @description('VM admin username.')
 param adminUsername string = 'azureuser'
 
-@description('Source IP prefix allowed to SSH into the VM. Restrict to your operator CIDR in production (e.g. "203.0.113.0/24"). Defaults to "*" for convenience but should be tightened.')
-param sshAllowedSourcePrefix string = '*'
+@description('Source IP prefix allowed to SSH into the VM. Must be set to your operator CIDR (e.g. "203.0.113.0/24"). No default is provided to prevent accidental exposure.')
+@minLength(1)
+param sshAllowedSourcePrefix string
+
+@description('Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only). Restrict further once VNet integration with the Container App is in place.')
+param sfuApiAllowedSourcePrefix string = 'AzureCloud'
 
 // ── Port constants ──────────────────────────────────────────────────────────────
 var sfuPort         = 3001
@@ -125,7 +129,8 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
         }
       }
       // SFU HTTP API — called by the API Container App
-      // TODO: tighten to Container Apps outbound CIDR once VNet integration is added
+      // TODO: move behind private VNet integration so this port is not internet-reachable.
+      // Currently restricted to AzureCloud IPs via sfuApiAllowedSourcePrefix.
       {
         name: 'allow-sfu-api'
         properties: {
@@ -133,7 +138,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           protocol: 'Tcp'
           access: 'Allow'
           direction: 'Inbound'
-          sourceAddressPrefix: 'Internet'
+          sourceAddressPrefix: sfuApiAllowedSourcePrefix
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: string(sfuPort)
@@ -259,5 +264,9 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // ── Outputs ─────────────────────────────────────────────────────────────────────
 output publicIpAddress string = publicIp.properties.ipAddress
 output fqdn string = publicIp.properties.dnsSettings.fqdn
+// TODO: Terminate TLS in front of the SFU (e.g. add an nginx reverse-proxy with a cert)
+// and change this URL to https:// so that the X-Internal-Key header and all SFU traffic
+// are encrypted in transit. Until then, deploy within a private VNet to avoid exposing
+// the plain-HTTP endpoint to the public internet.
 output sfuApiUrl string = 'http://${publicIp.properties.ipAddress}:${sfuPort}'
 output turnServerUrl string = 'turn:${publicIp.properties.ipAddress}:${turnPort}'

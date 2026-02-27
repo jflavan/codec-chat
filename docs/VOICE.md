@@ -197,15 +197,30 @@ services:
       SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
 
   coturn:
-    image: coturn/coturn:latest
+    # Pinned to a specific version (not `latest`) to prevent supply-chain attacks.
+    image: coturn/coturn:4.6.2
     restart: unless-stopped
     network_mode: host    # required for UDP relay port binding
-    command: >
-      --lt-cred-mech --use-auth-secret
-      --static-auth-secret=${TURN_SECRET}
-      --realm=codec-chat.com --listening-port=3478
-      --min-port=49152 --max-port=49200
-      --no-tls --no-dtls --log-file=stdout
+    environment:
+      TURN_SECRET: "${TURN_SECRET}"
+    # tmpfs keeps the generated config file in memory only (never written to disk).
+    # The entrypoint writes the secret to a config file so it does not appear in
+    # process listings (ps aux). sha256 requires coturn 4.6.0+ and must match the
+    # HMAC algorithm used by the API's TURN credential endpoint.
+    tmpfs:
+      - /tmp
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        printf '%s\n' \
+          'lt-cred-mech' 'use-auth-secret' \
+          "static-auth-secret=$$TURN_SECRET" \
+          'realm=codec-chat.com' 'listening-port=3478' \
+          'min-port=49152' 'max-port=49200' \
+          'no-tls' 'no-dtls' 'log-file=stdout' 'sha256' \
+          > /tmp/turnserver.conf
+        exec turnserver -c /tmp/turnserver.conf
 ```
 
 `network_mode: host` is used on coturn so UDP relay ports bind directly on the host NIC. The SFU uses explicit port mapping instead.
