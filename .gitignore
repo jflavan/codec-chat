@@ -85,5 +85,8 @@ uploads/
 appsettings.Development.json
 apps/api/Codec.Api/appsettings.Development.json
 
+# Local dev compose (may contain secrets)
+docker-compose.dev.yml
+
 # Deployment plan (contains infrastructure details)
 docs/GCP_DEPLOYMENT_PLAN.md

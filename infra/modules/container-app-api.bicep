@@ -14,6 +14,18 @@ param storageBlobEndpoint string
 param corsAllowedOrigins string
 param apiBaseUrl string
 
+@description('Internal URL of the mediasoup SFU (e.g., http://<voice-vm-ip>:3001).')
+param sfuApiUrl string = ''
+
+@description('TURN server URL for WebRTC ICE (e.g., turn:<voice-vm-ip>:3478).')
+param turnServerUrl string = ''
+
+@description('Key Vault secret URL for the TURN shared secret. Leave empty if voice is not enabled.')
+param voiceTurnKvUrl string = ''
+
+@description('Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled.')
+param voiceSfuInternalKeyKvUrl string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -65,7 +77,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           allowCredentials: true
         }
       }
-      secrets: [
+      secrets: concat([
         {
           name: 'connection-string'
           keyVaultUrl: '${keyVaultUri}secrets/ConnectionStrings--Default'
@@ -81,7 +93,19 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUri}secrets/GlobalAdmin--Email'
           identity: 'system'
         }
-      ]
+      ], voiceTurnKvUrl != '' ? [
+        {
+          name: 'voice-turn-secret'
+          keyVaultUrl: voiceTurnKvUrl
+          identity: 'system'
+        }
+      ] : [], voiceSfuInternalKeyKvUrl != '' ? [
+        {
+          name: 'voice-sfu-internal-key'
+          keyVaultUrl: voiceSfuInternalKeyKvUrl
+          identity: 'system'
+        }
+      ] : [])
       registries: [
         {
           server: containerRegistryLoginServer
@@ -98,7 +122,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
+          env: concat([
             {
               name: 'ASPNETCORE_ENVIRONMENT'
               value: 'Production'
@@ -131,7 +155,26 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'GlobalAdmin__Email'
               secretRef: 'global-admin-email'
             }
-          ]
+          ], sfuApiUrl != '' ? [
+            {
+              name: 'Voice__MediasoupApiUrl'
+              value: sfuApiUrl
+            }
+            {
+              name: 'Voice__TurnServerUrl'
+              value: turnServerUrl
+            }
+          ] : [], voiceTurnKvUrl != '' ? [
+            {
+              name: 'Voice__TurnSecret'
+              secretRef: 'voice-turn-secret'
+            }
+          ] : [], voiceSfuInternalKeyKvUrl != '' ? [
+            {
+              name: 'Voice__SfuInternalKey'
+              secretRef: 'voice-sfu-internal-key'
+            }
+          ] : [])
           probes: [
             {
               type: 'Liveness'

@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "17109227901842363604"
+      "templateHash": "6607898756118251830"
     }
   },
   "parameters": {
@@ -33,6 +33,12 @@
       "type": "securestring",
       "metadata": {
         "description": "PostgreSQL administrator password."
+      }
+    },
+    "globalAdminEmail": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Email address of the global admin user."
       }
     },
     "apiContainerImage": {
@@ -69,6 +75,40 @@
       "metadata": {
         "description": "Set to true on a second deployment pass to bind managed TLS certificates to custom domains. Requires a prior deployment with this set to false so that hostnames are registered first."
       }
+    },
+    "voiceVmEnabled": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Deploy the voice VM (mediasoup SFU + coturn). Set to false to skip voice infrastructure."
+      }
+    },
+    "voiceAdminSshPublicKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "SSH public key for the voice VM admin user. Required when voiceVmEnabled is true."
+      }
+    },
+    "voiceSshAllowedSourcePrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "Source IP or CIDR allowed to SSH into the voice VM. Required; set to your operator CIDR (e.g. \"203.0.113.0/24\"). No default is provided to prevent accidental open access."
+      }
+    },
+    "voiceTurnSecret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true."
+      }
+    },
+    "voiceSfuInternalKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Shared secret for the SFU internal API. Required when voiceVmEnabled is true."
+      }
     }
   },
   "variables": {
@@ -80,7 +120,8 @@
     "keyVaultName": "[format('kv-{0}', variables('baseName'))]",
     "containerAppsEnvName": "[format('cae-{0}', variables('baseName'))]",
     "apiAppName": "[format('ca-{0}-api', variables('baseName'))]",
-    "webAppName": "[format('ca-{0}-web', variables('baseName'))]"
+    "webAppName": "[format('ca-{0}-web', variables('baseName'))]",
+    "voiceVmName": "[format('vm-{0}-voice', variables('baseName'))]"
   },
   "resources": [
     {
@@ -673,6 +714,531 @@
       ]
     },
     {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "global-admin-email-secret",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "GlobalAdmin--Email"
+          },
+          "secretValue": {
+            "value": "[parameters('globalAdminEmail')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+      ]
+    },
+    {
+      "condition": "[parameters('voiceVmEnabled')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "voice-vm",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('voiceVmName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "adminSshPublicKey": {
+            "value": "[parameters('voiceAdminSshPublicKey')]"
+          },
+          "containerRegistryName": {
+            "value": "[variables('containerRegistryName')]"
+          },
+          "sshAllowedSourcePrefix": {
+            "value": "[parameters('voiceSshAllowedSourcePrefix')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "616378294393445261"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "adminSshPublicKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "SSH public key for the azureuser admin account."
+              }
+            },
+            "containerRegistryName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the existing Azure Container Registry (for AcrPull role assignment)."
+              }
+            },
+            "adminUsername": {
+              "type": "string",
+              "defaultValue": "azureuser",
+              "metadata": {
+                "description": "VM admin username."
+              }
+            },
+            "sshAllowedSourcePrefix": {
+              "type": "string",
+              "metadata": {
+                "description": "Source IP prefix allowed to SSH into the VM. Must be set to your operator CIDR (e.g. \"203.0.113.0/24\"). No default is provided to prevent accidental exposure."
+              }
+            },
+            "sfuApiAllowedSourcePrefix": {
+              "type": "string",
+              "defaultValue": "AzureCloud",
+              "metadata": {
+                "description": "Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only)."
+              }
+            }
+          },
+          "variables": {
+            "sfuPort": 3001,
+            "turnPort": 3478,
+            "rtcMinPort": 40000,
+            "rtcMaxPort": 40100,
+            "relayMinPort": 49152,
+            "relayMaxPort": 49200,
+            "cloudInit": "#cloud-config\r\n\r\npackage_update: true\r\npackage_upgrade: false\r\n\r\npackages:\r\n  - docker.io\r\n  - docker-compose-plugin\r\n  - curl\r\n  - jq\r\n\r\nruncmd:\r\n  - systemctl enable docker\r\n  - systemctl start docker\r\n  - mkdir -p /opt/voice\r\n  - chown azureuser:azureuser /opt/voice\r\n"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/publicIPAddresses",
+              "apiVersion": "2023-09-01",
+              "name": "[format('{0}-pip', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                  "domainNameLabel": "[parameters('name')]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2023-09-01",
+              "name": "[format('{0}-nsg', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "allow-ssh",
+                    "properties": {
+                      "priority": 100,
+                      "protocol": "Tcp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "[parameters('sshAllowedSourcePrefix')]",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "22"
+                    }
+                  },
+                  {
+                    "name": "allow-turn-udp",
+                    "properties": {
+                      "priority": 200,
+                      "protocol": "Udp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "*",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "[string(variables('turnPort'))]"
+                    }
+                  },
+                  {
+                    "name": "allow-turn-tcp",
+                    "properties": {
+                      "priority": 201,
+                      "protocol": "Tcp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "*",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "[string(variables('turnPort'))]"
+                    }
+                  },
+                  {
+                    "name": "allow-coturn-relay",
+                    "properties": {
+                      "priority": 210,
+                      "protocol": "Udp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "*",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "[format('{0}-{1}', variables('relayMinPort'), variables('relayMaxPort'))]"
+                    }
+                  },
+                  {
+                    "name": "allow-mediasoup-webrtc",
+                    "properties": {
+                      "priority": 220,
+                      "protocol": "Udp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "*",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "[format('{0}-{1}', variables('rtcMinPort'), variables('rtcMaxPort'))]"
+                    }
+                  },
+                  {
+                    "name": "allow-sfu-api",
+                    "properties": {
+                      "priority": 300,
+                      "protocol": "Tcp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "[parameters('sfuApiAllowedSourcePrefix')]",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "[string(variables('sfuPort'))]"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2023-09-01",
+              "name": "[format('{0}-vnet', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "10.1.0.0/24"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "voice",
+                    "properties": {
+                      "addressPrefix": "10.1.0.0/24",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', parameters('name')))]"
+                      }
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', parameters('name')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/networkInterfaces",
+              "apiVersion": "2023-09-01",
+              "name": "[format('{0}-nic', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "ipConfigurations": [
+                  {
+                    "name": "ipconfig1",
+                    "properties": {
+                      "subnet": {
+                        "id": "[format('{0}/subnets/voice', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('name'))))]"
+                      },
+                      "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name')))]"
+                      },
+                      "privateIPAllocationMethod": "Dynamic"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name')))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('name')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Compute/virtualMachines",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "hardwareProfile": {
+                  "vmSize": "Standard_B2s"
+                },
+                "storageProfile": {
+                  "imageReference": {
+                    "publisher": "Canonical",
+                    "offer": "0001-com-ubuntu-server-noble",
+                    "sku": "24_04-lts-gen2",
+                    "version": "latest"
+                  },
+                  "osDisk": {
+                    "createOption": "FromImage",
+                    "managedDisk": {
+                      "storageAccountType": "Standard_LRS"
+                    },
+                    "diskSizeGB": 30
+                  }
+                },
+                "osProfile": {
+                  "computerName": "[parameters('name')]",
+                  "adminUsername": "[parameters('adminUsername')]",
+                  "customData": "[base64(variables('cloudInit'))]",
+                  "linuxConfiguration": {
+                    "disablePasswordAuthentication": true,
+                    "ssh": {
+                      "publicKeys": [
+                        {
+                          "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
+                          "keyData": "[parameters('adminSshPublicKey')]"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "networkProfile": {
+                  "networkInterfaces": [
+                    {
+                      "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('name')))]"
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('name')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName')), resourceId('Microsoft.Compute/virtualMachines', parameters('name')), '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
+              "properties": {
+                "principalId": "[reference(resourceId('Microsoft.Compute/virtualMachines', parameters('name')), '2024-03-01', 'full').identity.principalId]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "publicIpAddress": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress]"
+            },
+            "fqdn": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').dnsSettings.fqdn]"
+            },
+            "sfuApiUrl": {
+              "type": "string",
+              "value": "[format('http://{0}:{1}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress, variables('sfuPort'))]"
+            },
+            "turnServerUrl": {
+              "type": "string",
+              "value": "[format('turn:{0}:{1}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress, variables('turnPort'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "condition": "[parameters('voiceVmEnabled')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "voice-turn-secret",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "Voice--TurnSecret"
+          },
+          "secretValue": {
+            "value": "[parameters('voiceTurnSecret')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+      ]
+    },
+    {
+      "condition": "[parameters('voiceVmEnabled')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "voice-sfu-internal-key",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "Voice--SfuInternalKey"
+          },
+          "secretValue": {
+            "value": "[parameters('voiceSfuInternalKey')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+      ]
+    },
+    {
       "condition": "[not(equals(parameters('apiCustomDomain'), ''))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -863,7 +1429,15 @@
           "customDomainName": {
             "value": "[parameters('apiCustomDomain')]"
           },
-          "managedCertificateId": "[if(and(parameters('bindCertificates'), not(equals(parameters('apiCustomDomain'), ''))), createObject('value', format('{0}/managedCertificates/cert-api', reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.id.value)), createObject('value', ''))]"
+          "managedCertificateId": "[if(and(parameters('bindCertificates'), not(equals(parameters('apiCustomDomain'), ''))), createObject('value', format('{0}/managedCertificates/cert-api', reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.id.value)), createObject('value', ''))]",
+          "sfuApiUrl": {
+            "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'sfuApiUrl', 'value'), '')]"
+          },
+          "turnServerUrl": {
+            "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'turnServerUrl', 'value'), '')]"
+          },
+          "voiceTurnKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--TurnSecret', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value)), createObject('value', ''))]",
+          "voiceSfuInternalKeyKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--SfuInternalKey', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value)), createObject('value', ''))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -872,7 +1446,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "6806080609849774220"
+              "templateHash": "12952861129033102760"
             }
           },
           "parameters": {
@@ -913,6 +1487,34 @@
             "apiBaseUrl": {
               "type": "string"
             },
+            "sfuApiUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Internal URL of the mediasoup SFU (e.g., http://<voice-vm-ip>:3001)."
+              }
+            },
+            "turnServerUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "TURN server URL for WebRTC ICE (e.g., turn:<voice-vm-ip>:3478)."
+              }
+            },
+            "voiceTurnKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the TURN shared secret. Leave empty if voice is not enabled."
+              }
+            },
+            "voiceSfuInternalKeyKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled."
+              }
+            },
             "customDomainName": {
               "type": "string",
               "defaultValue": "",
@@ -928,9 +1530,6 @@
               }
             }
           },
-          "variables": {
-            "isQuickstart": "[equals(parameters('containerImage'), 'mcr.microsoft.com/k8se/quickstart:latest')]"
-          },
           "resources": [
             {
               "type": "Microsoft.App/containerApps",
@@ -943,10 +1542,10 @@
               "properties": {
                 "managedEnvironmentId": "[parameters('environmentId')]",
                 "configuration": {
-                  "activeRevisionsMode": "Single",
+                  "activeRevisionsMode": "Multiple",
                   "ingress": {
                     "external": true,
-                    "targetPort": "[if(variables('isQuickstart'), 80, 8080)]",
+                    "targetPort": 8080,
                     "transport": "http",
                     "customDomains": "[if(and(not(equals(parameters('customDomainName'), '')), not(equals(parameters('managedCertificateId'), ''))), createArray(createObject('name', parameters('customDomainName'), 'certificateId', parameters('managedCertificateId'), 'bindingType', 'SniEnabled')), if(not(equals(parameters('customDomainName'), '')), createArray(createObject('name', parameters('customDomainName'), 'bindingType', 'Disabled')), createArray()))]",
                     "corsPolicy": {
@@ -967,8 +1566,13 @@
                       "allowCredentials": true
                     }
                   },
-                  "secrets": "[if(variables('isQuickstart'), createArray(), createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system')))]",
-                  "registries": "[if(variables('isQuickstart'), createArray(), createArray(createObject('server', parameters('containerRegistryLoginServer'), 'identity', 'system')))]"
+                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()))]",
+                  "registries": [
+                    {
+                      "server": "[parameters('containerRegistryLoginServer')]",
+                      "identity": "system"
+                    }
+                  ]
                 },
                 "template": {
                   "containers": [
@@ -979,8 +1583,27 @@
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"
                       },
-                      "env": "[if(variables('isQuickstart'), createArray(), createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint'))))]",
-                      "probes": "[if(variables('isQuickstart'), createArray(), createArray(createObject('type', 'Liveness', 'httpGet', createObject('path', '/health/live', 'port', 8080, 'scheme', 'HTTP'), 'periodSeconds', 30), createObject('type', 'Readiness', 'httpGet', createObject('path', '/health/ready', 'port', 8080, 'scheme', 'HTTP'), 'periodSeconds', 10)))]"
+                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()))]",
+                      "probes": [
+                        {
+                          "type": "Liveness",
+                          "httpGet": {
+                            "path": "/health/live",
+                            "port": 8080,
+                            "scheme": "HTTP"
+                          },
+                          "periodSeconds": 30
+                        },
+                        {
+                          "type": "Readiness",
+                          "httpGet": {
+                            "path": "/health/ready",
+                            "port": 8080,
+                            "scheme": "HTTP"
+                          },
+                          "periodSeconds": 10
+                        }
+                      ]
                     }
                   ],
                   "scale": {
@@ -1057,7 +1680,8 @@
         "[resourceId('Microsoft.Resources/deployments', 'container-apps-env')]",
         "[resourceId('Microsoft.Resources/deployments', 'container-registry')]",
         "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
-        "[resourceId('Microsoft.Resources/deployments', 'storage-account')]"
+        "[resourceId('Microsoft.Resources/deployments', 'storage-account')]",
+        "[resourceId('Microsoft.Resources/deployments', 'voice-vm')]"
       ]
     },
     {
@@ -1104,7 +1728,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "9446214098727553630"
+              "templateHash": "7331663258780236917"
             }
           },
           "parameters": {
@@ -1148,9 +1772,6 @@
               }
             }
           },
-          "variables": {
-            "isQuickstart": "[equals(parameters('containerImage'), 'mcr.microsoft.com/k8se/quickstart:latest')]"
-          },
           "resources": [
             {
               "type": "Microsoft.App/containerApps",
@@ -1163,14 +1784,19 @@
               "properties": {
                 "managedEnvironmentId": "[parameters('environmentId')]",
                 "configuration": {
-                  "activeRevisionsMode": "Single",
+                  "activeRevisionsMode": "Multiple",
                   "ingress": {
                     "external": true,
-                    "targetPort": "[if(variables('isQuickstart'), 80, 3000)]",
+                    "targetPort": 3000,
                     "transport": "http",
                     "customDomains": "[if(and(not(equals(parameters('customDomainName'), '')), not(equals(parameters('managedCertificateId'), ''))), createArray(createObject('name', parameters('customDomainName'), 'certificateId', parameters('managedCertificateId'), 'bindingType', 'SniEnabled')), if(not(equals(parameters('customDomainName'), '')), createArray(createObject('name', parameters('customDomainName'), 'bindingType', 'Disabled')), createArray()))]"
                   },
-                  "registries": "[if(variables('isQuickstart'), createArray(), createArray(createObject('server', parameters('containerRegistryLoginServer'), 'identity', 'system')))]"
+                  "registries": [
+                    {
+                      "server": "[parameters('containerRegistryLoginServer')]",
+                      "identity": "system"
+                    }
+                  ]
                 },
                 "template": {
                   "containers": [
@@ -1181,12 +1807,35 @@
                         "cpu": "[json('0.25')]",
                         "memory": "0.5Gi"
                       },
-                      "env": "[if(variables('isQuickstart'), createArray(), createArray(createObject('name', 'NODE_ENV', 'value', 'production'), createObject('name', 'PUBLIC_API_BASE_URL', 'value', parameters('publicApiBaseUrl')), createObject('name', 'PUBLIC_GOOGLE_CLIENT_ID', 'value', parameters('publicGoogleClientId'))))]",
-                      "probes": "[if(variables('isQuickstart'), createArray(), createArray(createObject('type', 'Liveness', 'httpGet', createObject('path', '/health', 'port', 3000, 'scheme', 'HTTP'), 'periodSeconds', 30)))]"
+                      "env": [
+                        {
+                          "name": "NODE_ENV",
+                          "value": "production"
+                        },
+                        {
+                          "name": "PUBLIC_API_BASE_URL",
+                          "value": "[parameters('publicApiBaseUrl')]"
+                        },
+                        {
+                          "name": "PUBLIC_GOOGLE_CLIENT_ID",
+                          "value": "[parameters('publicGoogleClientId')]"
+                        }
+                      ],
+                      "probes": [
+                        {
+                          "type": "Liveness",
+                          "httpGet": {
+                            "path": "/health",
+                            "port": 3000,
+                            "scheme": "HTTP"
+                          },
+                          "periodSeconds": 30
+                        }
+                      ]
                     }
                   ],
                   "scale": {
-                    "minReplicas": 0,
+                    "minReplicas": 1,
                     "maxReplicas": 2
                   }
                 }
@@ -1257,6 +1906,22 @@
     "keyVaultUri": {
       "type": "string",
       "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value]"
+    },
+    "voiceVmPublicIp": {
+      "type": "string",
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'publicIpAddress', 'value'), '')]"
+    },
+    "voiceVmFqdn": {
+      "type": "string",
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'fqdn', 'value'), '')]"
+    },
+    "sfuApiUrl": {
+      "type": "string",
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'sfuApiUrl', 'value'), '')]"
+    },
+    "turnServerUrl": {
+      "type": "string",
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'turnServerUrl', 'value'), '')]"
     }
   }
 }

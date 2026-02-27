@@ -1,0 +1,63 @@
+# Production voice services — mediasoup SFU + coturn TURN server.
+# Deployed to /opt/voice/docker-compose.yml on the voice VM by CI/CD.
+# CI/CD substitutes the ${...} variables before writing the file to the VM.
+#
+# Required substitutions (set as env vars before running envsubst):
+#   ACR_SERVER        — e.g. acrcodecprod.azurecr.io
+#   IMAGE_TAG         — Docker image tag (git SHA)
+#   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
+#   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
+#   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
+
+services:
+  sfu:
+    image: ${ACR_SERVER}/codec-sfu:${IMAGE_TAG}
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+      - "40000-40100:40000-40100/udp"
+    environment:
+      ANNOUNCED_IP: "${ANNOUNCED_IP}"
+      RTC_MIN_PORT: "40000"
+      RTC_MAX_PORT: "40100"
+      SFU_PORT: "3001"
+      SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
+
+  coturn:
+    # Pinned to a specific version tag (4.6.2). Note: this is a mutable tag, not a digest pin.
+    # For stronger supply-chain guarantees, pin by digest (@sha256:...) instead.
+    image: coturn/coturn:4.6.2
+    restart: unless-stopped
+    # network_mode: host is required so coturn can bind UDP relay ports
+    # directly on the host NIC without NAT, which would break relay address
+    # advertisement. The SFU uses explicit port mapping instead.
+    network_mode: host
+    environment:
+      TURN_SECRET: "${TURN_SECRET}"
+    # Write the coturn config to /tmp (tmpfs inside the container) so the secret does not
+    # appear in process listings (ps aux). Note: CI/CD envsubst substitutes ${TURN_SECRET}
+    # into this docker-compose.yml before writing it to /opt/voice/docker-compose.yml on
+    # the VM — the secret is therefore present in that file on disk. Ensure the VM's
+    # /opt/voice directory has restricted permissions (e.g. chmod 600 .../docker-compose.yml).
+    # sha256 requires coturn 4.6.0+ and must match the HMAC algorithm used by the API.
+    tmpfs:
+      - /tmp
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        printf '%s\n' \
+          'lt-cred-mech' \
+          'use-auth-secret' \
+          "static-auth-secret=$$TURN_SECRET" \
+          'realm=codec-chat.com' \
+          'listening-port=3478' \
+          'min-port=49152' \
+          'max-port=49200' \
+          'no-tls' \
+          'no-dtls' \
+          'log-file=stdout' \
+          'sha256' \
+          > /tmp/turnserver.conf
+        exec turnserver -c /tmp/turnserver.conf

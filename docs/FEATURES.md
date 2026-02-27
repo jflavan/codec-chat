@@ -195,6 +195,23 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Display override stack (`standalone` → `minimal-ui`) and `launch_handler` for navigate-existing
 - ✅ Edge Side Panel support (`preferred_width: 400`)
 
+### Voice Channels ([detailed spec](VOICE.md))
+- ✅ Persistent voice channel type (`ChannelType.Voice`) on servers — visible in channel sidebar with speaker icon
+- ✅ Join/leave voice channels freely — no ringing, drop in and out at will
+- ✅ Real-time audio via custom mediasoup v3 SFU — Opus codec, WebRTC media plane
+- ✅ SignalR used for signaling (join, leave, new-producer notifications); audio flows directly via WebRTC
+- ✅ Per-participant send transport (mic → SFU) and recv transport (SFU → speakers)
+- ✅ Mute/unmute — pauses/resumes the audio Producer; `VoiceMuteChanged` event broadcast to channel
+- ✅ Participant list with avatars and mute indicators shown on voice channel rows
+- ✅ `VoiceControls` bar shown while connected (mute toggle, leave button)
+- ✅ Double-consume race guard — `consumedProducerIds` Set prevents duplicate consumer creation
+- ✅ Concurrent join protection — unique DB index on `VoiceStates.UserId`; surfaced as clear error
+- ✅ Reliable disconnect cleanup — `OnDisconnectedAsync` try-catch with fallback delete by `ConnectionId`
+- ✅ Transport ownership validation on SFU — prevents cross-participant transport IDOR
+- ✅ Producer room validation on SFU — verifies producer exists in room before consuming
+- ✅ Microphone permission errors surfaced with user-friendly messages
+- ✅ SFU secured with shared internal key (`X-Internal-Key`), rate limiting (120 req/min), and JSON body size cap
+
 ### Frontend Architecture
 - ✅ Modular layered architecture (types, API client, auth, services, state, components)
 - ✅ Central `AppState` class with Svelte 5 `$state` / `$derived` runes
@@ -257,7 +274,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ## 🔮 Future (Later)
 
 ### Advanced Features
-- Voice channels (WebRTC)
 - Video chat
 - Screen sharing
 - Message pinning

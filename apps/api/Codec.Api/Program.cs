@@ -87,6 +87,19 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 
 builder.Services.AddScoped<IUserService, UserService>();
 
+// Named HTTP client for SFU internal API calls.
+// Attaches the shared internal key header when configured.
+builder.Services.AddHttpClient("sfu", (sp, client) =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    var sfuKey = sp.GetRequiredService<IConfiguration>()["Voice:SfuInternalKey"];
+    if (!string.IsNullOrEmpty(sfuKey))
+        client.DefaultRequestHeaders.Add("X-Internal-Key", sfuKey);
+    else
+        sp.GetRequiredService<ILogger<Program>>()
+          .LogWarning("SFU security configuration incomplete: Voice:SfuInternalKey is not configured.");
+});
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
 

@@ -37,6 +37,24 @@ param apiCustomDomain string = ''
 @description('Set to true on a second deployment pass to bind managed TLS certificates to custom domains. Requires a prior deployment with this set to false so that hostnames are registered first.')
 param bindCertificates bool = false
 
+@description('Deploy the voice VM (mediasoup SFU + coturn). Set to false to skip voice infrastructure.')
+param voiceVmEnabled bool = false
+
+@description('SSH public key for the voice VM admin user. Required when voiceVmEnabled is true.')
+@secure()
+param voiceAdminSshPublicKey string = ''
+
+@description('Source IP or CIDR allowed to SSH into the voice VM. Set to your operator CIDR (e.g. "203.0.113.0/24"). Defaults to empty string; the voice-vm module will use "AzureCloud" (deny internet SSH) when this is empty and voiceVmEnabled is false.')
+param voiceSshAllowedSourcePrefix string = ''
+
+@description('HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
+@secure()
+param voiceTurnSecret string = ''
+
+@description('Shared secret for the SFU internal API. Required when voiceVmEnabled is true.')
+@secure()
+param voiceSfuInternalKey string = ''
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -50,6 +68,7 @@ var keyVaultName = 'kv-${baseName}'
 var containerAppsEnvName = 'cae-${baseName}'
 var apiAppName = 'ca-${baseName}-api'
 var webAppName = 'ca-${baseName}-web'
+var voiceVmName = 'vm-${baseName}-voice'
 
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
 var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
@@ -129,6 +148,42 @@ module globalAdminEmailSecret 'modules/key-vault-secret.bicep' = {
   }
 }
 
+// ── Voice VM (mediasoup SFU + coturn) ────────────────────────────────────────────
+// Deployed only when voiceVmEnabled = true. Both services require UDP port exposure
+// that Azure Container Apps cannot provide, so they run on a dedicated VM instead.
+
+module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
+  name: 'voice-vm'
+  params: {
+    name: voiceVmName
+    location: location
+    adminSshPublicKey: voiceAdminSshPublicKey
+    containerRegistryName: containerRegistryName
+    sshAllowedSourcePrefix: voiceSshAllowedSourcePrefix
+  }
+}
+
+// Store the TURN secret in Key Vault so the API Container App can reference it securely.
+module voiceTurnSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
+  name: 'voice-turn-secret'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Voice--TurnSecret'
+    secretValue: voiceTurnSecret
+  }
+}
+
+// Store the SFU internal API key in Key Vault.
+module voiceSfuInternalKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
+  name: 'voice-sfu-internal-key'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Voice--SfuInternalKey'
+    secretValue: voiceSfuInternalKey
+  }
+}
+
+// ── Managed TLS certificates for custom domains ───────────────────────────────────
 // Managed TLS certificates for custom domains.
 // These must deploy AFTER the container apps so the hostnames are already registered.
 module apiCert 'modules/managed-certificate.bicep' = if (apiCustomDomain != '') {
@@ -175,6 +230,10 @@ module apiApp 'modules/container-app-api.bicep' = {
     corsAllowedOrigins: effectiveWebUrl
     customDomainName: apiCustomDomain
     managedCertificateId: apiCertId
+    sfuApiUrl: voiceVm.?outputs.sfuApiUrl ?? ''
+    turnServerUrl: voiceVm.?outputs.turnServerUrl ?? ''
+    voiceTurnKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--TurnSecret' : ''
+    voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
   }
 }
 
@@ -202,3 +261,7 @@ output containerRegistryLoginServer string = containerRegistry.outputs.loginServ
 output postgresqlFqdn string = postgresql.outputs.fqdn
 output storageBlobEndpoint string = storageAccount.outputs.blobEndpoint
 output keyVaultUri string = keyVault.outputs.uri
+output voiceVmPublicIp string = voiceVm.?outputs.publicIpAddress ?? ''
+output voiceVmFqdn string = voiceVm.?outputs.fqdn ?? ''
+output sfuApiUrl string = voiceVm.?outputs.sfuApiUrl ?? ''
+output turnServerUrl string = voiceVm.?outputs.turnServerUrl ?? ''

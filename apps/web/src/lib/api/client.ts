@@ -12,7 +12,8 @@ import type {
 	UserSearchResult,
 	DmConversation,
 	DirectMessage,
-	ServerInvite
+	ServerInvite,
+	VoiceChannelMember
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -227,12 +228,13 @@ export class ApiClient {
 	createChannel(
 		token: string,
 		serverId: string,
-		name: string
+		name: string,
+		type?: 'text' | 'voice'
 	): Promise<Channel> {
 		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/channels`, {
 			method: 'POST',
 			headers: this.headers(token, true),
-			body: JSON.stringify({ name })
+			body: JSON.stringify({ name, type: type ?? 'text' })
 		});
 	}
 
@@ -531,5 +533,33 @@ export class ApiClient {
 			`${this.baseUrl}/invites/${encodeURIComponent(code)}`,
 			{ method: 'POST', headers: this.headers(token) }
 		);
+	}
+
+	/* ───── Voice ───── */
+
+	/** Get current voice channel members. */
+	getVoiceStates(token: string, channelId: string): Promise<VoiceChannelMember[]> {
+		return this.request(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/voice-states`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Update the current user's mute/deafen state. */
+	updateVoiceState(token: string, isMuted: boolean, isDeafened: boolean): Promise<void> {
+		return this.requestVoid(`${this.baseUrl}/voice/state`, {
+			method: 'PATCH',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ isMuted, isDeafened })
+		});
+	}
+
+	/** Get short-lived TURN credentials for WebRTC. */
+	getTurnCredentials(
+		token: string
+	): Promise<{ urls: string[]; username: string; credential: string }> {
+		return this.request(`${this.baseUrl}/voice/turn-credentials`, {
+			headers: this.headers(token)
+		});
 	}
 }
