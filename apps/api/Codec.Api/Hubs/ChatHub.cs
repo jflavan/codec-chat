@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Codec.Api.Data;
@@ -194,8 +193,18 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         catch (DbUpdateException)
         {
             // Unique index on UserId fired — user already has an active session on another
-            // connection (e.g. two browser tabs). Reject cleanly rather than letting an
-            // unhandled exception surface as a generic internal error.
+            // connection (e.g. two browser tabs). Best-effort: clean up the SFU transports
+            // that were already created so they don't leak in the SFU room.
+            try
+            {
+                using var cleanupClient = httpClientFactory.CreateClient("sfu");
+                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
+            }
+            catch
+            {
+                // SFU cleanup is best-effort; suppress any errors.
+            }
+
             throw new HubException("You are already in a voice channel on another connection.");
         }
 

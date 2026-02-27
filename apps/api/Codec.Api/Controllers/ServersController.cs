@@ -360,7 +360,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var channels = await db.Channels
             .AsNoTracking()
             .Where(channel => channel.ServerId == serverId)
-            .Select(channel => new { channel.Id, channel.Name, channel.ServerId, Type = channel.Type.ToString().ToLower() })
+            .Select(channel => new { channel.Id, channel.Name, channel.ServerId, Type = channel.Type.ToString().ToLowerInvariant() })
             .ToListAsync();
 
         return Ok(channels);
@@ -407,7 +407,19 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             }
         }
 
-        var channelType = request.Type?.ToLower() == "voice" ? ChannelType.Voice : ChannelType.Text;
+        ChannelType channelType;
+        if (string.IsNullOrEmpty(request.Type) || string.Equals(request.Type, "text", StringComparison.OrdinalIgnoreCase))
+        {
+            channelType = ChannelType.Text;
+        }
+        else if (string.Equals(request.Type, "voice", StringComparison.OrdinalIgnoreCase))
+        {
+            channelType = ChannelType.Voice;
+        }
+        else
+        {
+            return BadRequest(new { error = $"Unsupported channel type '{request.Type}'. Supported values are 'text' and 'voice'." });
+        }
 
         var channel = new Channel
         {
@@ -424,7 +436,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             channel.Id,
             channel.Name,
             channel.ServerId,
-            Type = channel.Type.ToString().ToLower()
+            Type = channel.Type.ToString().ToLowerInvariant()
         });
     }
 
