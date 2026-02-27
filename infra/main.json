@@ -92,16 +92,15 @@
     },
     "voiceSshAllowedSourcePrefix": {
       "type": "string",
-      "defaultValue": "*",
       "metadata": {
-        "description": "Source IP or CIDR allowed to SSH into the voice VM. Defaults to unrestricted; tighten in production."
+        "description": "Source IP or CIDR allowed to SSH into the voice VM. Required; set to your operator CIDR (e.g. \"203.0.113.0/24\"). No default is provided to prevent accidental open access."
       }
     },
     "voiceTurnSecret": {
       "type": "securestring",
       "defaultValue": "",
       "metadata": {
-        "description": "HMAC-SHA1 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true."
+        "description": "HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true."
       }
     },
     "voiceSfuInternalKey": {
@@ -842,9 +841,15 @@
             },
             "sshAllowedSourcePrefix": {
               "type": "string",
-              "defaultValue": "*",
               "metadata": {
-                "description": "Source IP prefix allowed to SSH into the VM. Restrict to your operator CIDR in production (e.g. \"203.0.113.0/24\"). Defaults to \"*\" for convenience but should be tightened."
+                "description": "Source IP prefix allowed to SSH into the VM. Must be set to your operator CIDR (e.g. \"203.0.113.0/24\"). No default is provided to prevent accidental exposure."
+              }
+            },
+            "sfuApiAllowedSourcePrefix": {
+              "type": "string",
+              "defaultValue": "AzureCloud",
+              "metadata": {
+                "description": "Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only)."
               }
             }
           },
@@ -952,7 +957,7 @@
                       "protocol": "Tcp",
                       "access": "Allow",
                       "direction": "Inbound",
-                      "sourceAddressPrefix": "Internet",
+                      "sourceAddressPrefix": "[parameters('sfuApiAllowedSourcePrefix')]",
                       "sourcePortRange": "*",
                       "destinationAddressPrefix": "*",
                       "destinationPortRange": "[string(variables('sfuPort'))]"

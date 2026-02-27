@@ -57,6 +57,13 @@ export function createRoomRouter(worker: Worker): Router {
     const { roomId } = req.params;
     const { participantId, direction } = req.body as { participantId: string; direction: 'send' | 'recv' };
 
+    if (!participantId || typeof participantId !== 'string') {
+      return res.status(400).json({ error: 'participantId is required and must be a string' });
+    }
+    if (direction !== 'send' && direction !== 'recv') {
+      return res.status(400).json({ error: 'direction must be "send" or "recv"' });
+    }
+
     const room = rooms.get(roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
