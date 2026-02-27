@@ -53,6 +53,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
             .Select(vs => new
             {
                 vs.UserId,
+                vs.ParticipantId,
                 DisplayName = vs.User!.Nickname ?? vs.User.DisplayName,
                 AvatarUrl = vs.User.CustomAvatarPath ?? vs.User.AvatarUrl,
                 vs.IsMuted,

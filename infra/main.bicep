@@ -44,8 +44,8 @@ param voiceVmEnabled bool = false
 @secure()
 param voiceAdminSshPublicKey string = ''
 
-@description('Source IP or CIDR allowed to SSH into the voice VM. Required; set to your operator CIDR (e.g. "203.0.113.0/24"). No default is provided to prevent accidental open access.')
-param voiceSshAllowedSourcePrefix string
+@description('Source IP or CIDR allowed to SSH into the voice VM. Set to your operator CIDR (e.g. "203.0.113.0/24"). Defaults to empty string; the voice-vm module will use "AzureCloud" (deny internet SSH) when this is empty and voiceVmEnabled is false.')
+param voiceSshAllowedSourcePrefix string = ''
 
 @description('HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
 @secure()
