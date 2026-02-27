@@ -44,10 +44,10 @@ param voiceVmEnabled bool = false
 @secure()
 param voiceAdminSshPublicKey string = ''
 
-@description('Source IP or CIDR allowed to SSH into the voice VM. Defaults to unrestricted; tighten in production.')
-param voiceSshAllowedSourcePrefix string = '*'
+@description('Source IP or CIDR allowed to SSH into the voice VM. Required; set to your operator CIDR (e.g. "203.0.113.0/24"). No default is provided to prevent accidental open access.')
+param voiceSshAllowedSourcePrefix string
 
-@description('HMAC-SHA1 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
+@description('HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
 @secure()
 param voiceTurnSecret string = ''
 

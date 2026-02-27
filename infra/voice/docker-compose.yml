@@ -6,7 +6,7 @@
 #   ACR_SERVER        — e.g. acrcodecprod.azurecr.io
 #   IMAGE_TAG         — Docker image tag (git SHA)
 #   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
-#   TURN_SECRET       — HMAC-SHA1 shared secret for coturn time-limited credentials
+#   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
 #   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
 
 services:
@@ -24,20 +24,36 @@ services:
       SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
 
   coturn:
-    image: coturn/coturn:latest
+    # Pinned to a specific digest/version to prevent supply-chain attacks via mutable tags.
+    image: coturn/coturn:4.6.2
     restart: unless-stopped
     # network_mode: host is required so coturn can bind UDP relay ports
     # directly on the host NIC without NAT, which would break relay address
     # advertisement. The SFU uses explicit port mapping instead.
     network_mode: host
-    command: >
-      --lt-cred-mech
-      --use-auth-secret
-      --static-auth-secret=${TURN_SECRET}
-      --realm=codec-chat.com
-      --listening-port=3478
-      --min-port=49152
-      --max-port=49200
-      --no-tls
-      --no-dtls
-      --log-file=stdout
+    environment:
+      TURN_SECRET: "${TURN_SECRET}"
+    # Write the TURN secret to a config file (in tmpfs) so it does not appear in process
+    # listings (ps aux). tmpfs ensures the secret is memory-only and never written to disk.
+    # sha256 requires coturn 4.6.0+ and must match the HMAC algorithm used by the API.
+    tmpfs:
+      - /tmp
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        printf '%s\n' \
+          'lt-cred-mech' \
+          'use-auth-secret' \
+          "static-auth-secret=$$TURN_SECRET" \
+          'realm=codec-chat.com' \
+          'listening-port=3478' \
+          'min-port=49152' \
+          'max-port=49200' \
+          'no-tls' \
+          'no-dtls' \
+          'log-file=stdout' \
+          'sha256' \
+          > /tmp/turnserver.conf
+        exec turnserver -c /tmp/turnserver.conf

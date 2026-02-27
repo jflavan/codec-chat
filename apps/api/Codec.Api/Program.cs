@@ -97,7 +97,7 @@ builder.Services.AddHttpClient("sfu", (sp, client) =>
         client.DefaultRequestHeaders.Add("X-Internal-Key", sfuKey);
     else
         sp.GetRequiredService<ILogger<Program>>()
-          .LogWarning("Voice:SfuInternalKey is not configured — SFU /rooms routes are unprotected");
+          .LogWarning("SFU security configuration incomplete: Voice:SfuInternalKey is not configured.");
 });
 
 builder.Services.AddHealthChecks()
