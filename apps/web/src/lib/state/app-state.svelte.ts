@@ -11,11 +11,13 @@ import type {
 	UserSearchResult,
 	DmConversation,
 	DirectMessage,
-	ServerInvite
+	ServerInvite,
+	VoiceChannelMember
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
 import type { ReactionUpdate } from '$lib/services/chat-hub.js';
+import { VoiceService } from '$lib/services/voice-service.js';
 import {
 	persistToken,
 	loadStoredToken,
@@ -130,6 +132,7 @@ export class AppState {
 	/* ───── form fields ───── */
 	newServerName = $state('');
 	newChannelName = $state('');
+	newChannelType = $state<'text' | 'voice'>('text');
 	messageBody = $state('');
 	dmMessageBody = $state('');
 	pendingMentions = $state<Map<string, string>>(new Map());
@@ -146,6 +149,14 @@ export class AppState {
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
 	isHubConnected = $state(false);
+
+	/* ───── voice ───── */
+	activeVoiceChannelId = $state<string | null>(null);
+	/** Map of channelId → list of connected members, for sidebar display. */
+	voiceChannelMembers = $state<Map<string, VoiceChannelMember[]>>(new Map());
+	isMuted = $state(false);
+	isDeafened = $state(false);
+	isJoiningVoice = $state(false);
 
 	/* ───── reply state ───── */
 	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
@@ -220,8 +231,11 @@ export class AppState {
 	/* ───── internals ───── */
 	private api: ApiClient;
 	private hub: ChatHubService;
+	private voice: VoiceService = new VoiceService();
 	private refreshPromise: Promise<string | null> | null = null;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Audio elements keyed by participantId for remote streams. */
+	private remoteAudioElements = new Map<string, HTMLAudioElement>();
 
 	constructor(
 		private readonly apiBaseUrl: string,
@@ -363,6 +377,12 @@ export class AppState {
 		this.serverSettingsOpen = false;
 		this.replyingTo = null;
 		this.lightboxImageUrl = null;
+		this.activeVoiceChannelId = null;
+		this.voiceChannelMembers = new Map();
+		this.isMuted = false;
+		this.isDeafened = false;
+		this.isJoiningVoice = false;
+		this._cleanupRemoteAudio();
 
 		await tick();
 		renderGoogleButton('google-button');
@@ -415,7 +435,8 @@ export class AppState {
 			this.channelServerMap = mapNext;
 
 			const previousChannelId = this.selectedChannelId;
-			this.selectedChannelId = this.channels[0]?.id ?? null;
+			const firstTextChannel = this.channels.find((c) => c.type !== 'voice') ?? this.channels[0] ?? null;
+			this.selectedChannelId = firstTextChannel?.id ?? null;
 
 			// Clear mention badge for the auto-selected channel
 			if (this.selectedChannelId) {
@@ -433,6 +454,9 @@ export class AppState {
 				this.messages = [];
 				this.hasMoreMessages = false;
 			}
+
+			// Load voice state membership for each voice channel
+			await this._loadAllVoiceStates();
 		} catch (e) {
 			this.setError(e);
 		} finally {
@@ -610,11 +634,14 @@ export class AppState {
 
 		this.isCreatingChannel = true;
 		try {
-			const created = await this.api.createChannel(this.idToken, this.selectedServerId, name);
+			const created = await this.api.createChannel(this.idToken, this.selectedServerId, name, this.newChannelType);
 			this.newChannelName = '';
+			this.newChannelType = 'text';
 			this.showCreateChannel = false;
 			await this.loadChannels(this.selectedServerId);
-			await this.selectChannel(created.id);
+			if (created.type !== 'voice') {
+				await this.selectChannel(created.id);
+			}
 		} catch (e) {
 			this.setError(e);
 		} finally {
@@ -1333,6 +1360,141 @@ export class AppState {
 		this.hub.emitDmTyping(this.activeDmChannelId, this.effectiveDisplayName);
 	}
 
+	/* ═══════════════════ Voice ═══════════════════ */
+
+	async joinVoiceChannel(channelId: string): Promise<void> {
+		if (this.isJoiningVoice) return;
+
+		// Leave existing voice session first
+		if (this.activeVoiceChannelId) {
+			await this.leaveVoiceChannel();
+		}
+
+		this.isJoiningVoice = true;
+		try {
+			const members = await this.voice.join(channelId, this.hub, {
+				onNewTrack: (pid, track) => this._attachRemoteAudio(pid, track),
+				onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+			});
+
+			this.activeVoiceChannelId = channelId;
+			this.isMuted = false;
+			this.isDeafened = false;
+
+			// Seed the local member map with what the server returned
+			const memberMap = new Map(this.voiceChannelMembers);
+			memberMap.set(channelId, members);
+			this.voiceChannelMembers = memberMap;
+		} catch (e) {
+			// Clean up any partial join state on both server and client.
+			try { await this.hub.leaveVoiceChannel(); } catch { /* ignore */ }
+			await this.voice.leave();
+			this._cleanupRemoteAudio();
+			this.activeVoiceChannelId = null;
+
+			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+				this.setError(new Error('Microphone access is required to join a voice channel. Please allow microphone access in your browser and try again.'));
+			} else if (e instanceof DOMException && e.name === 'NotFoundError') {
+				this.setError(new Error('No microphone found. Please connect a microphone to join voice channels.'));
+			} else {
+				this.setError(e);
+			}
+		} finally {
+			this.isJoiningVoice = false;
+		}
+	}
+
+	async leaveVoiceChannel(): Promise<void> {
+		if (!this.activeVoiceChannelId) return;
+		const channelId = this.activeVoiceChannelId;
+
+		try {
+			await this.hub.leaveVoiceChannel();
+		} catch {
+			// ignore SignalR errors on leave
+		}
+
+		await this.voice.leave();
+		this._cleanupRemoteAudio();
+		this.activeVoiceChannelId = null;
+		this.isMuted = false;
+		this.isDeafened = false;
+
+		// Remove self from the local members map
+		if (this.me) {
+			const memberMap = new Map(this.voiceChannelMembers);
+			const currentMembers = memberMap.get(channelId) ?? [];
+			memberMap.set(channelId, currentMembers.filter((m) => m.userId !== this.me!.user.id));
+			this.voiceChannelMembers = memberMap;
+		}
+	}
+
+	async toggleMute(): Promise<void> {
+		this.isMuted = !this.isMuted;
+		this.voice.setMuted(this.isMuted);
+		await this.hub.updateVoiceState(this.isMuted, this.isDeafened);
+	}
+
+	async toggleDeafen(): Promise<void> {
+		this.isDeafened = !this.isDeafened;
+		// Deafening also mutes the microphone
+		if (this.isDeafened && !this.isMuted) {
+			this.isMuted = true;
+			this.voice.setMuted(true);
+		} else if (!this.isDeafened && this.isMuted) {
+			// Undeafening does not auto-unmute; keep current mute state
+		}
+		// Mute/unmute remote audio elements based on deafened state
+		for (const el of this.remoteAudioElements.values()) {
+			el.muted = this.isDeafened;
+		}
+		await this.hub.updateVoiceState(this.isMuted, this.isDeafened);
+	}
+
+	private async _loadAllVoiceStates(): Promise<void> {
+		if (!this.idToken) return;
+		const voiceChannels = this.channels.filter((c) => c.type === 'voice');
+		const memberMap = new Map(this.voiceChannelMembers);
+
+		await Promise.all(
+			voiceChannels.map(async (ch) => {
+				try {
+					const members = await this.api.getVoiceStates(this.idToken!, ch.id);
+					memberMap.set(ch.id, members);
+				} catch {
+					// ignore individual failures
+				}
+			})
+		);
+
+		this.voiceChannelMembers = memberMap;
+	}
+
+	private _attachRemoteAudio(participantId: string, track: MediaStreamTrack): void {
+		const el = new Audio();
+		el.srcObject = new MediaStream([track]);
+		el.muted = this.isDeafened;
+		el.play().catch(() => {});
+		this.remoteAudioElements.set(participantId, el);
+	}
+
+	private _detachRemoteAudio(participantId: string): void {
+		const el = this.remoteAudioElements.get(participantId);
+		if (el) {
+			el.pause();
+			el.srcObject = null;
+			this.remoteAudioElements.delete(participantId);
+		}
+	}
+
+	private _cleanupRemoteAudio(): void {
+		for (const el of this.remoteAudioElements.values()) {
+			el.pause();
+			el.srcObject = null;
+		}
+		this.remoteAudioElements.clear();
+	}
+
 	/* ═══════════════════ SignalR ═══════════════════ */
 
 	private async startSignalR(): Promise<void> {
@@ -1555,12 +1717,54 @@ export class AppState {
 				if (event.serverId === this.selectedServerId) {
 					this.channels = this.channels.filter((c) => c.id !== event.channelId);
 					if (this.selectedChannelId === event.channelId) {
-						const next = this.channels[0];
+						const next = this.channels.find((c) => c.type !== 'voice');
 						this.selectedChannelId = next?.id ?? null;
 						this.messages = [];
 					}
 				}
-			}
+			},
+			onUserJoinedVoice: (event) => {
+				const memberMap = new Map(this.voiceChannelMembers);
+				const members = [...(memberMap.get(event.channelId) ?? [])];
+				if (!members.some((m) => m.participantId === event.participantId)) {
+					members.push({
+						userId: event.userId,
+						displayName: event.displayName,
+						avatarUrl: event.avatarUrl ?? null,
+						isMuted: false,
+						isDeafened: false,
+						participantId: event.participantId,
+					});
+					memberMap.set(event.channelId, members);
+					this.voiceChannelMembers = memberMap;
+				}
+			},
+			onUserLeftVoice: (event) => {
+				const memberMap = new Map(this.voiceChannelMembers);
+				const members = (memberMap.get(event.channelId) ?? []).filter(
+					(m) => m.participantId !== event.participantId
+				);
+				memberMap.set(event.channelId, members);
+				this.voiceChannelMembers = memberMap;
+			},
+			onVoiceStateUpdated: (event) => {
+				const memberMap = new Map(this.voiceChannelMembers);
+				const members = (memberMap.get(event.channelId) ?? []).map((m) =>
+					m.userId === event.userId
+						? { ...m, isMuted: event.isMuted, isDeafened: event.isDeafened }
+						: m
+				);
+				memberMap.set(event.channelId, members);
+				this.voiceChannelMembers = memberMap;
+			},
+			onNewProducer: async (event) => {
+				if (this.activeVoiceChannelId === event.channelId) {
+					await this.voice.consumeProducer(event.producerId, event.participantId, this.hub, {
+						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, track),
+						onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+					});
+				}
+			},
 		});
 
 		this.isHubConnected = this.hub.isConnected;
@@ -1574,6 +1778,9 @@ export class AppState {
 	}
 
 	async destroy(): Promise<void> {
+		if (this.activeVoiceChannelId) {
+			await this.leaveVoiceChannel();
+		}
 		await this.hub.stop();
 	}
 

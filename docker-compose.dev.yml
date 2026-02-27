@@ -9,5 +9,21 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
+    command: >
+      --lt-cred-mech
+      --use-auth-secret
+      --static-auth-secret=REDACTED
+      --realm=codec.local
+      --listening-port=3478
+      --min-port=49152
+      --max-port=49200
+      --no-tls
+      --no-dtls
+      --log-file=stdout
+
 volumes:
   pgdata:

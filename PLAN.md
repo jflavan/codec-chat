@@ -788,6 +788,114 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Frontend builds successfully (`npm run build`, PWA v1.2.0, precache 31 entries)
 - [x] PWABuilder action items addressed (manifest, service worker, app capabilities)
 
+## Task breakdown: Voice Channels — Phase 1 (see [docs/VOICE.md](docs/VOICE.md))
+
+### Data model & migration
+- [x] Add `ChannelType` enum (`Text = 0`, `Voice = 1`) to `Models/`
+- [x] Add `ChannelType` property to `Channel` entity (default `Text`)
+- [x] Create `VoiceState` entity (`Id`, `UserId`, `ChannelId`, `ParticipantId`, `ConnectionId`, `IsMuted`, `JoinedAt`)
+- [x] Add unique index on `VoiceStates.UserId` to prevent multi-channel joins
+- [x] Add `VoiceStates` DbSet to `CodecDbContext`
+- [x] Create and apply EF Core migration (`AddVoiceChannels`)
+
+### SFU service (`apps/sfu/`)
+- [x] Create Node.js/Express SFU with mediasoup v3
+- [x] Implement `POST /rooms/:id/participants` — create or join room, return `routerRtpCapabilities`
+- [x] Implement `POST /rooms/:id/transports` — create WebRTC transport per participant (send + recv)
+- [x] Implement `POST /rooms/:id/transports/:tid/connect` — finalize DTLS handshake
+- [x] Implement `POST /rooms/:id/transports/:tid/produce` — create audio Producer
+- [x] Implement `POST /rooms/:id/consumers` — create Consumer for a remote Producer
+- [x] Implement `DELETE /rooms/:id/participants/:pid` — clean up participant transports
+- [x] Write `Dockerfile` for the SFU (multi-stage build with native mediasoup dependencies)
+
+### Security hardening (SFU)
+- [x] Add `X-Internal-Key` shared secret middleware on all `/rooms/*` routes
+- [x] Timing-safe comparison via `crypto.timingSafeEqual`
+- [x] Refuse to start in `production` if `SFU_INTERNAL_KEY` is unset
+- [x] Rate limiting: 120 req/min per IP via `express-rate-limit`
+- [x] JSON body size cap: `express.json({ limit: '32kb' })`
+- [x] Transport IDOR fix: require `participantId` in `/connect` and `/produce` bodies; validate ownership
+- [x] Producer room validation: verify `producerId` exists in room before `canConsume`
+
+### API — SignalR hub methods
+- [x] Implement `JoinVoiceChannel(channelId)` — create `VoiceState`, create SFU room/transports, return capabilities + member list
+- [x] Implement `LeaveVoiceChannel()` — remove `VoiceState`, delete SFU participant, broadcast `UserLeftVoice`
+- [x] Implement `ConnectTransport(transportId, dtlsParameters)` — proxy to SFU with participant ownership
+- [x] Implement `Produce(transportId, rtpParameters)` — proxy to SFU with participant ownership; broadcast `NewProducer`
+- [x] Implement `Consume(producerId, recvTransportId, rtpCapabilities)` — proxy to SFU
+- [x] Implement `SetMuted(muted)` — update `VoiceState.IsMuted`, broadcast `VoiceMuteChanged`
+- [x] Broadcast `UserJoinedVoice` to channel group on join
+- [x] Add `OnDisconnectedAsync` try-catch with fallback delete by `ConnectionId` for reliability
+- [x] Catch `DbUpdateException` on concurrent join (unique index violation) and surface as `HubException`
+
+### API — SFU HTTP client
+- [x] Register named `"sfu"` `HttpClient` in `Program.cs` with 10 s timeout
+- [x] Attach `X-Internal-Key` header when `Voice:SfuInternalKey` is configured
+- [x] Log warning when SFU key is not configured
+
+### Frontend — services and state
+- [x] Create `VoiceService` class (`apps/web/src/lib/services/voice-service.ts`)
+  - [x] `join()` — `getUserMedia` → `Device.load` → create transports → produce → consume existing members
+  - [x] `consumeProducer()` — dedup via `consumedProducerIds` Set (guards group-join/member-snapshot race)
+  - [x] `setMuted(muted)` — pause/resume Producer
+  - [x] `leave()` — close all consumers, producer, transports; stop mic tracks
+  - [x] Capture transport `const` locals in event handlers (avoids null dereference on concurrent `leave()`)
+- [x] Add `VoiceChannelMember` type to `models.ts`
+- [x] Add voice SignalR hub methods and events to `ChatHubService`
+- [x] Add voice state and actions to `AppState` (`voiceChannelId`, `voiceMembers`, `isMuted`, `joinVoice`, `leaveVoice`, `toggleMute`)
+
+### Frontend — UI components
+- [x] Update channel list to show voice channels with speaker icon and participant avatars
+- [x] `VoiceChannel.svelte` — channel row, participant list, join/leave button
+- [x] `VoiceControls.svelte` — mute/deafen controls shown while connected to a voice channel
+
+### Verification
+- [x] Backend builds successfully (`dotnet build`, 0 errors)
+- [x] Frontend type-checks with zero errors (`npm run check`)
+
+### Documentation
+- [x] Rewrite `docs/VOICE.md` with actual implementation, architecture, API, security, and infrastructure details
+- [x] Update `PLAN.md` with task breakdown
+- [x] Update `README.md` with voice channels feature and doc link
+- [x] Update `docs/FEATURES.md` to mark voice channels as implemented
+
+---
+
+## Task breakdown: Voice Infrastructure — Phase 4
+
+### SFU Docker image
+- [x] Multi-stage `Dockerfile` for `apps/sfu/` (build stage: compile TS; runtime stage: node + mediasoup native deps)
+- [x] Push to Azure Container Registry via `cd.yml`
+
+### Azure VM (`infra/modules/voice-vm.bicep`)
+- [x] `Standard_B2s` VM (2 vCPU, 4 GiB) on Ubuntu 24.04 LTS
+- [x] System-assigned managed identity with `AcrPull` role on ACR
+- [x] Static public IP, NIC, NSG
+- [x] NSG rules: SSH (parameterized source), SFU HTTP, UDP 40000–49999, deny-all
+- [x] `sshAllowedSourcePrefix` param (default `'*'`; restrict in production)
+- [x] `cloud-init` provisioner installs Docker, Docker Compose, `jq`
+
+### docker-compose (`infra/voice/docker-compose.yml`)
+- [x] `sfu` service with `network_mode: host` for mediasoup UDP
+- [x] All secrets injected via environment variables (substituted by `envsubst` in CI/CD)
+
+### Bicep wiring (`infra/main.bicep`, `infra/modules/container-app-api.bicep`)
+- [x] `voiceSfuInternalKey` param → Key Vault secret → API container app env var (`Voice__SfuInternalKey`)
+- [x] `voiceSshAllowedSourcePrefix` param wired to NSG rule
+- [x] API `HttpClient("sfu")` reads `Voice:SfuInternalKey` from configuration
+
+### CI/CD (`.github/workflows/cd.yml`)
+- [x] `deploy-voice` job: build + push `sfu` Docker image
+- [x] SSH to VM via `azure/CLI` + `az vm run-command invoke`
+- [x] IMDS-based ACR login (no `az` CLI needed on VM): IMDS AAD token → ACR `/oauth2/exchange` → `docker login`
+- [x] `envsubst` substitutes `SFU_INTERNAL_KEY`, `MEDIASOUP_ANNOUNCED_IP`, etc. into docker-compose
+- [x] `VOICE_SFU_INTERNAL_KEY` GitHub Actions secret
+
+### Verification
+- [x] `az bicep build --file main.bicep` passes (0 errors)
+
+---
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
@@ -797,3 +905,4 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Mobile slide-out navigation for server/channel sidebars
 - Comprehensive unit and integration tests
 - Container image vulnerability scanning (Trivy or Microsoft Defender)
+- Voice Phase 2: deafen, per-user volume, push-to-talk

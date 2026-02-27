@@ -20,6 +20,7 @@ env:
   ACR_NAME: acrcodecprod
   API_APP_NAME: ca-codec-prod-api
   WEB_APP_NAME: ca-codec-prod-web
+  VOICE_VM_NAME: vm-codec-prod-voice
 
 jobs:
   build-and-push:
@@ -59,6 +60,92 @@ jobs:
             ./apps/web
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-web:latest
+
+      - name: Build and push SFU image
+        run: |
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:${{ github.sha }} \
+                        -t ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:latest \
+                        ./apps/sfu
+          docker push ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:${{ github.sha }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:latest
+
+  deploy-voice:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    # Only runs when the voice VM is enabled. Set the VOICE_VM_ENABLED repository
+    # variable to 'true' once the VM has been provisioned via infra/main.bicep.
+    if: vars.VOICE_VM_ENABLED == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Substitute variables in docker-compose template
+        env:
+          ACR_SERVER: ${{ env.ACR_NAME }}.azurecr.io
+          IMAGE_TAG: ${{ github.sha }}
+          ANNOUNCED_IP: ${{ secrets.VOICE_VM_IP }}
+          TURN_SECRET: ${{ secrets.VOICE_TURN_SECRET }}
+          SFU_INTERNAL_KEY: ${{ secrets.VOICE_SFU_INTERNAL_KEY }}
+        run: |
+          envsubst '${ACR_SERVER} ${IMAGE_TAG} ${ANNOUNCED_IP} ${TURN_SECRET} ${SFU_INTERNAL_KEY}' \
+            < infra/voice/docker-compose.yml \
+            | base64 -w 0 > /tmp/compose-b64.txt
+
+      - name: Write docker-compose.yml to VM
+        run: |
+          COMPOSE_B64=$(cat /tmp/compose-b64.txt)
+          az vm run-command invoke \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VOICE_VM_NAME }} \
+            --command-id RunShellScript \
+            --scripts "echo '${COMPOSE_B64}' | base64 -d > /opt/voice/docker-compose.yml"
+
+      - name: Pull and start voice services
+        run: |
+          ACR_SERVER="${{ env.ACR_NAME }}.azurecr.io"
+          az vm run-command invoke \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VOICE_VM_NAME }} \
+            --command-id RunShellScript \
+            --parameters "ACR_SERVER=${ACR_SERVER}" \
+            --scripts '
+              set -e
+              ACR_SERVER="$1"
+              # Use managed identity via IMDS to get an AAD token for ACR, then exchange
+              # it for an ACR refresh token — no Azure CLI required on the VM.
+              AAD_TOKEN=$(curl -sf \
+                "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fcontainerregistry.azure.net%2F" \
+                -H "Metadata: true" | jq -r ".access_token")
+              ACR_REFRESH=$(curl -sf -X POST "https://${ACR_SERVER}/oauth2/exchange" \
+                -F "grant_type=access_token" \
+                -F "service=${ACR_SERVER}" \
+                -F "access_token=${AAD_TOKEN}" | jq -r ".refresh_token")
+              echo "${ACR_REFRESH}" | docker login "${ACR_SERVER}" \
+                -u 00000000-0000-0000-0000-000000000000 --password-stdin
+              docker compose -f /opt/voice/docker-compose.yml pull
+              docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
+            '
+
+      - name: Verify SFU health
+        run: |
+          STATUS=$(az vm run-command invoke \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VOICE_VM_NAME }} \
+            --command-id RunShellScript \
+            --scripts "curl -sf http://localhost:3001/health && echo OK" \
+            --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
+          if [[ "$STATUS" != *"OK"* ]]; then
+            echo "::error::SFU health check failed: $STATUS"
+            exit 1
+          fi
+          echo "SFU health check passed"
 
   migrate-database:
     runs-on: ubuntu-latest

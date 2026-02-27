@@ -101,6 +101,8 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Response compression** — API responses compressed with Brotli and Gzip for faster load times
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
 - ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting- ✅ **Progressive Web App (PWA)** — installable on desktop and mobile via browser "Add to Home Screen"; Workbox service worker precaches static assets for fast repeat visits; offline fallback page when network is unavailable; runtime Google Fonts caching; desktop/mobile install screenshots; app shortcuts, share target, and custom protocol handler; user-prompted update toast when a new version is available
+- ✅ **Voice channels** — real-time audio in server voice channels powered by a custom mediasoup SFU; join/leave freely, mute/unmute, participant list with avatars; mic permission errors surfaced clearly; audio-only (video planned)
+
 ## Self-Hosting
 
 Codec is designed to be easy to self-host. The repository includes a production-ready `docker-compose.yml` that starts the API, web frontend, PostgreSQL, and a local blob storage emulator.
@@ -135,6 +137,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - [Nicknames](docs/NICKNAMES.md) - Nicknames feature specification
 - [User Settings](docs/USER_SETTINGS.md) - User settings feature specification
 - [Message Replies](docs/REPLIES.md) - Message replies feature specification
+- [Voice Channels](docs/VOICE.md) - Voice channels feature specification, SFU architecture, and infrastructure
 - [Data Layer](docs/DATA.md) - Database schema and migrations
 
 ## Community & Project Policies
@@ -146,10 +149,11 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 ## Technology Stack
 - **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management; installable PWA via `@vite-pwa/sveltekit` with offline fallback, runtime font caching, and OS integration (shortcuts, share target)
 - **Backend:** ASP.NET Core 10, Controller-based APIs
-- **Real-time:** SignalR (WebSockets)
+- **Real-time:** SignalR (WebSockets) for messaging and signaling; mediasoup-client + WebRTC for voice audio
+- **Voice SFU:** Node.js + mediasoup v3 on a dedicated Azure VM (UDP media plane requires native sockets)
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID tokens)
-- **Infrastructure:** Azure Container Apps, Bicep IaC, GitHub Actions CI/CD
+- **Infrastructure:** Azure Container Apps + dedicated VM (voice SFU), Bicep IaC, GitHub Actions CI/CD
 
 ## License & Quality Checks
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjflavan%2Fcodec-chat.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjflavan%2Fcodec-chat?ref=badge_large)

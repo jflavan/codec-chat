@@ -117,6 +117,34 @@ export type ChannelDeletedEvent = {
 	channelId: string;
 };
 
+export type UserJoinedVoiceEvent = {
+	channelId: string;
+	userId: string;
+	displayName: string;
+	avatarUrl?: string | null;
+	participantId: string;
+};
+
+export type UserLeftVoiceEvent = {
+	channelId: string;
+	userId: string;
+	participantId: string;
+};
+
+export type VoiceStateUpdatedEvent = {
+	channelId: string;
+	userId: string;
+	isMuted: boolean;
+	isDeafened: boolean;
+};
+
+export type NewProducerEvent = {
+	channelId: string;
+	userId: string;
+	participantId: string;
+	producerId: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -145,6 +173,10 @@ export type SignalRCallbacks = {
 	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
 	onServerDeleted?: (event: ServerDeletedEvent) => void;
 	onChannelDeleted?: (event: ChannelDeletedEvent) => void;
+	onUserJoinedVoice?: (event: UserJoinedVoiceEvent) => void;
+	onUserLeftVoice?: (event: UserLeftVoiceEvent) => void;
+	onVoiceStateUpdated?: (event: VoiceStateUpdatedEvent) => void;
+	onNewProducer?: (event: NewProducerEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -245,6 +277,18 @@ export class ChatHubService {
 		}
 		if (callbacks.onChannelDeleted) {
 			connection.on('ChannelDeleted', callbacks.onChannelDeleted);
+		}
+		if (callbacks.onUserJoinedVoice) {
+			connection.on('UserJoinedVoice', callbacks.onUserJoinedVoice);
+		}
+		if (callbacks.onUserLeftVoice) {
+			connection.on('UserLeftVoice', callbacks.onUserLeftVoice);
+		}
+		if (callbacks.onVoiceStateUpdated) {
+			connection.on('VoiceStateUpdated', callbacks.onVoiceStateUpdated);
+		}
+		if (callbacks.onNewProducer) {
+			connection.on('NewProducer', callbacks.onNewProducer);
 		}
 
 		if (callbacks.onReconnecting) {
@@ -352,6 +396,52 @@ export class ChatHubService {
 		if (this.dmTypingTimeout) clearTimeout(this.dmTypingTimeout);
 		if (this.isConnected) {
 			this.connection!.invoke('StopDmTyping', dmChannelId, displayName).catch(() => {});
+		}
+	}
+
+	/* ───── Voice ───── */
+
+	async joinVoiceChannel(channelId: string): Promise<{
+		routerRtpCapabilities: object;
+		sendTransportOptions: object;
+		recvTransportOptions: object;
+		members: object[];
+	}> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		return this.connection!.invoke('JoinVoiceChannel', channelId);
+	}
+
+	async connectTransport(transportId: string, dtlsParameters: object): Promise<void> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		await this.connection!.invoke('ConnectTransport', transportId, dtlsParameters);
+	}
+
+	async produce(sendTransportId: string, rtpParameters: object): Promise<string> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		const result = await this.connection!.invoke('Produce', sendTransportId, rtpParameters);
+		// The hub returns { producerId: "..." }; extract the string for the caller.
+		return typeof result === 'string' ? result : result.producerId;
+	}
+
+	async consume(producerId: string, recvTransportId: string, rtpCapabilities: object): Promise<{
+		id: string;
+		producerId: string;
+		kind: string;
+		rtpParameters: object;
+	}> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		return this.connection!.invoke('Consume', producerId, recvTransportId, rtpCapabilities);
+	}
+
+	async updateVoiceState(isMuted: boolean, isDeafened: boolean): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('UpdateVoiceState', isMuted, isDeafened).catch(() => {});
+		}
+	}
+
+	async leaveVoiceChannel(): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('LeaveVoiceChannel').catch(() => {});
 		}
 	}
 }

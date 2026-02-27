@@ -35,6 +35,9 @@ namespace Codec.Api.Migrations
                     b.Property<Guid>("ServerId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ServerId");
@@ -630,6 +633,68 @@ namespace Codec.Api.Migrations
                     b.Navigation("SentFriendRequests");
 
                     b.Navigation("ServerMemberships");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.VoiceState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConnectionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeafened")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsMuted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ParticipantId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProducerId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("VoiceStates");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.VoiceState", b =>
+                {
+                    b.HasOne("Codec.Api.Models.Channel", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Codec.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }

@@ -360,7 +360,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var channels = await db.Channels
             .AsNoTracking()
             .Where(channel => channel.ServerId == serverId)
-            .Select(channel => new { channel.Id, channel.Name, channel.ServerId })
+            .Select(channel => new { channel.Id, channel.Name, channel.ServerId, Type = channel.Type.ToString().ToLower() })
             .ToListAsync();
 
         return Ok(channels);
@@ -407,10 +407,13 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             }
         }
 
+        var channelType = request.Type?.ToLower() == "voice" ? ChannelType.Voice : ChannelType.Text;
+
         var channel = new Channel
         {
             ServerId = serverId,
-            Name = request.Name.Trim()
+            Name = request.Name.Trim(),
+            Type = channelType
         };
 
         db.Channels.Add(channel);
@@ -420,7 +423,8 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         {
             channel.Id,
             channel.Name,
-            channel.ServerId
+            channel.ServerId,
+            Type = channel.Type.ToString().ToLower()
         });
     }
 
