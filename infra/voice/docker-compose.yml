@@ -24,7 +24,8 @@ services:
       SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
 
   coturn:
-    # Pinned to a specific digest/version to prevent supply-chain attacks via mutable tags.
+    # Pinned to a specific version tag (4.6.2). Note: this is a mutable tag, not a digest pin.
+    # For stronger supply-chain guarantees, pin by digest (@sha256:...) instead.
     image: coturn/coturn:4.6.2
     restart: unless-stopped
     # network_mode: host is required so coturn can bind UDP relay ports

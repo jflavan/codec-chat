@@ -10,8 +10,9 @@ Codec is a Discord-like chat application — a monorepo with a SvelteKit fronten
 
 ### Start PostgreSQL (required before API)
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+docker compose up -d postgres azurite
 # PostgreSQL 16 on localhost:5433, DB: codec_dev, user: codec, password: codec_dev_password
+# (docker-compose.dev.yml is gitignored; use the top-level docker-compose.yml for local dev)
 ```
 
 ### API (`apps/api/Codec.Api`)
