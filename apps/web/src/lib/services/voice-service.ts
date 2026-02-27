@@ -109,14 +109,13 @@ export class VoiceService {
 		this.consumers.set(consumer.id, consumer);
 		callbacks.onNewTrack(participantId, consumer.track);
 
-		consumer.on('transportclose', () => {
+		const cleanupConsumer = () => {
 			callbacks.onTrackEnded(participantId);
 			this.consumers.delete(consumer.id);
-		});
-		consumer.on('trackended', () => {
-			callbacks.onTrackEnded(participantId);
-			this.consumers.delete(consumer.id);
-		});
+			this.consumedProducerIds.delete(consumer.producerId);
+		};
+		consumer.on('transportclose', cleanupConsumer);
+		consumer.on('trackended', cleanupConsumer);
 	}
 
 	setMuted(muted: boolean): void {

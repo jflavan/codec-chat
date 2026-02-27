@@ -16,7 +16,7 @@ namespace Codec.Api.Hubs;
 /// Clients join channel-scoped, user-scoped, server-scoped, and voice-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
@@ -385,8 +385,9 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 await LeaveVoiceChannelInternal(appUser, voiceState);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Error during voice state cleanup on disconnect for connection {ConnectionId}. Attempting raw DB fallback.", Context.ConnectionId);
             // Best-effort cleanup. If we can't look up the user, attempt a raw DB delete
             // using only the ConnectionId so the stale row doesn't linger indefinitely.
             var stale = await db.VoiceStates
@@ -394,7 +395,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             if (stale is not null)
             {
                 db.VoiceStates.Remove(stale);
-                await db.SaveChangesAsync().ConfigureAwait(false);
+                await db.SaveChangesAsync();
             }
         }
 
