@@ -217,14 +217,20 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             })
             .ToListAsync();
 
-        await Clients.OthersInGroup($"voice-{channelId}").SendAsync("UserJoinedVoice", new
+        var joiningUser = new
         {
             channelId,
             userId = appUser.Id,
             displayName = appUser.EffectiveDisplayName,
             avatarUrl = appUser.CustomAvatarPath ?? appUser.AvatarUrl,
             participantId = Context.ConnectionId
-        });
+        };
+
+        // Notify other participants that a new user has joined.
+        await Clients.OthersInGroup($"voice-{channelId}").SendAsync("UserJoinedVoice", joiningUser);
+
+        // Also send to the caller so the client can render itself consistently in the member list.
+        await Clients.Caller.SendAsync("UserJoinedVoice", joiningUser);
 
         return new
         {
@@ -411,7 +417,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
 
         if (channelId is not null)
         {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{channelId}");
+            // Use the connection ID stored in VoiceState — not Context.ConnectionId — so that
+            // when switching channels or cleaning up a stale session from a different tab, we
+            // remove the correct connection from the voice group.
+            await Groups.RemoveFromGroupAsync(voiceState.ConnectionId, $"voice-{channelId}");
 
             await Clients.Group($"voice-{channelId}").SendAsync("UserLeftVoice", new
             {
