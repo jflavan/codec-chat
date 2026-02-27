@@ -27,9 +27,8 @@ param containerRegistryName string
 @description('VM admin username.')
 param adminUsername string = 'azureuser'
 
-@description('Source IP prefix allowed to SSH into the VM. Must be set to your operator CIDR (e.g. "203.0.113.0/24"). No default is provided to prevent accidental exposure.')
-@minLength(1)
-param sshAllowedSourcePrefix string
+@description('Source IP prefix allowed to SSH into the VM. Set to your operator CIDR (e.g. "203.0.113.0/24"). When empty, SSH is restricted to the AzureCloud service tag (Azure datacenter IPs). Defaults to empty string so non-voice deployments (voiceVmEnabled = false) do not require this parameter.')
+param sshAllowedSourcePrefix string = ''
 
 @description('Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only). Restrict further once VNet integration with the Container App is in place.')
 param sfuApiAllowedSourcePrefix string = 'AzureCloud'
@@ -67,7 +66,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           protocol: 'Tcp'
           access: 'Allow'
           direction: 'Inbound'
-          sourceAddressPrefix: sshAllowedSourcePrefix
+          sourceAddressPrefix: !empty(sshAllowedSourcePrefix) ? sshAllowedSourcePrefix : 'AzureCloud'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '22'

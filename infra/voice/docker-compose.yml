@@ -34,8 +34,11 @@ services:
     network_mode: host
     environment:
       TURN_SECRET: "${TURN_SECRET}"
-    # Write the TURN secret to a config file (in tmpfs) so it does not appear in process
-    # listings (ps aux). tmpfs ensures the secret is memory-only and never written to disk.
+    # Write the coturn config to /tmp (tmpfs inside the container) so the secret does not
+    # appear in process listings (ps aux). Note: CI/CD envsubst substitutes ${TURN_SECRET}
+    # into this docker-compose.yml before writing it to /opt/voice/docker-compose.yml on
+    # the VM — the secret is therefore present in that file on disk. Ensure the VM's
+    # /opt/voice directory has restricted permissions (e.g. chmod 600 .../docker-compose.yml).
     # sha256 requires coturn 4.6.0+ and must match the HMAC algorithm used by the API.
     tmpfs:
       - /tmp
