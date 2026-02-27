@@ -198,6 +198,10 @@ services:
 
   coturn:
     # Pinned to a specific version (not `latest`) to prevent supply-chain attacks.
+    # For stronger supply-chain guarantees, pin by digest instead of tag, e.g.:
+    #   image: coturn/coturn@sha256:<digest>
+    # Retrieve the current digest with:
+    #   docker pull coturn/coturn:4.6.2 && docker inspect --format='{{index .RepoDigests 0}}' coturn/coturn:4.6.2
     image: coturn/coturn:4.6.2
     restart: unless-stopped
     network_mode: host    # required for UDP relay port binding
