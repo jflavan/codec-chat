@@ -65,8 +65,8 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     }
 
     /// <summary>
-    /// Updates the current user's mute/deafen state and broadcasts the change to
-    /// other participants in the same voice channel.
+    /// Updates the current user's mute/deafen state in the database.
+    /// Returns the updated state.
     /// </summary>
     [HttpPatch("state")]
     public async Task<IActionResult> UpdateVoiceState([FromBody] UpdateVoiceStateRequest request)
@@ -94,15 +94,19 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     /// Requires coturn to be started with the <c>--sha256</c> flag (coturn 4.6.0+).
     /// </summary>
     [HttpGet("turn-credentials")]
-    public IActionResult GetTurnCredentials()
+    public async Task<IActionResult> GetTurnCredentials()
     {
         var turnSecret = config["Voice:TurnSecret"]
             ?? throw new InvalidOperationException("Voice:TurnSecret is required.");
         var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
 
-        // Username encodes the expiry timestamp (Unix seconds). coturn validates this.
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        // Username encodes the expiry timestamp (Unix seconds) and a stable per-user identifier.
+        // Using {expiry}:{userId} prevents credential sharing across users within the same
+        // validity window while remaining compatible with coturn's time-limited auth scheme.
         var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
-        var username = expiry.ToString();
+        var username = $"{expiry}:{appUser.Id}";
 
         var keyBytes = Encoding.UTF8.GetBytes(turnSecret);
         var msgBytes = Encoding.UTF8.GetBytes(username);
