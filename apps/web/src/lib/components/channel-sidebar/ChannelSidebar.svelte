@@ -2,8 +2,12 @@
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import UserPanel from './UserPanel.svelte';
 	import InvitePanel from './InvitePanel.svelte';
+	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
 
 	const app = getAppState();
+
+	const textChannels = $derived(app.channels.filter((c) => c.type !== 'voice'));
+	const voiceChannels = $derived(app.channels.filter((c) => c.type === 'voice'));
 </script>
 
 <aside class="channel-sidebar" aria-label="Channels">
@@ -39,10 +43,11 @@
 	</div>
 
 	<div class="channel-list-scroll">
+		<!-- Text Channels -->
 		<div class="channel-category">
 			<span class="category-label">Text Channels</span>
 			{#if app.canManageChannels && app.selectedServerId && !app.showCreateChannel}
-				<button class="category-action" aria-label="Create channel" onclick={() => { app.showCreateChannel = true; }}>
+				<button class="category-action" aria-label="Create channel" onclick={() => { app.showCreateChannel = true; app.newChannelType = 'text'; }}>
 					<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 						<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
 					</svg>
@@ -53,10 +58,10 @@
 		<ul class="channel-list" role="list">
 			{#if app.isLoadingChannels}
 				<li class="muted channel-item">Loading…</li>
-			{:else if app.channels.length === 0}
+			{:else if textChannels.length === 0 && voiceChannels.length === 0}
 				<li class="muted channel-item">No channels yet.</li>
 			{:else}
-				{#each app.channels as channel}
+				{#each textChannels as channel}
 					{@const mentions = app.channelMentionCount(channel.id)}
 					<li>
 						<button
@@ -77,11 +82,79 @@
 			{/if}
 		</ul>
 
+		<!-- Voice Channels -->
+		{#if voiceChannels.length > 0 || (app.canManageChannels && app.selectedServerId)}
+			<div class="channel-category">
+				<span class="category-label">Voice Channels</span>
+				{#if app.canManageChannels && app.selectedServerId && !app.showCreateChannel}
+					<button class="category-action" aria-label="Create voice channel" onclick={() => { app.showCreateChannel = true; app.newChannelType = 'voice'; }}>
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+							<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
+						</svg>
+					</button>
+				{/if}
+			</div>
+
+			<ul class="channel-list" role="list">
+				{#each voiceChannels as channel}
+					{@const members = app.voiceChannelMembers.get(channel.id) ?? []}
+					{@const isActive = channel.id === app.activeVoiceChannelId}
+					<li>
+						<button
+							class="channel-item voice-channel-item"
+							class:active={isActive}
+							onclick={() => app.joinVoiceChannel(channel.id)}
+							disabled={app.isJoiningVoice}
+							aria-label="Join {channel.name}"
+						>
+							<!-- Speaker icon -->
+							<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+							</svg>
+							<span>{channel.name}</span>
+							{#if members.length > 0}
+								<span class="voice-count" aria-label="{members.length} connected">{members.length}</span>
+							{/if}
+						</button>
+						{#if members.length > 0}
+							<ul class="voice-members" aria-label="Connected members">
+								{#each members as member}
+									<li class="voice-member">
+										{#if member.avatarUrl}
+											<img class="voice-avatar" src={member.avatarUrl} alt="" width="14" height="14" />
+										{:else}
+											<span class="voice-avatar-placeholder"></span>
+										{/if}
+										<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
+										{#if member.isMuted}
+											<svg class="voice-status-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
+												<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+											</svg>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
 		{#if app.canManageChannels && app.selectedServerId && app.showCreateChannel}
 			<form class="inline-form channel-create-form" onsubmit={(e) => { e.preventDefault(); app.createChannel(); }}>
+				<div class="type-toggle">
+					<label class="type-option" class:selected={app.newChannelType === 'text'}>
+						<input type="radio" name="channelType" value="text" bind:group={app.newChannelType} />
+						# Text
+					</label>
+					<label class="type-option" class:selected={app.newChannelType === 'voice'}>
+						<input type="radio" name="channelType" value="voice" bind:group={app.newChannelType} />
+						🔊 Voice
+					</label>
+				</div>
 				<input
 					type="text"
-					placeholder="new-channel"
+					placeholder={app.newChannelType === 'voice' ? 'new-voice' : 'new-channel'}
 					maxlength="100"
 					bind:value={app.newChannelName}
 					disabled={app.isCreatingChannel}
@@ -98,6 +171,10 @@
 
 	{#if app.canManageInvites && app.showInvitePanel}
 		<InvitePanel />
+	{/if}
+
+	{#if app.activeVoiceChannelId}
+		<VoiceConnectedBar />
 	{/if}
 
 	<UserPanel />
@@ -341,5 +418,107 @@
 
 	.muted {
 		color: var(--text-muted);
+	}
+
+	.voice-channel-item {
+		flex-wrap: wrap;
+	}
+
+	.voice-count {
+		margin-left: auto;
+		font-size: 11px;
+		color: var(--text-muted);
+		background: var(--bg-tertiary);
+		padding: 1px 5px;
+		border-radius: 8px;
+		flex-shrink: 0;
+	}
+
+	.voice-members {
+		list-style: none;
+		padding: 2px 0 4px 28px;
+		margin: 0;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+
+	.voice-member {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+	}
+
+	.voice-avatar {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		object-fit: cover;
+	}
+
+	.voice-avatar-placeholder {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: var(--bg-tertiary);
+		flex-shrink: 0;
+	}
+
+	.voice-member-name {
+		font-size: 12px;
+		color: var(--text-muted);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.muted-member {
+		opacity: 0.6;
+	}
+
+	.voice-status-icon {
+		flex-shrink: 0;
+		color: var(--text-dim, var(--text-muted));
+		opacity: 0.7;
+	}
+
+	.type-toggle {
+		display: flex;
+		gap: 6px;
+		margin-bottom: 4px;
+	}
+
+	.type-option {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		padding: 6px 10px;
+		border-radius: 4px;
+		font-size: 13px;
+		color: var(--text-muted);
+		cursor: pointer;
+		user-select: none;
+		border: 1px solid transparent;
+		transition: border-color 150ms ease, color 150ms ease;
+	}
+
+	.type-option input {
+		/* Visually hide the radio input while keeping it accessible and keyboard-focusable */
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.type-option.selected {
+		border-color: var(--accent);
+		color: var(--text-header);
 	}
 </style>

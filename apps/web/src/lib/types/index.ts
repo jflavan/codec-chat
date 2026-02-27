@@ -1,6 +1,8 @@
 export type {
 	MemberServer,
+	ChannelType,
 	Channel,
+	VoiceChannelMember,
 	LinkPreview,
 	Mention,
 	ReplyContext,

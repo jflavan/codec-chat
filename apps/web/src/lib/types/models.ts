@@ -7,11 +7,25 @@ export type MemberServer = {
 	sortOrder: number;
 };
 
-/** Text channel within a server. */
+/** Channel type discriminator. */
+export type ChannelType = 'text' | 'voice';
+
+/** Text or voice channel within a server. */
 export type Channel = {
 	id: string;
 	name: string;
 	serverId: string;
+	type?: ChannelType;
+};
+
+/** A user currently connected to a voice channel. */
+export type VoiceChannelMember = {
+	userId: string;
+	displayName: string;
+	avatarUrl?: string | null;
+	isMuted: boolean;
+	isDeafened: boolean;
+	participantId: string;
 };
 
 /** Aggregated emoji reaction on a message. */

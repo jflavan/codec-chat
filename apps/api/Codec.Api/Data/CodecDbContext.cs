@@ -21,6 +21,7 @@ public class CodecDbContext : DbContext
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
     public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
     public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
+    public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -177,6 +178,30 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<DirectMessage>()
             .HasIndex(dm => dm.ReplyToDirectMessageId);
+
+        // VoiceState relationships and indexes.
+        modelBuilder.Entity<VoiceState>()
+            .HasOne(vs => vs.User)
+            .WithMany()
+            .HasForeignKey(vs => vs.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<VoiceState>()
+            .HasOne(vs => vs.Channel)
+            .WithMany()
+            .HasForeignKey(vs => vs.ChannelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // A user can only be in one voice channel at a time.
+        modelBuilder.Entity<VoiceState>()
+            .HasIndex(vs => vs.UserId)
+            .IsUnique();
+
+        modelBuilder.Entity<VoiceState>()
+            .HasIndex(vs => vs.ChannelId);
+
+        modelBuilder.Entity<VoiceState>()
+            .HasIndex(vs => vs.ConnectionId);
 
         // Link preview relationships, indexes, and check constraint.
         modelBuilder.Entity<LinkPreview>(entity =>
