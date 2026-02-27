@@ -105,7 +105,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "echo '${COMPOSE_B64}' | base64 -d > /opt/voice/docker-compose.yml"
+            --scripts "echo '${COMPOSE_B64}' | base64 -d > /opt/voice/docker-compose.yml && chmod 600 /opt/voice/docker-compose.yml"
 
       - name: Pull and start voice services
         run: |
