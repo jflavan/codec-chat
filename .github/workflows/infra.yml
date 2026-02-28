@@ -79,7 +79,12 @@ jobs:
               globalAdminEmail='${{ secrets.GLOBAL_ADMIN_EMAIL }}' \
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
-              bindCertificates=true
+              bindCertificates=true \
+              voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
+              voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
+              voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
+              voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
+              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}'
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         run: |
@@ -94,7 +99,12 @@ jobs:
               globalAdminEmail='${{ secrets.GLOBAL_ADMIN_EMAIL }}' \
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
-              bindCertificates=false
+              bindCertificates=false \
+              voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
+              voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
+              voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
+              voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
+              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}'
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -109,7 +119,12 @@ jobs:
               globalAdminEmail='${{ secrets.GLOBAL_ADMIN_EMAIL }}' \
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
-              bindCertificates=true
+              bindCertificates=true \
+              voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
+              voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
+              voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
+              voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
+              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}'
 
       - name: Show deployment outputs
         run: |
