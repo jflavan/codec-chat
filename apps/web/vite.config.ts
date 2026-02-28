@@ -88,6 +88,7 @@ export default defineConfig({
 				share_target: {
 					action: '/',
 					method: 'GET',
+					enctype: 'application/x-www-form-urlencoded',
 					params: {
 						title: 'title',
 						text: 'text',
@@ -104,8 +105,6 @@ export default defineConfig({
 			} as Record<string, unknown>,
 			workbox: {
 				globPatterns: ['client/**/*.{html,js,css,ico,png,svg,webp,webmanifest}'],
-				navigateFallback: '/offline.html',
-				navigateFallbackDenylist: [/^\/api\//, /^\/health/],
 				cleanupOutdatedCaches: true,
 				runtimeCaching: [
 					{
