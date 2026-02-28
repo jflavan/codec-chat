@@ -1395,7 +1395,11 @@ export class AppState {
 			this.activeVoiceChannelId = null;
 
 			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
-				this.setError(new Error('Microphone access is required to join a voice channel. Please allow microphone access in your browser and try again.'));
+				const isSystemDenied = e.message?.includes('Permission denied by system');
+				const message = isSystemDenied
+					? 'Microphone access was denied by your operating system. On macOS, go to System Settings → Privacy & Security → Microphone and enable your browser.'
+					: 'Microphone access is required to join a voice channel. Please allow microphone access in your browser and try again.';
+				this.setError(new Error(message));
 			} else if (e instanceof DOMException && e.name === 'NotFoundError') {
 				this.setError(new Error('No microphone found. Please connect a microphone to join voice channels.'));
 			} else {

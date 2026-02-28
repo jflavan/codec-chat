@@ -106,6 +106,7 @@ export default defineConfig({
 			workbox: {
 				globPatterns: ['client/**/*.{html,js,css,ico,png,svg,webp,webmanifest}'],
 				cleanupOutdatedCaches: true,
+				navigateFallback: undefined,
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
