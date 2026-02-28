@@ -194,7 +194,7 @@ package_upgrade: false
 
 packages:
   - docker.io
-  - docker-compose-plugin
+  - docker-compose-v2
   - curl
   - jq
 
