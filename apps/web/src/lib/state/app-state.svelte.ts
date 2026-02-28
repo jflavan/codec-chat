@@ -1386,6 +1386,8 @@ export class AppState {
 			memberMap.set(channelId, members);
 			this.voiceChannelMembers = memberMap;
 		} catch (e) {
+			console.error('[Voice] Failed to join voice channel:', e);
+
 			// Clean up any partial join state on both server and client.
 			try { await this.hub.leaveVoiceChannel(); } catch { /* ignore */ }
 			await this.voice.leave();
