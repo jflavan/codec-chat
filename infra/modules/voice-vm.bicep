@@ -2,7 +2,7 @@
 ///
 /// Azure Container Apps does not support UDP ingress. Both mediasoup (WebRTC media
 /// ports 40000-40100/udp) and coturn (STUN/TURN on 3478/udp+tcp) require raw UDP,
-/// so they run here on a dedicated Standard_B2s VM instead.
+/// so they run here on a dedicated Standard_B2s_v2 VM instead.
 ///
 /// Deployment flow:
 ///   1. Bicep provisions the VM, VNet, NSG, and static public IP.
@@ -208,7 +208,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   location: location
   identity: { type: 'SystemAssigned' }
   properties: {
-    hardwareProfile: { vmSize: 'Standard_B2s' }
+    hardwareProfile: { vmSize: 'Standard_B2s_v2' }
     storageProfile: {
       imageReference: {
         publisher: 'Canonical'
