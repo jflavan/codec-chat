@@ -12,7 +12,7 @@ const config = {
 			directives: {
 				'default-src': ['self'],
 				'script-src': ['self', 'unsafe-inline', 'strict-dynamic', 'https://accounts.google.com'],
-				'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
+				'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com', 'https://accounts.google.com'],
 				'font-src': ['self', 'https://fonts.gstatic.com'],
 				'connect-src': ['self'],
 				'object-src': ['none'],
