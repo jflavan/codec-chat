@@ -2,7 +2,7 @@
 ///
 /// Azure Container Apps does not support UDP ingress. Both mediasoup (WebRTC media
 /// ports 40000-40100/udp) and coturn (STUN/TURN on 3478/udp+tcp) require raw UDP,
-/// so they run here on a dedicated Standard_B2s_v2 VM instead.
+/// so they run here on a dedicated VM instead.
 ///
 /// Deployment flow:
 ///   1. Bicep provisions the VM, VNet, NSG, and static public IP.
@@ -32,6 +32,9 @@ param sshAllowedSourcePrefix string = ''
 
 @description('Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only). Restrict further once VNet integration with the Container App is in place.')
 param sfuApiAllowedSourcePrefix string = 'AzureCloud'
+
+@description('VM SKU size. Must be an x86-based SKU available in the target region.')
+param vmSize string = 'Standard_D2als_v7'
 
 // ── Port constants ──────────────────────────────────────────────────────────────
 var sfuPort         = 3001
@@ -208,7 +211,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   location: location
   identity: { type: 'SystemAssigned' }
   properties: {
-    hardwareProfile: { vmSize: 'Standard_B2s_v2' }
+    hardwareProfile: { vmSize: vmSize }
     storageProfile: {
       imageReference: {
         publisher: 'Canonical'
