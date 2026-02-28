@@ -114,24 +114,23 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --parameters "ACR_SERVER=${ACR_SERVER}" \
-            --scripts '
+            --scripts "
               set -e
-              ACR_SERVER="$1"
+              ACR_SERVER=${ACR_SERVER}
               # Use managed identity via IMDS to get an AAD token for ACR, then exchange
               # it for an ACR refresh token — no Azure CLI required on the VM.
-              AAD_TOKEN=$(curl -sf \
-                "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fcontainerregistry.azure.net%2F" \
-                -H "Metadata: true" | jq -r ".access_token")
-              ACR_REFRESH=$(curl -sf -X POST "https://${ACR_SERVER}/oauth2/exchange" \
-                -F "grant_type=access_token" \
-                -F "service=${ACR_SERVER}" \
-                -F "access_token=${AAD_TOKEN}" | jq -r ".refresh_token")
-              echo "${ACR_REFRESH}" | docker login "${ACR_SERVER}" \
+              AAD_TOKEN=\$(curl -sf \
+                'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fcontainerregistry.azure.net%2F' \
+                -H 'Metadata: true' | jq -r '.access_token')
+              ACR_REFRESH=\$(curl -sf -X POST \"https://\${ACR_SERVER}/oauth2/exchange\" \
+                -d 'grant_type=access_token' \
+                -d \"service=\${ACR_SERVER}\" \
+                -d \"access_token=\${AAD_TOKEN}\" | jq -r '.refresh_token')
+              echo \"\${ACR_REFRESH}\" | docker login \"\${ACR_SERVER}\" \
                 -u 00000000-0000-0000-0000-000000000000 --password-stdin
               docker compose -f /opt/voice/docker-compose.yml pull
               docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
-            '
+            "
 
       - name: Verify SFU health
         run: |

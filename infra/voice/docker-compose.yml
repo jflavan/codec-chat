@@ -50,7 +50,7 @@ services:
         printf '%s\n' \
           'lt-cred-mech' \
           'use-auth-secret' \
-          "static-auth-secret=$$TURN_SECRET" \
+          "static-auth-secret=${TURN_SECRET}" \
           'realm=codec-chat.com' \
           'listening-port=3478' \
           'min-port=49152' \
