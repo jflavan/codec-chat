@@ -6,7 +6,7 @@
 #   ACR_SERVER        — e.g. acrcodecprod.azurecr.io
 #   IMAGE_TAG         — Docker image tag (git SHA)
 #   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
-#   TURN_SECRET       — HMAC-SHA1 shared secret for coturn time-limited credentials
+#   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
 #   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
 
 services:
@@ -40,7 +40,7 @@ services:
     # into this docker-compose.yml before writing it to /opt/voice/docker-compose.yml on
     # the VM — the secret is therefore present in that file on disk. Ensure the VM's
     # /opt/voice directory has restricted permissions (e.g. chmod 600 .../docker-compose.yml).
-    # HMAC-SHA1 is coturn's default and must match the API's credential generation algorithm.
+    # HMAC-SHA256 requires coturn 4.6.0+ and must match the API's credential generation algorithm.
     tmpfs:
       - /tmp
     entrypoint:
@@ -60,5 +60,6 @@ services:
           'no-tls' \
           'no-dtls' \
           'log-file=stdout' \
+          'sha256' \
           > /tmp/turnserver.conf
         exec turnserver -c /tmp/turnserver.conf
