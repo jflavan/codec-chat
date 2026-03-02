@@ -1536,6 +1536,16 @@ export class AppState {
 			{
 			onReconnecting: () => {
 				this.isHubConnected = false;
+				// Tear down voice — SignalR group membership is lost, so the voice
+				// session cannot recover without a full re-join.
+				if (this.activeVoiceChannelId) {
+					this.voice.leave();
+					this._cleanupRemoteAudio();
+					this.activeVoiceChannelId = null;
+					this.isMuted = false;
+					this.isDeafened = false;
+					this.setTransientError('Voice disconnected due to network interruption.');
+				}
 				if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
 				this.reconnectTimer = setTimeout(() => {
 					if (!this.isHubConnected) window.location.reload();
@@ -1553,6 +1563,13 @@ export class AppState {
 				if (this.reconnectTimer) {
 					clearTimeout(this.reconnectTimer);
 					this.reconnectTimer = null;
+				}
+				if (this.activeVoiceChannelId) {
+					this.voice.leave();
+					this._cleanupRemoteAudio();
+					this.activeVoiceChannelId = null;
+					this.isMuted = false;
+					this.isDeafened = false;
 				}
 				if (error) window.location.reload();
 			},
@@ -1804,6 +1821,11 @@ export class AppState {
 		if (this.activeDmChannelId) {
 			await this.hub.joinDmChannel(this.activeDmChannelId);
 		}
+	}
+
+	/** Synchronous voice cleanup for beforeunload (stops mic tracks immediately). */
+	teardownVoiceSync(): void {
+		this.voice.teardownSync();
 	}
 
 	async destroy(): Promise<void> {

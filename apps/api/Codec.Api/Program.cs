@@ -100,6 +100,15 @@ builder.Services.AddHttpClient("sfu", (sp, client) =>
           .LogWarning("SFU security configuration incomplete: Voice:SfuInternalKey is not configured.");
 });
 
+// Validate voice configuration at startup in non-development environments.
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Voice:TurnSecret"]))
+        throw new InvalidOperationException("Voice:TurnSecret must be configured in production.");
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Voice:SfuInternalKey"]))
+        throw new InvalidOperationException("Voice:SfuInternalKey must be configured in production.");
+}
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
 

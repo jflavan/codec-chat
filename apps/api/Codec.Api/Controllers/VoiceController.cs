@@ -90,15 +90,16 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     }
 
     /// <summary>
-    /// Issues short-lived TURN credentials using HMAC-SHA256 time-limited authentication.
+    /// Issues short-lived TURN credentials using HMAC-SHA1 time-limited authentication.
     /// The secret never leaves the server; clients receive a username + credential pair valid for 1 hour.
-    /// Requires coturn to be started with the <c>--sha256</c> flag (coturn 4.6.0+).
+    /// Compatible with coturn's default lt-cred-mech + use-auth-secret configuration.
     /// </summary>
     [HttpGet("turn-credentials")]
     public async Task<IActionResult> GetTurnCredentials()
     {
-        var turnSecret = config["Voice:TurnSecret"]
-            ?? throw new InvalidOperationException("Voice:TurnSecret is required.");
+        var turnSecret = config["Voice:TurnSecret"];
+        if (string.IsNullOrWhiteSpace(turnSecret))
+            throw new InvalidOperationException("Voice:TurnSecret is required.");
         var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
 
         var appUser = await userService.GetOrCreateUserAsync(User);
@@ -111,7 +112,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
 
         var keyBytes = Encoding.UTF8.GetBytes(turnSecret);
         var msgBytes = Encoding.UTF8.GetBytes(username);
-        using var hmac = new HMACSHA256(keyBytes);
+        using var hmac = new HMACSHA1(keyBytes);
         var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
 
         return Ok(new

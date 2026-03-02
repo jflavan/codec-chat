@@ -71,8 +71,10 @@ export function createRoomRouter(worker: Worker): Router {
 
     const participant = getOrCreateParticipant(room, participantId);
     if (direction === 'send') {
+      participant.sendTransport?.close();
       participant.sendTransport = transport;
     } else {
+      participant.recvTransport?.close();
       participant.recvTransport = transport;
     }
 
@@ -88,6 +90,10 @@ export function createRoomRouter(worker: Worker): Router {
   router.post('/rooms/:roomId/transports/:transportId/connect', async (req, res) => {
     const { roomId, transportId } = req.params;
     const { participantId, dtlsParameters } = req.body as { participantId: string; dtlsParameters: DtlsParameters };
+
+    if (!participantId || !dtlsParameters) {
+      return res.status(400).json({ error: 'participantId and dtlsParameters are required' });
+    }
 
     const room = rooms.get(roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
@@ -112,6 +118,13 @@ export function createRoomRouter(worker: Worker): Router {
     const { roomId, transportId } = req.params;
     const { participantId, kind, rtpParameters } = req.body as { participantId: string; kind: MediaKind; rtpParameters: RtpParameters };
 
+    if (!participantId || !kind || !rtpParameters) {
+      return res.status(400).json({ error: 'participantId, kind, and rtpParameters are required' });
+    }
+    if (kind !== 'audio') {
+      return res.status(400).json({ error: 'Only audio producers are supported' });
+    }
+
     const room = rooms.get(roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
@@ -121,10 +134,14 @@ export function createRoomRouter(worker: Worker): Router {
       return res.status(403).json({ error: 'Transport not found or not owned by participant' });
     }
 
+    participant.producer?.close();
     const producer = await participant.sendTransport.produce({ kind, rtpParameters });
     participant.producer = producer;
 
-    producer.on('transportclose', () => { producer.close(); });
+    producer.on('transportclose', () => {
+      producer.close();
+      participant.producer = undefined;
+    });
 
     res.json({ producerId: producer.id });
   });
@@ -133,6 +150,10 @@ export function createRoomRouter(worker: Worker): Router {
   router.post('/rooms/:roomId/consumers', async (req, res) => {
     const { roomId } = req.params;
     const { producerId, transportId, rtpCapabilities, participantId } = req.body;
+
+    if (!producerId || !transportId || !rtpCapabilities || !participantId) {
+      return res.status(400).json({ error: 'producerId, transportId, rtpCapabilities, and participantId are required' });
+    }
 
     const room = rooms.get(roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
@@ -153,9 +174,6 @@ export function createRoomRouter(worker: Worker): Router {
     }
 
     // Validate that the recv transport belongs to the requesting participant.
-    if (!participantId) {
-      return res.status(403).json({ error: 'participantId is required' });
-    }
     const consumerParticipant = room.participants.get(participantId);
     if (!consumerParticipant || consumerParticipant.recvTransport?.id !== transportId) {
       return res.status(403).json({ error: 'Recv transport not found or not owned by participant' });
@@ -168,8 +186,14 @@ export function createRoomRouter(worker: Worker): Router {
     });
 
     consumerParticipant.consumers.set(consumer.id, consumer);
-    consumer.on('transportclose', () => { consumer.close(); });
-    consumer.on('producerclose', () => { consumer.close(); });
+    consumer.on('transportclose', () => {
+      consumer.close();
+      consumerParticipant.consumers.delete(consumer.id);
+    });
+    consumer.on('producerclose', () => {
+      consumer.close();
+      consumerParticipant.consumers.delete(consumer.id);
+    });
 
     res.json({
       id: consumer.id,

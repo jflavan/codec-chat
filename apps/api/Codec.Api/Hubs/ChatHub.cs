@@ -168,12 +168,26 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         if (existing is not null)
             await LeaveVoiceChannelInternal(appUser, existing);
 
-        // Call the SFU before touching the DB. If the SFU is unavailable we throw here
-        // with no state change — no stale VoiceState row, no spurious UserJoinedVoice event.
+        // Call the SFU before touching the DB. If any step fails, clean up any
+        // resources already created so they don't leak in the SFU room.
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        var routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, channelId);
-        var sendTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "send");
-        var recvTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "recv");
+        JsonElement routerRtpCapabilities, sendTransport, recvTransport;
+        try
+        {
+            routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, channelId);
+            sendTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "send");
+            recvTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "recv");
+        }
+        catch
+        {
+            try
+            {
+                using var cleanupClient = httpClientFactory.CreateClient("sfu");
+                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
+            }
+            catch { /* SFU cleanup is best-effort */ }
+            throw;
+        }
 
         // SFU is ready — persist voice state and join the SignalR group.
         var voiceState = new VoiceState
@@ -240,12 +254,32 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         var serverId = channel.ServerId.ToString();
         await Clients.Group($"server-{serverId}").SendAsync("UserJoinedVoice", joiningUser);
 
+        // Generate TURN credentials so the client can relay through the TURN server
+        // when direct UDP is blocked by NAT/firewall.
+        var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
+        var turnSecret = config["Voice:TurnSecret"] ?? "";
+        object? iceServers = null;
+        if (!string.IsNullOrWhiteSpace(turnSecret))
+        {
+            var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+            var turnUsername = $"{expiry}:{appUser.Id}";
+            var keyBytes = System.Text.Encoding.UTF8.GetBytes(turnSecret);
+            var msgBytes = System.Text.Encoding.UTF8.GetBytes(turnUsername);
+            using var hmac = new System.Security.Cryptography.HMACSHA1(keyBytes);
+            var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
+            iceServers = new[]
+            {
+                new { urls = new[] { turnServerUrl }, username = turnUsername, credential }
+            };
+        }
+
         return new
         {
             routerRtpCapabilities,
             sendTransportOptions = sendTransport,
             recvTransportOptions = recvTransport,
-            members
+            members,
+            iceServers
         };
     }
 

@@ -42,13 +42,19 @@ export class VoiceService {
 		const sendTransportOptions = result.sendTransportOptions as TransportOptions;
 		const recvTransportOptions = result.recvTransportOptions as TransportOptions;
 		const members = result.members as (VoiceChannelMember & { producerId?: string })[];
+		const iceServers = (result as Record<string, unknown>).iceServers as
+			| { urls: string[]; username: string; credential: string }[]
+			| undefined;
 
 		await this.device.load({ routerRtpCapabilities });
 
 		// Send transport: microphone audio → SFU
 		// Capture transport references into locals so event handlers don't rely on
 		// `this.sendTransport` / `this.recvTransport`, which could be nulled by leave().
-		const sendTransport = this.device.createSendTransport(sendTransportOptions);
+		const sendTransport = this.device.createSendTransport({
+			...sendTransportOptions,
+			...(iceServers ? { iceServers } : {}),
+		});
 		this.sendTransport = sendTransport;
 		sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
 			hub.connectTransport(sendTransport.id, dtlsParameters)
@@ -62,7 +68,10 @@ export class VoiceService {
 		});
 
 		// Recv transport: SFU audio → speakers
-		const recvTransport = this.device.createRecvTransport(recvTransportOptions);
+		const recvTransport = this.device.createRecvTransport({
+			...recvTransportOptions,
+			...(iceServers ? { iceServers } : {}),
+		});
 		this.recvTransport = recvTransport;
 		recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
 			hub.connectTransport(recvTransport.id, dtlsParameters)
@@ -147,6 +156,24 @@ export class VoiceService {
 			this.localStream = null;
 		}
 
+		this.device = null;
+	}
+
+	/** Synchronous cleanup for beforeunload — stops mic tracks immediately. */
+	teardownSync(): void {
+		if (this.localStream) {
+			for (const track of this.localStream.getTracks()) {
+				track.stop();
+			}
+			this.localStream = null;
+		}
+		this.sendTransport?.close();
+		this.sendTransport = null;
+		this.recvTransport?.close();
+		this.recvTransport = null;
+		this.producer = null;
+		this.consumers.clear();
+		this.consumedProducerIds.clear();
 		this.device = null;
 	}
 }
