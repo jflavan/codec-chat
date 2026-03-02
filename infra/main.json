@@ -100,7 +100,7 @@
       "type": "securestring",
       "defaultValue": "",
       "metadata": {
-        "description": "HMAC-SHA1 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true."
+        "description": "HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true."
       }
     },
     "voiceSfuInternalKey": {

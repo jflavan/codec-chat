@@ -265,7 +265,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             var turnUsername = $"{expiry}:{appUser.Id}";
             var keyBytes = System.Text.Encoding.UTF8.GetBytes(turnSecret);
             var msgBytes = System.Text.Encoding.UTF8.GetBytes(turnUsername);
-            using var hmac = new System.Security.Cryptography.HMACSHA1(keyBytes);
+            using var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes);
             var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
             iceServers = new[]
             {
