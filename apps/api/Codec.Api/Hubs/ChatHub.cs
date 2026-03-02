@@ -235,11 +235,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             participantId = Context.ConnectionId
         };
 
-        // Notify other participants that a new user has joined.
-        await Clients.OthersInGroup($"voice-{channelId}").SendAsync("UserJoinedVoice", joiningUser);
-
-        // Also send to the caller so the client can render itself consistently in the member list.
-        await Clients.Caller.SendAsync("UserJoinedVoice", joiningUser);
+        // Notify all server members so the sidebar voice member list updates for everyone,
+        // not just participants already in the voice channel.
+        var serverId = channel.ServerId.ToString();
+        await Clients.Group($"server-{serverId}").SendAsync("UserJoinedVoice", joiningUser);
 
         return new
         {
@@ -357,9 +356,16 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         voiceState.IsDeafened = isDeafened;
         await db.SaveChangesAsync();
 
-        if (channelId is not null)
+        if (channelId is not null && voiceState.ChannelId.HasValue)
         {
-            await Clients.OthersInGroup($"voice-{channelId}").SendAsync("VoiceStateUpdated", new
+            // Broadcast to all server members so sidebar mute/deafen icons stay in sync.
+            var serverId = await db.Channels.AsNoTracking()
+                .Where(c => c.Id == voiceState.ChannelId.Value)
+                .Select(c => (Guid?)c.ServerId)
+                .FirstOrDefaultAsync();
+
+            var targetGroup = serverId.HasValue ? $"server-{serverId}" : $"voice-{channelId}";
+            await Clients.OthersInGroup(targetGroup).SendAsync("VoiceStateUpdated", new
             {
                 channelId,
                 userId = appUser.Id,
@@ -409,8 +415,34 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 .FirstOrDefaultAsync(vs => vs.ConnectionId == Context.ConnectionId);
             if (stale is not null)
             {
+                var staleChannelId = stale.ChannelId?.ToString();
+                var staleServerId = stale.ChannelId.HasValue
+                    ? await db.Channels.AsNoTracking()
+                        .Where(c => c.Id == stale.ChannelId.Value)
+                        .Select(c => (Guid?)c.ServerId)
+                        .FirstOrDefaultAsync()
+                    : null;
+
                 db.VoiceStates.Remove(stale);
                 await db.SaveChangesAsync();
+
+                // Broadcast leave so other server members don't see phantom voice members.
+                if (staleChannelId is not null && staleServerId.HasValue)
+                {
+                    try
+                    {
+                        await Clients.Group($"server-{staleServerId}").SendAsync("UserLeftVoice", new
+                        {
+                            channelId = staleChannelId,
+                            userId = stale.UserId,
+                            participantId = stale.ParticipantId
+                        });
+                    }
+                    catch
+                    {
+                        // Best-effort broadcast; DB row is already cleaned up.
+                    }
+                }
             }
         }
 
@@ -420,6 +452,14 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     private async Task LeaveVoiceChannelInternal(Models.User appUser, VoiceState voiceState)
     {
         var channelId = voiceState.ChannelId?.ToString();
+
+        // Look up the server before removing state so we can broadcast to all server members.
+        Guid? serverId = voiceState.ChannelId.HasValue
+            ? await db.Channels.AsNoTracking()
+                .Where(c => c.Id == voiceState.ChannelId.Value)
+                .Select(c => (Guid?)c.ServerId)
+                .FirstOrDefaultAsync()
+            : null;
 
         db.VoiceStates.Remove(voiceState);
         await db.SaveChangesAsync();
@@ -431,7 +471,9 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             // remove the correct connection from the voice group.
             await Groups.RemoveFromGroupAsync(voiceState.ConnectionId, $"voice-{channelId}");
 
-            await Clients.Group($"voice-{channelId}").SendAsync("UserLeftVoice", new
+            // Broadcast to all server members so sidebar member lists update for everyone.
+            var targetGroup = serverId.HasValue ? $"server-{serverId}" : $"voice-{channelId}";
+            await Clients.Group(targetGroup).SendAsync("UserLeftVoice", new
             {
                 channelId,
                 userId = appUser.Id,
