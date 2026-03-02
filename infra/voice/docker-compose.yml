@@ -6,7 +6,7 @@
 #   ACR_SERVER        — e.g. acrcodecprod.azurecr.io
 #   IMAGE_TAG         — Docker image tag (git SHA)
 #   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
-#   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
+#   TURN_SECRET       — HMAC-SHA1 shared secret for coturn time-limited credentials
 #   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
 
 services:
