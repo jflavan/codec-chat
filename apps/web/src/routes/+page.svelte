@@ -33,6 +33,15 @@
 			return;
 		}
 		app.init();
+
+		const handleBeforeUnload = () => {
+			app.teardownVoiceSync();
+		};
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		return () => {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+		};
 	});
 
 	onDestroy(() => {

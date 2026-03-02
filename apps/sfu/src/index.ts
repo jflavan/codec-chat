@@ -51,6 +51,14 @@ async function main() {
   }
 
   app.use(createRoomRouter(worker));
+
+  // Global error handler — prevent mediasoup internals from leaking to callers.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('Unhandled error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
   app.listen(PORT, () => {
     console.log(`SFU listening on http://0.0.0.0:${PORT}`);
   });

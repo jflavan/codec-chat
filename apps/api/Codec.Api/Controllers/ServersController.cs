@@ -16,7 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("servers")]
-public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, IHubContext<ChatHub> hub) : ControllerBase
+public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -819,6 +819,40 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         if (channel is null)
         {
             return NotFound(new { error = "Channel not found." });
+        }
+
+        // Clean up active voice sessions before deleting the channel.
+        if (channel.Type == ChannelType.Voice)
+        {
+            var voiceStates = await db.VoiceStates
+                .Where(vs => vs.ChannelId == channelId)
+                .ToListAsync();
+
+            if (voiceStates.Count > 0)
+            {
+                foreach (var vs in voiceStates)
+                {
+                    await hub.Clients.Group($"server-{serverId}").SendAsync("UserLeftVoice", new
+                    {
+                        channelId = channelId.ToString(),
+                        userId = vs.UserId,
+                        participantId = vs.ParticipantId
+                    });
+                }
+
+                db.VoiceStates.RemoveRange(voiceStates);
+
+                var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
+                try
+                {
+                    using var sfuClient = httpClientFactory.CreateClient("sfu");
+                    await sfuClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}");
+                }
+                catch
+                {
+                    // SFU cleanup is best-effort; channel deletion proceeds regardless.
+                }
+            }
         }
 
         // Delete associated data before removing the channel.

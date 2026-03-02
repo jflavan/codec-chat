@@ -34,12 +34,13 @@ services:
     network_mode: host
     environment:
       TURN_SECRET: "${TURN_SECRET}"
+      ANNOUNCED_IP: "${ANNOUNCED_IP}"
     # Write the coturn config to /tmp (tmpfs inside the container) so the secret does not
     # appear in process listings (ps aux). Note: CI/CD envsubst substitutes ${TURN_SECRET}
     # into this docker-compose.yml before writing it to /opt/voice/docker-compose.yml on
     # the VM — the secret is therefore present in that file on disk. Ensure the VM's
     # /opt/voice directory has restricted permissions (e.g. chmod 600 .../docker-compose.yml).
-    # sha256 requires coturn 4.6.0+ and must match the HMAC algorithm used by the API.
+    # HMAC-SHA1 is coturn's default and must match the API's credential generation algorithm.
     tmpfs:
       - /tmp
     entrypoint:
@@ -53,11 +54,11 @@ services:
           "static-auth-secret=${TURN_SECRET}" \
           'realm=codec-chat.com' \
           'listening-port=3478' \
+          "external-ip=${ANNOUNCED_IP}" \
           'min-port=49152' \
           'max-port=49200' \
           'no-tls' \
           'no-dtls' \
           'log-file=stdout' \
-          'sha256' \
           > /tmp/turnserver.conf
         exec turnserver -c /tmp/turnserver.conf
