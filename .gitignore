@@ -90,3 +90,6 @@ docker-compose.dev.yml
 
 # Deployment plan (contains infrastructure details)
 docs/GCP_DEPLOYMENT_PLAN.md
+
+# Dolt database files (added by bd init)
+.dolt/
