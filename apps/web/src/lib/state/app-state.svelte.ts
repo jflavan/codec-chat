@@ -1381,9 +1381,32 @@ export class AppState {
 			this.isMuted = false;
 			this.isDeafened = false;
 
-			// Seed the local member map with what the server returned
+			// Seed the local member map with what the server returned (excludes self),
+			// then add ourselves so the UI always shows the joining user. The
+			// onUserJoinedVoice callback may have already added us due to the hub
+			// sending UserJoinedVoice to the caller before returning — merge rather
+			// than overwrite to avoid erasing that entry.
 			const memberMap = new Map(this.voiceChannelMembers);
-			memberMap.set(channelId, members);
+			const existing = memberMap.get(channelId) ?? [];
+			const merged = [...members];
+			// Add any members already present from real-time events (e.g. self)
+			for (const m of existing) {
+				if (!merged.some((e) => e.participantId === m.participantId)) {
+					merged.push(m);
+				}
+			}
+			// Ensure self is always in the list
+			if (this.me && !merged.some((m) => m.userId === this.me!.user.id)) {
+				merged.push({
+					userId: this.me.user.id,
+					displayName: this.effectiveDisplayName,
+					avatarUrl: this.me.user.avatarUrl ?? null,
+					isMuted: false,
+					isDeafened: false,
+					participantId: '',
+				});
+			}
+			memberMap.set(channelId, merged);
 			this.voiceChannelMembers = memberMap;
 		} catch (e) {
 			console.error('[Voice] Failed to join voice channel:', e);

@@ -164,7 +164,7 @@ export function createRoomRouter(worker: Worker): Router {
     const consumer = await consumerParticipant.recvTransport!.consume({
       producerId,
       rtpCapabilities,
-      paused: true, // Client resumes after setting up the track.
+      paused: false, // Start unpaused so RTP flows immediately to the client.
     });
 
     consumerParticipant.consumers.set(consumer.id, consumer);
