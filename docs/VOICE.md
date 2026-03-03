@@ -7,7 +7,7 @@ This document describes the **Voice Channels** feature for Codec — real-time a
 | Phase | Description | Status |
 |-------|-------------|--------|
 | Phase 1 | Voice channels (server-side SFU, SignalR signaling, browser WebRTC) | ✅ Complete |
-| Phase 2 | Deafen, per-user volume, push-to-talk | 📋 Planned |
+| Phase 2 | Deafen, per-user volume, push-to-talk | ✅ Complete |
 | Phase 3 | Direct voice calls from DMs | 📋 Planned |
 | Phase 4 | Voice infrastructure (Azure VM, Docker Compose, CI/CD) | ✅ Complete |
 | Phase 5 | Video chat and screen sharing | 🔮 Future |
@@ -276,19 +276,37 @@ Required GitHub Actions secrets: `VOICE_VM_HOST`, `VOICE_VM_SSH_KEY`, `VOICE_SFU
 | `NotFoundError` | "No microphone was found. Please connect a microphone and try again." |
 | Other | "Could not access microphone: {error message}" |
 
-### Known Limitations (Phase 1)
+### Known Limitations
 
 - Audio only (no video, no screen sharing)
-- No deafen/undeafen (planned Phase 2)
-- No per-user volume control (planned Phase 2)
-- No push-to-talk (planned Phase 2)
 - Single worker per SFU process (scales to ~500 concurrent participants before needing horizontal scaling)
 - No TURN credential rotation (TURN secret is static)
 
 ---
 
-## Phase 2 Planned Work
+## Phase 2: Per-User Volume & Push-to-Talk
 
-- **Deafen**: Pause all consumers client-side; broadcast `VoiceDeafenChanged` event
-- **Per-user volume**: `gainNode` in Web Audio API per consumer track; no server changes needed
-- **Push-to-talk**: Hold key → `producer.resume()`, release → `producer.pause()`; configurable keybind in User Settings
+### Per-User Volume Control
+
+- Each remote audio stream is routed through a Web Audio API `GainNode` for independent volume control
+- Volume range: 0–100% per user
+- Right-click a voice member in the channel sidebar to adjust their volume
+- Volumes persist in `localStorage` under key `codec-user-volumes`
+- Deafen overrides per-user volume (sets all gains to 0); undeafen restores saved volumes
+
+### Push-to-Talk
+
+- Two input modes: **Voice Activity** (mic always on, default) and **Push to Talk** (mic active only while holding key)
+- Configured in User Settings → Voice & Audio tab
+- Default PTT key: `V` (configurable via key recorder in settings)
+- PTT preferences persist in `localStorage` under key `codec-voice-preferences`
+- Text input fields are excluded from PTT activation (typing doesn't trigger PTT)
+- VoiceConnectedBar shows "Push to Talk" / "Transmitting" status label when in PTT mode
+
+### No Server Changes
+
+Both features are entirely client-side:
+- No new API endpoints or SignalR events
+- No database changes
+- Volume uses Web Audio API GainNode
+- PTT uses mediasoup producer `pause()`/`resume()`
