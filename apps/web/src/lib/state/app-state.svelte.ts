@@ -159,6 +159,12 @@ export class AppState {
 	isJoiningVoice = $state(false);
 	/** Per-user volume levels: userId -> 0.0-1.0. Loaded from localStorage on init. */
 	userVolumes = $state<Map<string, number>>(new Map());
+	/** Input mode: 'voice-activity' (always-on mic) or 'push-to-talk'. */
+	voiceInputMode = $state<'voice-activity' | 'push-to-talk'>('voice-activity');
+	/** KeyboardEvent.code for push-to-talk key. */
+	pttKey = $state('KeyV');
+	/** True while the PTT key is held down. */
+	isPttActive = $state(false);
 
 	/* ───── reply state ───── */
 	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
@@ -240,6 +246,8 @@ export class AppState {
 	private audioNodes = new Map<string, { source: MediaStreamAudioSourceNode; gain: GainNode }>();
 	/** participantId -> userId lookup for volume. Built during attach. */
 	private audioParticipantUserMap = new Map<string, string>();
+	private pttKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+	private pttKeyupHandler: ((e: KeyboardEvent) => void) | null = null;
 
 	constructor(
 		private readonly apiBaseUrl: string,
@@ -303,6 +311,7 @@ export class AppState {
 	/** Bootstrap auth: restore session or show sign-in UI. */
 	init(): void {
 		this._loadUserVolumes();
+		this._loadVoicePreferences();
 		if (!isSessionExpired()) {
 			const stored = loadStoredToken();
 			if (stored && !isTokenExpired(stored)) {
@@ -1389,6 +1398,12 @@ export class AppState {
 			this.isMuted = false;
 			this.isDeafened = false;
 
+			if (this.voiceInputMode === 'push-to-talk') {
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+				this._registerPttListeners();
+			}
+
 			// Seed the local member map with what the server returned (excludes self),
 			// then add ourselves so the UI always shows the joining user. The
 			// onUserJoinedVoice callback may have already added us due to the hub
@@ -1456,6 +1471,8 @@ export class AppState {
 		this.activeVoiceChannelId = null;
 		this.isMuted = false;
 		this.isDeafened = false;
+		this.isPttActive = false;
+		this._removePttListeners();
 
 		// Remove self from the local members map
 		if (this.me) {
@@ -1571,6 +1588,65 @@ export class AppState {
 		localStorage.setItem('codec-user-volumes', JSON.stringify(obj));
 	}
 
+	private _loadVoicePreferences(): void {
+		try {
+			const raw = localStorage.getItem('codec-voice-preferences');
+			if (raw) {
+				const parsed = JSON.parse(raw) as { inputMode?: string; pttKey?: string };
+				if (parsed.inputMode === 'voice-activity' || parsed.inputMode === 'push-to-talk') {
+					this.voiceInputMode = parsed.inputMode;
+				}
+				if (parsed.pttKey) {
+					this.pttKey = parsed.pttKey;
+				}
+			}
+		} catch {
+			// ignore corrupt data
+		}
+	}
+
+	private _saveVoicePreferences(): void {
+		localStorage.setItem('codec-voice-preferences', JSON.stringify({
+			inputMode: this.voiceInputMode,
+			pttKey: this.pttKey,
+		}));
+	}
+
+	private _registerPttListeners(): void {
+		this._removePttListeners();
+
+		this.pttKeydownHandler = (e: KeyboardEvent) => {
+			if (e.code !== this.pttKey || e.repeat) return;
+			// Don't activate PTT while typing in text fields
+			const tag = (document.activeElement as HTMLElement)?.tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable) return;
+
+			this.isPttActive = true;
+			this.voice.setMuted(false);
+		};
+
+		this.pttKeyupHandler = (e: KeyboardEvent) => {
+			if (e.code !== this.pttKey) return;
+
+			this.isPttActive = false;
+			this.voice.setMuted(true);
+		};
+
+		window.addEventListener('keydown', this.pttKeydownHandler);
+		window.addEventListener('keyup', this.pttKeyupHandler);
+	}
+
+	private _removePttListeners(): void {
+		if (this.pttKeydownHandler) {
+			window.removeEventListener('keydown', this.pttKeydownHandler);
+			this.pttKeydownHandler = null;
+		}
+		if (this.pttKeyupHandler) {
+			window.removeEventListener('keyup', this.pttKeyupHandler);
+			this.pttKeyupHandler = null;
+		}
+	}
+
 	setUserVolume(userId: string, volume: number): void {
 		const clamped = Math.max(0, Math.min(1, volume));
 		const updated = new Map(this.userVolumes);
@@ -1597,6 +1673,32 @@ export class AppState {
 		this.setUserVolume(userId, 1.0);
 	}
 
+	setVoiceInputMode(mode: 'voice-activity' | 'push-to-talk'): void {
+		this.voiceInputMode = mode;
+		this._saveVoicePreferences();
+
+		if (this.activeVoiceChannelId) {
+			if (mode === 'push-to-talk') {
+				// Switch to PTT: pause producer, register listeners
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+				this._registerPttListeners();
+			} else {
+				// Switch to VA: resume producer (if not manually muted), remove listeners
+				this._removePttListeners();
+				this.isPttActive = false;
+				if (!this.isMuted) {
+					this.voice.setMuted(false);
+				}
+			}
+		}
+	}
+
+	setPttKey(code: string): void {
+		this.pttKey = code;
+		this._saveVoicePreferences();
+	}
+
 	/* ═══════════════════ SignalR ═══════════════════ */
 
 	private async startSignalR(): Promise<void> {
@@ -1614,9 +1716,11 @@ export class AppState {
 				if (this.activeVoiceChannelId) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._removePttListeners();
 					this.activeVoiceChannelId = null;
 					this.isMuted = false;
 					this.isDeafened = false;
+					this.isPttActive = false;
 					this.setTransientError('Voice disconnected due to network interruption.');
 				}
 				if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -1640,9 +1744,11 @@ export class AppState {
 				if (this.activeVoiceChannelId) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._removePttListeners();
 					this.activeVoiceChannelId = null;
 					this.isMuted = false;
 					this.isDeafened = false;
+					this.isPttActive = false;
 				}
 				if (error) window.location.reload();
 			},
@@ -1900,6 +2006,7 @@ export class AppState {
 	teardownVoiceSync(): void {
 		this.voice.teardownSync();
 		this._cleanupRemoteAudio();
+		this._removePttListeners();
 		this.audioContext?.close().catch(() => {});
 		this.audioContext = null;
 	}
