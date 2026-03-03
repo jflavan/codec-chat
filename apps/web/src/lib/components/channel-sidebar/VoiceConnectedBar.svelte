@@ -8,9 +8,15 @@
 	);
 </script>
 
-<div class="voice-bar" role="status" aria-label="Voice connected">
+<div class="voice-bar" class:transmitting={app.isPttActive} role="status" aria-label="Voice connected">
 	<div class="voice-info">
-		<span class="voice-label">Voice Connected</span>
+		<span class="voice-label">
+			{#if app.voiceInputMode === 'push-to-talk'}
+				{app.isPttActive ? 'Transmitting' : 'Push to Talk'}
+			{:else}
+				Voice Connected
+			{/if}
+		</span>
 		<span class="voice-channel-name"># {channelName}</span>
 	</div>
 	<div class="voice-controls">
@@ -139,5 +145,9 @@
 	.leave-btn:hover {
 		background: var(--danger, #f04747);
 		color: #fff;
+	}
+
+	.voice-bar.transmitting .voice-label {
+		color: var(--accent, #5865f2);
 	}
 </style>
