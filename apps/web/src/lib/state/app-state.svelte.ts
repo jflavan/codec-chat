@@ -157,6 +157,8 @@ export class AppState {
 	isMuted = $state(false);
 	isDeafened = $state(false);
 	isJoiningVoice = $state(false);
+	/** Per-user volume levels: userId -> 0.0-1.0. Loaded from localStorage on init. */
+	userVolumes = $state<Map<string, number>>(new Map());
 
 	/* ───── reply state ───── */
 	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
@@ -234,8 +236,10 @@ export class AppState {
 	private voice: VoiceService = new VoiceService();
 	private refreshPromise: Promise<string | null> | null = null;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-	/** Audio elements keyed by participantId for remote streams. */
-	private remoteAudioElements = new Map<string, HTMLAudioElement>();
+	private audioContext: AudioContext | null = null;
+	private audioNodes = new Map<string, { source: MediaStreamAudioSourceNode; gain: GainNode }>();
+	/** participantId -> userId lookup for volume. Built during attach. */
+	private audioParticipantUserMap = new Map<string, string>();
 
 	constructor(
 		private readonly apiBaseUrl: string,
@@ -298,6 +302,7 @@ export class AppState {
 
 	/** Bootstrap auth: restore session or show sign-in UI. */
 	init(): void {
+		this._loadUserVolumes();
 		if (!isSessionExpired()) {
 			const stored = loadStoredToken();
 			if (stored && !isTokenExpired(stored)) {
@@ -1373,7 +1378,10 @@ export class AppState {
 		this.isJoiningVoice = true;
 		try {
 			const members = await this.voice.join(channelId, this.hub, {
-				onNewTrack: (pid, track) => this._attachRemoteAudio(pid, track),
+				onNewTrack: (pid, track) => {
+					const userId = this._findUserIdByParticipant(pid);
+					this._attachRemoteAudio(pid, userId, track);
+				},
 				onTrackEnded: (pid) => this._detachRemoteAudio(pid),
 			});
 
@@ -1473,9 +1481,10 @@ export class AppState {
 		} else if (!this.isDeafened && this.isMuted) {
 			// Undeafening does not auto-unmute; keep current mute state
 		}
-		// Mute/unmute remote audio elements based on deafened state
-		for (const el of this.remoteAudioElements.values()) {
-			el.muted = this.isDeafened;
+		// Mute/unmute remote audio based on deafened state
+		for (const [pid, nodes] of this.audioNodes) {
+			const userId = this.audioParticipantUserMap.get(pid);
+			nodes.gain.gain.value = this.isDeafened ? 0 : (this.userVolumes.get(userId ?? '') ?? 1.0);
 		}
 		await this.hub.updateVoiceState(this.isMuted, this.isDeafened);
 	}
@@ -1499,29 +1508,89 @@ export class AppState {
 		this.voiceChannelMembers = memberMap;
 	}
 
-	private _attachRemoteAudio(participantId: string, track: MediaStreamTrack): void {
-		const el = new Audio();
-		el.srcObject = new MediaStream([track]);
-		el.muted = this.isDeafened;
-		el.play().catch(() => {});
-		this.remoteAudioElements.set(participantId, el);
+	private _attachRemoteAudio(participantId: string, userId: string, track: MediaStreamTrack): void {
+		if (!this.audioContext) {
+			this.audioContext = new AudioContext();
+		}
+		const source = this.audioContext.createMediaStreamSource(new MediaStream([track]));
+		const gain = this.audioContext.createGain();
+		const volume = this.isDeafened ? 0 : (this.userVolumes.get(userId) ?? 1.0);
+		gain.gain.value = volume;
+		source.connect(gain);
+		gain.connect(this.audioContext.destination);
+		this.audioNodes.set(participantId, { source, gain });
+		this.audioParticipantUserMap.set(participantId, userId);
 	}
 
 	private _detachRemoteAudio(participantId: string): void {
-		const el = this.remoteAudioElements.get(participantId);
-		if (el) {
-			el.pause();
-			el.srcObject = null;
-			this.remoteAudioElements.delete(participantId);
+		const nodes = this.audioNodes.get(participantId);
+		if (nodes) {
+			nodes.source.disconnect();
+			nodes.gain.disconnect();
+			this.audioNodes.delete(participantId);
 		}
+		this.audioParticipantUserMap.delete(participantId);
 	}
 
 	private _cleanupRemoteAudio(): void {
-		for (const el of this.remoteAudioElements.values()) {
-			el.pause();
-			el.srcObject = null;
+		for (const nodes of this.audioNodes.values()) {
+			nodes.source.disconnect();
+			nodes.gain.disconnect();
 		}
-		this.remoteAudioElements.clear();
+		this.audioNodes.clear();
+		this.audioParticipantUserMap.clear();
+	}
+
+	private _findUserIdByParticipant(participantId: string): string {
+		if (!this.activeVoiceChannelId) return '';
+		const members = this.voiceChannelMembers.get(this.activeVoiceChannelId) ?? [];
+		return members.find((m) => m.participantId === participantId)?.userId ?? '';
+	}
+
+	private _loadUserVolumes(): void {
+		try {
+			const raw = localStorage.getItem('codec-user-volumes');
+			if (raw) {
+				const parsed = JSON.parse(raw) as Record<string, number>;
+				this.userVolumes = new Map(Object.entries(parsed));
+			}
+		} catch {
+			// ignore corrupt data
+		}
+	}
+
+	private _saveUserVolumes(): void {
+		const obj: Record<string, number> = {};
+		for (const [k, v] of this.userVolumes) {
+			obj[k] = v;
+		}
+		localStorage.setItem('codec-user-volumes', JSON.stringify(obj));
+	}
+
+	setUserVolume(userId: string, volume: number): void {
+		const clamped = Math.max(0, Math.min(1, volume));
+		const updated = new Map(this.userVolumes);
+		if (clamped === 1.0) {
+			updated.delete(userId); // default = no entry
+		} else {
+			updated.set(userId, clamped);
+		}
+		this.userVolumes = updated;
+		this._saveUserVolumes();
+
+		// Apply to any active audio node for this user
+		if (!this.isDeafened) {
+			for (const [pid, uid] of this.audioParticipantUserMap) {
+				if (uid === userId) {
+					const nodes = this.audioNodes.get(pid);
+					if (nodes) nodes.gain.gain.value = clamped;
+				}
+			}
+		}
+	}
+
+	resetUserVolume(userId: string): void {
+		this.setUserVolume(userId, 1.0);
 	}
 
 	/* ═══════════════════ SignalR ═══════════════════ */
@@ -1806,7 +1875,7 @@ export class AppState {
 			onNewProducer: async (event) => {
 				if (this.activeVoiceChannelId === event.channelId) {
 					await this.voice.consumeProducer(event.producerId, event.participantId, this.hub, {
-						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, track),
+						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, event.userId, track),
 						onTrackEnded: (pid) => this._detachRemoteAudio(pid),
 					});
 				}
@@ -1826,6 +1895,9 @@ export class AppState {
 	/** Synchronous voice cleanup for beforeunload (stops mic tracks immediately). */
 	teardownVoiceSync(): void {
 		this.voice.teardownSync();
+		this._cleanupRemoteAudio();
+		this.audioContext?.close().catch(() => {});
+		this.audioContext = null;
 	}
 
 	async destroy(): Promise<void> {
