@@ -8,7 +8,7 @@ This document describes the **Voice Channels** feature for Codec — real-time a
 |-------|-------------|--------|
 | Phase 1 | Voice channels (server-side SFU, SignalR signaling, browser WebRTC) | ✅ Complete |
 | Phase 2 | Deafen, per-user volume, push-to-talk | ✅ Complete |
-| Phase 3 | Direct voice calls from DMs | 📋 Planned |
+| Phase 3 | Direct voice calls from DMs | ✅ Complete |
 | Phase 4 | Voice infrastructure (Azure VM, Docker Compose, CI/CD) | ✅ Complete |
 | Phase 5 | Video chat and screen sharing | 🔮 Future |
 
