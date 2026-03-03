@@ -119,7 +119,7 @@ export class AppState {
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
-	settingsCategory = $state<'profile' | 'account'>('profile');
+	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
 	serverSettingsOpen = $state(false);
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
@@ -157,6 +157,14 @@ export class AppState {
 	isMuted = $state(false);
 	isDeafened = $state(false);
 	isJoiningVoice = $state(false);
+	/** Per-user volume levels: userId -> 0.0-1.0. Loaded from localStorage on init. */
+	userVolumes = $state<Map<string, number>>(new Map());
+	/** Input mode: 'voice-activity' (always-on mic) or 'push-to-talk'. */
+	voiceInputMode = $state<'voice-activity' | 'push-to-talk'>('voice-activity');
+	/** KeyboardEvent.code for push-to-talk key. */
+	pttKey = $state('KeyV');
+	/** True while the PTT key is held down. */
+	isPttActive = $state(false);
 
 	/* ───── reply state ───── */
 	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
@@ -234,8 +242,12 @@ export class AppState {
 	private voice: VoiceService = new VoiceService();
 	private refreshPromise: Promise<string | null> | null = null;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-	/** Audio elements keyed by participantId for remote streams. */
-	private remoteAudioElements = new Map<string, HTMLAudioElement>();
+	private audioContext: AudioContext | null = null;
+	private audioNodes = new Map<string, { source: MediaStreamAudioSourceNode; gain: GainNode }>();
+	/** participantId -> userId lookup for volume. Built during attach. */
+	private audioParticipantUserMap = new Map<string, string>();
+	private pttKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+	private pttKeyupHandler: ((e: KeyboardEvent) => void) | null = null;
 
 	constructor(
 		private readonly apiBaseUrl: string,
@@ -298,6 +310,8 @@ export class AppState {
 
 	/** Bootstrap auth: restore session or show sign-in UI. */
 	init(): void {
+		this._loadUserVolumes();
+		this._loadVoicePreferences();
 		if (!isSessionExpired()) {
 			const stored = loadStoredToken();
 			if (stored && !isTokenExpired(stored)) {
@@ -1373,13 +1387,22 @@ export class AppState {
 		this.isJoiningVoice = true;
 		try {
 			const members = await this.voice.join(channelId, this.hub, {
-				onNewTrack: (pid, track) => this._attachRemoteAudio(pid, track),
+				onNewTrack: (pid, track) => {
+					const userId = this._findUserIdByParticipant(pid);
+					this._attachRemoteAudio(pid, userId, track);
+				},
 				onTrackEnded: (pid) => this._detachRemoteAudio(pid),
 			});
 
 			this.activeVoiceChannelId = channelId;
 			this.isMuted = false;
 			this.isDeafened = false;
+
+			if (this.voiceInputMode === 'push-to-talk') {
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+				this._registerPttListeners();
+			}
 
 			// Seed the local member map with what the server returned (excludes self),
 			// then add ourselves so the UI always shows the joining user. The
@@ -1415,6 +1438,8 @@ export class AppState {
 			try { await this.hub.leaveVoiceChannel(); } catch { /* ignore */ }
 			await this.voice.leave();
 			this._cleanupRemoteAudio();
+			this._removePttListeners();
+			this.isPttActive = false;
 			this.activeVoiceChannelId = null;
 
 			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
@@ -1448,6 +1473,8 @@ export class AppState {
 		this.activeVoiceChannelId = null;
 		this.isMuted = false;
 		this.isDeafened = false;
+		this.isPttActive = false;
+		this._removePttListeners();
 
 		// Remove self from the local members map
 		if (this.me) {
@@ -1460,7 +1487,19 @@ export class AppState {
 
 	async toggleMute(): Promise<void> {
 		this.isMuted = !this.isMuted;
-		this.voice.setMuted(this.isMuted);
+		if (this.voiceInputMode === 'push-to-talk') {
+			// In PTT mode, mute button toggles between "PTT active" and "fully muted"
+			if (this.isMuted) {
+				this._removePttListeners();
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+			} else {
+				this.voice.setMuted(true); // still muted until PTT key held
+				this._registerPttListeners();
+			}
+		} else {
+			this.voice.setMuted(this.isMuted);
+		}
 		await this.hub.updateVoiceState(this.isMuted, this.isDeafened);
 	}
 
@@ -1473,9 +1512,10 @@ export class AppState {
 		} else if (!this.isDeafened && this.isMuted) {
 			// Undeafening does not auto-unmute; keep current mute state
 		}
-		// Mute/unmute remote audio elements based on deafened state
-		for (const el of this.remoteAudioElements.values()) {
-			el.muted = this.isDeafened;
+		// Mute/unmute remote audio based on deafened state
+		for (const [pid, nodes] of this.audioNodes) {
+			const userId = this.audioParticipantUserMap.get(pid);
+			nodes.gain.gain.value = this.isDeafened ? 0 : (this.userVolumes.get(userId ?? '') ?? 1.0);
 		}
 		await this.hub.updateVoiceState(this.isMuted, this.isDeafened);
 	}
@@ -1499,29 +1539,178 @@ export class AppState {
 		this.voiceChannelMembers = memberMap;
 	}
 
-	private _attachRemoteAudio(participantId: string, track: MediaStreamTrack): void {
-		const el = new Audio();
-		el.srcObject = new MediaStream([track]);
-		el.muted = this.isDeafened;
-		el.play().catch(() => {});
-		this.remoteAudioElements.set(participantId, el);
+	private _attachRemoteAudio(participantId: string, userId: string, track: MediaStreamTrack): void {
+		this._detachRemoteAudio(participantId); // guard against re-attach
+		if (!this.audioContext) {
+			this.audioContext = new AudioContext();
+		}
+		if (this.audioContext.state === 'suspended') {
+			this.audioContext.resume().catch(() => {});
+		}
+		const source = this.audioContext.createMediaStreamSource(new MediaStream([track]));
+		const gain = this.audioContext.createGain();
+		const volume = this.isDeafened ? 0 : (this.userVolumes.get(userId) ?? 1.0);
+		gain.gain.value = volume;
+		source.connect(gain);
+		gain.connect(this.audioContext.destination);
+		this.audioNodes.set(participantId, { source, gain });
+		this.audioParticipantUserMap.set(participantId, userId);
 	}
 
 	private _detachRemoteAudio(participantId: string): void {
-		const el = this.remoteAudioElements.get(participantId);
-		if (el) {
-			el.pause();
-			el.srcObject = null;
-			this.remoteAudioElements.delete(participantId);
+		const nodes = this.audioNodes.get(participantId);
+		if (nodes) {
+			nodes.source.disconnect();
+			nodes.gain.disconnect();
+			this.audioNodes.delete(participantId);
 		}
+		this.audioParticipantUserMap.delete(participantId);
 	}
 
 	private _cleanupRemoteAudio(): void {
-		for (const el of this.remoteAudioElements.values()) {
-			el.pause();
-			el.srcObject = null;
+		for (const nodes of this.audioNodes.values()) {
+			nodes.source.disconnect();
+			nodes.gain.disconnect();
 		}
-		this.remoteAudioElements.clear();
+		this.audioNodes.clear();
+		this.audioParticipantUserMap.clear();
+	}
+
+	private _findUserIdByParticipant(participantId: string): string {
+		if (!this.activeVoiceChannelId) return '';
+		const members = this.voiceChannelMembers.get(this.activeVoiceChannelId) ?? [];
+		return members.find((m) => m.participantId === participantId)?.userId ?? '';
+	}
+
+	private _loadUserVolumes(): void {
+		try {
+			const raw = localStorage.getItem('codec-user-volumes');
+			if (raw) {
+				const parsed = JSON.parse(raw) as Record<string, number>;
+				this.userVolumes = new Map(Object.entries(parsed));
+			}
+		} catch {
+			// ignore corrupt data
+		}
+	}
+
+	private _saveUserVolumes(): void {
+		const obj: Record<string, number> = {};
+		for (const [k, v] of this.userVolumes) {
+			obj[k] = v;
+		}
+		localStorage.setItem('codec-user-volumes', JSON.stringify(obj));
+	}
+
+	private _loadVoicePreferences(): void {
+		try {
+			const raw = localStorage.getItem('codec-voice-preferences');
+			if (raw) {
+				const parsed = JSON.parse(raw) as { inputMode?: string; pttKey?: string };
+				if (parsed.inputMode === 'voice-activity' || parsed.inputMode === 'push-to-talk') {
+					this.voiceInputMode = parsed.inputMode;
+				}
+				if (parsed.pttKey) {
+					this.pttKey = parsed.pttKey;
+				}
+			}
+		} catch {
+			// ignore corrupt data
+		}
+	}
+
+	private _saveVoicePreferences(): void {
+		localStorage.setItem('codec-voice-preferences', JSON.stringify({
+			inputMode: this.voiceInputMode,
+			pttKey: this.pttKey,
+		}));
+	}
+
+	private _registerPttListeners(): void {
+		this._removePttListeners();
+
+		this.pttKeydownHandler = (e: KeyboardEvent) => {
+			if (e.code !== this.pttKey || e.repeat) return;
+			// Don't activate PTT while typing in text fields
+			const tag = (document.activeElement as HTMLElement)?.tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable) return;
+
+			this.isPttActive = true;
+			this.voice.setMuted(false);
+		};
+
+		this.pttKeyupHandler = (e: KeyboardEvent) => {
+			if (e.code !== this.pttKey) return;
+
+			this.isPttActive = false;
+			this.voice.setMuted(true);
+		};
+
+		window.addEventListener('keydown', this.pttKeydownHandler);
+		window.addEventListener('keyup', this.pttKeyupHandler);
+	}
+
+	private _removePttListeners(): void {
+		if (this.pttKeydownHandler) {
+			window.removeEventListener('keydown', this.pttKeydownHandler);
+			this.pttKeydownHandler = null;
+		}
+		if (this.pttKeyupHandler) {
+			window.removeEventListener('keyup', this.pttKeyupHandler);
+			this.pttKeyupHandler = null;
+		}
+	}
+
+	setUserVolume(userId: string, volume: number): void {
+		const clamped = Math.max(0, Math.min(1, volume));
+		const updated = new Map(this.userVolumes);
+		if (clamped === 1.0) {
+			updated.delete(userId); // default = no entry
+		} else {
+			updated.set(userId, clamped);
+		}
+		this.userVolumes = updated;
+		this._saveUserVolumes();
+
+		// Apply to any active audio node for this user
+		if (!this.isDeafened) {
+			for (const [pid, uid] of this.audioParticipantUserMap) {
+				if (uid === userId) {
+					const nodes = this.audioNodes.get(pid);
+					if (nodes) nodes.gain.gain.value = clamped;
+				}
+			}
+		}
+	}
+
+	resetUserVolume(userId: string): void {
+		this.setUserVolume(userId, 1.0);
+	}
+
+	setVoiceInputMode(mode: 'voice-activity' | 'push-to-talk'): void {
+		this.voiceInputMode = mode;
+		this._saveVoicePreferences();
+
+		if (this.activeVoiceChannelId) {
+			if (mode === 'push-to-talk') {
+				// Switch to PTT: pause producer, register listeners
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+				this._registerPttListeners();
+			} else {
+				// Switch to VA: resume producer (if not manually muted), remove listeners
+				this._removePttListeners();
+				this.isPttActive = false;
+				if (!this.isMuted) {
+					this.voice.setMuted(false);
+				}
+			}
+		}
+	}
+
+	setPttKey(code: string): void {
+		this.pttKey = code;
+		this._saveVoicePreferences();
 	}
 
 	/* ═══════════════════ SignalR ═══════════════════ */
@@ -1541,9 +1730,11 @@ export class AppState {
 				if (this.activeVoiceChannelId) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._removePttListeners();
 					this.activeVoiceChannelId = null;
 					this.isMuted = false;
 					this.isDeafened = false;
+					this.isPttActive = false;
 					this.setTransientError('Voice disconnected due to network interruption.');
 				}
 				if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -1567,9 +1758,11 @@ export class AppState {
 				if (this.activeVoiceChannelId) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._removePttListeners();
 					this.activeVoiceChannelId = null;
 					this.isMuted = false;
 					this.isDeafened = false;
+					this.isPttActive = false;
 				}
 				if (error) window.location.reload();
 			},
@@ -1806,7 +1999,7 @@ export class AppState {
 			onNewProducer: async (event) => {
 				if (this.activeVoiceChannelId === event.channelId) {
 					await this.voice.consumeProducer(event.producerId, event.participantId, this.hub, {
-						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, track),
+						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, event.userId, track),
 						onTrackEnded: (pid) => this._detachRemoteAudio(pid),
 					});
 				}
@@ -1826,12 +2019,18 @@ export class AppState {
 	/** Synchronous voice cleanup for beforeunload (stops mic tracks immediately). */
 	teardownVoiceSync(): void {
 		this.voice.teardownSync();
+		this._cleanupRemoteAudio();
+		this._removePttListeners();
+		this.audioContext?.close().catch(() => {});
+		this.audioContext = null;
 	}
 
 	async destroy(): Promise<void> {
 		if (this.activeVoiceChannelId) {
 			await this.leaveVoiceChannel();
 		}
+		this.audioContext?.close().catch(() => {});
+		this.audioContext = null;
 		await this.hub.stop();
 	}
 
