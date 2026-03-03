@@ -9,6 +9,7 @@
 	import ReplyComposerBar from '$lib/components/chat/ReplyComposerBar.svelte';
 	import ComposerOverlay from '$lib/components/chat/ComposerOverlay.svelte';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
+	import DmCallHeader from '$lib/components/voice/DmCallHeader.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -268,7 +269,24 @@
 				{app.activeDmParticipant?.displayName ?? 'Select a conversation'}
 			</h1>
 		</div>
+		<div class="dm-header-right">
+			<button
+				class="call-btn-header"
+				disabled={!!app.activeCall || !!app.incomingCall}
+				onclick={() => { if (app.activeDmChannelId) app.startCall(app.activeDmChannelId); }}
+				aria-label="Start voice call"
+				title="Start voice call"
+			>
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+				</svg>
+			</button>
+		</div>
 	</header>
+
+	{#if app.activeCall && app.activeCall.dmChannelId === app.activeDmChannelId}
+		<DmCallHeader />
+	{/if}
 
 	<div class="dm-body">
 		{#if isDragOver && app.activeDmChannelId}
@@ -296,6 +314,24 @@
 				</p>
 			{:else}
 				{#each app.dmMessages as message, i (message.id)}
+					{#if message.messageType === 1}
+						<div class="system-message voice-call-event">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="call-event-icon" class:missed={message.body === 'missed'}>
+								<path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+							</svg>
+							<span class="call-event-text">
+								{#if message.body === 'missed'}
+									Missed voice call
+								{:else if message.body?.startsWith('call:')}
+									{@const secs = parseInt(message.body.split(':')[1] ?? '0')}
+									Voice call — {Math.floor(secs / 60)}m {secs % 60}s
+								{:else}
+									Voice call
+								{/if}
+							</span>
+							<time class="call-event-time">{formatTime(message.createdAt)}</time>
+						</div>
+					{:else}
 					{@const prev = i > 0 ? app.dmMessages[i - 1] : null}
 					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
@@ -428,6 +464,7 @@
 						{/if}
 					</article>
 					</div>
+					{/if}
 				{/each}
 			{/if}
 		</div>
@@ -1194,6 +1231,56 @@
 			animation: none;
 			background: color-mix(in srgb, var(--accent) 10%, transparent);
 		}
+	}
+
+	/* ───── Call button in header ───── */
+
+	.dm-header-right {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+	}
+	.call-btn-header {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		padding: 6px;
+		border-radius: 4px;
+		display: grid;
+		place-items: center;
+		transition: color 150ms ease, background 150ms ease;
+	}
+	.call-btn-header:hover:not(:disabled) {
+		color: var(--text-normal);
+		background: var(--bg-message-hover);
+	}
+	.call-btn-header:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	/* ───── Voice call system messages ───── */
+
+	.system-message.voice-call-event {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 8px 16px;
+		color: var(--text-muted);
+		font-size: 13px;
+	}
+	.call-event-icon {
+		color: var(--success);
+		flex-shrink: 0;
+	}
+	.call-event-icon.missed {
+		color: var(--danger);
+	}
+	.call-event-time {
+		font-size: 11px;
+		color: var(--text-dim);
 	}
 
 	/* ───── Mobile adjustments ───── */
