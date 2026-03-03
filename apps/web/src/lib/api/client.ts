@@ -13,7 +13,8 @@ import type {
 	DmConversation,
 	DirectMessage,
 	ServerInvite,
-	VoiceChannelMember
+	VoiceChannelMember,
+	ActiveCallResponse
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -552,6 +553,17 @@ export class ApiClient {
 			headers: this.headers(token, true),
 			body: JSON.stringify({ isMuted, isDeafened })
 		});
+	}
+
+	/** Get the active or ringing call for the current user, or null. */
+	async getActiveCall(token: string): Promise<ActiveCallResponse | null> {
+		try {
+			return await this.request(`${this.baseUrl}/voice/active-call`, {
+				headers: this.headers(token)
+			});
+		} catch {
+			return null; // 204 No Content or error
+		}
 	}
 
 	/** Get short-lived TURN credentials for WebRTC. */

@@ -21,5 +21,6 @@ export type {
 	DmLastMessage,
 	DmConversation,
 	DirectMessage,
+	ActiveCallResponse,
 	ServerInvite
 } from './models.js';
