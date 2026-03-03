@@ -16,6 +16,10 @@ public class VoiceState
     public Guid? ChannelId { get; set; }
     public Channel? Channel { get; set; }
 
+    /// <summary>The DM channel for a direct voice call. Null for server voice channels.</summary>
+    public Guid? DmChannelId { get; set; }
+    public DmChannel? DmChannel { get; set; }
+
     public bool IsMuted { get; set; }
     public bool IsDeafened { get; set; }
 
