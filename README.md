@@ -14,6 +14,7 @@ codec/
 ├── apps/
 │   ├── api/          # ASP.NET Core 10 Web API
 │   │   └── Codec.Api/
+│   ├── sfu/          # mediasoup SFU for voice channels
 │   └── web/          # SvelteKit web front-end
 ├── docs/             # Project documentation
 ├── infra/            # Bicep IaC modules (Azure infrastructure)
@@ -88,7 +89,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Image uploads** — post images (PNG, JPEG, WebP, GIF) via file picker, clipboard paste, or drag-and-drop in both server channels and DMs
 - ✅ **Image lightbox** — click any inline image to view it full-size in an overlay with keyboard dismiss and open-original link
 - ✅ **Nicknames** — user-chosen display name that overrides Google name across all surfaces (messages, member lists, friends, typing indicators)
-- ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove) and account info
+- ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove), account info, and Voice & Audio settings (input mode, PTT keybind)
 - ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR; YouTube links render as click-to-play inline video players via `svelte-youtube-embed`
 - ✅ **@mentions** — autocomplete member picker in composer, @here to notify everyone, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
 - ✅ **Message replies** — inline reply to any message in channels or DMs, reply context displayed above message body, click to scroll to original with highlight animation, Escape to cancel, graceful handling of deleted parent messages
@@ -102,7 +103,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
 - ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
 - ✅ **Progressive Web App (PWA)** — installable on desktop and mobile via browser "Add to Home Screen"; Workbox service worker precaches static assets for fast repeat visits; offline fallback page when network is unavailable; runtime Google Fonts caching; desktop/mobile install screenshots; app shortcuts, share target, and custom protocol handler; user-prompted update toast when a new version is available
-- ✅ **Voice channels** — real-time audio in server voice channels powered by a custom mediasoup SFU; join/leave freely, mute/unmute, participant list with avatars; mic permission errors surfaced clearly; audio-only (video planned)
+- ✅ **Voice channels** — real-time audio in server voice channels powered by a custom mediasoup SFU; join/leave freely, mute/unmute/deafen, participant list with avatars; per-user volume control via right-click context menu (Web Audio GainNode pipeline, localStorage persistence); push-to-talk with configurable keybind and Voice Activity / PTT mode toggle in Voice & Audio settings; mic permission errors surfaced clearly; audio-only (video planned)
 
 ## Self-Hosting
 
