@@ -3,6 +3,7 @@
 	import SettingsSidebar from './SettingsSidebar.svelte';
 	import ProfileSettings from './ProfileSettings.svelte';
 	import AccountSettings from './AccountSettings.svelte';
+	import VoiceAudioSettings from './VoiceAudioSettings.svelte';
 
 	const app = getAppState();
 
@@ -57,6 +58,8 @@
 			</button>
 			{#if app.settingsCategory === 'profile'}
 				<ProfileSettings />
+			{:else if app.settingsCategory === 'voice-audio'}
+				<VoiceAudioSettings />
 			{:else}
 				<AccountSettings />
 			{/if}

@@ -3,8 +3,11 @@
 	import UserPanel from './UserPanel.svelte';
 	import InvitePanel from './InvitePanel.svelte';
 	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
+	import VoiceMemberContextMenu from '$lib/components/voice/VoiceMemberContextMenu.svelte';
 
 	const app = getAppState();
+
+	let contextMenu = $state<{ userId: string; displayName: string; x: number; y: number } | null>(null);
 
 	const textChannels = $derived(app.channels.filter((c) => c.type !== 'voice'));
 	const voiceChannels = $derived(app.channels.filter((c) => c.type === 'voice'));
@@ -119,7 +122,15 @@
 						{#if members.length > 0}
 							<ul class="voice-members" aria-label="Connected members">
 								{#each members as member}
-									<li class="voice-member">
+									<li
+										class="voice-member"
+										oncontextmenu={(e) => {
+											if (member.userId !== app.me?.user.id) {
+												e.preventDefault();
+												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+											}
+										}}
+									>
 										{#if member.avatarUrl}
 											<img class="voice-avatar" src={member.avatarUrl} alt="" width="14" height="14" />
 										{:else}
@@ -179,6 +190,16 @@
 
 	<UserPanel />
 </aside>
+
+{#if contextMenu}
+	<VoiceMemberContextMenu
+		userId={contextMenu.userId}
+		displayName={contextMenu.displayName}
+		x={contextMenu.x}
+		y={contextMenu.y}
+		onclose={() => { contextMenu = null; }}
+	/>
+{/if}
 
 <style>
 	.channel-sidebar {
