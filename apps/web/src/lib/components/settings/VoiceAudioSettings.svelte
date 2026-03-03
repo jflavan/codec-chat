@@ -23,6 +23,10 @@
 	function handleKeyCapture(e: KeyboardEvent) {
 		e.preventDefault();
 		e.stopPropagation();
+		if (e.key === 'Escape') {
+			isRecordingKey = false;
+			return;
+		}
 		app.setPttKey(e.code);
 		isRecordingKey = false;
 	}

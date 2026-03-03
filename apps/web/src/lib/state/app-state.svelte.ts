@@ -1438,6 +1438,8 @@ export class AppState {
 			try { await this.hub.leaveVoiceChannel(); } catch { /* ignore */ }
 			await this.voice.leave();
 			this._cleanupRemoteAudio();
+			this._removePttListeners();
+			this.isPttActive = false;
 			this.activeVoiceChannelId = null;
 
 			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
@@ -1485,7 +1487,19 @@ export class AppState {
 
 	async toggleMute(): Promise<void> {
 		this.isMuted = !this.isMuted;
-		this.voice.setMuted(this.isMuted);
+		if (this.voiceInputMode === 'push-to-talk') {
+			// In PTT mode, mute button toggles between "PTT active" and "fully muted"
+			if (this.isMuted) {
+				this._removePttListeners();
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+			} else {
+				this.voice.setMuted(true); // still muted until PTT key held
+				this._registerPttListeners();
+			}
+		} else {
+			this.voice.setMuted(this.isMuted);
+		}
 		await this.hub.updateVoiceState(this.isMuted, this.isDeafened);
 	}
 
