@@ -90,6 +90,52 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     }
 
     /// <summary>
+    /// Returns the caller's active or ringing VoiceCall, if any.
+    /// Used on page load/reconnect to restore call state.
+    /// </summary>
+    [HttpGet("active-call")]
+    public async Task<IActionResult> GetActiveCall()
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        var call = await db.VoiceCalls
+            .AsNoTracking()
+            .Where(c => (c.CallerUserId == appUser.Id || c.RecipientUserId == appUser.Id)
+                && (c.Status == VoiceCallStatus.Ringing || c.Status == VoiceCallStatus.Active))
+            .Select(c => new
+            {
+                c.Id,
+                c.DmChannelId,
+                c.CallerUserId,
+                c.RecipientUserId,
+                status = c.Status.ToString().ToLowerInvariant(),
+                c.StartedAt,
+                c.AnsweredAt
+            })
+            .FirstOrDefaultAsync();
+
+        if (call is null)
+            return NoContent();
+
+        var otherUserId = call.CallerUserId == appUser.Id ? call.RecipientUserId : call.CallerUserId;
+        var otherUser = await db.Users.AsNoTracking().FirstAsync(u => u.Id == otherUserId);
+
+        return Ok(new
+        {
+            call.Id,
+            call.DmChannelId,
+            call.CallerUserId,
+            call.RecipientUserId,
+            call.status,
+            call.StartedAt,
+            call.AnsweredAt,
+            otherUserId,
+            otherDisplayName = otherUser.Nickname ?? otherUser.DisplayName,
+            otherAvatarUrl = otherUser.CustomAvatarPath ?? otherUser.AvatarUrl
+        });
+    }
+
+    /// <summary>
     /// Issues short-lived TURN credentials using HMAC-SHA256 time-limited authentication.
     /// The secret never leaves the server; clients receive a username + credential pair valid for 1 hour.
     /// Requires coturn 4.6.0+ with the <c>sha256</c> option enabled.
