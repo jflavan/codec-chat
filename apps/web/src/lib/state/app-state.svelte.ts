@@ -119,7 +119,7 @@ export class AppState {
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
-	settingsCategory = $state<'profile' | 'account'>('profile');
+	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
 	serverSettingsOpen = $state(false);
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
