@@ -1509,8 +1509,12 @@ export class AppState {
 	}
 
 	private _attachRemoteAudio(participantId: string, userId: string, track: MediaStreamTrack): void {
+		this._detachRemoteAudio(participantId); // guard against re-attach
 		if (!this.audioContext) {
 			this.audioContext = new AudioContext();
+		}
+		if (this.audioContext.state === 'suspended') {
+			this.audioContext.resume().catch(() => {});
 		}
 		const source = this.audioContext.createMediaStreamSource(new MediaStream([track]));
 		const gain = this.audioContext.createGain();
@@ -1904,6 +1908,8 @@ export class AppState {
 		if (this.activeVoiceChannelId) {
 			await this.leaveVoiceChannel();
 		}
+		this.audioContext?.close().catch(() => {});
+		this.audioContext = null;
 		await this.hub.stop();
 	}
 
