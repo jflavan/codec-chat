@@ -243,7 +243,10 @@ export class AppState {
 	private refreshPromise: Promise<string | null> | null = null;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	private audioContext: AudioContext | null = null;
-	private audioNodes = new Map<string, { source: MediaStreamAudioSourceNode; gain: GainNode }>();
+	private audioNodes = new Map<
+		string,
+		{ element: HTMLAudioElement; source: MediaElementAudioSourceNode; gain: GainNode }
+	>();
 	/** participantId -> userId lookup for volume. Built during attach. */
 	private audioParticipantUserMap = new Map<string, string>();
 	private pttKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -1547,13 +1550,21 @@ export class AppState {
 		if (this.audioContext.state === 'suspended') {
 			this.audioContext.resume().catch(() => {});
 		}
-		const source = this.audioContext.createMediaStreamSource(new MediaStream([track]));
+
+		// Use an <audio> element so Chrome desktop activates the WebRTC audio
+		// decoding pipeline. createMediaStreamSource alone produces silence on
+		// desktop Chrome because the track never gets "consumed" by an element.
+		const el = new Audio();
+		el.srcObject = new MediaStream([track]);
+		el.play().catch(() => {});
+
+		const source = this.audioContext.createMediaElementSource(el);
 		const gain = this.audioContext.createGain();
 		const volume = this.isDeafened ? 0 : (this.userVolumes.get(userId) ?? 1.0);
 		gain.gain.value = volume;
 		source.connect(gain);
 		gain.connect(this.audioContext.destination);
-		this.audioNodes.set(participantId, { source, gain });
+		this.audioNodes.set(participantId, { element: el, source, gain });
 		this.audioParticipantUserMap.set(participantId, userId);
 	}
 
@@ -1562,6 +1573,8 @@ export class AppState {
 		if (nodes) {
 			nodes.source.disconnect();
 			nodes.gain.disconnect();
+			nodes.element.pause();
+			nodes.element.srcObject = null;
 			this.audioNodes.delete(participantId);
 		}
 		this.audioParticipantUserMap.delete(participantId);
@@ -1571,6 +1584,8 @@ export class AppState {
 		for (const nodes of this.audioNodes.values()) {
 			nodes.source.disconnect();
 			nodes.gain.disconnect();
+			nodes.element.pause();
+			nodes.element.srcObject = null;
 		}
 		this.audioNodes.clear();
 		this.audioParticipantUserMap.clear();
