@@ -15,7 +15,7 @@ namespace Codec.Api.Hubs;
 /// Clients join channel-scoped, user-scoped, server-scoped, and voice-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
@@ -133,6 +133,459 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     {
         await Clients.OthersInGroup($"dm-{dmChannelId}")
             .SendAsync("DmStoppedTyping", dmChannelId, displayName);
+    }
+
+    /* ═══════════════════ DM Voice Calls ═══════════════════ */
+
+    /// <summary>
+    /// Initiates a DM voice call. Creates a VoiceCall record, sends IncomingCall to the
+    /// recipient, and starts a 30-second ringing timeout.
+    /// </summary>
+    public async Task<object> StartCall(string dmChannelId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+
+        if (!Guid.TryParse(dmChannelId, out var dmChannelGuid))
+            throw new HubException("Invalid DM channel ID.");
+
+        // Verify caller is a member of this DM channel.
+        var membership = await db.DmChannelMembers
+            .AsNoTracking()
+            .Where(m => m.DmChannelId == dmChannelGuid && m.UserId == appUser.Id)
+            .FirstOrDefaultAsync();
+
+        if (membership is null)
+            throw new HubException("Not a member of this DM channel.");
+
+        // Find the other participant.
+        var recipientMembership = await db.DmChannelMembers
+            .AsNoTracking()
+            .Include(m => m.User)
+            .Where(m => m.DmChannelId == dmChannelGuid && m.UserId != appUser.Id)
+            .FirstOrDefaultAsync();
+
+        if (recipientMembership?.User is null)
+            throw new HubException("Recipient not found.");
+
+        var recipientUser = recipientMembership.User;
+
+        // Check for call collision: existing Ringing call between these two users.
+        var existingCall = await db.VoiceCalls
+            .FirstOrDefaultAsync(c => c.DmChannelId == dmChannelGuid
+                && c.Status == VoiceCallStatus.Ringing);
+
+        if (existingCall is not null)
+            throw new HubException("There is already an active call on this conversation.");
+
+        // Check if caller already has an active call.
+        var callerActiveCall = await db.VoiceCalls
+            .FirstOrDefaultAsync(c => (c.CallerUserId == appUser.Id || c.RecipientUserId == appUser.Id)
+                && (c.Status == VoiceCallStatus.Ringing || c.Status == VoiceCallStatus.Active));
+
+        if (callerActiveCall is not null)
+            throw new HubException("You are already in a call.");
+
+        // Leave any existing server voice channel.
+        var existingVoiceState = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
+        if (existingVoiceState is not null)
+            await LeaveVoiceChannelInternal(appUser, existingVoiceState);
+
+        var call = new VoiceCall
+        {
+            Id = Guid.NewGuid(),
+            DmChannelId = dmChannelGuid,
+            CallerUserId = appUser.Id,
+            RecipientUserId = recipientUser.Id,
+            Status = VoiceCallStatus.Ringing,
+            StartedAt = DateTimeOffset.UtcNow
+        };
+
+        db.VoiceCalls.Add(call);
+        await db.SaveChangesAsync();
+
+        // Notify recipient.
+        await Clients.Group($"user-{recipientUser.Id}").SendAsync("IncomingCall", new
+        {
+            callId = call.Id,
+            dmChannelId,
+            callerUserId = appUser.Id,
+            callerDisplayName = appUser.EffectiveDisplayName,
+            callerAvatarUrl = appUser.CustomAvatarPath ?? appUser.AvatarUrl
+        });
+
+        // Start 30-second timeout.
+        callTimeoutService.StartTimeout(call.Id, appUser.Id, recipientUser.Id, dmChannelGuid);
+
+        return new
+        {
+            callId = call.Id,
+            recipientUserId = recipientUser.Id,
+            recipientDisplayName = recipientUser.Nickname ?? recipientUser.DisplayName,
+            recipientAvatarUrl = recipientUser.CustomAvatarPath ?? recipientUser.AvatarUrl
+        };
+    }
+
+    /// <summary>
+    /// Accepts an incoming DM voice call. Sets up the SFU room and transports for the
+    /// recipient, then notifies the caller to set up their transports.
+    /// </summary>
+    public async Task<object> AcceptCall(string callId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+
+        if (!Guid.TryParse(callId, out var callGuid))
+            throw new HubException("Invalid call ID.");
+
+        var call = await db.VoiceCalls.FirstOrDefaultAsync(c => c.Id == callGuid);
+        if (call is null)
+            throw new HubException("Call not found.");
+
+        if (call.RecipientUserId != appUser.Id)
+            throw new HubException("You are not the recipient of this call.");
+
+        if (call.Status != VoiceCallStatus.Ringing)
+            return new { alreadyHandled = true }; // Idempotent
+
+        // Cancel the ringing timeout.
+        callTimeoutService.CancelTimeout(call.Id);
+
+        // Leave any existing voice session for the recipient.
+        var existingVoiceState = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
+        if (existingVoiceState is not null)
+            await LeaveVoiceChannelInternal(appUser, existingVoiceState);
+
+        call.Status = VoiceCallStatus.Active;
+        call.AnsweredAt = DateTimeOffset.UtcNow;
+        call.EndReason = VoiceCallEndReason.Answered;
+
+        // Create SFU room and transports for the recipient.
+        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
+        var roomId = $"call-{call.Id}";
+        JsonElement routerRtpCapabilities, sendTransport, recvTransport;
+        try
+        {
+            routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, roomId);
+            sendTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "send");
+            recvTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "recv");
+        }
+        catch
+        {
+            try
+            {
+                using var cleanupClient = httpClientFactory.CreateClient("sfu");
+                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{Context.ConnectionId}");
+            }
+            catch { /* best-effort */ }
+            throw;
+        }
+
+        // Persist VoiceState for recipient.
+        var recipientVoiceState = new VoiceState
+        {
+            Id = Guid.NewGuid(),
+            UserId = appUser.Id,
+            DmChannelId = call.DmChannelId,
+            ConnectionId = Context.ConnectionId,
+            ParticipantId = Context.ConnectionId,
+            JoinedAt = DateTimeOffset.UtcNow
+        };
+        db.VoiceStates.Add(recipientVoiceState);
+        await db.SaveChangesAsync();
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{roomId}");
+
+        // Generate TURN credentials.
+        var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
+        var turnSecret = config["Voice:TurnSecret"] ?? "";
+        object? iceServers = null;
+        if (!string.IsNullOrWhiteSpace(turnSecret))
+        {
+            var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+            var turnUsername = $"{expiry}:{appUser.Id}";
+            var keyBytes = Encoding.UTF8.GetBytes(turnSecret);
+            var msgBytes = Encoding.UTF8.GetBytes(turnUsername);
+            using var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes);
+            var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
+            iceServers = new[] { new { urls = new[] { turnServerUrl }, username = turnUsername, credential } };
+        }
+
+        // Notify the caller so they can also set up their WebRTC connection.
+        await Clients.Group($"user-{call.CallerUserId}").SendAsync("CallAccepted", new
+        {
+            callId = call.Id,
+            dmChannelId = call.DmChannelId,
+            roomId
+        });
+
+        return new
+        {
+            callId = call.Id,
+            roomId,
+            routerRtpCapabilities,
+            sendTransportOptions = sendTransport,
+            recvTransportOptions = recvTransport,
+            iceServers
+        };
+    }
+
+    /// <summary>
+    /// Called by the caller after receiving CallAccepted to create their SFU transports.
+    /// </summary>
+    public async Task<object> SetupCallTransports(string callId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+
+        if (!Guid.TryParse(callId, out var callGuid))
+            throw new HubException("Invalid call ID.");
+
+        var call = await db.VoiceCalls.AsNoTracking().FirstOrDefaultAsync(c => c.Id == callGuid);
+        if (call is null || call.CallerUserId != appUser.Id)
+            throw new HubException("Call not found.");
+
+        if (call.Status != VoiceCallStatus.Active)
+            throw new HubException("Call is not active.");
+
+        // Leave any existing voice session.
+        var existingVoiceState = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
+        if (existingVoiceState is not null)
+            await LeaveVoiceChannelInternal(appUser, existingVoiceState);
+
+        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
+        var roomId = $"call-{call.Id}";
+        JsonElement routerRtpCapabilities, sendTransport, recvTransport;
+        try
+        {
+            routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, roomId);
+            sendTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "send");
+            recvTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "recv");
+        }
+        catch
+        {
+            try
+            {
+                using var cleanupClient = httpClientFactory.CreateClient("sfu");
+                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{Context.ConnectionId}");
+            }
+            catch { /* best-effort */ }
+            throw;
+        }
+
+        var voiceState = new VoiceState
+        {
+            Id = Guid.NewGuid(),
+            UserId = appUser.Id,
+            DmChannelId = call.DmChannelId,
+            ConnectionId = Context.ConnectionId,
+            ParticipantId = Context.ConnectionId,
+            JoinedAt = DateTimeOffset.UtcNow
+        };
+        db.VoiceStates.Add(voiceState);
+        await db.SaveChangesAsync();
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{roomId}");
+
+        // Generate TURN credentials.
+        var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
+        var turnSecret = config["Voice:TurnSecret"] ?? "";
+        object? iceServers = null;
+        if (!string.IsNullOrWhiteSpace(turnSecret))
+        {
+            var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+            var turnUsername = $"{expiry}:{appUser.Id}";
+            var keyBytes = Encoding.UTF8.GetBytes(turnSecret);
+            var msgBytes = Encoding.UTF8.GetBytes(turnUsername);
+            using var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes);
+            var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
+            iceServers = new[] { new { urls = new[] { turnServerUrl }, username = turnUsername, credential } };
+        }
+
+        // Get other participant (recipient) to check for their producer.
+        var otherVoiceState = await db.VoiceStates
+            .AsNoTracking()
+            .Where(vs => vs.DmChannelId == call.DmChannelId && vs.UserId != appUser.Id)
+            .Select(vs => new
+            {
+                userId = vs.UserId,
+                displayName = vs.User!.Nickname ?? vs.User.DisplayName,
+                avatarUrl = vs.User.CustomAvatarPath ?? vs.User.AvatarUrl,
+                vs.IsMuted,
+                vs.IsDeafened,
+                participantId = vs.ParticipantId,
+                producerId = vs.ProducerId
+            })
+            .ToListAsync();
+
+        return new
+        {
+            routerRtpCapabilities,
+            sendTransportOptions = sendTransport,
+            recvTransportOptions = recvTransport,
+            members = otherVoiceState,
+            iceServers
+        };
+    }
+
+    /// <summary>
+    /// Declines an incoming call. Ends it as Declined and notifies the caller.
+    /// </summary>
+    public async Task DeclineCall(string callId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+
+        if (!Guid.TryParse(callId, out var callGuid))
+            throw new HubException("Invalid call ID.");
+
+        var call = await db.VoiceCalls.FirstOrDefaultAsync(c => c.Id == callGuid);
+        if (call is null) return; // Already handled
+        if (call.RecipientUserId != appUser.Id)
+            throw new HubException("You are not the recipient of this call.");
+        if (call.Status != VoiceCallStatus.Ringing) return; // Idempotent
+
+        callTimeoutService.CancelTimeout(call.Id);
+
+        call.Status = VoiceCallStatus.Ended;
+        call.EndReason = VoiceCallEndReason.Declined;
+        call.EndedAt = DateTimeOffset.UtcNow;
+
+        // Persist "Missed call" system message.
+        var callerUser = await db.Users.AsNoTracking().FirstAsync(u => u.Id == call.CallerUserId);
+        var systemMessage = new DirectMessage
+        {
+            Id = Guid.NewGuid(),
+            DmChannelId = call.DmChannelId,
+            AuthorUserId = call.CallerUserId,
+            AuthorName = callerUser.Nickname ?? callerUser.DisplayName,
+            Body = "missed",
+            MessageType = MessageType.VoiceCallEvent,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        db.DirectMessages.Add(systemMessage);
+        await db.SaveChangesAsync();
+
+        await Clients.Group($"user-{call.CallerUserId}").SendAsync("CallDeclined", new
+        {
+            callId = call.Id,
+            dmChannelId = call.DmChannelId
+        });
+
+        // Broadcast system message as ReceiveDm.
+        var msgPayload = new
+        {
+            systemMessage.Id, systemMessage.DmChannelId, systemMessage.AuthorUserId,
+            systemMessage.AuthorName, systemMessage.Body,
+            imageUrl = (string?)null, systemMessage.CreatedAt,
+            editedAt = (DateTimeOffset?)null,
+            authorAvatarUrl = callerUser.CustomAvatarPath ?? callerUser.AvatarUrl,
+            linkPreviews = Array.Empty<object>(),
+            replyContext = (object?)null,
+            messageType = (int)systemMessage.MessageType
+        };
+        await Clients.Group($"user-{call.CallerUserId}").SendAsync("ReceiveDm", msgPayload);
+        await Clients.Group($"user-{call.RecipientUserId}").SendAsync("ReceiveDm", msgPayload);
+    }
+
+    /// <summary>
+    /// Ends an active call. Either party can call this. Cleans up SFU resources,
+    /// removes VoiceState, and persists a system message with the call duration.
+    /// </summary>
+    public async Task EndCall()
+    {
+        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+
+        var call = await db.VoiceCalls
+            .FirstOrDefaultAsync(c => (c.CallerUserId == appUser.Id || c.RecipientUserId == appUser.Id)
+                && (c.Status == VoiceCallStatus.Ringing || c.Status == VoiceCallStatus.Active));
+
+        if (call is null) return; // No active call
+
+        await EndCallInternal(call, appUser.Id);
+    }
+
+    /// <summary>
+    /// Internal helper to end a call with full cleanup. Used by EndCall and OnDisconnectedAsync.
+    /// </summary>
+    private async Task EndCallInternal(VoiceCall call, Guid initiatingUserId)
+    {
+        callTimeoutService.CancelTimeout(call.Id);
+
+        var wasActive = call.Status == VoiceCallStatus.Active;
+        call.Status = VoiceCallStatus.Ended;
+        call.EndedAt = DateTimeOffset.UtcNow;
+
+        if (!wasActive)
+        {
+            // Was still ringing — treat as missed
+            call.EndReason = VoiceCallEndReason.Missed;
+        }
+
+        // Calculate duration for system message.
+        var durationSeconds = wasActive && call.AnsweredAt.HasValue
+            ? (int)(call.EndedAt.Value - call.AnsweredAt.Value).TotalSeconds
+            : 0;
+
+        var body = wasActive ? $"call:{durationSeconds}" : "missed";
+
+        var callerUser = await db.Users.AsNoTracking().FirstAsync(u => u.Id == call.CallerUserId);
+        var systemMessage = new DirectMessage
+        {
+            Id = Guid.NewGuid(),
+            DmChannelId = call.DmChannelId,
+            AuthorUserId = call.CallerUserId,
+            AuthorName = callerUser.Nickname ?? callerUser.DisplayName,
+            Body = body,
+            MessageType = MessageType.VoiceCallEvent,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        db.DirectMessages.Add(systemMessage);
+
+        // Clean up VoiceState for both participants.
+        var voiceStates = await db.VoiceStates
+            .Where(vs => vs.DmChannelId == call.DmChannelId)
+            .ToListAsync();
+
+        var roomId = $"call-{call.Id}";
+        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
+
+        foreach (var vs in voiceStates)
+        {
+            db.VoiceStates.Remove(vs);
+            await Groups.RemoveFromGroupAsync(vs.ConnectionId, $"voice-{roomId}");
+
+            // Clean up SFU participant.
+            try
+            {
+                using var client = httpClientFactory.CreateClient("sfu");
+                await client.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{vs.ParticipantId}");
+            }
+            catch { /* best-effort */ }
+        }
+
+        await db.SaveChangesAsync();
+
+        // Notify the other party.
+        var otherUserId = call.CallerUserId == initiatingUserId ? call.RecipientUserId : call.CallerUserId;
+        await Clients.Group($"user-{otherUserId}").SendAsync("CallEnded", new
+        {
+            callId = call.Id,
+            dmChannelId = call.DmChannelId,
+            endReason = wasActive ? "answered" : "missed",
+            durationSeconds = wasActive ? durationSeconds : (int?)null
+        });
+
+        // Broadcast system message.
+        var msgPayload = new
+        {
+            systemMessage.Id, systemMessage.DmChannelId, systemMessage.AuthorUserId,
+            systemMessage.AuthorName, systemMessage.Body,
+            imageUrl = (string?)null, systemMessage.CreatedAt,
+            editedAt = (DateTimeOffset?)null,
+            authorAvatarUrl = callerUser.CustomAvatarPath ?? callerUser.AvatarUrl,
+            linkPreviews = Array.Empty<object>(),
+            replyContext = (object?)null,
+            messageType = (int)systemMessage.MessageType
+        };
+        await Clients.Group($"user-{call.CallerUserId}").SendAsync("ReceiveDm", msgPayload);
+        await Clients.Group($"user-{call.RecipientUserId}").SendAsync("ReceiveDm", msgPayload);
     }
 
     /* ═══════════════════ Voice ═══════════════════ */
@@ -294,16 +747,16 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             .AsNoTracking()
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
 
-        if (voiceState?.ChannelId is null)
-            throw new HubException("Not currently in a voice channel.");
+        if (voiceState is null)
+            throw new HubException("Not currently in a voice session.");
 
+        var roomId = await GetSfuRoomIdAsync(voiceState);
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
         using var client = httpClientFactory.CreateClient("sfu");
-        // Include participantId so the SFU can verify this transport belongs to the caller.
         var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, dtlsParameters });
         var content = new StringContent(body, Encoding.UTF8, "application/json");
         var resp = await client.PostAsync(
-            $"{sfuApiUrl}/rooms/{voiceState.ChannelId}/transports/{transportId}/connect", content);
+            $"{sfuApiUrl}/rooms/{roomId}/transports/{transportId}/connect", content);
         resp.EnsureSuccessStatusCode();
     }
 
@@ -317,29 +770,27 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         var voiceState = await db.VoiceStates
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
 
-        if (voiceState?.ChannelId is null)
-            throw new HubException("Not currently in a voice channel.");
+        if (voiceState is null)
+            throw new HubException("Not currently in a voice session.");
 
-        var channelId = voiceState.ChannelId.ToString()!;
+        var roomId = await GetSfuRoomIdAsync(voiceState);
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
         using var client = httpClientFactory.CreateClient("sfu");
-        // Include participantId so the SFU can verify this transport belongs to the caller.
         var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, kind = "audio", rtpParameters });
         var content = new StringContent(body, Encoding.UTF8, "application/json");
         var resp = await client.PostAsync(
-            $"{sfuApiUrl}/rooms/{channelId}/transports/{transportId}/produce", content);
+            $"{sfuApiUrl}/rooms/{roomId}/transports/{transportId}/produce", content);
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content.ReadFromJsonAsync<JsonElement>();
         var producerId = result.GetProperty("producerId").GetString()!;
 
-        // Persist so late joiners returned by JoinVoiceChannel can consume this participant.
         voiceState.ProducerId = producerId;
         await db.SaveChangesAsync();
 
-        await Clients.OthersInGroup($"voice-{channelId}").SendAsync("NewProducer", new
+        await Clients.OthersInGroup($"voice-{roomId}").SendAsync("NewProducer", new
         {
-            channelId,
+            channelId = voiceState.ChannelId?.ToString(),
             userId = appUser.Id,
             participantId = Context.ConnectionId,
             producerId
@@ -359,24 +810,23 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             .AsNoTracking()
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
 
-        if (voiceState?.ChannelId is null)
-            throw new HubException("Not currently in a voice channel.");
+        if (voiceState is null)
+            throw new HubException("Not currently in a voice session.");
 
+        var roomId = await GetSfuRoomIdAsync(voiceState);
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
         using var client = httpClientFactory.CreateClient("sfu");
-        // Include participantId so the SFU can verify the recv transport belongs to the caller.
         var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, producerId, transportId = recvTransportId, rtpCapabilities });
         var content = new StringContent(body, Encoding.UTF8, "application/json");
         var resp = await client.PostAsync(
-            $"{sfuApiUrl}/rooms/{voiceState.ChannelId}/consumers", content);
+            $"{sfuApiUrl}/rooms/{roomId}/consumers", content);
         resp.EnsureSuccessStatusCode();
 
         return await resp.Content.ReadFromJsonAsync<JsonElement>();
     }
 
     /// <summary>
-    /// Broadcasts a mute/deafen state change to other participants in the voice channel.
-    /// The caller's active channel is looked up from their VoiceState.
+    /// Broadcasts a mute/deafen state change to other participants in the voice channel or DM call.
     /// </summary>
     public async Task UpdateVoiceState(bool isMuted, bool isDeafened)
     {
@@ -385,13 +835,13 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
 
         if (voiceState is null) return; // Not in voice; ignore silently.
 
-        var channelId = voiceState.ChannelId?.ToString();
         voiceState.IsMuted = isMuted;
         voiceState.IsDeafened = isDeafened;
         await db.SaveChangesAsync();
 
-        if (channelId is not null && voiceState.ChannelId.HasValue)
+        if (voiceState.ChannelId.HasValue)
         {
+            var channelId = voiceState.ChannelId.ToString()!;
             // Broadcast to all server members so sidebar mute/deafen icons stay in sync.
             var serverId = await db.Channels.AsNoTracking()
                 .Where(c => c.Id == voiceState.ChannelId.Value)
@@ -402,6 +852,18 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             await Clients.OthersInGroup(targetGroup).SendAsync("VoiceStateUpdated", new
             {
                 channelId,
+                userId = appUser.Id,
+                isMuted,
+                isDeafened
+            });
+        }
+        else if (voiceState.DmChannelId.HasValue)
+        {
+            // DM call — broadcast to the voice room group.
+            var roomId = await GetSfuRoomIdAsync(voiceState);
+            await Clients.OthersInGroup($"voice-{roomId}").SendAsync("VoiceStateUpdated", new
+            {
+                channelId = (string?)null,
                 userId = appUser.Id,
                 isMuted,
                 isDeafened
@@ -423,28 +885,31 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     }
 
     /// <summary>
-    /// Cleans up voice state when a client disconnects (tab close, network drop, etc.).
-    /// Wrapped in try-catch so a transient failure (e.g. DB unavailable, expired token) during
-    /// user lookup cannot prevent the voice state row from being removed.
+    /// Cleans up voice state and call state when a client disconnects.
     /// </summary>
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         try
         {
+            var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+
             var voiceState = await db.VoiceStates
                 .FirstOrDefaultAsync(vs => vs.ConnectionId == Context.ConnectionId);
 
             if (voiceState is not null)
-            {
-                var appUser = await userService.GetOrCreateUserAsync(Context.User!);
                 await LeaveVoiceChannelInternal(appUser, voiceState);
-            }
+
+            // Check for ringing or active calls involving this user.
+            var activeCall = await db.VoiceCalls
+                .FirstOrDefaultAsync(c => (c.CallerUserId == appUser.Id || c.RecipientUserId == appUser.Id)
+                    && (c.Status == VoiceCallStatus.Ringing || c.Status == VoiceCallStatus.Active));
+
+            if (activeCall is not null)
+                await EndCallInternal(activeCall, appUser.Id);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error during voice state cleanup on disconnect for connection {ConnectionId}. Attempting raw DB fallback.", Context.ConnectionId);
-            // Best-effort cleanup. If we can't look up the user, attempt a raw DB delete
-            // using only the ConnectionId so the stale row doesn't linger indefinitely.
+            logger.LogError(ex, "Error during voice/call state cleanup on disconnect for connection {ConnectionId}. Attempting raw DB fallback.", Context.ConnectionId);
             var stale = await db.VoiceStates
                 .FirstOrDefaultAsync(vs => vs.ConnectionId == Context.ConnectionId);
             if (stale is not null)
@@ -460,7 +925,6 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 db.VoiceStates.Remove(stale);
                 await db.SaveChangesAsync();
 
-                // Broadcast leave so other server members don't see phantom voice members.
                 if (staleChannelId is not null && staleServerId.HasValue)
                 {
                     try
@@ -472,10 +936,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                             participantId = stale.ParticipantId
                         });
                     }
-                    catch
-                    {
-                        // Best-effort broadcast; DB row is already cleaned up.
-                    }
+                    catch { /* best-effort */ }
                 }
             }
         }
@@ -486,47 +947,81 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     private async Task LeaveVoiceChannelInternal(Models.User appUser, VoiceState voiceState)
     {
         var channelId = voiceState.ChannelId?.ToString();
+        string? roomId = null;
 
-        // Look up the server before removing state so we can broadcast to all server members.
-        Guid? serverId = voiceState.ChannelId.HasValue
-            ? await db.Channels.AsNoTracking()
+        Guid? serverId = null;
+        if (voiceState.ChannelId.HasValue)
+        {
+            serverId = await db.Channels.AsNoTracking()
                 .Where(c => c.Id == voiceState.ChannelId.Value)
                 .Select(c => (Guid?)c.ServerId)
-                .FirstOrDefaultAsync()
-            : null;
+                .FirstOrDefaultAsync();
+            roomId = channelId;
+        }
+        else if (voiceState.DmChannelId.HasValue)
+        {
+            var call = await db.VoiceCalls
+                .AsNoTracking()
+                .Where(c => c.DmChannelId == voiceState.DmChannelId.Value
+                    && (c.Status == VoiceCallStatus.Active || c.Status == VoiceCallStatus.Ringing))
+                .FirstOrDefaultAsync();
+            if (call is not null)
+                roomId = $"call-{call.Id}";
+        }
 
         db.VoiceStates.Remove(voiceState);
         await db.SaveChangesAsync();
 
-        if (channelId is not null)
+        if (roomId is not null)
         {
-            // Use the connection ID stored in VoiceState — not Context.ConnectionId — so that
-            // when switching channels or cleaning up a stale session from a different tab, we
-            // remove the correct connection from the voice group.
-            await Groups.RemoveFromGroupAsync(voiceState.ConnectionId, $"voice-{channelId}");
+            await Groups.RemoveFromGroupAsync(voiceState.ConnectionId, $"voice-{roomId}");
 
-            // Broadcast to all server members so sidebar member lists update for everyone.
-            var targetGroup = serverId.HasValue ? $"server-{serverId}" : $"voice-{channelId}";
-            await Clients.Group(targetGroup).SendAsync("UserLeftVoice", new
+            if (serverId.HasValue)
             {
-                channelId,
-                userId = appUser.Id,
-                participantId = voiceState.ParticipantId
-            });
+                await Clients.Group($"server-{serverId}").SendAsync("UserLeftVoice", new
+                {
+                    channelId,
+                    userId = appUser.Id,
+                    participantId = voiceState.ParticipantId
+                });
+            }
 
-            // Remove the participant from the SFU room.
+            // Remove from SFU.
             var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
             try
             {
                 using var client = httpClientFactory.CreateClient("sfu");
-                await client.DeleteAsync(
-                    $"{sfuApiUrl}/rooms/{channelId}/participants/{voiceState.ParticipantId}");
+                await client.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{voiceState.ParticipantId}");
             }
-            catch
-            {
-                // SFU may be unavailable; voice state is already cleaned up in DB.
-            }
+            catch { /* best-effort */ }
         }
+    }
+
+    /* ── Room ID resolver ── */
+
+    /// <summary>
+    /// Resolves the SFU room ID for the given voice state.
+    /// Server voice channels use the channel ID; DM calls use "call-{callId}".
+    /// </summary>
+    private async Task<string> GetSfuRoomIdAsync(VoiceState voiceState)
+    {
+        if (voiceState.ChannelId.HasValue)
+            return voiceState.ChannelId.Value.ToString();
+
+        if (voiceState.DmChannelId.HasValue)
+        {
+            var call = await db.VoiceCalls
+                .AsNoTracking()
+                .Where(c => c.DmChannelId == voiceState.DmChannelId.Value
+                    && c.Status == VoiceCallStatus.Active)
+                .OrderByDescending(c => c.AnsweredAt)
+                .FirstOrDefaultAsync();
+
+            if (call is not null)
+                return $"call-{call.Id}";
+        }
+
+        throw new HubException("Not currently in a voice session.");
     }
 
     /* ── SFU helpers ── */
