@@ -104,6 +104,7 @@ The web app runs at `http://localhost:5174` by default.
 - ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
 - ✅ **Progressive Web App (PWA)** — installable on desktop and mobile via browser "Add to Home Screen"; Workbox service worker precaches static assets for fast repeat visits; offline fallback page when network is unavailable; runtime Google Fonts caching; desktop/mobile install screenshots; app shortcuts, share target, and custom protocol handler; user-prompted update toast when a new version is available
 - ✅ **Voice channels** — real-time audio in server voice channels powered by a custom mediasoup SFU; join/leave freely, mute/unmute/deafen, participant list with avatars; per-user volume control via right-click context menu (Web Audio GainNode pipeline, localStorage persistence); push-to-talk with configurable keybind and Voice Activity / PTT mode toggle in Voice & Audio settings; mic permission errors surfaced clearly; audio-only (video planned)
+- ✅ **DM voice calls** — 1:1 voice calls from DM conversations with ringing/accept/decline flow; incoming call overlay with ring tone; call header with elapsed time display; automatic 30-second ringing timeout; system messages for call events (missed calls, call duration); call state recovery on reconnect
 
 ## Self-Hosting
 
