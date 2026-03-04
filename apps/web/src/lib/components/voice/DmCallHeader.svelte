@@ -27,7 +27,7 @@
 		if (timer) clearInterval(timer);
 	});
 
-	const formattedTime = $derived(() => {
+	const formattedTime = $derived.by(() => {
 		const m = Math.floor(elapsed / 60);
 		const s = elapsed % 60;
 		return `${m}:${s.toString().padStart(2, '0')}`;
@@ -49,7 +49,7 @@
 				{#if app.activeCall.status === 'ringing'}
 					<span class="call-status ringing">Calling...</span>
 				{:else}
-					<span class="call-status active">{formattedTime()}</span>
+					<span class="call-status active">{formattedTime}</span>
 				{/if}
 			</div>
 		</div>

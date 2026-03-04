@@ -185,6 +185,14 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         if (callerActiveCall is not null)
             throw new HubException("You are already in a call.");
 
+        // Check if recipient already has an active call.
+        var recipientActiveCall = await db.VoiceCalls
+            .FirstOrDefaultAsync(c => (c.CallerUserId == recipientUser.Id || c.RecipientUserId == recipientUser.Id)
+                && (c.Status == VoiceCallStatus.Ringing || c.Status == VoiceCallStatus.Active));
+
+        if (recipientActiveCall is not null)
+            throw new HubException("Recipient is already in a call.");
+
         // Leave any existing server voice channel.
         var existingVoiceState = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
         if (existingVoiceState is not null)
@@ -256,7 +264,6 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
 
         call.Status = VoiceCallStatus.Active;
         call.AnsweredAt = DateTimeOffset.UtcNow;
-        call.EndReason = VoiceCallEndReason.Answered;
 
         // Create SFU room and transports for the recipient.
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
@@ -512,7 +519,11 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         call.Status = VoiceCallStatus.Ended;
         call.EndedAt = DateTimeOffset.UtcNow;
 
-        if (!wasActive)
+        if (wasActive)
+        {
+            call.EndReason = VoiceCallEndReason.Completed;
+        }
+        else
         {
             // Was still ringing — treat as missed
             call.EndReason = VoiceCallEndReason.Missed;
@@ -568,7 +579,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         {
             callId = call.Id,
             dmChannelId = call.DmChannelId,
-            endReason = wasActive ? "answered" : "missed",
+            endReason = wasActive ? "completed" : "missed",
             durationSeconds = wasActive ? durationSeconds : (int?)null
         });
 
@@ -914,6 +925,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 .FirstOrDefaultAsync(vs => vs.ConnectionId == Context.ConnectionId);
             if (stale is not null)
             {
+                var staleUserId = stale.UserId;
                 var staleChannelId = stale.ChannelId?.ToString();
                 var staleServerId = stale.ChannelId.HasValue
                     ? await db.Channels.AsNoTracking()
@@ -938,6 +950,26 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                     }
                     catch { /* best-effort */ }
                 }
+
+                // Best-effort cleanup of any active/ringing call for this user.
+                try
+                {
+                    var staleCall = await db.VoiceCalls
+                        .FirstOrDefaultAsync(c => (c.CallerUserId == staleUserId || c.RecipientUserId == staleUserId)
+                            && (c.Status == VoiceCallStatus.Ringing || c.Status == VoiceCallStatus.Active));
+                    if (staleCall is not null)
+                    {
+                        callTimeoutService.CancelTimeout(staleCall.Id);
+                        var wasActive = staleCall.Status == VoiceCallStatus.Active;
+                        staleCall.Status = VoiceCallStatus.Ended;
+                        staleCall.EndedAt = DateTimeOffset.UtcNow;
+                        staleCall.EndReason = wasActive
+                            ? VoiceCallEndReason.Completed
+                            : VoiceCallEndReason.Missed;
+                        await db.SaveChangesAsync();
+                    }
+                }
+                catch { /* best-effort */ }
             }
         }
 
