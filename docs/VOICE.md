@@ -310,3 +310,135 @@ Both features are entirely client-side:
 - No database changes
 - Volume uses Web Audio API GainNode
 - PTT uses mediasoup producer `pause()`/`resume()`
+
+---
+
+## Phase 3: DM Voice Calls
+
+### Overview
+
+1:1 voice calls initiated from DM conversations. Unlike server voice channels (drop-in/drop-out), DM calls use a ringing/accept/decline flow similar to phone calls.
+
+### Architecture
+
+```
+Caller                         API (ASP.NET Core)              Recipient
+  │                                   │                            │
+  │── SignalR: StartCall(dmChannelId) ──>│                         │
+  │                                   │── Creates VoiceCall (Ringing) ──>│
+  │                                   │── IncomingCall event ──────────>│
+  │                                   │                            │
+  │                                   │<── SignalR: AcceptCall(callId) ──│
+  │                                   │── Creates SFU room (call-{callId}) │
+  │                                   │── VoiceCall → Active       │
+  │                                   │── recvTransport + sendTransport ──>│
+  │<── CallAccepted (sendTransport, recvTransport) ──│             │
+  │── SignalR: SetupCallTransports ──>│                            │
+  │                                   │                            │
+  │═══════════ WebRTC Audio via SFU (call-{callId}) ══════════════│
+  │                                   │                            │
+  │── SignalR: EndCall(callId) ──────>│                            │
+  │                                   │── Ends VoiceCall, cleans up SFU  │
+  │                                   │── CallEnded event ─────────────>│
+```
+
+**Key design points:**
+- DM calls use SFU room IDs of the form `call-{callId}` to distinguish from server voice channel rooms (which use `channelId`)
+- `VoiceCallTimeoutService` runs as a background service, ending unanswered calls after 30 seconds and cleaning stale `Ringing` records every 60 seconds
+- Users cannot be in a server voice channel and a DM call simultaneously (enforced by the unique `VoiceStates.UserId` index)
+- Call state is recoverable — `GET /voice/active-call` returns the active call on page load/reconnect
+
+### Data Model
+
+#### VoiceCall Entity
+
+```csharp
+public class VoiceCall
+{
+    public Guid Id { get; set; }
+    public int DmChannelId { get; set; }
+    public int CallerUserId { get; set; }
+    public int RecipientUserId { get; set; }
+    public VoiceCallStatus Status { get; set; }          // Ringing, Active, Ended
+    public VoiceCallEndReason? EndReason { get; set; }    // Answered, Declined, Missed, Timeout, Disconnected
+    public DateTimeOffset StartedAt { get; set; }
+    public DateTimeOffset? AnsweredAt { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
+}
+```
+
+#### MessageType Enum
+
+```csharp
+public enum MessageType { Regular = 0, VoiceCallEvent = 1 }
+```
+
+Added to `DirectMessage` entity. System messages with `MessageType = VoiceCallEvent` have body values:
+- `"missed"` — call was not answered (timeout or decline)
+- `"call:{seconds}"` — completed call with duration in seconds
+
+#### VoiceState Changes
+
+`VoiceState` gains a nullable `DmChannelId` foreign key. When a user is in a DM call, `ChannelId` is `0` and `DmChannelId` points to the DM channel.
+
+### API
+
+#### REST Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/voice/active-call` | User | Returns the user's active/ringing VoiceCall with other party's display info, or `null` |
+
+#### SignalR Hub Methods (client → server)
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `StartCall` | `dmChannelId: string` | Start a DM voice call; creates `VoiceCall` (Ringing); sends `IncomingCall` to recipient |
+| `AcceptCall` | `callId: string` | Accept incoming call; creates SFU room and transports; returns transport options to both parties |
+| `SetupCallTransports` | `callId, sendTransportId, recvTransportId` | Caller finalizes transport setup after receiving `CallAccepted` |
+| `DeclineCall` | `callId: string` | Decline an incoming call; ends call with `Declined` reason |
+| `EndCall` | `callId: string` | End an active or ringing call; cleans up SFU state and voice records |
+
+#### SignalR Events (server → client)
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `IncomingCall` | `{ callId, dmChannelId, callerUserId, callerDisplayName, callerAvatarUrl }` | Incoming call notification (recipient's user group) |
+| `CallAccepted` | `{ callId, sendTransportOptions, recvTransportOptions }` | Call accepted with SFU transport options (caller's user group) |
+| `CallDeclined` | `{ callId }` | Call declined (caller's user group) |
+| `CallEnded` | `{ callId }` | Call ended (both participants' user groups) |
+| `CallMissed` | `{ callId }` | Call timed out (caller's user group) |
+
+### Frontend
+
+#### Key Files
+
+| File | Description |
+|------|-------------|
+| `src/lib/components/voice/IncomingCallOverlay.svelte` | Full-screen incoming call modal with ring tone (Web Audio API oscillator) |
+| `src/lib/components/voice/DmCallHeader.svelte` | Compact header bar during active calls (elapsed time, mute/deafen, end) |
+| `src/lib/components/dm/DmChatArea.svelte` | Call button in DM header; system message rendering for voice call events |
+| `src/lib/state/app-state.svelte.ts` | `activeCall` and `incomingCall` state; call lifecycle methods |
+| `src/lib/services/voice-service.ts` | `joinWithOptions()` for connecting to calls with pre-fetched transport options |
+
+#### Call Flow (Caller)
+
+1. User clicks phone icon in DM header — `AppState.startCall(dmChannelId)` is called
+2. `hub.startCall(dmChannelId)` sends SignalR request; API creates `VoiceCall` record (Ringing)
+3. Caller sees `DmCallHeader` with "Calling..." status
+4. On `CallAccepted` event: `VoiceService.joinWithOptions()` connects to SFU with transport options
+5. `hub.setupCallTransports()` finalizes the caller's transport IDs on the server
+6. Audio flows via WebRTC through the SFU
+
+#### Call Flow (Recipient)
+
+1. `IncomingCall` event triggers `IncomingCallOverlay` — pulsing ring tone, caller info, accept/decline buttons
+2. On accept: `hub.acceptCall(callId)` creates SFU room and transports
+3. `VoiceService.joinWithOptions()` connects to SFU with returned transport options
+4. `DmCallHeader` replaces the overlay with elapsed time and controls
+
+#### System Messages
+
+Voice call events are persisted as `DirectMessage` records with `MessageType = VoiceCallEvent`:
+- **Missed call** (body: `"missed"`): shown as "Missed voice call" with phone icon
+- **Completed call** (body: `"call:{seconds}"`): shown as "Voice call — {formatted duration}"

@@ -80,7 +80,11 @@ src/
 │   │   ├── dm/
 │   │   │   ├── HomeSidebar.svelte        # Home sidebar (Friends nav + DM list)
 │   │   │   ├── DmList.svelte             # DM conversation entries
-│   │   │   └── DmChatArea.svelte         # DM chat (header, feed, composer, typing)
+│   │   │   └── DmChatArea.svelte         # DM chat (header, feed, composer, call button)
+│   │   ├── voice/
+│   │   │   ├── VoiceControls.svelte      # Mute/deafen controls in voice channel
+│   │   │   ├── IncomingCallOverlay.svelte # Full-screen incoming call modal with ring tone
+│   │   │   └── DmCallHeader.svelte       # Active call header (timer, mute, end)
 │   │   ├── settings/
 │   │   │   ├── UserSettingsModal.svelte   # Full-screen modal overlay shell
 │   │   │   ├── SettingsSidebar.svelte     # Category navigation sidebar
@@ -296,6 +300,9 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `DELETE /dm/channels/{channelId}/messages/{messageId}` - Delete a direct message (author only; cascade-deletes link previews; broadcasts `DmMessageDeleted` via SignalR)
 - `DELETE /dm/channels/{channelId}` - Close a DM conversation (sets `IsOpen = false` for current user; messages preserved)
 
+#### Voice Calls
+- `GET /voice/active-call` - Get the current user's active or ringing call (returns caller/recipient display info, call status, and timestamps; used on page load/reconnect to restore call state)
+
 #### Image Uploads
 - `POST /uploads/images` - Upload an image file (multipart/form-data; JPEG, PNG, WebP, GIF; 10 MB max; returns `{ imageUrl }`)
 
@@ -318,6 +325,11 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `LeaveDmChannel` | `dmChannelId: string` | Leave a DM channel group |
 | `StartDmTyping` | `dmChannelId: string, displayName: string` | Broadcast typing indicator to DM partner |
 | `StopDmTyping` | `dmChannelId: string, displayName: string` | Clear typing indicator |
+| `StartCall` | `dmChannelId: string` | Initiate a DM voice call; creates VoiceCall record; sends `IncomingCall` to recipient |
+| `AcceptCall` | `callId: string` | Accept an incoming call; sets up SFU transports; returns transport options for both parties |
+| `SetupCallTransports` | `callId: string, sendTransportId: string, recvTransportId: string` | Finalize transport setup for the call initiator after callee accepts |
+| `DeclineCall` | `callId: string` | Decline an incoming call; ends the call with `Declined` reason |
+| `EndCall` | `callId: string` | End an active or ringing call; cleans up SFU state and VoiceState records |
 
 #### Server → Client Events
 | Event | Payload | Description |
@@ -343,6 +355,11 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `MemberJoined` | `{ serverId }` | A new member joined the server (sent to server group; triggers member list refresh) |
 | `MemberLeft` | `{ serverId }` | A member left or was kicked from the server (sent to server group; triggers member list refresh) |
 | `LinkPreviewsReady` | `{ messageId, channelId?, dmChannelId?, linkPreviews: [...] }` | Link preview metadata fetched — frontend patches the message's `linkPreviews` array |
+| `IncomingCall` | `{ callId, dmChannelId, callerUserId, callerDisplayName, callerAvatarUrl }` | Incoming voice call from a DM partner (sent to recipient's user group) |
+| `CallAccepted` | `{ callId, sendTransportOptions, recvTransportOptions }` | Call was accepted; includes SFU transport options for the caller to connect |
+| `CallDeclined` | `{ callId }` | Call was declined by the recipient (sent to caller's user group) |
+| `CallEnded` | `{ callId }` | Call was ended by either party (sent to both participants' user groups) |
+| `CallMissed` | `{ callId }` | Call timed out without being answered (sent to caller's user group) |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -457,9 +474,15 @@ User ────┬──── ServerMember ──── Server
          ├──── Friendship ──── User
          │    (Requester)     (Recipient)
          │
-         └──── DmChannelMember ──── DmChannel
-                                       │
-                                  DirectMessage
+         ├──── DmChannelMember ──── DmChannel
+         │                             │
+         │                        DirectMessage
+         │
+         ├──── VoiceCall ──── DmChannel
+         │    (Caller/Recipient)
+         │
+         └──── VoiceState ──── Channel (nullable)
+                               DmChannel (nullable)
 
 Message ───────┐
                ├──── LinkPreview
@@ -526,10 +549,17 @@ DirectMessage ─┘
 
 #### DirectMessage
 - Individual message within a DM conversation
-- Fields: Id, DmChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), ReplyToDirectMessageId (nullable, self-referencing FK), CreatedAt
+- Fields: Id, DmChannelId, AuthorUserId, AuthorName, Body, ImageUrl (nullable), ReplyToDirectMessageId (nullable, self-referencing FK), MessageType (Regular=0, VoiceCallEvent=1), CreatedAt
 - Follows the same shape as the server `Message` entity
 - Has many `LinkPreview` entries (max 5, fetched asynchronously after message is posted)
 - Self-referencing FK with ON DELETE SET NULL (orphaned replies show "Original message was deleted")
+- `MessageType = VoiceCallEvent` messages are system messages for call events (body: "missed" or "call:{seconds}")
+
+#### VoiceCall
+- Tracks the lifecycle of a 1:1 DM voice call
+- Fields: Id, DmChannelId, CallerUserId, RecipientUserId, Status (Ringing=0, Active=1, Ended=2), EndReason (Answered, Declined, Missed, Timeout, Disconnected), StartedAt, AnsweredAt, EndedAt
+- One active call per DM channel at a time (enforced at API level)
+- `VoiceCallTimeoutService` monitors ringing calls — ends them after 30 seconds with `Timeout` reason and creates a "missed" system message
 
 #### LinkPreview
 - URL metadata extracted from a message body (Open Graph + HTML meta fallbacks)
