@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260303140912_AddVoiceCalls")]
+    partial class AddVoiceCalls
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -451,10 +454,7 @@ namespace Codec.Api.Migrations
 
                     b.HasIndex("CallerUserId");
 
-                    b.HasIndex("DmChannelId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_VoiceCalls_DmChannelId_ActiveOrRinging")
-                        .HasFilter("\"Status\" IN (0, 1)");
+                    b.HasIndex("DmChannelId");
 
                     b.HasIndex("RecipientUserId");
 

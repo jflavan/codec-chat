@@ -3,21 +3,27 @@
 
 	const app = getAppState();
 
-	const channelName = $derived(
-		app.channels.find((c) => c.id === app.activeVoiceChannelId)?.name ?? 'Voice'
+	const isInCall = $derived(!!app.activeCall);
+
+	const label = $derived(
+		isInCall
+			? app.activeCall!.otherDisplayName
+			: app.channels.find((c) => c.id === app.activeVoiceChannelId)?.name ?? 'Voice'
 	);
 </script>
 
 <div class="voice-bar" class:transmitting={app.isPttActive} role="status" aria-label="Voice connected">
 	<div class="voice-info">
 		<span class="voice-label">
-			{#if app.voiceInputMode === 'push-to-talk'}
+			{#if isInCall}
+				In Call
+			{:else if app.voiceInputMode === 'push-to-talk'}
 				{app.isPttActive ? 'Transmitting' : 'Push to Talk'}
 			{:else}
 				Voice Connected
 			{/if}
 		</span>
-		<span class="voice-channel-name"># {channelName}</span>
+		<span class="voice-channel-name">{isInCall ? `In call with ${label}` : `# ${label}`}</span>
 	</div>
 	<div class="voice-controls">
 		<button
@@ -62,9 +68,9 @@
 
 		<button
 			class="voice-btn leave-btn"
-			onclick={() => app.leaveVoiceChannel()}
-			aria-label="Leave voice"
-			title="Leave voice"
+			onclick={() => isInCall ? app.endCall() : app.leaveVoiceChannel()}
+			aria-label={isInCall ? 'End call' : 'Leave voice'}
+			title={isInCall ? 'End call' : 'Leave voice'}
 		>
 			<!-- Phone hangup icon (Material Design call_end) -->
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

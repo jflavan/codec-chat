@@ -212,6 +212,20 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Microphone permission errors surfaced with user-friendly messages
 - ✅ SFU secured with shared internal key (`X-Internal-Key`), rate limiting (120 req/min), and JSON body size cap
 
+### DM Voice Calls ([detailed spec](VOICE.md))
+- ✅ 1:1 voice calls initiated from DM conversations via call button in chat header
+- ✅ Incoming call overlay — full-screen modal with caller info, ring tone (Web Audio API), accept/decline buttons
+- ✅ Call signaling via SignalR — `StartCall`, `AcceptCall`, `DeclineCall`, `EndCall` hub methods
+- ✅ WebRTC audio via mediasoup SFU — DM calls use `call-{callId}` room IDs distinct from server channel rooms
+- ✅ `VoiceCall` entity tracks call lifecycle (Ringing → Active → Ended) with caller/recipient IDs and timestamps
+- ✅ `VoiceCallTimeoutService` — background service manages 30-second ringing timeout and 60-second stale call cleanup
+- ✅ System messages in DM history — "Missed voice call" for unanswered calls, "Voice call — {duration}" for completed calls
+- ✅ `DmCallHeader` component — compact header during active calls with elapsed time, mute/deafen controls, end button
+- ✅ `VoiceConnectedBar` updated — shows "In call with {name}" during DM calls; end call button
+- ✅ Dual-mode voice sessions — users can join server voice channels OR DM calls, not both simultaneously
+- ✅ Call state recovery on reconnect — `GET /voice/active-call` endpoint restores call UI after page reload
+- ✅ Collision detection — prevents starting a call when either party is already in a call or voice channel
+
 ### Frontend Architecture
 - ✅ Modular layered architecture (types, API client, auth, services, state, components)
 - ✅ Central `AppState` class with Svelte 5 `$state` / `$derived` runes

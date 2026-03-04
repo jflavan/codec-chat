@@ -906,3 +906,10 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Comprehensive unit and integration tests
 - Container image vulnerability scanning (Trivy or Microsoft Defender)
 - Voice Phase 2: deafen, per-user volume, push-to-talk
+- Voice Phase 3: 1:1 DM voice calls (completed)
+  - VoiceCall entity with lifecycle management (Ringing → Active → Ended)
+  - SignalR call signaling (StartCall, AcceptCall, DeclineCall, EndCall)
+  - 30-second ringing timeout with automatic missed-call handling
+  - WebRTC transport setup via mediasoup SFU with call-specific room IDs
+  - Incoming call overlay with ring tone, DM call header with elapsed time
+  - System messages for voice call events (missed calls, call duration)

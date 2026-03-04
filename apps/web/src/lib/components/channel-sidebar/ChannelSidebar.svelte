@@ -184,7 +184,7 @@
 		<InvitePanel />
 	{/if}
 
-	{#if app.activeVoiceChannelId}
+	{#if app.activeVoiceChannelId || app.activeCall}
 		<VoiceConnectedBar />
 	{/if}
 

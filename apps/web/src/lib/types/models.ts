@@ -184,6 +184,21 @@ export type DirectMessage = {
 	authorAvatarUrl?: string | null;
 	linkPreviews: LinkPreview[];
 	replyContext: ReplyContext | null;
+	messageType?: number; // 0 = regular, 1 = voiceCallEvent
+};
+
+/** Active or ringing call returned by GET /voice/active-call. */
+export type ActiveCallResponse = {
+	id: string;
+	dmChannelId: string;
+	callerUserId: string;
+	recipientUserId: string;
+	status: 'ringing' | 'active' | 'ended';
+	startedAt: string;
+	answeredAt?: string | null;
+	otherUserId: string;
+	otherDisplayName: string;
+	otherAvatarUrl?: string | null;
 };
 
 /** Server invite code created by an Owner or Admin. */

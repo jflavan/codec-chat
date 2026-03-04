@@ -151,6 +151,9 @@ else
     builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsPath, $"{apiBaseUrl}/uploads"));
 }
 
+builder.Services.AddSingleton<VoiceCallTimeoutService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutService>());
+
 builder.Services.AddSingleton<IAvatarService, AvatarService>();
 builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();
 
