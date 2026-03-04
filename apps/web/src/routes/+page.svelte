@@ -15,6 +15,7 @@
 	import LoadingScreen from '$lib/components/LoadingScreen.svelte';
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
+	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -131,6 +132,7 @@
 
 <ImagePreview />
 <AlphaNotification />
+<IncomingCallOverlay />
 
 {#if !app.isSignedIn}
 	<LoginScreen />

@@ -145,6 +145,37 @@ export type NewProducerEvent = {
 	producerId: string;
 };
 
+export type IncomingCallEvent = {
+	callId: string;
+	dmChannelId: string;
+	callerUserId: string;
+	callerDisplayName: string;
+	callerAvatarUrl?: string | null;
+};
+
+export type CallAcceptedEvent = {
+	callId: string;
+	dmChannelId: string;
+	roomId: string;
+};
+
+export type CallDeclinedEvent = {
+	callId: string;
+	dmChannelId: string;
+};
+
+export type CallEndedEvent = {
+	callId: string;
+	dmChannelId: string;
+	endReason: string;
+	durationSeconds?: number | null;
+};
+
+export type CallMissedEvent = {
+	callId: string;
+	dmChannelId: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -177,6 +208,11 @@ export type SignalRCallbacks = {
 	onUserLeftVoice?: (event: UserLeftVoiceEvent) => void;
 	onVoiceStateUpdated?: (event: VoiceStateUpdatedEvent) => void;
 	onNewProducer?: (event: NewProducerEvent) => void;
+	onIncomingCall?: (event: IncomingCallEvent) => void;
+	onCallAccepted?: (event: CallAcceptedEvent) => void;
+	onCallDeclined?: (event: CallDeclinedEvent) => void;
+	onCallEnded?: (event: CallEndedEvent) => void;
+	onCallMissed?: (event: CallMissedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -289,6 +325,21 @@ export class ChatHubService {
 		}
 		if (callbacks.onNewProducer) {
 			connection.on('NewProducer', callbacks.onNewProducer);
+		}
+		if (callbacks.onIncomingCall) {
+			connection.on('IncomingCall', callbacks.onIncomingCall);
+		}
+		if (callbacks.onCallAccepted) {
+			connection.on('CallAccepted', callbacks.onCallAccepted);
+		}
+		if (callbacks.onCallDeclined) {
+			connection.on('CallDeclined', callbacks.onCallDeclined);
+		}
+		if (callbacks.onCallEnded) {
+			connection.on('CallEnded', callbacks.onCallEnded);
+		}
+		if (callbacks.onCallMissed) {
+			connection.on('CallMissed', callbacks.onCallMissed);
 		}
 
 		if (callbacks.onReconnecting) {
@@ -442,6 +493,53 @@ export class ChatHubService {
 	async leaveVoiceChannel(): Promise<void> {
 		if (this.isConnected) {
 			await this.connection!.invoke('LeaveVoiceChannel').catch(() => {});
+		}
+	}
+
+	/* ───── DM Voice Calls ───── */
+
+	async startCall(dmChannelId: string): Promise<{
+		callId: string;
+		recipientUserId: string;
+		recipientDisplayName: string;
+		recipientAvatarUrl?: string | null;
+	}> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		return this.connection!.invoke('StartCall', dmChannelId);
+	}
+
+	async acceptCall(callId: string): Promise<{
+		callId: string;
+		roomId: string;
+		routerRtpCapabilities: object;
+		sendTransportOptions: object;
+		recvTransportOptions: object;
+		iceServers?: object[];
+		alreadyHandled?: boolean;
+	}> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		return this.connection!.invoke('AcceptCall', callId);
+	}
+
+	async setupCallTransports(callId: string): Promise<{
+		routerRtpCapabilities: object;
+		sendTransportOptions: object;
+		recvTransportOptions: object;
+		members: object[];
+		iceServers?: object[];
+	}> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		return this.connection!.invoke('SetupCallTransports', callId);
+	}
+
+	async declineCall(callId: string): Promise<void> {
+		if (!this.isConnected) throw new Error('Hub not connected');
+		await this.connection!.invoke('DeclineCall', callId);
+	}
+
+	async endCall(): Promise<void> {
+		if (this.isConnected) {
+			await this.connection!.invoke('EndCall').catch(() => {});
 		}
 	}
 }

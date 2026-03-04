@@ -166,6 +166,26 @@ export class AppState {
 	/** True while the PTT key is held down. */
 	isPttActive = $state(false);
 
+	/* ───── calls ───── */
+	activeCall = $state<{
+		callId: string;
+		dmChannelId: string;
+		otherUserId: string;
+		otherDisplayName: string;
+		otherAvatarUrl?: string | null;
+		status: 'ringing' | 'active';
+		startedAt: string;
+		answeredAt?: string;
+	} | null>(null);
+
+	incomingCall = $state<{
+		callId: string;
+		dmChannelId: string;
+		callerUserId: string;
+		callerDisplayName: string;
+		callerAvatarUrl?: string | null;
+	} | null>(null);
+
 	/* ───── reply state ───── */
 	replyingTo = $state<{ messageId: string; authorName: string; bodyPreview: string; context: 'channel' | 'dm' } | null>(null);
 
@@ -1728,6 +1748,158 @@ export class AppState {
 		this._saveVoicePreferences();
 	}
 
+	/* ═══════════════════ DM Voice Calls ═══════════════════ */
+
+	async startCall(dmChannelId: string): Promise<void> {
+		if (this.activeCall || this.incomingCall) return;
+
+		// Leave any active server voice channel.
+		if (this.activeVoiceChannelId) {
+			await this.leaveVoiceChannel();
+		}
+
+		try {
+			const result = await this.hub.startCall(dmChannelId);
+			this.activeCall = {
+				callId: result.callId,
+				dmChannelId,
+				otherUserId: result.recipientUserId,
+				otherDisplayName: result.recipientDisplayName,
+				otherAvatarUrl: result.recipientAvatarUrl,
+				status: 'ringing',
+				startedAt: new Date().toISOString(),
+			};
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async acceptCall(callId: string): Promise<void> {
+		if (!this.incomingCall || this.incomingCall.callId !== callId) return;
+
+		// Leave any active server voice channel.
+		if (this.activeVoiceChannelId) {
+			await this.leaveVoiceChannel();
+		}
+
+		const caller = this.incomingCall;
+		this.incomingCall = null;
+
+		try {
+			const result = await this.hub.acceptCall(callId);
+
+			if ('alreadyHandled' in result && result.alreadyHandled) return;
+
+			this.activeCall = {
+				callId,
+				dmChannelId: caller.dmChannelId,
+				otherUserId: caller.callerUserId,
+				otherDisplayName: caller.callerDisplayName,
+				otherAvatarUrl: caller.callerAvatarUrl,
+				status: 'active',
+				startedAt: new Date().toISOString(),
+				answeredAt: new Date().toISOString(),
+			};
+
+			// Set up WebRTC with the transport options from AcceptCall.
+			await this.voice.joinWithOptions(
+				{
+					routerRtpCapabilities: result.routerRtpCapabilities,
+					sendTransportOptions: result.sendTransportOptions,
+					recvTransportOptions: result.recvTransportOptions,
+					iceServers: result.iceServers as any,
+				},
+				this.hub,
+				{
+					onNewTrack: (pid, track) => {
+						this._attachRemoteAudio(pid, caller.callerUserId, track);
+					},
+					onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+				}
+			);
+
+			this.isMuted = false;
+			this.isDeafened = false;
+
+			if (this.voiceInputMode === 'push-to-talk') {
+				this.voice.setMuted(true);
+				this.isPttActive = false;
+				this._registerPttListeners();
+			}
+		} catch (e) {
+			console.error('[Voice] Failed to accept call:', e);
+			this.activeCall = null;
+			try { await this.hub.endCall(); } catch { /* ignore */ }
+			await this.voice.leave();
+			this._cleanupRemoteAudio();
+			this.setError(e);
+		}
+	}
+
+	async declineCall(callId: string): Promise<void> {
+		if (!this.incomingCall || this.incomingCall.callId !== callId) return;
+		this.incomingCall = null;
+
+		try {
+			await this.hub.declineCall(callId);
+		} catch {
+			// ignore
+		}
+	}
+
+	async endCall(): Promise<void> {
+		if (!this.activeCall) return;
+		this.activeCall = null;
+
+		try {
+			await this.hub.endCall();
+		} catch {
+			// ignore
+		}
+
+		await this.voice.leave();
+		this._cleanupRemoteAudio();
+		this.isMuted = false;
+		this.isDeafened = false;
+		this.isPttActive = false;
+		this._removePttListeners();
+	}
+
+	async checkActiveCall(): Promise<void> {
+		if (!this.idToken) return;
+		const call = await this.api.getActiveCall(this.idToken);
+		if (!call) return;
+
+		if (call.status === 'ringing') {
+			if (call.callerUserId === this.me?.user.id) {
+				// We initiated the call — restore ringing state.
+				this.activeCall = {
+					callId: call.id,
+					dmChannelId: call.dmChannelId,
+					otherUserId: call.otherUserId,
+					otherDisplayName: call.otherDisplayName,
+					otherAvatarUrl: call.otherAvatarUrl,
+					status: 'ringing',
+					startedAt: call.startedAt,
+				};
+			} else {
+				// We are the recipient — show incoming call.
+				this.incomingCall = {
+					callId: call.id,
+					dmChannelId: call.dmChannelId,
+					callerUserId: call.otherUserId,
+					callerDisplayName: call.otherDisplayName,
+					callerAvatarUrl: call.otherAvatarUrl,
+				};
+			}
+		}
+		// Active calls after refresh can't be rejoined without re-establishing WebRTC,
+		// so just end them cleanly.
+		if (call.status === 'active') {
+			try { await this.hub.endCall(); } catch { /* ignore */ }
+		}
+	}
+
 	/* ═══════════════════ SignalR ═══════════════════ */
 
 	private async startSignalR(): Promise<void> {
@@ -1742,11 +1914,13 @@ export class AppState {
 				this.isHubConnected = false;
 				// Tear down voice — SignalR group membership is lost, so the voice
 				// session cannot recover without a full re-join.
-				if (this.activeVoiceChannelId) {
+				if (this.activeVoiceChannelId || this.activeCall) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
 					this._removePttListeners();
 					this.activeVoiceChannelId = null;
+					this.activeCall = null;
+					this.incomingCall = null;
 					this.isMuted = false;
 					this.isDeafened = false;
 					this.isPttActive = false;
@@ -2012,11 +2186,85 @@ export class AppState {
 				this.voiceChannelMembers = memberMap;
 			},
 			onNewProducer: async (event) => {
-				if (this.activeVoiceChannelId === event.channelId) {
+				// Handle both server voice channels and DM calls.
+				const inVoiceChannel = this.activeVoiceChannelId === event.channelId;
+				const inDmCall = this.activeCall?.status === 'active';
+				if (inVoiceChannel || inDmCall) {
 					await this.voice.consumeProducer(event.producerId, event.participantId, this.hub, {
 						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, event.userId, track),
 						onTrackEnded: (pid) => this._detachRemoteAudio(pid),
 					});
+				}
+			},
+			onIncomingCall: (event) => {
+				// Don't show incoming call if we already have one or are in a call.
+				if (this.activeCall || this.incomingCall) return;
+				this.incomingCall = event;
+			},
+			onCallAccepted: async (event) => {
+				if (!this.activeCall || this.activeCall.callId !== event.callId) return;
+
+				try {
+					// Caller: set up our transports now.
+					const transportResult = await this.hub.setupCallTransports(event.callId);
+
+					this.activeCall = { ...this.activeCall, status: 'active', answeredAt: new Date().toISOString() };
+
+					await this.voice.joinWithOptions(
+						{
+							routerRtpCapabilities: transportResult.routerRtpCapabilities,
+							sendTransportOptions: transportResult.sendTransportOptions,
+							recvTransportOptions: transportResult.recvTransportOptions,
+							members: transportResult.members as any,
+							iceServers: transportResult.iceServers as any,
+						},
+						this.hub,
+						{
+							onNewTrack: (pid, track) => {
+								this._attachRemoteAudio(pid, this.activeCall!.otherUserId, track);
+							},
+							onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+						}
+					);
+
+					this.isMuted = false;
+					this.isDeafened = false;
+
+					if (this.voiceInputMode === 'push-to-talk') {
+						this.voice.setMuted(true);
+						this.isPttActive = false;
+						this._registerPttListeners();
+					}
+				} catch (e) {
+					console.error('[Voice] Failed to set up call as caller:', e);
+					this.activeCall = null;
+					await this.voice.leave();
+					this._cleanupRemoteAudio();
+					this.setError(e);
+				}
+			},
+			onCallDeclined: (event) => {
+				if (this.activeCall?.callId === event.callId) {
+					this.activeCall = null;
+				}
+			},
+			onCallEnded: (event) => {
+				if (this.activeCall?.callId === event.callId) {
+					this.activeCall = null;
+					this.voice.leave();
+					this._cleanupRemoteAudio();
+					this.isMuted = false;
+					this.isDeafened = false;
+					this.isPttActive = false;
+					this._removePttListeners();
+				}
+			},
+			onCallMissed: (event) => {
+				if (this.activeCall?.callId === event.callId) {
+					this.activeCall = null;
+				}
+				if (this.incomingCall?.callId === event.callId) {
+					this.incomingCall = null;
 				}
 			},
 		});
@@ -2029,6 +2277,9 @@ export class AppState {
 		if (this.activeDmChannelId) {
 			await this.hub.joinDmChannel(this.activeDmChannelId);
 		}
+
+		// Check for active call on initial connect.
+		await this.checkActiveCall();
 	}
 
 	/** Synchronous voice cleanup for beforeunload (stops mic tracks immediately). */
@@ -2036,11 +2287,16 @@ export class AppState {
 		this.voice.teardownSync();
 		this._cleanupRemoteAudio();
 		this._removePttListeners();
+		this.activeCall = null;
+		this.incomingCall = null;
 		this.audioContext?.close().catch(() => {});
 		this.audioContext = null;
 	}
 
 	async destroy(): Promise<void> {
+		if (this.activeCall) {
+			await this.endCall();
+		}
 		if (this.activeVoiceChannelId) {
 			await this.leaveVoiceChannel();
 		}

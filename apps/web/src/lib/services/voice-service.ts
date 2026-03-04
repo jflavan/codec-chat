@@ -91,6 +91,67 @@ export class VoiceService {
 		return members;
 	}
 
+	/**
+	 * Join a voice session with pre-fetched transport options (for DM calls).
+	 * Skips the hub.joinVoiceChannel() call since transports are already created.
+	 */
+	async joinWithOptions(
+		options: {
+			routerRtpCapabilities: object;
+			sendTransportOptions: object;
+			recvTransportOptions: object;
+			members?: (VoiceChannelMember & { producerId?: string })[];
+			iceServers?: { urls: string[]; username: string; credential: string }[];
+		},
+		hub: ChatHubService,
+		callbacks: VoiceServiceCallbacks
+	): Promise<VoiceChannelMember[]> {
+		this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+		const audioTrack = this.localStream.getAudioTracks()[0];
+
+		this.device = new Device();
+		const routerRtpCapabilities = options.routerRtpCapabilities as RtpCapabilities;
+		const sendTransportOptions = options.sendTransportOptions as TransportOptions;
+		const recvTransportOptions = options.recvTransportOptions as TransportOptions;
+		const members = (options.members ?? []) as (VoiceChannelMember & { producerId?: string })[];
+		const iceServers = options.iceServers;
+
+		await this.device.load({ routerRtpCapabilities });
+
+		const sendTransport = this.device.createSendTransport({
+			...sendTransportOptions,
+			...(iceServers ? { iceServers } : {}),
+		});
+		this.sendTransport = sendTransport;
+		sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+			hub.connectTransport(sendTransport.id, dtlsParameters).then(callback).catch(errback);
+		});
+		sendTransport.on('produce', ({ kind, rtpParameters }, callback, errback) => {
+			hub.produce(sendTransport.id, rtpParameters)
+				.then((producerId) => callback({ id: producerId }))
+				.catch(errback);
+		});
+
+		const recvTransport = this.device.createRecvTransport({
+			...recvTransportOptions,
+			...(iceServers ? { iceServers } : {}),
+		});
+		this.recvTransport = recvTransport;
+		recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+			hub.connectTransport(recvTransport.id, dtlsParameters).then(callback).catch(errback);
+		});
+
+		this.producer = await sendTransport.produce({ track: audioTrack });
+
+		for (const member of members) {
+			if (member.producerId) {
+				await this.consumeProducer(member.producerId, member.participantId, hub, callbacks);
+			}
+		}
+
+		return members;
+	}
+
 	async consumeProducer(
 		producerId: string,
 		participantId: string,

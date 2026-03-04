@@ -22,6 +22,7 @@ public class CodecDbContext : DbContext
     public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
     public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
     public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
+    public DbSet<VoiceCall> VoiceCalls => Set<VoiceCall>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -202,6 +203,51 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<VoiceState>()
             .HasIndex(vs => vs.ConnectionId);
+
+        // VoiceCall relationships and indexes.
+        modelBuilder.Entity<VoiceCall>()
+            .HasOne(vc => vc.DmChannel)
+            .WithMany()
+            .HasForeignKey(vc => vc.DmChannelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<VoiceCall>()
+            .HasOne(vc => vc.CallerUser)
+            .WithMany()
+            .HasForeignKey(vc => vc.CallerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<VoiceCall>()
+            .HasOne(vc => vc.RecipientUser)
+            .WithMany()
+            .HasForeignKey(vc => vc.RecipientUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<VoiceCall>()
+            .HasIndex(vc => vc.DmChannelId);
+
+        // Prevent concurrent active/ringing calls on the same DM channel.
+        modelBuilder.Entity<VoiceCall>()
+            .HasIndex(vc => vc.DmChannelId)
+            .HasFilter("\"Status\" IN (0, 1)")
+            .IsUnique()
+            .HasDatabaseName("IX_VoiceCalls_DmChannelId_ActiveOrRinging");
+
+        modelBuilder.Entity<VoiceCall>()
+            .HasIndex(vc => vc.CallerUserId);
+
+        modelBuilder.Entity<VoiceCall>()
+            .HasIndex(vc => vc.RecipientUserId);
+
+        // VoiceState -> DmChannel relationship for direct calls.
+        modelBuilder.Entity<VoiceState>()
+            .HasOne(vs => vs.DmChannel)
+            .WithMany()
+            .HasForeignKey(vs => vs.DmChannelId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<VoiceState>()
+            .HasIndex(vs => vs.DmChannelId);
 
         // Link preview relationships, indexes, and check constraint.
         modelBuilder.Entity<LinkPreview>(entity =>

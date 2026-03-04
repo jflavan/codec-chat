@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import DmList from '$lib/components/dm/DmList.svelte';
+	import VoiceConnectedBar from '$lib/components/channel-sidebar/VoiceConnectedBar.svelte';
 
 	const app = getAppState();
 
@@ -40,6 +41,10 @@
 	<div class="dm-section">
 		<DmList />
 	</div>
+
+	{#if app.activeVoiceChannelId || app.activeCall}
+		<VoiceConnectedBar />
+	{/if}
 </aside>
 
 <style>
