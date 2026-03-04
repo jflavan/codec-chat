@@ -23,6 +23,9 @@ public class VoiceCallTimeoutService(
     /// </summary>
     public void StartTimeout(Guid callId, Guid callerUserId, Guid recipientUserId, Guid dmChannelId)
     {
+        // Cancel any existing timeout for this call before starting a new one.
+        CancelTimeout(callId);
+
         var cts = new CancellationTokenSource();
         _callTimers[callId] = cts;
 
@@ -36,10 +39,11 @@ public class VoiceCallTimeoutService(
             {
                 return; // Call was answered/declined/ended before timeout
             }
-            finally
-            {
-                _callTimers.TryRemove(callId, out _);
-            }
+
+            // Use TryRemove as the atomic gate: if CancelTimeout already removed
+            // this entry, we must not fire the timeout handler.
+            if (!_callTimers.TryRemove(callId, out _))
+                return;
 
             await HandleTimeout(callId, callerUserId, recipientUserId, dmChannelId);
         });
@@ -51,7 +55,6 @@ public class VoiceCallTimeoutService(
         if (_callTimers.TryRemove(callId, out var cts))
         {
             cts.Cancel();
-            cts.Dispose();
         }
     }
 
@@ -160,10 +163,25 @@ public class VoiceCallTimeoutService(
                     await hubContext.Clients.Group($"user-{call.RecipientUserId}").SendAsync("CallMissed", payload, stoppingToken);
                 }
 
-                if (staleCalls.Count > 0)
+                // Also clean up stale Active calls with no voice states (orphaned by failed disconnect cleanup).
+                var staleActiveCutoff = DateTimeOffset.UtcNow.AddMinutes(-2);
+                var staleActiveCalls = await db.VoiceCalls
+                    .Where(c => c.Status == VoiceCallStatus.Active && c.AnsweredAt < staleActiveCutoff)
+                    .Where(c => !db.VoiceStates.Any(vs => vs.DmChannelId == c.DmChannelId))
+                    .ToListAsync(stoppingToken);
+
+                foreach (var call in staleActiveCalls)
+                {
+                    call.Status = VoiceCallStatus.Ended;
+                    call.EndReason = VoiceCallEndReason.Completed;
+                    call.EndedAt = DateTimeOffset.UtcNow;
+                }
+
+                var totalCleaned = staleCalls.Count + staleActiveCalls.Count;
+                if (totalCleaned > 0)
                 {
                     await db.SaveChangesAsync(stoppingToken);
-                    logger.LogInformation("Cleaned up {Count} stale ringing call(s)", staleCalls.Count);
+                    logger.LogInformation("Cleaned up {Count} stale call(s) ({Ringing} ringing, {Active} active)", totalCleaned, staleCalls.Count, staleActiveCalls.Count);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

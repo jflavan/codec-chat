@@ -557,13 +557,15 @@ export class ApiClient {
 
 	/** Get the active or ringing call for the current user, or null. */
 	async getActiveCall(token: string): Promise<ActiveCallResponse | null> {
-		try {
-			return await this.request(`${this.baseUrl}/voice/active-call`, {
-				headers: this.headers(token)
-			});
-		} catch {
-			return null; // 204 No Content or error
+		const response = await fetch(`${this.baseUrl}/voice/active-call`, {
+			headers: this.headers(token)
+		});
+		if (response.status === 204) return null;
+		if (!response.ok) {
+			const body = await response.json().catch(() => null);
+			throw new ApiError(response.status, body?.error);
 		}
+		return response.json() as Promise<ActiveCallResponse>;
 	}
 
 	/** Get short-lived TURN credentials for WebRTC. */

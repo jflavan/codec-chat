@@ -226,6 +226,13 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<VoiceCall>()
             .HasIndex(vc => vc.DmChannelId);
 
+        // Prevent concurrent active/ringing calls on the same DM channel.
+        modelBuilder.Entity<VoiceCall>()
+            .HasIndex(vc => vc.DmChannelId)
+            .HasFilter("\"Status\" IN (0, 1)")
+            .IsUnique()
+            .HasDatabaseName("IX_VoiceCalls_DmChannelId_ActiveOrRinging");
+
         modelBuilder.Entity<VoiceCall>()
             .HasIndex(vc => vc.CallerUserId);
 
