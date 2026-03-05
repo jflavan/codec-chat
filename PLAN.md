@@ -906,6 +906,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Comprehensive unit and integration tests
 - Container image vulnerability scanning (Trivy or Microsoft Defender)
 - Voice Phase 2: deafen, per-user volume, push-to-talk
+- Voice mobile controls: long-press gesture + responsive UserActionSheet (desktop popup / mobile bottom sheet) for per-user volume controls (completed)
 - Voice Phase 3: 1:1 DM voice calls (completed)
   - VoiceCall entity with lifecycle management (Ringing → Active → Ended)
   - SignalR call signaling (StartCall, AcceptCall, DeclineCall, EndCall)
