@@ -105,6 +105,18 @@
 				requestAnimationFrame(() => scrollToBottom(true));
 			});
 		}
+
+		// Re-scroll when images or embeds finish loading and expand the scroll
+		// height. The 'load' event doesn't bubble, so capture phase is required.
+		function handleContentLoad() {
+			if (isLockedToBottom && !isAtBottom()) {
+				scrollToBottom(true);
+			}
+		}
+		container?.addEventListener('load', handleContentLoad, true);
+		return () => {
+			container?.removeEventListener('load', handleContentLoad, true);
+		};
 	});
 
 	// Reset scroll state on channel change
@@ -147,8 +159,12 @@
 		// Read scroll state without creating a dependency on it
 		untrack(() => {
 			if (isLockedToBottom) {
-				// Use instant scroll for bulk loads (initial load or rapid influx)
-				tick().then(() => scrollToBottom(newMessages > 3));
+				// Use instant scroll for bulk loads (initial load or rapid influx).
+				// Wait for the next animation frame so the browser finishes layout
+				// for the newly rendered messages before we measure scrollHeight.
+				tick().then(() => {
+					requestAnimationFrame(() => scrollToBottom(newMessages > 3));
+				});
 			} else {
 				unreadCount += newMessages;
 			}
