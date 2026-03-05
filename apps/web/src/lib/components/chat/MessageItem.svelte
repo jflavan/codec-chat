@@ -246,6 +246,7 @@
 					reactions={message.reactions}
 					{currentUserId}
 					onToggle={handleToggleReaction}
+					members={app.members}
 				/>
 			{/if}
 		</div>
@@ -303,6 +304,7 @@
 					reactions={message.reactions}
 					{currentUserId}
 					onToggle={handleToggleReaction}
+					members={app.members}
 				/>
 			{/if}
 		</div>

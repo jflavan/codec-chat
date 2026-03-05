@@ -1,18 +1,40 @@
 <script lang="ts">
-	import type { Reaction } from '$lib/types/index.js';
+	import type { Reaction, Member } from '$lib/types/index.js';
 
 	let {
 		reactions,
 		currentUserId,
-		onToggle
+		onToggle,
+		members = []
 	}: {
 		reactions: Reaction[];
 		currentUserId: string | null;
 		onToggle: (emoji: string) => void;
+		members?: Member[];
 	} = $props();
 
 	function hasReacted(reaction: Reaction): boolean {
 		return currentUserId !== null && reaction.userIds.includes(currentUserId);
+	}
+
+	function reactionTitle(reaction: Reaction): string {
+		if (members.length === 0) {
+			return `${reaction.count} ${reaction.count === 1 ? 'reaction' : 'reactions'}`;
+		}
+		const memberMap = new Map(members.map((m) => [m.userId, m.displayName]));
+		const names = reaction.userIds
+			.map((id) => memberMap.get(id))
+			.filter((name): name is string => name !== undefined);
+		const MAX_NAMES = 10;
+		if (names.length === 0) {
+			return `${reaction.count} ${reaction.count === 1 ? 'reaction' : 'reactions'}`;
+		}
+		if (names.length <= MAX_NAMES) {
+			return names.join(', ');
+		}
+		const shown = names.slice(0, MAX_NAMES);
+		const remaining = names.length - MAX_NAMES;
+		return `${shown.join(', ')}, and ${remaining} more`;
 	}
 </script>
 
@@ -22,7 +44,7 @@
 			class="reaction-pill"
 			class:reacted={hasReacted(reaction)}
 			onclick={() => onToggle(reaction.emoji)}
-			title="{reaction.count} {reaction.count === 1 ? 'reaction' : 'reactions'}"
+			title={reactionTitle(reaction)}
 		>
 			<span class="reaction-emoji">{reaction.emoji}</span>
 			<span class="reaction-count">{reaction.count}</span>
