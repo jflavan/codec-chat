@@ -17,24 +17,19 @@
 		return currentUserId !== null && reaction.userIds.includes(currentUserId);
 	}
 
-	function reactionTitle(reaction: Reaction): string {
+	function getReactorNames(reaction: Reaction): { names: string[]; remaining: number } {
 		if (members.length === 0) {
-			return `${reaction.count} ${reaction.count === 1 ? 'reaction' : 'reactions'}`;
+			return { names: [], remaining: 0 };
 		}
 		const memberMap = new Map(members.map((m) => [m.userId, m.displayName]));
 		const names = reaction.userIds
 			.map((id) => memberMap.get(id))
 			.filter((name): name is string => name !== undefined);
 		const MAX_NAMES = 10;
-		if (names.length === 0) {
-			return `${reaction.count} ${reaction.count === 1 ? 'reaction' : 'reactions'}`;
-		}
 		if (names.length <= MAX_NAMES) {
-			return names.join(', ');
+			return { names, remaining: 0 };
 		}
-		const shown = names.slice(0, MAX_NAMES);
-		const remaining = names.length - MAX_NAMES;
-		return `${shown.join(', ')}, and ${remaining} more`;
+		return { names: names.slice(0, MAX_NAMES), remaining: names.length - MAX_NAMES };
 	}
 </script>
 
@@ -44,7 +39,7 @@
 			class="reaction-pill"
 			class:reacted={hasReacted(reaction)}
 			onclick={() => onToggle(reaction.emoji)}
-			title={reactionTitle(reaction)}
+
 		>
 			<span class="reaction-emoji">{reaction.emoji}</span>
 			<span class="reaction-count">{reaction.count}</span>
