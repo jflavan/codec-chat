@@ -1,3 +1,5 @@
+> **SUPERSEDED:** The long-press interaction described below was replaced with simple tap/click in commit `68043f1`. Long-press was unreliable on mobile due to OS text selection interference. The `longpress` Svelte action (`long-press.ts`) was deleted. The `UserActionSheet` component and responsive presentation are unchanged.
+
 # Voice Mobile Controls Design
 
 ## Problem
