@@ -4,7 +4,6 @@
 	import InvitePanel from './InvitePanel.svelte';
 	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
 	import UserActionSheet from '$lib/components/voice/UserActionSheet.svelte';
-	import { longpress } from '$lib/utils/long-press.js';
 
 	const app = getAppState();
 
@@ -125,17 +124,25 @@
 								{#each members as member}
 									<li
 										class="voice-member"
-										use:longpress={{
-											onpress: (x, y) => {
-												if (member.userId !== app.me?.user.id) {
-													contextMenu = { userId: member.userId, displayName: member.displayName, x, y };
-												}
+										class:voice-member--interactive={member.userId !== app.me?.user.id}
+										role={member.userId !== app.me?.user.id ? 'button' : undefined}
+										tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
+										onclick={(e) => {
+											if (member.userId !== app.me?.user.id) {
+												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 											}
 										}}
 										oncontextmenu={(e) => {
 											if (member.userId !== app.me?.user.id) {
 												e.preventDefault();
 												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+											}
+										}}
+										onkeydown={(e) => {
+											if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+												e.preventDefault();
+												const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+												contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
 											}
 										}}
 									>
@@ -477,9 +484,17 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		touch-action: manipulation;
-		-webkit-touch-callout: none;
-		user-select: none;
+	}
+
+	.voice-member--interactive {
+		cursor: pointer;
+		border-radius: 3px;
+		padding: 2px 4px;
+		margin: -2px -4px;
+	}
+
+	.voice-member--interactive:hover {
+		background: var(--bg-message-hover);
 	}
 
 	.voice-avatar {

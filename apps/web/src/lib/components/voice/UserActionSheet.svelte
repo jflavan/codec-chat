@@ -74,11 +74,12 @@
 	>
 		<div class="action-sheet__header">{displayName}</div>
 		<div class="action-sheet__section">
-			<label class="volume-label">
+			<label class="volume-label" for="volume-{userId}">
 				Volume
 				<span class="volume-value">{sliderValue}%</span>
 			</label>
 			<input
+				id="volume-{userId}"
 				type="range"
 				min="0"
 				max="100"
