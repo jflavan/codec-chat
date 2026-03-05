@@ -127,6 +127,7 @@
 										class:voice-member--interactive={member.userId !== app.me?.user.id}
 										role={member.userId !== app.me?.user.id ? 'button' : undefined}
 										tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
+										aria-label={member.userId !== app.me?.user.id ? `${member.displayName} volume controls` : undefined}
 										onclick={(e) => {
 											if (member.userId !== app.me?.user.id) {
 												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
