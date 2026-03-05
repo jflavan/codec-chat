@@ -281,6 +281,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `GET /channels/{channelId}/messages?before={timestamp}&limit={n}` - Get messages in a channel with cursor-based pagination (requires membership or Global Admin; `before` DateTimeOffset cursor and `limit` 1–200 default 100; returns `{ hasMore, messages }` with `imageUrl`, `replyContext`)
 - `POST /channels/{channelId}/messages` - Post a message to a channel (requires membership or Global Admin; accepts optional `imageUrl`, `replyToMessageId`; broadcasts via SignalR)
 - `DELETE /channels/{channelId}/messages/{messageId}` - Delete a channel message (author or Global Admin; cascade-deletes reactions and link previews; broadcasts `MessageDeleted` via SignalR)
+- `DELETE /channels/{channelId}/messages` - Purge all messages in a channel (Global Admin only; cascade-deletes reactions and link previews; broadcasts `ChannelPurged` via SignalR)
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership or Global Admin; broadcasts via SignalR)
 
 #### Friends
@@ -341,6 +342,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
 | `ReactionUpdated` | `{ messageId, channelId, reactions: [{ emoji, count, userIds }] }` | Reaction toggled on a message |
 | `MessageDeleted` | `{ messageId, channelId }` | A channel message was deleted by its author or a Global Admin (sent to channel group) |
+| `ChannelPurged` | `{ channelId }` | All messages in a channel were purged by a Global Admin (sent to channel group; clients clear message list) |
 | `ServerDeleted` | `{ serverId }` | A server was deleted by its Owner or a Global Admin (sent to server group; clients navigate away and remove from server list) |
 | `ChannelDeleted` | `{ serverId, channelId }` | A channel was deleted by an Owner, Admin, or Global Admin (sent to server group; clients remove from channel list and navigate if active) |
 | `FriendRequestReceived` | `{ requestId, requester: { id, displayName, avatarUrl }, createdAt }` | Friend request received (sent to recipient's user group) |

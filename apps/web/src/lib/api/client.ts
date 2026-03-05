@@ -329,6 +329,13 @@ export class ApiClient {
 		);
 	}
 
+	purgeChannel(token: string, channelId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
 	editMessage(token: string, channelId: string, messageId: string, body: string): Promise<{ id: string; body: string; editedAt: string }> {
 		return this.request(
 			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,

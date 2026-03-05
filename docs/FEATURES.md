@@ -136,6 +136,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Global admin can delete any server (cascade-deletes all channels, messages, members, invites)
 - ✅ Global admin can delete any channel (cascade-deletes all messages, reactions, link previews)
 - ✅ Global admin can delete any message in channels (bypasses author-only restriction)
+- ✅ Global admin can purge all messages from a text channel (bulk-delete via Server Settings; cascade-deletes reactions and link previews; real-time `ChannelPurged` SignalR event clears connected clients)
 - ✅ Global admin can kick any non-Owner member from any server (bypasses membership/role check)
 - ✅ SignalR: global admin auto-joins all server groups on connect (receives real-time updates for every server)
 - ✅ `isGlobalAdmin` flag exposed in `/me` API response and frontend state
