@@ -52,7 +52,8 @@ src/
 │   │   ├── tokens.css      # CSS custom properties (CODEC CRT design tokens)
 │   │   └── global.css      # Base styles, resets, font imports
 │   ├── utils/
-│   │   └── format.ts       # Date/time formatting helpers
+│   │   ├── format.ts       # Date/time formatting helpers
+│   │   └── long-press.ts   # Svelte action for touch/pointer long-press detection
 │   ├── components/
 │   │   ├── server-sidebar/
 │   │   │   └── ServerSidebar.svelte      # Server icon rail (create/join-via-invite)
@@ -83,6 +84,7 @@ src/
 │   │   │   └── DmChatArea.svelte         # DM chat (header, feed, composer, call button)
 │   │   ├── voice/
 │   │   │   ├── VoiceControls.svelte      # Mute/deafen controls in voice channel
+│   │   │   ├── UserActionSheet.svelte    # Per-user action sheet (desktop popup / mobile bottom sheet)
 │   │   │   ├── IncomingCallOverlay.svelte # Full-screen incoming call modal with ring tone
 │   │   │   └── DmCallHeader.svelte       # Active call header (timer, mute, end)
 │   │   ├── settings/

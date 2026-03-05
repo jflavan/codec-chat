@@ -203,6 +203,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Per-participant send transport (mic → SFU) and recv transport (SFU → speakers)
 - ✅ Mute/unmute — pauses/resumes the audio Producer; `VoiceMuteChanged` event broadcast to channel
 - ✅ Participant list with avatars and mute indicators shown on voice channel rows
+- ✅ Per-user volume controls accessible via right-click (desktop) and long-press (mobile) — responsive `UserActionSheet` with positioned popup or bottom sheet
 - ✅ `VoiceControls` bar shown while connected (mute toggle, leave button)
 - ✅ Double-consume race guard — `consumedProducerIds` Set prevents duplicate consumer creation
 - ✅ Concurrent join protection — unique DB index on `VoiceStates.UserId`; surfaced as clear error
