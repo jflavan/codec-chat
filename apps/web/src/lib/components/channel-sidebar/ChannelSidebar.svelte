@@ -3,7 +3,8 @@
 	import UserPanel from './UserPanel.svelte';
 	import InvitePanel from './InvitePanel.svelte';
 	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
-	import VoiceMemberContextMenu from '$lib/components/voice/VoiceMemberContextMenu.svelte';
+	import UserActionSheet from '$lib/components/voice/UserActionSheet.svelte';
+	import { longpress } from '$lib/utils/long-press.js';
 
 	const app = getAppState();
 
@@ -124,6 +125,13 @@
 								{#each members as member}
 									<li
 										class="voice-member"
+										use:longpress={{
+											onpress: (x, y) => {
+												if (member.userId !== app.me?.user.id) {
+													contextMenu = { userId: member.userId, displayName: member.displayName, x, y };
+												}
+											}
+										}}
 										oncontextmenu={(e) => {
 											if (member.userId !== app.me?.user.id) {
 												e.preventDefault();
@@ -192,7 +200,7 @@
 </aside>
 
 {#if contextMenu}
-	<VoiceMemberContextMenu
+	<UserActionSheet
 		userId={contextMenu.userId}
 		displayName={contextMenu.displayName}
 		x={contextMenu.x}
@@ -469,6 +477,9 @@
 		display: flex;
 		align-items: center;
 		gap: 5px;
+		touch-action: manipulation;
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 
 	.voice-avatar {
