@@ -50,7 +50,7 @@
 
 	// Desktop positioning — clamp to viewport
 	const menuWidth = 220;
-	const menuHeight = 140;
+	const menuHeight = 180;
 	const clampedX = Math.min(x ?? 0, window.innerWidth - menuWidth - 8);
 	const clampedY = Math.min(y ?? 0, window.innerHeight - menuHeight - 8);
 </script>
@@ -67,7 +67,7 @@
 		class:action-sheet--mobile={isMobile}
 		class:action-sheet--desktop={!isMobile}
 		style={!isMobile ? `left: ${clampedX}px; top: ${clampedY}px;` : undefined}
-		role="menu"
+		role="dialog"
 		aria-label="{displayName} volume controls"
 		tabindex="-1"
 		bind:this={sheetEl}
@@ -89,7 +89,7 @@
 			/>
 		</div>
 		{#if sliderValue !== 100}
-			<button class="action-sheet__item" onclick={handleReset} role="menuitem">
+			<button class="action-sheet__item" onclick={handleReset}>
 				Reset Volume
 			</button>
 		{/if}
