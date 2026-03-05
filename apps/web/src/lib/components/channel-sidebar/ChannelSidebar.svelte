@@ -477,6 +477,9 @@
 		display: flex;
 		align-items: center;
 		gap: 5px;
+		touch-action: manipulation;
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 
 	.voice-avatar {
