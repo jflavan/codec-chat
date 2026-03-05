@@ -257,7 +257,6 @@ Required GitHub Actions secrets: `VOICE_VM_HOST`, `VOICE_VM_SSH_KEY`, `VOICE_SFU
 | `src/lib/components/channel-sidebar/VoiceChannel.svelte` | Voice channel row with participant list and join/leave |
 | `src/lib/components/voice/VoiceControls.svelte` | Mute/deafen controls shown while in a voice channel |
 | `src/lib/components/voice/UserActionSheet.svelte` | Responsive per-user action sheet (desktop popup / mobile bottom sheet) |
-| `src/lib/utils/long-press.ts` | Reusable `longpress` Svelte action for touch/pointer long-press detection |
 
 ### Join Flow
 
@@ -292,10 +291,9 @@ Required GitHub Actions secrets: `VOICE_VM_HOST`, `VOICE_VM_SSH_KEY`, `VOICE_SFU
 
 - Each remote audio stream is routed through a Web Audio API `GainNode` for independent volume control
 - Volume range: 0–100% per user
-- Right-click (desktop) or long-press (mobile) a voice member in the channel sidebar to open the `UserActionSheet` and adjust their volume
+- Tap/click or right-click a voice member in the channel sidebar to open the `UserActionSheet` and adjust their volume
 - Responsive presentation: positioned popup on desktop (`pointer: fine`), bottom sheet on mobile (`pointer: coarse`)
 - Mobile bottom sheet includes larger touch targets (24px slider thumb, 44px buttons), safe-area padding, and slide-up animation
-- `longpress` Svelte action (`lib/utils/long-press.ts`) detects 500ms hold with 10px movement cancellation threshold
 - Volumes persist in `localStorage` under key `codec-user-volumes`
 - Deafen overrides per-user volume (sets all gains to 0); undeafen restores saved volumes
 
