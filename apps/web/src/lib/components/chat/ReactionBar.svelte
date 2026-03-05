@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { Reaction, Member } from '$lib/types/index.js';
 
 	let {
@@ -62,15 +63,21 @@
 		hoveredEmoji = null;
 	}
 
+	onDestroy(() => {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		if (touchTimeout) clearTimeout(touchTimeout);
+	});
+
 	function hasReacted(reaction: Reaction): boolean {
 		return currentUserId !== null && reaction.userIds.includes(currentUserId);
 	}
 
+	const memberMap = $derived(new Map(members.map((m) => [m.userId, m.displayName])));
+
 	function getReactorNames(reaction: Reaction): { names: string[]; remaining: number } {
-		if (members.length === 0) {
+		if (memberMap.size === 0) {
 			return { names: [], remaining: 0 };
 		}
-		const memberMap = new Map(members.map((m) => [m.userId, m.displayName]));
 		const names = reaction.userIds
 			.map((id) => memberMap.get(id))
 			.filter((name): name is string => name !== undefined);
@@ -83,7 +90,7 @@
 </script>
 
 <div class="reaction-bar">
-	{#each reactions as reaction}
+	{#each reactions as reaction (reaction.emoji)}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="reaction-pill-wrapper"
@@ -98,6 +105,7 @@
 				class="reaction-pill"
 				class:reacted={hasReacted(reaction)}
 				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
+				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
 			>
 				<span class="reaction-emoji">{reaction.emoji}</span>
 				<span class="reaction-count">{reaction.count}</span>
@@ -105,7 +113,7 @@
 
 			{#if hoveredEmoji === reaction.emoji}
 				{@const info = getReactorNames(reaction)}
-				<div class="reaction-popover" role="tooltip">
+				<div class="reaction-popover" role="tooltip" id="popover-{reactions.indexOf(reaction)}">
 					<div class="popover-emoji">{reaction.emoji}</div>
 					{#if info.names.length > 0}
 						<ul class="popover-names">
@@ -208,7 +216,6 @@
 		max-width: 200px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 		z-index: 100;
-		pointer-events: auto;
 		animation: popover-fade-in 150ms ease;
 	}
 
