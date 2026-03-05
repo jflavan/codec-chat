@@ -29,6 +29,39 @@
 		hoveredEmoji = null;
 	}
 
+	let touchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+	let touchTriggered = $state(false);
+
+	function handleTouchStart(emoji: string) {
+		touchTriggered = false;
+		touchTimeout = setTimeout(() => {
+			touchTriggered = true;
+			hoveredEmoji = emoji;
+		}, 500);
+	}
+
+	function handleTouchEnd(e: TouchEvent) {
+		if (touchTimeout) {
+			clearTimeout(touchTimeout);
+			touchTimeout = null;
+		}
+		if (touchTriggered) {
+			e.preventDefault();
+			touchTriggered = false;
+		}
+	}
+
+	function handleTouchMove() {
+		if (touchTimeout) {
+			clearTimeout(touchTimeout);
+			touchTimeout = null;
+		}
+	}
+
+	function handleBackdropTap() {
+		hoveredEmoji = null;
+	}
+
 	function hasReacted(reaction: Reaction): boolean {
 		return currentUserId !== null && reaction.userIds.includes(currentUserId);
 	}
@@ -51,10 +84,15 @@
 
 <div class="reaction-bar">
 	{#each reactions as reaction}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="reaction-pill-wrapper"
 			onmouseenter={() => showPopover(reaction.emoji)}
 			onmouseleave={hidePopover}
+			ontouchstart={() => handleTouchStart(reaction.emoji)}
+			ontouchend={handleTouchEnd}
+			ontouchmove={handleTouchMove}
+			oncontextmenu={(e) => { if (touchTriggered) e.preventDefault(); }}
 		>
 			<button
 				class="reaction-pill"
@@ -87,6 +125,15 @@
 			{/if}
 		</div>
 	{/each}
+
+	{#if hoveredEmoji !== null}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="popover-backdrop"
+			onclick={handleBackdropTap}
+			ontouchstart={handleBackdropTap}
+		></div>
+	{/if}
 </div>
 
 <style>
@@ -114,6 +161,10 @@
 			background-color 150ms ease,
 			border-color 150ms ease;
 		line-height: 1.4;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
+		touch-action: manipulation;
 	}
 
 	.reaction-pill:hover {
@@ -196,5 +247,11 @@
 		font-size: 12px;
 		color: var(--text-muted);
 		text-align: center;
+	}
+
+	.popover-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 99;
 	}
 </style>
