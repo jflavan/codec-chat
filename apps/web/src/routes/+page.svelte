@@ -132,7 +132,9 @@
 
 <ImagePreview />
 <AlphaNotification />
-<IncomingCallOverlay />
+{#if app.incomingCall}
+	<IncomingCallOverlay />
+{/if}
 
 {#if !app.isSignedIn}
 	<LoginScreen />
