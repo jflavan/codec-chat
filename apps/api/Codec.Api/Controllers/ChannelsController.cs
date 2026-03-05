@@ -484,6 +484,45 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     }
 
     /// <summary>
+    /// Deletes all messages in a channel. Requires global admin.
+    /// Cascade-deletes associated reactions and link previews.
+    /// </summary>
+    [HttpDelete("{channelId:guid}/messages")]
+    public async Task<IActionResult> PurgeChannelMessages(Guid channelId)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null)
+        {
+            return NotFound(new { error = "Channel not found." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        if (!appUser.IsGlobalAdmin)
+        {
+            return Forbid();
+        }
+
+        await db.LinkPreviews
+            .Where(lp => lp.Message.ChannelId == channelId)
+            .ExecuteDeleteAsync();
+
+        await db.Reactions
+            .Where(r => r.Message.ChannelId == channelId)
+            .ExecuteDeleteAsync();
+
+        await db.Messages
+            .Where(m => m.ChannelId == channelId)
+            .ExecuteDeleteAsync();
+
+        await chatHub.Clients.Group(channelId.ToString()).SendAsync("ChannelPurged", new
+        {
+            ChannelId = channelId
+        });
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Edits a message body. Only the author of the message can edit it. Requires server membership.
     /// Sets the <c>EditedAt</c> timestamp to the current UTC time.
     /// </summary>
