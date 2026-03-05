@@ -79,6 +79,16 @@
 	}
 </script>
 
+{#snippet channelTypeIcon(type: string | undefined)}
+	{#if type === 'voice'}
+		<svg class="channel-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+			<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+		</svg>
+	{:else}
+		<span class="channel-hash">#</span>
+	{/if}
+{/snippet}
+
 <div class="server-settings">
 	<h1 class="settings-title">Server Settings</h1>
 
@@ -203,18 +213,20 @@
 				<div class="channel-item">
 					{#if channelEditId === channel.id}
 						<div class="inline-edit">
-							<span class="channel-hash">#</span>
-							<input
-								type="text"
-								class="input"
-								bind:value={channelEditName}
-								maxlength="100"
-								disabled={app.isUpdatingChannelName}
-								onkeydown={(e) => {
-									if (e.key === 'Enter') saveChannelName(channel.id);
-									if (e.key === 'Escape') cancelEditingChannel();
-								}}
-							/>
+							<div class="inline-edit-row">
+								{@render channelTypeIcon(channel.type)}
+								<input
+									type="text"
+									class="input"
+									bind:value={channelEditName}
+									maxlength="100"
+									disabled={app.isUpdatingChannelName}
+									onkeydown={(e) => {
+										if (e.key === 'Enter') saveChannelName(channel.id);
+										if (e.key === 'Escape') cancelEditingChannel();
+									}}
+								/>
+							</div>
 							<div class="inline-actions">
 								<button
 									type="button"
@@ -236,7 +248,7 @@
 						</div>
 					{:else}
 						<div class="channel-display">
-							<span class="channel-hash">#</span>
+							{@render channelTypeIcon(channel.type)}
 							<span class="channel-name">{channel.name}</span>
 							{#if app.canManageChannels}
 								<button
@@ -440,6 +452,16 @@
 		gap: 8px;
 	}
 
+	.inline-edit-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.inline-edit-row .input {
+		flex: 1;
+	}
+
 	.inline-actions {
 		display: flex;
 		gap: 8px;
@@ -524,6 +546,12 @@
 		color: var(--text-muted);
 		font-weight: 600;
 		flex-shrink: 0;
+	}
+
+	.channel-icon {
+		color: var(--text-muted);
+		flex-shrink: 0;
+		opacity: 0.7;
 	}
 
 	.channel-name {
