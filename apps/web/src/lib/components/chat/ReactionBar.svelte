@@ -261,4 +261,10 @@
 		inset: 0;
 		z-index: 99;
 	}
+
+	@media (hover: hover) {
+		.popover-backdrop {
+			pointer-events: none;
+		}
+	}
 </style>
