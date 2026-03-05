@@ -56,6 +56,7 @@ export class AppState {
 	servers = $state<MemberServer[]>([]);
 	channels = $state<Channel[]>([]);
 	messages = $state<Message[]>([]);
+	isPurgingChannel = $state(false);
 	members = $state<Member[]>([]);
 	friends = $state<Friend[]>([]);
 	incomingRequests = $state<FriendRequest[]>([]);
@@ -1078,6 +1079,23 @@ export class AppState {
 		}
 	}
 
+	/** Purge all messages from a channel. Global admin only. */
+	async purgeChannel(channelId: string): Promise<void> {
+		if (!this.idToken) return;
+		this.isPurgingChannel = true;
+		try {
+			await this.api.purgeChannel(this.idToken, channelId);
+			if (!this.hub.isConnected && channelId === this.selectedChannelId) {
+				this.messages = [];
+				this.hasMoreMessages = false;
+			}
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isPurgingChannel = false;
+		}
+	}
+
 	/** Delete a DM message owned by the current user. */
 	async deleteDmMessage(messageId: string): Promise<void> {
 		if (!this.idToken || !this.activeDmChannelId) return;
@@ -2090,6 +2108,12 @@ export class AppState {
 			onMessageDeleted: (event) => {
 				if (event.channelId === this.selectedChannelId) {
 					this.messages = this.messages.filter((m) => m.id !== event.messageId);
+				}
+			},
+			onChannelPurged: (event) => {
+				if (event.channelId === this.selectedChannelId) {
+					this.messages = [];
+					this.hasMoreMessages = false;
 				}
 			},
 			onDmMessageDeleted: (event) => {
