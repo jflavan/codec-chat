@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { Reaction, Member } from '$lib/types/index.js';
 
 	let {
@@ -13,43 +14,134 @@
 		members?: Member[];
 	} = $props();
 
+	let hoveredEmoji: string | null = $state(null);
+	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+
+	function showPopover(emoji: string) {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = setTimeout(() => {
+			hoveredEmoji = emoji;
+		}, 250);
+	}
+
+	function hidePopover() {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = null;
+		hoveredEmoji = null;
+	}
+
+	let touchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+	let touchTriggered = $state(false);
+
+	function handleTouchStart(emoji: string) {
+		touchTriggered = false;
+		touchTimeout = setTimeout(() => {
+			touchTriggered = true;
+			hoveredEmoji = emoji;
+		}, 500);
+	}
+
+	function handleTouchEnd(e: TouchEvent) {
+		if (touchTimeout) {
+			clearTimeout(touchTimeout);
+			touchTimeout = null;
+		}
+		if (touchTriggered) {
+			e.preventDefault();
+			touchTriggered = false;
+		}
+	}
+
+	function handleTouchMove() {
+		if (touchTimeout) {
+			clearTimeout(touchTimeout);
+			touchTimeout = null;
+		}
+	}
+
+	function handleBackdropTap() {
+		hoveredEmoji = null;
+	}
+
+	onDestroy(() => {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		if (touchTimeout) clearTimeout(touchTimeout);
+	});
+
 	function hasReacted(reaction: Reaction): boolean {
 		return currentUserId !== null && reaction.userIds.includes(currentUserId);
 	}
 
-	function reactionTitle(reaction: Reaction): string {
-		if (members.length === 0) {
-			return `${reaction.count} ${reaction.count === 1 ? 'reaction' : 'reactions'}`;
+	const memberMap = $derived(new Map(members.map((m) => [m.userId, m.displayName])));
+
+	function getReactorNames(reaction: Reaction): { names: string[]; remaining: number } {
+		if (memberMap.size === 0) {
+			return { names: [], remaining: 0 };
 		}
-		const memberMap = new Map(members.map((m) => [m.userId, m.displayName]));
 		const names = reaction.userIds
 			.map((id) => memberMap.get(id))
 			.filter((name): name is string => name !== undefined);
 		const MAX_NAMES = 10;
-		if (names.length === 0) {
-			return `${reaction.count} ${reaction.count === 1 ? 'reaction' : 'reactions'}`;
-		}
 		if (names.length <= MAX_NAMES) {
-			return names.join(', ');
+			return { names, remaining: 0 };
 		}
-		const shown = names.slice(0, MAX_NAMES);
-		const remaining = names.length - MAX_NAMES;
-		return `${shown.join(', ')}, and ${remaining} more`;
+		return { names: names.slice(0, MAX_NAMES), remaining: names.length - MAX_NAMES };
 	}
 </script>
 
 <div class="reaction-bar">
-	{#each reactions as reaction}
-		<button
-			class="reaction-pill"
-			class:reacted={hasReacted(reaction)}
-			onclick={() => onToggle(reaction.emoji)}
-			title={reactionTitle(reaction)}
+	{#each reactions as reaction (reaction.emoji)}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="reaction-pill-wrapper"
+			onmouseenter={() => showPopover(reaction.emoji)}
+			onmouseleave={hidePopover}
+			ontouchstart={() => handleTouchStart(reaction.emoji)}
+			ontouchend={handleTouchEnd}
+			ontouchmove={handleTouchMove}
+			oncontextmenu={(e) => { if (touchTriggered) e.preventDefault(); }}
 		>
-			<span class="reaction-emoji">{reaction.emoji}</span>
-			<span class="reaction-count">{reaction.count}</span>
-		</button>
+			<button
+				class="reaction-pill"
+				class:reacted={hasReacted(reaction)}
+				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
+				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
+			>
+				<span class="reaction-emoji">{reaction.emoji}</span>
+				<span class="reaction-count">{reaction.count}</span>
+			</button>
+
+			{#if hoveredEmoji === reaction.emoji}
+				{@const info = getReactorNames(reaction)}
+				<div class="reaction-popover" role="tooltip" id="popover-{reactions.indexOf(reaction)}">
+					<div class="popover-emoji">{reaction.emoji}</div>
+					{#if info.names.length > 0}
+						<ul class="popover-names">
+							{#each info.names as name}
+								<li>{name}</li>
+							{/each}
+							{#if info.remaining > 0}
+								<li class="popover-more">and {info.remaining} more</li>
+							{/if}
+						</ul>
+					{:else}
+						<div class="popover-fallback">
+							{reaction.count} {reaction.count === 1 ? 'reaction' : 'reactions'}
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</div>
 	{/each}
+
+	{#if hoveredEmoji !== null}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="popover-backdrop"
+			onclick={handleBackdropTap}
+			ontouchstart={handleBackdropTap}
+		></div>
+	{/if}
 </div>
 
 <style>
@@ -77,6 +169,10 @@
 			background-color 150ms ease,
 			border-color 150ms ease;
 		line-height: 1.4;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
+		touch-action: manipulation;
 	}
 
 	.reaction-pill:hover {
@@ -101,5 +197,68 @@
 
 	.reaction-pill.reacted .reaction-count {
 		color: var(--accent);
+	}
+
+	.reaction-pill-wrapper {
+		position: relative;
+	}
+
+	.reaction-popover {
+		position: absolute;
+		bottom: calc(100% + 8px);
+		left: 50%;
+		transform: translateX(-50%);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 8px 12px;
+		min-width: 120px;
+		max-width: 200px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+		z-index: 100;
+		animation: popover-fade-in 150ms ease;
+	}
+
+	@keyframes popover-fade-in {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) translateY(4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
+	}
+
+	.popover-emoji {
+		font-size: 20px;
+		text-align: center;
+		margin-bottom: 4px;
+	}
+
+	.popover-names {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		font-size: 12px;
+		color: var(--text-normal);
+		line-height: 1.6;
+	}
+
+	.popover-more {
+		color: var(--text-muted);
+		font-style: italic;
+	}
+
+	.popover-fallback {
+		font-size: 12px;
+		color: var(--text-muted);
+		text-align: center;
+	}
+
+	.popover-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 99;
 	}
 </style>
