@@ -52,8 +52,7 @@ src/
 │   │   ├── tokens.css      # CSS custom properties (CODEC CRT design tokens)
 │   │   └── global.css      # Base styles, resets, font imports
 │   ├── utils/
-│   │   ├── format.ts       # Date/time formatting helpers
-│   │   └── long-press.ts   # Svelte action for touch/pointer long-press detection
+│   │   └── format.ts       # Date/time formatting helpers
 │   ├── components/
 │   │   ├── server-sidebar/
 │   │   │   └── ServerSidebar.svelte      # Server icon rail (create/join-via-invite)

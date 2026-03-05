@@ -138,6 +138,13 @@
 												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 											}
 										}}
+										onkeydown={(e) => {
+											if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+												e.preventDefault();
+												const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+												contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
+											}
+										}}
 									>
 										{#if member.avatarUrl}
 											<img class="voice-avatar" src={member.avatarUrl} alt="" width="14" height="14" />
