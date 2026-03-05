@@ -73,6 +73,10 @@ export type MessageDeletedEvent = {
 	channelId: string;
 };
 
+export type ChannelPurgedEvent = {
+	channelId: string;
+};
+
 export type DmMessageDeletedEvent = {
 	messageId: string;
 	dmChannelId: string;
@@ -204,6 +208,7 @@ export type SignalRCallbacks = {
 	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
 	onServerDeleted?: (event: ServerDeletedEvent) => void;
 	onChannelDeleted?: (event: ChannelDeletedEvent) => void;
+	onChannelPurged?: (event: ChannelPurgedEvent) => void;
 	onUserJoinedVoice?: (event: UserJoinedVoiceEvent) => void;
 	onUserLeftVoice?: (event: UserLeftVoiceEvent) => void;
 	onVoiceStateUpdated?: (event: VoiceStateUpdatedEvent) => void;
@@ -313,6 +318,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onChannelDeleted) {
 			connection.on('ChannelDeleted', callbacks.onChannelDeleted);
+		}
+		if (callbacks.onChannelPurged) {
+			connection.on('ChannelPurged', callbacks.onChannelPurged);
 		}
 		if (callbacks.onUserJoinedVoice) {
 			connection.on('UserJoinedVoice', callbacks.onUserJoinedVoice);
