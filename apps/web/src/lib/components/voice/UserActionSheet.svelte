@@ -19,6 +19,12 @@
 
 	const isMobile = !window.matchMedia('(pointer: fine)').matches;
 
+	let sheetEl = $state<HTMLDivElement | null>(null);
+
+	$effect(() => {
+		if (sheetEl) sheetEl.focus();
+	});
+
 	let sliderValue = $state(Math.round((app.userVolumes.get(userId) ?? 1.0) * 100));
 
 	function handleVolumeChange(e: Event) {
@@ -45,8 +51,8 @@
 	// Desktop positioning — clamp to viewport
 	const menuWidth = 220;
 	const menuHeight = 140;
-	const clampedX = $derived(Math.min(x ?? 0, window.innerWidth - menuWidth - 8));
-	const clampedY = $derived(Math.min(y ?? 0, window.innerHeight - menuHeight - 8));
+	const clampedX = Math.min(x ?? 0, window.innerWidth - menuWidth - 8);
+	const clampedY = Math.min(y ?? 0, window.innerHeight - menuHeight - 8);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -62,6 +68,9 @@
 		class:action-sheet--desktop={!isMobile}
 		style={!isMobile ? `left: ${clampedX}px; top: ${clampedY}px;` : undefined}
 		role="menu"
+		aria-label="{displayName} volume controls"
+		tabindex="-1"
+		bind:this={sheetEl}
 	>
 		<div class="action-sheet__header">{displayName}</div>
 		<div class="action-sheet__section">
