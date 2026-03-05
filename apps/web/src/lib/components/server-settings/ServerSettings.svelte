@@ -9,6 +9,7 @@
 	let channelEditName = $state('');
 	let confirmDeleteServer = $state(false);
 	let confirmDeleteChannelId = $state<string | null>(null);
+	let confirmPurgeChannelId = $state<string | null>(null);
 	let iconFileInput = $state<HTMLInputElement>();
 
 	function startEditingServerName() {
@@ -54,6 +55,11 @@
 	async function handleDeleteChannel(channelId: string) {
 		await app.deleteChannel(channelId);
 		confirmDeleteChannelId = null;
+	}
+
+	async function handlePurgeChannel(channelId: string) {
+		await app.purgeChannel(channelId);
+		confirmPurgeChannelId = null;
 	}
 
 	function triggerIconUpload() {
@@ -240,6 +246,38 @@
 								>
 									Edit
 								</button>
+							{/if}
+							{#if app.isGlobalAdmin && channel.type !== 'voice'}
+								{#if confirmPurgeChannelId === channel.id}
+									<span class="danger-warning-inline">Delete all messages?</span>
+									<button
+										type="button"
+										class="btn-danger-sm"
+										disabled={app.isPurgingChannel}
+										onclick={() => handlePurgeChannel(channel.id)}
+									>
+										{app.isPurgingChannel ? 'Purging...' : 'Confirm'}
+									</button>
+									<button
+										type="button"
+										class="btn-secondary-sm"
+										disabled={app.isPurgingChannel}
+										onclick={() => (confirmPurgeChannelId = null)}
+									>
+										Cancel
+									</button>
+								{:else}
+									<button
+										type="button"
+										class="btn-danger-sm"
+										onclick={() => {
+											confirmPurgeChannelId = channel.id;
+											confirmDeleteChannelId = null;
+										}}
+									>
+										Purge
+									</button>
+								{/if}
 							{/if}
 							{#if app.canDeleteChannel}
 								{#if confirmDeleteChannelId === channel.id}
@@ -571,6 +609,12 @@
 
 	.btn-secondary-sm:hover:not(:disabled) {
 		color: var(--text-header);
+	}
+
+	.danger-warning-inline {
+		color: var(--danger);
+		font-size: 12px;
+		white-space: nowrap;
 	}
 
 	@media (max-width: 899px) {
