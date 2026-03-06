@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Codec.Api.Models;
 
 /// <summary>
@@ -5,4 +7,4 @@ namespace Codec.Api.Models;
 /// </summary>
 /// <param name="Name">Display name for the channel (required, max 100 characters).</param>
 /// <param name="Type">Channel type: "text" (default) or "voice".</param>
-public record CreateChannelRequest(string Name, string? Type = null);
+public record CreateChannelRequest([Required, StringLength(100, MinimumLength = 1)] string Name, string? Type = null);
