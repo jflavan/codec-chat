@@ -2344,16 +2344,18 @@ export class AppState {
 					this.incomingCall = null;
 				}
 			},
-			onCustomEmojiAdded: (emoji) => {
+			onCustomEmojiAdded: (event) => {
 				if (this.selectedServerId) {
-					this.customEmojis = [...this.customEmojis, emoji];
+					this.customEmojis = [...this.customEmojis, event.emoji];
 				}
 			},
-			onCustomEmojiUpdated: (emoji) => {
-				this.customEmojis = this.customEmojis.map(e => e.id === emoji.id ? { ...e, ...emoji } : e);
+			onCustomEmojiUpdated: (event) => {
+				this.customEmojis = this.customEmojis.map(e =>
+					e.id === event.emojiId ? { ...e, name: event.name } : e
+				);
 			},
-			onCustomEmojiDeleted: (data) => {
-				this.customEmojis = this.customEmojis.filter(e => e.id !== data.id);
+			onCustomEmojiDeleted: (event) => {
+				this.customEmojis = this.customEmojis.filter(e => e.id !== event.emojiId);
 			},
 		});
 

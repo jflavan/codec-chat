@@ -52,19 +52,28 @@ export type LinkPreviewsReadyEvent = {
 	linkPreviews: LinkPreview[];
 };
 
-export type CustomEmojiEvent = {
-	id: string;
+export type CustomEmojiAddedEvent = {
+	serverId: string;
+	emoji: {
+		id: string;
+		name: string;
+		imageUrl: string;
+		contentType: string;
+		isAnimated: boolean;
+		createdAt: string;
+		uploadedByUserId: string;
+	};
+};
+
+export type CustomEmojiUpdatedEvent = {
+	serverId: string;
+	emojiId: string;
 	name: string;
-	imageUrl: string;
-	contentType: string;
-	isAnimated: boolean;
-	createdAt: string;
-	uploadedByUserId: string;
 };
 
 export type CustomEmojiDeletedEvent = {
-	id: string;
 	serverId: string;
+	emojiId: string;
 };
 
 export type MentionReceivedEvent = {
@@ -233,9 +242,9 @@ export type SignalRCallbacks = {
 	onCallDeclined?: (event: CallDeclinedEvent) => void;
 	onCallEnded?: (event: CallEndedEvent) => void;
 	onCallMissed?: (event: CallMissedEvent) => void;
-	onCustomEmojiAdded?: (emoji: CustomEmojiEvent) => void;
-	onCustomEmojiUpdated?: (emoji: CustomEmojiEvent) => void;
-	onCustomEmojiDeleted?: (data: CustomEmojiDeletedEvent) => void;
+	onCustomEmojiAdded?: (event: CustomEmojiAddedEvent) => void;
+	onCustomEmojiUpdated?: (event: CustomEmojiUpdatedEvent) => void;
+	onCustomEmojiDeleted?: (event: CustomEmojiDeletedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
