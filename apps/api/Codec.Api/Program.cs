@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -247,6 +248,32 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseResponseCompression();
+
+app.UseExceptionHandler(appBuilder =>
+{
+    appBuilder.Run(async context =>
+    {
+        var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+        context.Response.ContentType = "application/problem+json";
+
+        var (status, title, detail) = exception switch
+        {
+            Codec.Api.Services.Exceptions.ForbiddenException fe => (403, "Forbidden", fe.Message),
+            Codec.Api.Services.Exceptions.NotFoundException ne => (404, "Not Found", ne.Message),
+            _ => (500, "Internal Server Error", "An unexpected error occurred.")
+        };
+
+        context.Response.StatusCode = status;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = $"https://httpstatuses.com/{status}",
+            title,
+            status,
+            detail
+        });
+    });
+});
+
 app.UseCors("default");
 
 // Trust forwarded headers from Azure Container Apps reverse proxy.
