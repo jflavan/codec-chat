@@ -60,7 +60,7 @@
 
 	let showPicker = $state(false);
 	let showFullPicker = $state(false);
-	const quickEmojis = $derived(getFrequentEmojis(8));
+	const quickEmojis = getFrequentEmojis(8);
 
 	function handleToggleReaction(emoji: string) {
 		recordEmojiUse(emoji);

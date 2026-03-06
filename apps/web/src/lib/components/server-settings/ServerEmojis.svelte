@@ -23,10 +23,13 @@
 		nameValid && selectedFile !== null && !app.isUploadingEmoji && app.customEmojis.length < MAX_EMOJIS
 	);
 
+	const renameValid = $derived(/^[a-zA-Z0-9_]{2,32}$/.test(renameValue));
+
 	function handleFileSelect(e: Event) {
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
+		if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
 		selectedFile = file;
 		filePreviewUrl = URL.createObjectURL(file);
 	}
@@ -48,7 +51,7 @@
 	}
 
 	async function saveRename() {
-		if (!renamingId || !renameValue.trim()) return;
+		if (!renamingId || !renameValid) return;
 		await app.renameCustomEmoji(renamingId, renameValue.trim());
 		renamingId = '';
 		renameValue = '';
@@ -139,7 +142,7 @@
 							maxlength="32"
 						/>
 						<div class="inline-actions">
-							<button type="button" class="btn-primary" onclick={saveRename}>Save</button>
+							<button type="button" class="btn-primary" disabled={!renameValid} onclick={saveRename}>Save</button>
 							<button type="button" class="btn-secondary" onclick={cancelRename}>Cancel</button>
 						</div>
 					{:else}
@@ -234,6 +237,7 @@
 
 	.input {
 		width: 100%;
+		box-sizing: border-box;
 		padding: 10px 12px;
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
