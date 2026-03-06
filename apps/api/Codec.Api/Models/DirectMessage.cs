@@ -19,4 +19,5 @@ public class DirectMessage
     public DmChannel? DmChannel { get; set; }
     public User? AuthorUser { get; set; }
     public List<LinkPreview> LinkPreviews { get; set; } = new();
+    public List<Reaction> Reactions { get; set; } = new();
 }
