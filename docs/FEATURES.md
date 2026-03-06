@@ -44,6 +44,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ **Channel deletion** — delete channels from Server Settings (Owner/Admin/Global Admin; cascade-deletes all messages, reactions, and link previews; real-time removal via SignalR)
 - ✅ **Server deletion** — delete entire server (Owner or Global Admin; cascade-deletes all channels, messages, members, invites; real-time removal via SignalR)
 - ✅ **Server icons** — custom server icon upload (JPG, JPEG, PNG, WebP, GIF; 10 MB max); content-hash filenames; real-time sync via `ServerIconChanged` SignalR event; delete icon to revert to default
+- ✅ **Custom emojis** — upload, rename, and delete custom emojis per server (PNG, JPEG, WebP, GIF; 256 KB max; 50 per server); name validation (2–32 alphanumeric/underscore chars); content-addressed storage; real-time sync via `CustomEmojiAdded`, `CustomEmojiUpdated`, `CustomEmojiDeleted` SignalR events; Owner/Admin only for management; all members can list
 
 ### Channel & Messaging
 - ✅ Channel list per server
@@ -92,6 +93,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Message deletion in DMs — same delete-own-message experience as server channels
 - ✅ Message editing in DMs — same inline edit experience as server channels
 - ✅ Text formatting in DMs — same bold/italic formatting as server channels
+- ✅ Emoji reactions in DMs — same reaction toggle experience as server channels (Reaction entity supports nullable MessageId/DirectMessageId with mutual exclusivity constraint)
 
 ### Link Previews ([detailed spec](LINK_PREVIEWS.md))
 - ✅ Automatic URL detection in message bodies (server channels and DMs)
@@ -299,7 +301,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Customization
 - Web client themes
-- Custom emojis
 - Status messages
 
 ### Enterprise Features

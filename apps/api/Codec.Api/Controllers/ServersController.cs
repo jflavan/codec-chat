@@ -793,7 +793,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             return Conflict(new { error = $"An emoji named '{name}' already exists." });
 
         var imageUrl = await customEmojiService.SaveEmojiAsync(serverId, name, file);
-        var isAnimated = file.ContentType is "image/gif" or "image/apng";
+        var isAnimated = file.ContentType is "image/gif";
 
         var emoji = new CustomEmoji
         {

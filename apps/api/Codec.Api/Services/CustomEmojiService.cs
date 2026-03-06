@@ -9,12 +9,12 @@ public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiS
 
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/jpeg", "image/png", "image/webp", "image/gif", "image/apng"
+        "image/jpeg", "image/png", "image/webp", "image/gif"
     };
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".webp", ".gif", ".apng"
+        ".jpg", ".jpeg", ".png", ".webp", ".gif"
     };
 
     public string? Validate(IFormFile file)
@@ -22,7 +22,7 @@ public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiS
         if (file.Length == 0) return "File is empty.";
         if (file.Length > MaxFileSizeBytes) return "File size exceeds 256 KB limit.";
         if (!AllowedContentTypes.Contains(file.ContentType))
-            return $"Unsupported file type '{file.ContentType}'. Allowed: PNG, JPEG, WebP, GIF, APNG.";
+            return $"Unsupported file type '{file.ContentType}'. Allowed: PNG, JPEG, WebP, GIF.";
         var ext = Path.GetExtension(file.FileName);
         if (string.IsNullOrEmpty(ext) || !AllowedExtensions.Contains(ext))
             return $"Unsupported file extension '{ext}'.";
@@ -41,7 +41,13 @@ public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiS
 
     public async Task DeleteEmojiAsync(string imageUrl)
     {
-        await fileStorage.DeleteAsync(ContainerName, imageUrl);
+        var containerSegment = $"/{ContainerName}/";
+        var idx = imageUrl.IndexOf(containerSegment, StringComparison.Ordinal);
+        if (idx >= 0)
+        {
+            var blobPath = imageUrl[(idx + containerSegment.Length)..];
+            await fileStorage.DeleteAsync(ContainerName, blobPath);
+        }
     }
 
     private static async Task<string> ComputeHashAsync(IFormFile file)
