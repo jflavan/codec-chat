@@ -47,7 +47,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         if (!areFriends)
         {
-            return StatusCode(403, new { error = "You must be friends to start a DM conversation." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You must be friends to start a DM conversation.");
         }
 
         // Check for an existing DM channel between the two users.
@@ -634,17 +634,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     public async Task<IActionResult> CloseChannel(Guid channelId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
         var membership = await db.DmChannelMembers
-            .FirstOrDefaultAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
-
-        if (membership is null)
-        {
-            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
-            if (channelExists)
-                throw new Codec.Api.Services.Exceptions.ForbiddenException("You are not a participant in this conversation.");
-            throw new Codec.Api.Services.Exceptions.NotFoundException("DM channel not found.");
-        }
+            .FirstAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
 
         membership.IsOpen = false;
         await db.SaveChangesAsync();

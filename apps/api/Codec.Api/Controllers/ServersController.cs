@@ -154,11 +154,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = await db.Servers.FindAsync(serverId);
-        if (server is null)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
+        var server = (await db.Servers.FindAsync(serverId))!;
 
         var oldName = server.Name;
         server.Name = request.Name.Trim();
@@ -562,12 +558,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             .Include(s => s.Channels)
             .Include(s => s.Members)
             .Include(s => s.Invites)
-            .FirstOrDefaultAsync(s => s.Id == serverId);
-
-        if (server is null)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
+            .FirstAsync(s => s.Id == serverId);
 
         // Delete all messages and their associated data in server channels.
         var channelIds = server.Channels.Select(c => c.Id).ToList();
@@ -700,11 +691,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = await db.Servers.FindAsync(serverId);
-        if (server is null)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
+        var server = (await db.Servers.FindAsync(serverId))!;
 
         // Remove the previous icon file if one exists.
         if (!string.IsNullOrEmpty(server.IconUrl))
@@ -735,11 +722,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = await db.Servers.FindAsync(serverId);
-        if (server is null)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
+        var server = (await db.Servers.FindAsync(serverId))!;
 
         if (!string.IsNullOrEmpty(server.IconUrl))
         {
