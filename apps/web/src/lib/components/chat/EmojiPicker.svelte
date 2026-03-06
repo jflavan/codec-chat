@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { emojiCategories } from '$lib/data/emojis';
-	import { getFrequentEmojis, recordEmojiUse } from '$lib/utils/emoji-frequency';
+	import { getFrequentEmojis } from '$lib/utils/emoji-frequency';
 	import type { CustomEmoji } from '$lib/types/models';
 
 	let {
@@ -19,7 +19,7 @@
 	let scrollContainer = $state<HTMLDivElement>();
 	let searchInput = $state<HTMLInputElement>();
 
-	const frequentEmojis = $derived(getFrequentEmojis(16));
+	const frequentEmojis = getFrequentEmojis(16);
 
 	type DisplayCategory = {
 		id: string;
@@ -80,7 +80,6 @@
 	});
 
 	function handleSelect(emoji: string) {
-		recordEmojiUse(emoji);
 		onSelect(emoji);
 		if (mode === 'reaction') onClose();
 	}

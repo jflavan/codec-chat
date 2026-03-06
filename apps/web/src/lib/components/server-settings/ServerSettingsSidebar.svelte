@@ -3,9 +3,9 @@
 
 	const app = getAppState();
 
-	// Only show Emojis tab if user is admin or owner
+	// Only show Emojis tab if user is admin, owner, or global admin
 	const isAdminOrOwner = $derived(
-		app.currentServerRole === 'Admin' || app.currentServerRole === 'Owner'
+		app.isGlobalAdmin || app.currentServerRole === 'Admin' || app.currentServerRole === 'Owner'
 	);
 
 	const categories = $derived.by(() => {

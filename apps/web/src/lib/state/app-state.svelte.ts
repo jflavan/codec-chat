@@ -457,6 +457,7 @@ export class AppState {
 			if (this.selectedServerId) {
 				await this.loadChannels(this.selectedServerId);
 				await this.loadMembers(this.selectedServerId);
+				await this.loadCustomEmojis(this.selectedServerId);
 			}
 		} catch (e) {
 			this.setError(e);
