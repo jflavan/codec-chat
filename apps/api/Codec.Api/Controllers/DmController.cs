@@ -208,16 +208,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         var appUser = await userService.GetOrCreateUserAsync(User);
 
-        var isMember = await db.DmChannelMembers.AsNoTracking()
-            .AnyAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
-
-        if (!isMember)
-        {
-            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
-            return channelExists
-                ? StatusCode(403, new { error = "You are not a participant in this conversation." })
-                : NotFound(new { error = "DM channel not found." });
-        }
+        await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
         var query = db.DirectMessages
             .AsNoTracking()
@@ -361,7 +352,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         var myMembership = members.FirstOrDefault(m => m.UserId == appUser.Id);
         if (myMembership is null)
         {
-            return StatusCode(403, new { error = "You are not a participant in this conversation." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You are not a participant in this conversation.");
         }
 
         var authorName = userService.GetEffectiveDisplayName(appUser);
@@ -546,16 +537,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         var appUser = await userService.GetOrCreateUserAsync(User);
 
-        var isMember = await db.DmChannelMembers.AsNoTracking()
-            .AnyAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
-
-        if (!isMember)
-        {
-            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
-            return channelExists
-                ? StatusCode(403, new { error = "You are not a participant in this conversation." })
-                : NotFound(new { error = "DM channel not found." });
-        }
+        await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
         var message = await db.DirectMessages.FirstOrDefaultAsync(m => m.Id == messageId && m.DmChannelId == channelId);
         if (message is null)
@@ -565,7 +547,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         if (message.AuthorUserId != appUser.Id)
         {
-            return StatusCode(403, new { error = "You can only edit your own messages." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You can only edit your own messages.");
         }
 
         message.Body = request.Body.Trim();
@@ -606,16 +588,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
 
-        var isMember = await db.DmChannelMembers.AsNoTracking()
-            .AnyAsync(m => m.DmChannelId == channelId && m.UserId == appUser.Id);
-
-        if (!isMember)
-        {
-            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
-            return channelExists
-                ? StatusCode(403, new { error = "You are not a participant in this conversation." })
-                : NotFound(new { error = "DM channel not found." });
-        }
+        await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
         var message = await db.DirectMessages.FirstOrDefaultAsync(m => m.Id == messageId && m.DmChannelId == channelId);
         if (message is null)
@@ -625,7 +598,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         if (message.AuthorUserId != appUser.Id)
         {
-            return StatusCode(403, new { error = "You can only delete your own messages." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You can only delete your own messages.");
         }
 
         var otherUserId = await db.DmChannelMembers
@@ -668,9 +641,9 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         if (membership is null)
         {
             var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == channelId);
-            return channelExists
-                ? StatusCode(403, new { error = "You are not a participant in this conversation." })
-                : NotFound(new { error = "DM channel not found." });
+            if (channelExists)
+                throw new Codec.Api.Services.Exceptions.ForbiddenException("You are not a participant in this conversation.");
+            throw new Codec.Api.Services.Exceptions.NotFoundException("DM channel not found.");
         }
 
         membership.IsOpen = false;
