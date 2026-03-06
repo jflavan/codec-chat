@@ -266,7 +266,7 @@ export class AppState {
 	private audioContext: AudioContext | null = null;
 	private audioNodes = new Map<
 		string,
-		{ element: HTMLAudioElement; source: MediaElementAudioSourceNode; gain: GainNode }
+		{ element: HTMLAudioElement; source: MediaStreamAudioSourceNode; gain: GainNode }
 	>();
 	/** participantId -> userId lookup for volume. Built during attach. */
 	private audioParticipantUserMap = new Map<string, string>();
@@ -1589,14 +1589,17 @@ export class AppState {
 			this.audioContext.resume().catch(() => {});
 		}
 
-		// Use an <audio> element so Chrome desktop activates the WebRTC audio
-		// decoding pipeline. createMediaStreamSource alone produces silence on
-		// desktop Chrome because the track never gets "consumed" by an element.
+		// Chrome desktop requires the track to be consumed by an <audio> element
+		// to activate the WebRTC decoding pipeline. We mute the element so it
+		// doesn't bypass the Web Audio API gain chain (which controls volume &
+		// deafen), then use createMediaStreamSource for gain-controlled output.
+		const stream = new MediaStream([track]);
 		const el = new Audio();
-		el.srcObject = new MediaStream([track]);
+		el.srcObject = stream;
+		el.muted = true;
 		el.play().catch(() => {});
 
-		const source = this.audioContext.createMediaElementSource(el);
+		const source = this.audioContext.createMediaStreamSource(stream);
 		const gain = this.audioContext.createGain();
 		const volume = this.isDeafened ? 0 : (this.userVolumes.get(userId) ?? 1.0);
 		gain.gain.value = volume;
