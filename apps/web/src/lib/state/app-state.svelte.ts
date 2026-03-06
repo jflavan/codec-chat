@@ -123,6 +123,7 @@ export class AppState {
 	settingsOpen = $state(false);
 	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
 	serverSettingsOpen = $state(false);
+	serverSettingsCategory = $state<'general' | 'emojis'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
@@ -322,6 +323,7 @@ export class AppState {
 
 	openServerSettings(): void {
 		this.serverSettingsOpen = true;
+		this.serverSettingsCategory = 'general';
 	}
 
 	closeServerSettings(): void {
