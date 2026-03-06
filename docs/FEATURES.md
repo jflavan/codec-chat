@@ -43,6 +43,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ **Channel name editing** — rename channels from Server Settings (Owner/Admin only; real-time sync via SignalR)
 - ✅ **Channel deletion** — delete channels from Server Settings (Owner/Admin/Global Admin; cascade-deletes all messages, reactions, and link previews; real-time removal via SignalR)
 - ✅ **Server deletion** — delete entire server (Owner or Global Admin; cascade-deletes all channels, messages, members, invites; real-time removal via SignalR)
+- ✅ **Server icons** — custom server icon upload (JPG, JPEG, PNG, WebP, GIF; 10 MB max); content-hash filenames; real-time sync via `ServerIconChanged` SignalR event; delete icon to revert to default
 
 ### Channel & Messaging
 - ✅ Channel list per server
@@ -171,6 +172,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Responsive breakpoints (mobile, tablet, desktop)
 - ✅ Accessibility: focus-visible outlines, prefers-reduced-motion, semantic HTML, ARIA labels
 - ✅ Design specification documented in `docs/DESIGN.md`
+- ✅ **Client-side form validation** — character counters on server/channel name inputs, disabled submit states, inline error messages from API responses
 
 ### Connection Status
 - ✅ SignalR reconnection lifecycle tracking (`onReconnecting`, `onReconnected`, `onClose` callbacks)
@@ -255,16 +257,9 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Response compression (Brotli + Gzip, `CompressionLevel.Fastest`) for `application/json` payloads
 - ✅ Optimized user profile writes — skips `SaveChangesAsync` when Google profile fields are unchanged
 - ✅ Cached mention parsing — regex results cached per message batch to eliminate redundant execution
-
-## 🚧 In Progress
-
-### Authorization
-- Authorization policies for endpoints
-
-### Data Validation
-- Enhanced input validation
-- Error response standardization
-- Client-side form validation
+- ✅ **Authorization helpers** — centralized membership and role checks in `UserService` (`EnsureMemberAsync`, `EnsureAdminAsync`, `EnsureOwnerAsync`, `EnsureDmParticipantAsync`); global admin bypass; custom exceptions with global ProblemDetails handler
+- ✅ **DataAnnotations validation** — request DTOs annotated with `[Required]`, `[StringLength]`, etc.; automatic model validation returns RFC 7807 ProblemDetails
+- ✅ **Global exception handler** — `ForbiddenException` → 403, `NotFoundException` → 404, unhandled → 500; all errors return ProblemDetails JSON
 
 ## 📋 Planned (Near-term)
 
@@ -276,7 +271,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Server Management
 - Server settings/configuration
-- Server icons/avatars
 - Channel categories/organization
 
 ### Link Previews

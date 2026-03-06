@@ -90,7 +90,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
 
         if (friendship.RequesterId != appUser.Id && friendship.RecipientId != appUser.Id)
         {
-            return StatusCode(403, new { error = "You are not a participant in this friendship." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You are not a participant in this friendship.");
         }
 
         var otherUserId = friendship.RequesterId == appUser.Id
@@ -262,7 +262,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
 
         if (friendship.RecipientId != appUser.Id)
         {
-            return StatusCode(403, new { error = "Only the recipient can respond to this request." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("Only the recipient can respond to this request.");
         }
 
         var isAccept = string.Equals(request.Action, "accept", StringComparison.OrdinalIgnoreCase);
@@ -323,7 +323,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
 
         if (friendship.RequesterId != appUser.Id)
         {
-            return StatusCode(403, new { error = "Only the requester can cancel this request." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("Only the requester can cancel this request.");
         }
 
         var recipientId = friendship.RecipientId;

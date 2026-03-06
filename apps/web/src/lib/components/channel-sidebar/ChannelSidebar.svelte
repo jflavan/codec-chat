@@ -186,6 +186,11 @@
 					bind:value={app.newChannelName}
 					disabled={app.isCreatingChannel}
 				/>
+				<div class="form-meta">
+					<span class="char-counter" class:warn={app.newChannelName.length >= 100}>
+						{app.newChannelName.length}/100
+					</span>
+				</div>
 				<div class="inline-form-actions">
 					<button type="submit" class="btn-primary" disabled={app.isCreatingChannel || !app.newChannelName.trim()}>
 						{app.isCreatingChannel ? '…' : 'Create'}
@@ -569,4 +574,5 @@
 		border-color: var(--accent);
 		color: var(--text-header);
 	}
+
 </style>

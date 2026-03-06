@@ -49,14 +49,9 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     [HttpPut("me/nickname")]
     public async Task<IActionResult> SetNickname([FromBody] SetNicknameRequest request)
     {
-        var trimmed = request.Nickname?.Trim();
+        var trimmed = request.Nickname?.Trim() ?? "";
 
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
-        }
-
-        if (trimmed.Length > 32)
+        if (string.IsNullOrEmpty(trimmed))
         {
             return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
         }

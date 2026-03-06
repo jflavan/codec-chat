@@ -78,13 +78,10 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+        await userService.EnsureMemberAsync(serverId, appUser.Id);
 
-        if (membership is null)
-        {
-            return Forbid();
-        }
+        var membership = await db.ServerMembers
+            .FirstAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
         // Remove the previous server avatar file if one exists.
         if (!string.IsNullOrEmpty(membership.CustomAvatarPath))
@@ -106,13 +103,10 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> DeleteServerAvatar(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var membership = await db.ServerMembers
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+        await userService.EnsureMemberAsync(serverId, appUser.Id);
 
-        if (membership is null)
-        {
-            return Forbid();
-        }
+        var membership = await db.ServerMembers
+            .FirstAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
 
         if (string.IsNullOrEmpty(membership.CustomAvatarPath))
         {
