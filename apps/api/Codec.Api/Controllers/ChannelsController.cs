@@ -38,11 +38,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var query = db.Messages
             .AsNoTracking()
@@ -233,11 +229,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var authorName = userService.GetEffectiveDisplayName(appUser);
         if (string.IsNullOrWhiteSpace(authorName))
@@ -454,11 +446,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (message is null)
@@ -468,7 +456,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         if (message.AuthorUserId != appUser.Id && !appUser.IsGlobalAdmin)
         {
-            return StatusCode(403, new { error = "You can only delete your own messages." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You can only delete your own messages.");
         }
 
         db.Messages.Remove(message);
@@ -499,7 +487,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         var appUser = await userService.GetOrCreateUserAsync(User);
         if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
+            throw new Codec.Api.Services.Exceptions.ForbiddenException();
         }
 
         await db.LinkPreviews
@@ -541,11 +529,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (message is null)
@@ -555,7 +539,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         if (message.AuthorUserId != appUser.Id)
         {
-            return StatusCode(403, new { error = "You can only edit your own messages." });
+            throw new Codec.Api.Services.Exceptions.ForbiddenException("You can only edit your own messages.");
         }
 
         message.Body = request.Body.Trim();
@@ -594,11 +578,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var messageExists = await db.Messages.AnyAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (!messageExists)
