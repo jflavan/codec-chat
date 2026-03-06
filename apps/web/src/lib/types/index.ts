@@ -4,6 +4,7 @@ export type {
 	Channel,
 	VoiceChannelMember,
 	LinkPreview,
+	CustomEmoji,
 	Mention,
 	ReplyContext,
 	Message,

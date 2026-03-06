@@ -45,6 +45,18 @@ export type LinkPreview = {
 	canonicalUrl: string | null;
 };
 
+/** Server custom emoji uploaded by a member. */
+export type CustomEmoji = {
+	id: string;
+	serverId: string;
+	name: string;
+	imageUrl: string;
+	contentType: string;
+	isAnimated: boolean;
+	createdAt: string;
+	uploadedByUserId: string;
+};
+
 /** Resolved user mention in a message. */
 export type Mention = {
 	userId: string;
