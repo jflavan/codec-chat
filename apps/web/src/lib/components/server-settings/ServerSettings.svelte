@@ -159,6 +159,11 @@
 							if (e.key === 'Escape') cancelEditingServerName();
 						}}
 					/>
+					<div class="form-meta">
+						<span class="char-counter" class:warn={serverNameEdit.length >= 100}>
+							{serverNameEdit.length}/100
+						</span>
+					</div>
 					<div class="inline-actions">
 						<button
 							type="button"
@@ -226,6 +231,11 @@
 										if (e.key === 'Escape') cancelEditingChannel();
 									}}
 								/>
+							</div>
+							<div class="form-meta">
+								<span class="char-counter" class:warn={channelEditName.length >= 100}>
+									{channelEditName.length}/100
+								</span>
 							</div>
 							<div class="inline-actions">
 								<button
@@ -643,6 +653,19 @@
 		color: var(--danger);
 		font-size: 12px;
 		white-space: nowrap;
+	}
+
+	.form-meta {
+		display: flex;
+		justify-content: flex-end;
+		padding: 2px 0;
+	}
+	.char-counter {
+		font-size: 11px;
+		color: var(--text-muted);
+	}
+	.char-counter.warn {
+		color: var(--danger, #e74c3c);
 	}
 
 	@media (max-width: 899px) {
