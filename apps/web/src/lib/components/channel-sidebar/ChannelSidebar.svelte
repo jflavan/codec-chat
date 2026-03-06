@@ -575,16 +575,4 @@
 		color: var(--text-header);
 	}
 
-	.form-meta {
-		display: flex;
-		justify-content: flex-end;
-		padding: 2px 0;
-	}
-	.char-counter {
-		font-size: 11px;
-		color: var(--text-muted);
-	}
-	.char-counter.warn {
-		color: var(--danger, #e74c3c);
-	}
 </style>

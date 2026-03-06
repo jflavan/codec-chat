@@ -258,8 +258,12 @@ app.UseExceptionHandler(appBuilder =>
 
         var (status, title, detail) = exception switch
         {
-            Codec.Api.Services.Exceptions.ForbiddenException fe => (403, "Forbidden", fe.Message),
-            Codec.Api.Services.Exceptions.NotFoundException ne => (404, "Not Found", ne.Message),
+            Codec.Api.Services.Exceptions.CodecException ce => (ce.StatusCode, ce.StatusCode switch
+            {
+                403 => "Forbidden",
+                404 => "Not Found",
+                _ => "Error"
+            }, ce.Message),
             _ => (500, "Internal Server Error", "An unexpected error occurred.")
         };
 
