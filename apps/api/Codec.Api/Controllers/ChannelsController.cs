@@ -85,11 +85,11 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         {
             var reactions = await db.Reactions
                 .AsNoTracking()
-                .Where(reaction => messageIds.Contains(reaction.MessageId))
+                .Where(reaction => reaction.MessageId != null && messageIds.Contains(reaction.MessageId.Value))
                 .ToListAsync();
 
             reactionLookup = reactions
-                .GroupBy(reaction => reaction.MessageId)
+                .GroupBy(reaction => reaction.MessageId!.Value)
                 .ToDictionary(
                     group => group.Key,
                     group => (IReadOnlyList<ReactionSummary>)group
@@ -491,11 +491,11 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         await db.LinkPreviews
-            .Where(lp => lp.Message.ChannelId == channelId)
+            .Where(lp => lp.Message!.ChannelId == channelId)
             .ExecuteDeleteAsync();
 
         await db.Reactions
-            .Where(r => r.Message.ChannelId == channelId)
+            .Where(r => r.Message!.ChannelId == channelId)
             .ExecuteDeleteAsync();
 
         await db.Messages
