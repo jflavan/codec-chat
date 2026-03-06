@@ -171,6 +171,11 @@
 								bind:value={app.newServerName}
 								disabled={app.isCreatingServer}
 							/>
+							<div class="form-meta">
+								<span class="char-counter" class:warn={app.newServerName.length >= 100}>
+									{app.newServerName.length}/100
+								</span>
+							</div>
 							<div class="inline-form-actions">
 								<button type="submit" class="btn-primary" disabled={app.isCreatingServer || !app.newServerName.trim()}>
 									{app.isCreatingServer ? '…' : 'Create'}
@@ -515,5 +520,18 @@
 
 	.muted {
 		color: var(--text-muted);
+	}
+
+	.form-meta {
+		display: flex;
+		justify-content: flex-end;
+		padding: 2px 0;
+	}
+	.char-counter {
+		font-size: 11px;
+		color: var(--text-muted);
+	}
+	.char-counter.warn {
+		color: var(--danger, #e74c3c);
 	}
 </style>
