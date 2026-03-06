@@ -54,9 +54,10 @@
 			title={app.isDeafened ? 'Undeafen' : 'Deafen'}
 		>
 			{#if app.isDeafened}
-				<!-- Headset off -->
+				<!-- Headset with slash -->
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-					<path d="M12 1C7.03 1 3 5.03 3 10v3c0 1.1.9 2 2 2h1v-5H5c0-3.87 3.13-7 7-7s7 3.13 7 7h-1v5h1c1.1 0 2-.9 2-2v-3c0-4.97-4.03-9-9-9zm-1 14h2v1h-2zm5.5 1.5h-1.01L16 21H8l-.49-4.5H6.5c-.28 0-.5-.22-.5-.5v-4c0-.28.22-.5.5-.5h11c.28 0 .5.22.5.5v4c0 .28-.22.5-.5.5z"/>
+					<path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z"/>
+					<line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
 				</svg>
 			{:else}
 				<!-- Headset on -->
