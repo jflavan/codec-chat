@@ -66,7 +66,10 @@ export class ApiClient {
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
-			throw new ApiError(response.status, body?.error);
+			const message = body?.error
+				?? body?.detail
+				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
+			throw new ApiError(response.status, message ?? undefined);
 		}
 		return response.json() as Promise<T>;
 	}
@@ -86,7 +89,10 @@ export class ApiClient {
 
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
-			throw new ApiError(response.status, body?.error);
+			const message = body?.error
+				?? body?.detail
+				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
+			throw new ApiError(response.status, message ?? undefined);
 		}
 	}
 
@@ -570,7 +576,10 @@ export class ApiClient {
 		if (response.status === 204) return null;
 		if (!response.ok) {
 			const body = await response.json().catch(() => null);
-			throw new ApiError(response.status, body?.error);
+			const message = body?.error
+				?? body?.detail
+				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
+			throw new ApiError(response.status, message ?? undefined);
 		}
 		return response.json() as Promise<ActiveCallResponse>;
 	}
