@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import ServerSettingsSidebar from './ServerSettingsSidebar.svelte';
 	import ServerSettings from './ServerSettings.svelte';
+	import ServerEmojis from './ServerEmojis.svelte';
 
 	const app = getAppState();
 
@@ -39,7 +41,10 @@
 	onkeydown={handleKeydown}
 >
 	<div class="settings-panel" role="document">
-		<div class="settings-content">
+		<div class="settings-sidebar-col">
+			<ServerSettingsSidebar />
+		</div>
+		<div class="settings-content-col">
 			<button
 				class="close-btn"
 				onclick={() => app.closeServerSettings()}
@@ -50,7 +55,11 @@
 					<path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
 				</svg>
 			</button>
-			<ServerSettings />
+			{#if app.serverSettingsCategory === 'emojis'}
+				<ServerEmojis />
+			{:else}
+				<ServerSettings />
+			{/if}
 		</div>
 	</div>
 </dialog>
@@ -78,14 +87,23 @@
 		display: flex;
 		width: 100%;
 		height: 100%;
-		max-width: 740px;
+		max-width: 940px;
 		margin: 0 auto;
 		position: relative;
 	}
 
-	.settings-content {
+	.settings-sidebar-col {
+		width: 200px;
+		flex-shrink: 0;
+		background: var(--bg-tertiary);
+		overflow-y: auto;
+		padding: 48px 8px 16px;
+	}
+
+	.settings-content-col {
 		flex: 1;
 		min-width: 0;
+		max-width: 740px;
 		background: var(--bg-primary);
 		overflow-y: auto;
 		padding: 48px 32px 32px;
@@ -104,6 +122,8 @@
 		cursor: pointer;
 		display: grid;
 		place-items: center;
+		min-width: 44px;
+		min-height: 44px;
 		transition: color 150ms ease, background-color 150ms ease;
 	}
 
@@ -112,10 +132,25 @@
 		background: var(--bg-message-hover);
 	}
 
-	/* Responsive: adjust padding on small screens */
 	@media (max-width: 899px) {
-		.settings-content {
-			padding: 24px 16px 32px;
+		.settings-panel {
+			flex-direction: column;
+		}
+
+		.settings-sidebar-col {
+			width: 100%;
+			padding: 12px 8px 0;
+			overflow-y: visible;
+		}
+
+		.settings-content-col {
+			max-width: 100%;
+			padding: 24px 16px calc(32px + env(safe-area-inset-bottom, 0));
+		}
+
+		.close-btn {
+			top: 8px;
+			right: 8px;
 		}
 	}
 </style>
