@@ -23,6 +23,7 @@ public class CodecDbContext : DbContext
     public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
     public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
     public DbSet<VoiceCall> VoiceCalls => Set<VoiceCall>();
+    public DbSet<CustomEmoji> CustomEmojis => Set<CustomEmoji>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -269,5 +270,25 @@ public class CodecDbContext : DbContext
             entity.ToTable(t => t.HasCheckConstraint("CK_LinkPreview_SingleParent",
                 "(\"MessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR (\"MessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)"));
         });
+
+        modelBuilder.Entity<CustomEmoji>()
+            .HasOne(e => e.Server)
+            .WithMany(s => s.CustomEmojis)
+            .HasForeignKey(e => e.ServerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CustomEmoji>()
+            .HasOne(e => e.UploadedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.UploadedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CustomEmoji>()
+            .HasIndex(e => new { e.ServerId, e.Name })
+            .IsUnique();
+
+        modelBuilder.Entity<CustomEmoji>()
+            .Property(e => e.Name)
+            .HasMaxLength(32);
     }
 }
