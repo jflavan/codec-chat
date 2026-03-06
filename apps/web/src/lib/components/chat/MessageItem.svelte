@@ -244,7 +244,7 @@
 					</div>
 				</div>
 			{:else if message.body}
-				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} /></p>
+				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={app.customEmojis} /></p>
 			{/if}
 			{#if message.imageUrl}
 				<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
@@ -298,7 +298,7 @@
 				</div>
 			{:else if message.body}
 				<p class="message-body">
-					<LinkifiedText text={message.body} mentions={effectiveMentions} />
+					<LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={app.customEmojis} />
 					{#if message.editedAt}
 						<span class="edited-label">(edited)</span>
 					{/if}
