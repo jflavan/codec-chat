@@ -249,6 +249,8 @@ using (var scope = app.Services.CreateScope())
 
 app.UseResponseCompression();
 
+app.UseCors("default");
+
 app.UseExceptionHandler(appBuilder =>
 {
     appBuilder.Run(async context =>
@@ -277,8 +279,6 @@ app.UseExceptionHandler(appBuilder =>
         });
     });
 });
-
-app.UseCors("default");
 
 // Trust forwarded headers from Azure Container Apps reverse proxy.
 app.UseForwardedHeaders(new ForwardedHeadersOptions
