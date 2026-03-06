@@ -117,16 +117,6 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateServerRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return BadRequest(new { error = "Server name is required." });
-        }
-
-        if (request.Name.Trim().Length > 100)
-        {
-            return BadRequest(new { error = "Server name must be 100 characters or fewer." });
-        }
-
         var appUser = await userService.GetOrCreateUserAsync(User);
 
         var server = new Server { Name = request.Name.Trim() };
@@ -161,16 +151,6 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     [HttpPatch("{serverId:guid}")]
     public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return BadRequest(new { error = "Server name is required." });
-        }
-
-        if (request.Name.Trim().Length > 100)
-        {
-            return BadRequest(new { error = "Server name must be 100 characters or fewer." });
-        }
-
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
@@ -329,16 +309,6 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     [HttpPost("{serverId:guid}/channels")]
     public async Task<IActionResult> CreateChannel(Guid serverId, [FromBody] CreateChannelRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return BadRequest(new { error = "Channel name is required." });
-        }
-
-        if (request.Name.Trim().Length > 100)
-        {
-            return BadRequest(new { error = "Channel name must be 100 characters or fewer." });
-        }
-
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
@@ -381,16 +351,6 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     [HttpPatch("{serverId:guid}/channels/{channelId:guid}")]
     public async Task<IActionResult> UpdateChannel(Guid serverId, Guid channelId, [FromBody] UpdateChannelRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return BadRequest(new { error = "Channel name is required." });
-        }
-
-        if (request.Name.Trim().Length > 100)
-        {
-            return BadRequest(new { error = "Channel name must be 100 characters or fewer." });
-        }
-
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 

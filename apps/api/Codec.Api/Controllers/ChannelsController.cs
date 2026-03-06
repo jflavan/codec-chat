@@ -517,11 +517,6 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     [HttpPut("{channelId:guid}/messages/{messageId:guid}")]
     public async Task<IActionResult> EditMessage(Guid channelId, Guid messageId, [FromBody] EditMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Body))
-        {
-            return BadRequest(new { error = "Message body is required." });
-        }
-
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
         if (channel is null)
         {
@@ -564,11 +559,6 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     [HttpPost("{channelId:guid}/messages/{messageId:guid}/reactions")]
     public async Task<IActionResult> ToggleReaction(Guid channelId, Guid messageId, [FromBody] ToggleReactionRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Emoji))
-        {
-            return BadRequest(new { error = "Emoji is required." });
-        }
-
         var emoji = request.Emoji.Trim();
 
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
