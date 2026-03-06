@@ -8,6 +8,8 @@
 	import ReplyReference from './ReplyReference.svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
+	import EmojiPicker from './EmojiPicker.svelte';
+	import { getFrequentEmojis, recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 
 	let {
 		message,
@@ -57,11 +59,14 @@
 	});
 
 	let showPicker = $state(false);
-	const quickEmojis = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '🚀', '💯'];
+	let showFullPicker = $state(false);
+	const quickEmojis = $derived(getFrequentEmojis(8));
 
 	function handleToggleReaction(emoji: string) {
+		recordEmojiUse(emoji);
 		app.toggleReaction(message.id, emoji);
 		showPicker = false;
+		showFullPicker = false;
 	}
 
 	function closePicker() {
@@ -117,7 +122,7 @@
 
 <article class="message" class:grouped class:mentioned={isMentioned}>
 	<!-- Floating action bar — appears on hover at top-right of message -->
-	<div class="message-actions" class:picker-open={showPicker}>
+	<div class="message-actions" class:picker-open={showPicker || showFullPicker}>
 		<button
 			class="action-btn"
 			onclick={handleReply}
@@ -180,7 +185,26 @@
 						{emoji}
 					</button>
 				{/each}
+				<button
+					class="emoji-option emoji-more"
+					onclick={() => { showPicker = false; showFullPicker = true; }}
+					role="menuitem"
+					aria-label="More emojis"
+					title="More emojis"
+				>
+					<svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+						<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"/>
+					</svg>
+				</button>
 			</div>
+		{/if}
+		{#if showFullPicker}
+			<EmojiPicker
+				mode="reaction"
+				onSelect={handleToggleReaction}
+				onClose={() => { showFullPicker = false; }}
+				customEmojis={app.customEmojis}
+			/>
 		{/if}
 	</div>
 
@@ -427,6 +451,13 @@
 
 	.emoji-option:hover {
 		background: var(--bg-message-hover);
+	}
+
+	.emoji-more {
+		color: var(--text-dim);
+	}
+	.emoji-more:hover {
+		color: var(--text-normal);
 	}
 
 	/* ───── Message layout ───── */
