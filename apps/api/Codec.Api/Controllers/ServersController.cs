@@ -172,23 +172,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null)
@@ -222,11 +206,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> GetMembers(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(serverId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var members = await db.ServerMembers
             .AsNoTracking()
@@ -274,26 +254,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        ServerRole? callerRole = null;
-        if (!appUser.IsGlobalAdmin)
-        {
-            var callerMembership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (callerMembership is null)
-            {
-                return Forbid();
-            }
-
-            if (callerMembership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-
-            callerRole = callerMembership.Role;
-        }
+        var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         if (targetUserId == appUser.Id)
         {
@@ -313,7 +274,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             return BadRequest(new { error = "Cannot kick the server owner." });
         }
 
-        if (callerRole is ServerRole.Admin && targetMembership.Role is ServerRole.Admin)
+        if (callerMembership.Role is ServerRole.Admin && targetMembership.Role is ServerRole.Admin)
         {
             return Forbid();
         }
@@ -351,11 +312,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> GetChannels(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(serverId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var channels = await db.Channels
             .AsNoTracking()
@@ -382,30 +339,8 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
             return BadRequest(new { error = "Channel name must be 100 characters or fewer." });
         }
 
-        var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
-        if (!serverExists)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
-
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         ChannelType channelType;
         if (string.IsNullOrEmpty(request.Type) || string.Equals(request.Type, "text", StringComparison.OrdinalIgnoreCase))
@@ -457,23 +392,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var channel = await db.Channels
             .FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
@@ -511,29 +430,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
-
-        var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
-        if (!serverExists)
-        {
-            return NotFound(new { error = "Server not found." });
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         DateTimeOffset? expiresAt = request.ExpiresInHours switch
         {
@@ -578,23 +475,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> GetInvites(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var now = DateTimeOffset.UtcNow;
         var invites = await db.ServerInvites
@@ -625,23 +506,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var invite = await db.ServerInvites
             .FirstOrDefaultAsync(i => i.Id == inviteId && i.ServerId == serverId);
@@ -731,18 +596,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> DeleteServer(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null || membership.Role is not ServerRole.Owner)
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureOwnerAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = await db.Servers
             .Include(s => s.Channels)
@@ -795,23 +649,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> DeleteChannel(Guid serverId, Guid channelId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var channel = await db.Channels
             .FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
@@ -900,23 +738,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null)
@@ -951,23 +773,7 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     public async Task<IActionResult> DeleteServerIcon(Guid serverId)
     {
         var appUser = await userService.GetOrCreateUserAsync(User);
-
-        if (!appUser.IsGlobalAdmin)
-        {
-            var membership = await db.ServerMembers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
-
-            if (membership is null)
-            {
-                return Forbid();
-            }
-
-            if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-            {
-                return Forbid();
-            }
-        }
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null)
