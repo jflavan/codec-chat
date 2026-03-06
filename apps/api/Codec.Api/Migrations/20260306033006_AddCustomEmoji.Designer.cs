@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260306033006_AddCustomEmoji")]
+    partial class AddCustomEmoji
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -309,14 +312,11 @@ namespace Codec.Api.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("DirectMessageId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Emoji")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("MessageId")
+                    b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
@@ -326,18 +326,10 @@ namespace Codec.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("DirectMessageId", "UserId", "Emoji")
-                        .IsUnique()
-                        .HasFilter("\"DirectMessageId\" IS NOT NULL");
-
                     b.HasIndex("MessageId", "UserId", "Emoji")
-                        .IsUnique()
-                        .HasFilter("\"MessageId\" IS NOT NULL");
+                        .IsUnique();
 
-                    b.ToTable("Reactions", t =>
-                        {
-                            t.HasCheckConstraint("CK_Reaction_SingleParent", "(\"MessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR (\"MessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)");
-                        });
+                    b.ToTable("Reactions");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.Server", b =>
@@ -695,23 +687,17 @@ namespace Codec.Api.Migrations
 
             modelBuilder.Entity("Codec.Api.Models.Reaction", b =>
                 {
-                    b.HasOne("Codec.Api.Models.DirectMessage", "DirectMessage")
-                        .WithMany("Reactions")
-                        .HasForeignKey("DirectMessageId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("Codec.Api.Models.Message", "Message")
                         .WithMany("Reactions")
                         .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Codec.Api.Models.User", "User")
                         .WithMany("Reactions")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("DirectMessage");
 
                     b.Navigation("Message");
 
@@ -816,8 +802,6 @@ namespace Codec.Api.Migrations
             modelBuilder.Entity("Codec.Api.Models.DirectMessage", b =>
                 {
                     b.Navigation("LinkPreviews");
-
-                    b.Navigation("Reactions");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.DmChannel", b =>

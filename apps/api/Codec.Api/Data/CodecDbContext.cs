@@ -23,6 +23,7 @@ public class CodecDbContext : DbContext
     public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
     public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
     public DbSet<VoiceCall> VoiceCalls => Set<VoiceCall>();
+    public DbSet<CustomEmoji> CustomEmojis => Set<CustomEmoji>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,20 +67,33 @@ public class CodecDbContext : DbContext
             .WithMany(user => user.ServerMemberships)
             .HasForeignKey(member => member.UserId);
 
-        modelBuilder.Entity<Reaction>()
-            .HasOne(reaction => reaction.Message)
-            .WithMany(message => message.Reactions)
-            .HasForeignKey(reaction => reaction.MessageId);
+        modelBuilder.Entity<Reaction>(entity =>
+        {
+            entity.HasOne(r => r.Message)
+                .WithMany(m => m.Reactions)
+                .HasForeignKey(r => r.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Reaction>()
-            .HasOne(reaction => reaction.User)
-            .WithMany(user => user.Reactions)
-            .HasForeignKey(reaction => reaction.UserId);
+            entity.HasOne(r => r.DirectMessage)
+                .WithMany(dm => dm.Reactions)
+                .HasForeignKey(r => r.DirectMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        // Each user can react with a given emoji on a message at most once.
-        modelBuilder.Entity<Reaction>()
-            .HasIndex(reaction => new { reaction.MessageId, reaction.UserId, reaction.Emoji })
-            .IsUnique();
+            entity.HasOne(r => r.User)
+                .WithMany(u => u.Reactions)
+                .HasForeignKey(r => r.UserId);
+
+            entity.HasIndex(r => new { r.MessageId, r.UserId, r.Emoji })
+                .IsUnique()
+                .HasFilter("\"MessageId\" IS NOT NULL");
+
+            entity.HasIndex(r => new { r.DirectMessageId, r.UserId, r.Emoji })
+                .IsUnique()
+                .HasFilter("\"DirectMessageId\" IS NOT NULL");
+
+            entity.ToTable(t => t.HasCheckConstraint("CK_Reaction_SingleParent",
+                "(\"MessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR (\"MessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)"));
+        });
 
         // Friendship relationships and constraints.
         modelBuilder.Entity<Friendship>()
@@ -269,5 +283,25 @@ public class CodecDbContext : DbContext
             entity.ToTable(t => t.HasCheckConstraint("CK_LinkPreview_SingleParent",
                 "(\"MessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR (\"MessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)"));
         });
+
+        modelBuilder.Entity<CustomEmoji>()
+            .HasOne(e => e.Server)
+            .WithMany(s => s.CustomEmojis)
+            .HasForeignKey(e => e.ServerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CustomEmoji>()
+            .HasOne(e => e.UploadedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.UploadedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CustomEmoji>()
+            .HasIndex(e => new { e.ServerId, e.Name })
+            .IsUnique();
+
+        modelBuilder.Entity<CustomEmoji>()
+            .Property(e => e.Name)
+            .HasMaxLength(32);
     }
 }

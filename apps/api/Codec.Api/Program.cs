@@ -157,6 +157,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutSe
 
 builder.Services.AddSingleton<IAvatarService, AvatarService>();
 builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();
+builder.Services.AddScoped<ICustomEmojiService, CustomEmojiService>();
 
 // Link preview HttpClient with DNS rebinding protection, redirect limits, and no cookies.
 builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =>
@@ -307,6 +308,14 @@ if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
     {
         FileProvider = new PhysicalFileProvider(imageStoragePath),
         RequestPath = "/uploads/images"
+    });
+
+    var emojiStoragePath = Path.Combine(uploadsPath, "emojis");
+    Directory.CreateDirectory(emojiStoragePath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(emojiStoragePath),
+        RequestPath = "/uploads/emojis"
     });
 }
 
