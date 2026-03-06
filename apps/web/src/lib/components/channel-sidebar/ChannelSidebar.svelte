@@ -186,6 +186,11 @@
 					bind:value={app.newChannelName}
 					disabled={app.isCreatingChannel}
 				/>
+				<div class="form-meta">
+					<span class="char-counter" class:warn={app.newChannelName.length >= 100}>
+						{app.newChannelName.length}/100
+					</span>
+				</div>
 				<div class="inline-form-actions">
 					<button type="submit" class="btn-primary" disabled={app.isCreatingChannel || !app.newChannelName.trim()}>
 						{app.isCreatingChannel ? '…' : 'Create'}
@@ -568,5 +573,18 @@
 	.type-option.selected {
 		border-color: var(--accent);
 		color: var(--text-header);
+	}
+
+	.form-meta {
+		display: flex;
+		justify-content: flex-end;
+		padding: 2px 0;
+	}
+	.char-counter {
+		font-size: 11px;
+		color: var(--text-muted);
+	}
+	.char-counter.warn {
+		color: var(--danger, #e74c3c);
 	}
 </style>
