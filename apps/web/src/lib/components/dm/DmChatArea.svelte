@@ -1302,6 +1302,14 @@
 	/* ───── Mobile adjustments ───── */
 
 	@media (max-width: 768px) {
+		.system-message.voice-call-event {
+			background: var(--bg-secondary);
+			border-radius: 8px;
+			margin: 4px 16px;
+			padding: 10px 16px;
+			font-size: 14px;
+		}
+
 		.dm-action-btn {
 			min-width: 44px;
 			min-height: 44px;
