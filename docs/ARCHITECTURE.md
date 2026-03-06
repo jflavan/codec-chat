@@ -276,6 +276,12 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `DELETE /servers/{serverId}` - Delete a server and all associated data (requires Owner or Global Admin; cascade-deletes channels, messages, reactions, link previews, members, invites; broadcasts `ServerDeleted` via SignalR)
 - `DELETE /servers/{serverId}/channels/{channelId}` - Delete a channel and all associated data (requires Owner, Admin, or Global Admin; cascade-deletes messages, reactions, link previews; broadcasts `ChannelDeleted` via SignalR)
 
+#### Custom Emojis
+- `GET /servers/{serverId}/emojis` - List all custom emojis for a server (requires membership; returns name, imageUrl, contentType, isAnimated, uploadedByUserId, createdAt)
+- `POST /servers/{serverId}/emojis` - Upload a new custom emoji (requires Owner/Admin; multipart/form-data with `name` and `file`; PNG, JPEG, WebP, GIF; 256 KB max; 50 emojis per server; broadcasts `CustomEmojiAdded` via SignalR)
+- `PATCH /servers/{serverId}/emojis/{emojiId}` - Rename a custom emoji (requires Owner/Admin; broadcasts `CustomEmojiUpdated` via SignalR)
+- `DELETE /servers/{serverId}/emojis/{emojiId}` - Delete a custom emoji and its stored file (requires Owner/Admin; broadcasts `CustomEmojiDeleted` via SignalR)
+
 #### Server Invites
 - `POST /servers/{serverId}/invites` - Create an invite code (requires Owner, Admin, or Global Admin role; generates 8-char alphanumeric code)
 - `GET /servers/{serverId}/invites` - List active invites (requires Owner, Admin, or Global Admin role; filters expired invites)
@@ -364,6 +370,9 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `MemberJoined` | `{ serverId }` | A new member joined the server (sent to server group; triggers member list refresh) |
 | `MemberLeft` | `{ serverId }` | A member left or was kicked from the server (sent to server group; triggers member list refresh) |
 | `LinkPreviewsReady` | `{ messageId, channelId?, dmChannelId?, linkPreviews: [...] }` | Link preview metadata fetched — frontend patches the message's `linkPreviews` array |
+| `CustomEmojiAdded` | `{ serverId, emoji: { id, name, imageUrl, contentType, isAnimated, uploadedByUserId, createdAt } }` | A custom emoji was uploaded to a server (sent to server group) |
+| `CustomEmojiUpdated` | `{ serverId, emojiId, name }` | A custom emoji was renamed (sent to server group) |
+| `CustomEmojiDeleted` | `{ serverId, emojiId }` | A custom emoji was deleted (sent to server group) |
 | `IncomingCall` | `{ callId, dmChannelId, callerUserId, callerDisplayName, callerAvatarUrl }` | Incoming voice call from a DM partner (sent to recipient's user group) |
 | `CallAccepted` | `{ callId, sendTransportOptions, recvTransportOptions }` | Call was accepted; includes SFU transport options for the caller to connect |
 | `CallDeclined` | `{ callId }` | Call was declined by the recipient (sent to caller's user group) |
@@ -476,9 +485,12 @@ Content-Type: application/json
 ```
 User ────┬──── ServerMember ──── Server
          │                         │
+         │                    CustomEmoji
+         │                         │
          ├──── Message ──────── Channel
          │        │
          ├──── Reaction ────────┘
+         │        └──── DirectMessage
          │
          ├──── Friendship ──── User
          │    (Requester)     (Recipient)
@@ -509,7 +521,7 @@ DirectMessage ─┘
 
 #### Server
 - Top-level organizational unit (like Discord servers)
-- Contains channels and has members
+- Contains channels, members, and custom emojis
 - Fields: Id, Name
 
 #### ServerMember
@@ -529,9 +541,20 @@ DirectMessage ─┘
 - Self-referencing FK with ON DELETE SET NULL (orphaned replies show "Original message was deleted")
 
 #### Reaction
-- Emoji reaction on a message by a user
-- Fields: Id, MessageId, UserId, Emoji, CreatedAt
-- Unique constraint on (MessageId, UserId, Emoji) — one reaction per emoji per user per message
+- Emoji reaction on a message or direct message by a user
+- Fields: Id, MessageId (nullable), DirectMessageId (nullable), UserId, Emoji, CreatedAt
+- Check constraint: exactly one of MessageId or DirectMessageId must be non-null
+- Unique constraint on (MessageId, UserId, Emoji) for channel message reactions
+- Unique constraint on (DirectMessageId, UserId, Emoji) for DM reactions
+
+#### CustomEmoji
+- Custom emoji image scoped to a server
+- Fields: Id, ServerId, Name (max 32 chars, alphanumeric/underscore), ImageUrl, ContentType, IsAnimated, UploadedByUserId, CreatedAt
+- Unique constraint on (ServerId, Name)
+- Cascade delete with Server; restrict delete on User (emoji preserved if uploader is removed)
+- Max 50 emojis per server (enforced at API level)
+- Supported formats: PNG, JPEG, WebP, GIF (256 KB max)
+- Content-addressed storage with SHA-256 hash in filename
 
 #### Friendship
 - Relationship between two users (friend request or confirmed friendship)

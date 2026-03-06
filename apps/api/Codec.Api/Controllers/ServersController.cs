@@ -16,7 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("servers")]
-public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config) : ControllerBase
+public class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -737,6 +737,134 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
                 iconUrl = (string?)null
             });
         }
+
+        return NoContent();
+    }
+
+    /* ═══════════════════ Custom Emojis ═══════════════════ */
+
+    /// <summary>Lists all custom emojis for a server. Requires server membership.</summary>
+    [HttpGet("{serverId:guid}/emojis")]
+    public async Task<IActionResult> ListEmojis(Guid serverId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var emojis = await db.CustomEmojis
+            .AsNoTracking()
+            .Where(e => e.ServerId == serverId)
+            .OrderBy(e => e.Name)
+            .Select(e => new
+            {
+                e.Id, e.Name, e.ImageUrl, e.ContentType, e.IsAnimated,
+                e.UploadedByUserId, e.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(emojis);
+    }
+
+    /// <summary>Uploads a new custom emoji. Requires Owner or Admin role.</summary>
+    [HttpPost("{serverId:guid}/emojis")]
+    public async Task<IActionResult> UploadEmoji(
+        Guid serverId, [FromForm] string name, IFormFile file)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        // Validate name format.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[a-zA-Z0-9_]{2,32}$"))
+            return BadRequest(new { error = "Name must be 2-32 alphanumeric/underscore characters." });
+
+        // Validate file.
+        var validationError = customEmojiService.Validate(file);
+        if (validationError is not null)
+            return BadRequest(new { error = validationError });
+
+        // Check 50-emoji limit.
+        var count = await db.CustomEmojis.CountAsync(e => e.ServerId == serverId);
+        if (count >= 50)
+            return BadRequest(new { error = "Server has reached the 50 custom emoji limit." });
+
+        // Check name uniqueness.
+        var nameTaken = await db.CustomEmojis.AnyAsync(
+            e => e.ServerId == serverId && e.Name == name);
+        if (nameTaken)
+            return Conflict(new { error = $"An emoji named '{name}' already exists." });
+
+        var imageUrl = await customEmojiService.SaveEmojiAsync(serverId, name, file);
+        var isAnimated = file.ContentType is "image/gif";
+
+        var emoji = new CustomEmoji
+        {
+            ServerId = serverId,
+            Name = name,
+            ImageUrl = imageUrl,
+            ContentType = file.ContentType,
+            IsAnimated = isAnimated,
+            UploadedByUserId = appUser.Id
+        };
+
+        db.CustomEmojis.Add(emoji);
+        await db.SaveChangesAsync();
+
+        var payload = new
+        {
+            emoji.Id, emoji.Name, emoji.ImageUrl, emoji.ContentType,
+            emoji.IsAnimated, emoji.UploadedByUserId, emoji.CreatedAt
+        };
+
+        await hub.Clients.Group($"server-{serverId}")
+            .SendAsync("CustomEmojiAdded", new { serverId, emoji = payload });
+
+        return Created($"/servers/{serverId}/emojis/{emoji.Id}", payload);
+    }
+
+    /// <summary>Renames a custom emoji. Requires Owner or Admin role.</summary>
+    [HttpPatch("{serverId:guid}/emojis/{emojiId:guid}")]
+    public async Task<IActionResult> RenameEmoji(
+        Guid serverId, Guid emojiId, [FromBody] RenameEmojiRequest request)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var emoji = await db.CustomEmojis.FirstOrDefaultAsync(
+            e => e.Id == emojiId && e.ServerId == serverId);
+        if (emoji is null)
+            return NotFound(new { error = "Emoji not found." });
+
+        var nameTaken = await db.CustomEmojis.AnyAsync(
+            e => e.ServerId == serverId && e.Name == request.Name && e.Id != emojiId);
+        if (nameTaken)
+            return Conflict(new { error = $"An emoji named '{request.Name}' already exists." });
+
+        emoji.Name = request.Name;
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}")
+            .SendAsync("CustomEmojiUpdated", new { serverId, emojiId, name = request.Name });
+
+        return Ok(new { emoji.Id, emoji.Name, emoji.ImageUrl });
+    }
+
+    /// <summary>Deletes a custom emoji. Requires Owner or Admin role.</summary>
+    [HttpDelete("{serverId:guid}/emojis/{emojiId:guid}")]
+    public async Task<IActionResult> DeleteEmoji(Guid serverId, Guid emojiId)
+    {
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var emoji = await db.CustomEmojis.FirstOrDefaultAsync(
+            e => e.Id == emojiId && e.ServerId == serverId);
+        if (emoji is null)
+            return NotFound(new { error = "Emoji not found." });
+
+        await customEmojiService.DeleteEmojiAsync(emoji.ImageUrl);
+        db.CustomEmojis.Remove(emoji);
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}")
+            .SendAsync("CustomEmojiDeleted", new { serverId, emojiId });
 
         return NoContent();
     }
