@@ -159,6 +159,12 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
   - Automatic migrations (development)
   - CORS support for local development
 
+### Authorization & Error Handling
+- Controllers use `UserService` helper methods (`EnsureMemberAsync`, `EnsureAdminAsync`, `EnsureOwnerAsync`, `EnsureDmParticipantAsync`) for membership and role checks
+- Authorization failures throw `ForbiddenException` (→ 403) or `NotFoundException` (→ 404)
+- A global exception handler converts exceptions to RFC 7807 ProblemDetails JSON responses
+- Request DTOs use `System.ComponentModel.DataAnnotations` (`[Required]`, `[StringLength]`, etc.) for structural validation; business logic validation remains inline in controllers
+
 ### Real-time Layer (SignalR)
 - **Hub endpoint:** `/hubs/chat`
 - **Transport:** WebSockets (with automatic fallback to Server-Sent Events / Long Polling)
