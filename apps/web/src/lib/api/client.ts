@@ -553,7 +553,7 @@ export class ApiClient {
 	/* ───── Custom Emojis ───── */
 
 	/** List all custom emojis for a server. */
-	async getCustomEmojis(token: string, serverId: string): Promise<CustomEmoji[]> {
+	getCustomEmojis(token: string, serverId: string): Promise<CustomEmoji[]> {
 		return this.request<CustomEmoji[]>(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis`,
 			{ headers: this.headers(token) }
@@ -572,16 +572,16 @@ export class ApiClient {
 	}
 
 	/** Rename a custom emoji. */
-	async renameCustomEmoji(token: string, serverId: string, emojiId: string, name: string): Promise<void> {
-		await this.requestVoid(
+	renameCustomEmoji(token: string, serverId: string, emojiId: string, name: string): Promise<void> {
+		return this.requestVoid(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis/${encodeURIComponent(emojiId)}`,
 			{ method: 'PATCH', headers: this.headers(token, true), body: JSON.stringify({ name }) }
 		);
 	}
 
 	/** Delete a custom emoji from a server. */
-	async deleteCustomEmoji(token: string, serverId: string, emojiId: string): Promise<void> {
-		await this.requestVoid(
+	deleteCustomEmoji(token: string, serverId: string, emojiId: string): Promise<void> {
+		return this.requestVoid(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis/${encodeURIComponent(emojiId)}`,
 			{ method: 'DELETE', headers: this.headers(token) }
 		);

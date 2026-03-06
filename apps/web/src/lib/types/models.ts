@@ -48,7 +48,6 @@ export type LinkPreview = {
 /** Server custom emoji uploaded by a member. */
 export type CustomEmoji = {
 	id: string;
-	serverId: string;
 	name: string;
 	imageUrl: string;
 	contentType: string;
