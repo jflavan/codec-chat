@@ -41,11 +41,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
             return BadRequest(new { error = "Channel is not a voice channel." });
         }
 
-        var isMember = appUser.IsGlobalAdmin || await userService.IsMemberAsync(channel.ServerId, appUser.Id);
-        if (!isMember)
-        {
-            return Forbid();
-        }
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var states = await db.VoiceStates
             .AsNoTracking()

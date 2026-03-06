@@ -102,4 +102,110 @@ public class UserService(CodecDbContext db) : IUserService
     {
         return string.IsNullOrWhiteSpace(user.Nickname) ? user.DisplayName : user.Nickname;
     }
+
+    /// <inheritdoc />
+    public async Task<ServerMember> EnsureMemberAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false)
+    {
+        if (isGlobalAdmin)
+        {
+            var member = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+            if (member is not null) return member;
+
+            var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+            if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
+
+            return new ServerMember { ServerId = serverId, UserId = userId };
+        }
+
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+        if (membership is null)
+        {
+            var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+            if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
+            throw new Exceptions.ForbiddenException();
+        }
+
+        return membership;
+    }
+
+    /// <inheritdoc />
+    public async Task<ServerMember> EnsureAdminAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false)
+    {
+        if (isGlobalAdmin)
+        {
+            var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+            if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
+
+            var member = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+            return member ?? new ServerMember { ServerId = serverId, UserId = userId };
+        }
+
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+        if (membership is null)
+        {
+            var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+            if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
+            throw new Exceptions.ForbiddenException();
+        }
+
+        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+            throw new Exceptions.ForbiddenException();
+
+        return membership;
+    }
+
+    /// <inheritdoc />
+    public async Task<ServerMember> EnsureOwnerAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false)
+    {
+        if (isGlobalAdmin)
+        {
+            var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+            if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
+
+            var member = await db.ServerMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+            return member ?? new ServerMember { ServerId = serverId, UserId = userId };
+        }
+
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+        if (membership is null)
+        {
+            var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
+            if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
+            throw new Exceptions.ForbiddenException();
+        }
+
+        if (membership.Role is not ServerRole.Owner)
+            throw new Exceptions.ForbiddenException();
+
+        return membership;
+    }
+
+    /// <inheritdoc />
+    public async Task EnsureDmParticipantAsync(Guid dmChannelId, Guid userId)
+    {
+        var isMember = await db.DmChannelMembers.AsNoTracking()
+            .AnyAsync(m => m.DmChannelId == dmChannelId && m.UserId == userId);
+
+        if (!isMember)
+        {
+            var channelExists = await db.DmChannels.AsNoTracking().AnyAsync(c => c.Id == dmChannelId);
+            if (!channelExists) throw new Exceptions.NotFoundException("DM channel not found.");
+            throw new Exceptions.ForbiddenException("You are not a participant in this conversation.");
+        }
+    }
 }
