@@ -1593,12 +1593,13 @@ export class AppState {
 		// to activate the WebRTC decoding pipeline. We mute the element so it
 		// doesn't bypass the Web Audio API gain chain (which controls volume &
 		// deafen), then use createMediaStreamSource for gain-controlled output.
+		const stream = new MediaStream([track]);
 		const el = new Audio();
-		el.srcObject = new MediaStream([track]);
+		el.srcObject = stream;
 		el.muted = true;
 		el.play().catch(() => {});
 
-		const source = this.audioContext.createMediaStreamSource(new MediaStream([track]));
+		const source = this.audioContext.createMediaStreamSource(stream);
 		const gain = this.audioContext.createGain();
 		const volume = this.isDeafened ? 0 : (this.userVolumes.get(userId) ?? 1.0);
 		gain.gain.value = volume;
