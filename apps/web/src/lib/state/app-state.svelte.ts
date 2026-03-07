@@ -12,7 +12,8 @@ import type {
 	DmConversation,
 	DirectMessage,
 	ServerInvite,
-	VoiceChannelMember
+	VoiceChannelMember,
+	CustomEmoji
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -122,9 +123,12 @@ export class AppState {
 	settingsOpen = $state(false);
 	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
 	serverSettingsOpen = $state(false);
+	serverSettingsCategory = $state<'general' | 'emojis'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
+	customEmojis = $state<CustomEmoji[]>([]);
+	isUploadingEmoji = $state(false);
 
 	/* ───── mobile navigation ───── */
 	mobileNavOpen = $state(false);
@@ -319,6 +323,7 @@ export class AppState {
 
 	openServerSettings(): void {
 		this.serverSettingsOpen = true;
+		this.serverSettingsCategory = 'general';
 	}
 
 	closeServerSettings(): void {
@@ -405,6 +410,7 @@ export class AppState {
 		this.selectedServerId = null;
 		this.selectedChannelId = null;
 		this.serverInvites = [];
+		this.customEmojis = [];
 		this.showInvitePanel = false;
 		this.typingUsers = [];
 		this.error = null;
@@ -451,6 +457,7 @@ export class AppState {
 			if (this.selectedServerId) {
 				await this.loadChannels(this.selectedServerId);
 				await this.loadMembers(this.selectedServerId);
+				await this.loadCustomEmojis(this.selectedServerId);
 			}
 		} catch (e) {
 			this.setError(e);
@@ -546,6 +553,15 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isLoadingMembers = false;
+		}
+	}
+
+	async loadCustomEmojis(serverId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			this.customEmojis = await this.api.getCustomEmojis(this.idToken, serverId);
+		} catch (e) {
+			this.setError(e);
 		}
 	}
 
@@ -732,6 +748,39 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isUploadingServerIcon = false;
+		}
+	}
+
+	async uploadCustomEmoji(name: string, file: File): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isUploadingEmoji = true;
+		try {
+			const emoji = await this.api.uploadCustomEmoji(this.idToken, this.selectedServerId, name, file);
+			this.customEmojis = [...this.customEmojis, emoji];
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isUploadingEmoji = false;
+		}
+	}
+
+	async renameCustomEmoji(emojiId: string, name: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.renameCustomEmoji(this.idToken, this.selectedServerId, emojiId, name);
+			this.customEmojis = this.customEmojis.map(e => e.id === emojiId ? { ...e, name } : e);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async deleteCustomEmoji(emojiId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.deleteCustomEmoji(this.idToken, this.selectedServerId, emojiId);
+			this.customEmojis = this.customEmojis.filter(e => e.id !== emojiId);
+		} catch (e) {
+			this.setError(e);
 		}
 	}
 
@@ -1165,6 +1214,7 @@ export class AppState {
 		this.messages = [];
 		this.hasMoreMessages = false;
 		this.members = [];
+		this.customEmojis = [];
 		this.mobileNavOpen = false;
 		this.loadFriends();
 		this.loadFriendRequests();
@@ -1188,6 +1238,7 @@ export class AppState {
 
 		await this.loadChannels(serverId);
 		await this.loadMembers(serverId);
+		await this.loadCustomEmojis(serverId);
 	}
 
 	async loadFriends(): Promise<void> {
@@ -2293,6 +2344,19 @@ export class AppState {
 				if (this.incomingCall?.callId === event.callId) {
 					this.incomingCall = null;
 				}
+			},
+			onCustomEmojiAdded: (event) => {
+				if (this.selectedServerId === event.serverId) {
+					this.customEmojis = [...this.customEmojis, event.emoji];
+				}
+			},
+			onCustomEmojiUpdated: (event) => {
+				this.customEmojis = this.customEmojis.map(e =>
+					e.id === event.emojiId ? { ...e, name: event.name } : e
+				);
+			},
+			onCustomEmojiDeleted: (event) => {
+				this.customEmojis = this.customEmojis.filter(e => e.id !== event.emojiId);
 			},
 		});
 

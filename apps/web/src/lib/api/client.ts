@@ -14,7 +14,8 @@ import type {
 	DirectMessage,
 	ServerInvite,
 	VoiceChannelMember,
-	ActiveCallResponse
+	ActiveCallResponse,
+	CustomEmoji
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -546,6 +547,43 @@ export class ApiClient {
 		return this.request(
 			`${this.baseUrl}/invites/${encodeURIComponent(code)}`,
 			{ method: 'POST', headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Custom Emojis ───── */
+
+	/** List all custom emojis for a server. */
+	getCustomEmojis(token: string, serverId: string): Promise<CustomEmoji[]> {
+		return this.request<CustomEmoji[]>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Upload a new custom emoji to a server. */
+	async uploadCustomEmoji(token: string, serverId: string, name: string, file: File): Promise<CustomEmoji> {
+		const form = new FormData();
+		form.append('name', name);
+		form.append('file', file);
+		return this.request<CustomEmoji>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis`,
+			{ method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
+		);
+	}
+
+	/** Rename a custom emoji. */
+	renameCustomEmoji(token: string, serverId: string, emojiId: string, name: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis/${encodeURIComponent(emojiId)}`,
+			{ method: 'PATCH', headers: this.headers(token, true), body: JSON.stringify({ name }) }
+		);
+	}
+
+	/** Delete a custom emoji from a server. */
+	deleteCustomEmoji(token: string, serverId: string, emojiId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/emojis/${encodeURIComponent(emojiId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
 		);
 	}
 
