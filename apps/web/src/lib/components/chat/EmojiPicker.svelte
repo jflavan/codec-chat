@@ -276,7 +276,35 @@
 
 	@media (max-width: 768px) {
 		.emoji-picker-container {
-			width: min(100vw, 320px);
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			top: unset;
+			width: 100%;
+			max-height: 60vh;
+			border-radius: 12px 12px 0 0;
+			padding-bottom: env(safe-area-inset-bottom);
+			animation: slide-up 200ms ease;
+			z-index: 100;
+		}
+
+		.emoji-picker-container.flipped {
+			top: unset;
+			bottom: 0;
+		}
+
+		.picker-backdrop {
+			background: rgba(0, 0, 0, 0.5);
+		}
+	}
+
+	@keyframes slide-up {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: translateY(0);
 		}
 	}
 </style>

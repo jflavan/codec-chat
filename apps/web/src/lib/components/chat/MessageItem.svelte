@@ -708,5 +708,38 @@
 			color: var(--text-muted);
 			opacity: 0.5;
 		}
+
+		.emoji-picker {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			top: unset;
+			border-radius: 12px 12px 0 0;
+			justify-content: center;
+			padding: 12px;
+			padding-bottom: calc(12px + env(safe-area-inset-bottom));
+			z-index: 100;
+			animation: slide-up 200ms ease;
+		}
+
+		.message-actions.flipped .emoji-picker {
+			top: unset;
+			bottom: 0;
+		}
+
+		.picker-backdrop {
+			background: rgba(0, 0, 0, 0.5);
+			z-index: 99;
+		}
+	}
+
+	@keyframes slide-up {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: translateY(0);
+		}
 	}
 </style>
