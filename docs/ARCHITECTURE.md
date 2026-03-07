@@ -51,8 +51,11 @@ src/
 │   ├── styles/
 │   │   ├── tokens.css      # CSS custom properties (CODEC CRT design tokens)
 │   │   └── global.css      # Base styles, resets, font imports
+│   ├── data/
+│   │   └── emojis.ts       # Static emoji dataset (categories, names, keywords)
 │   ├── utils/
-│   │   └── format.ts       # Date/time formatting helpers
+│   │   ├── format.ts       # Date/time formatting helpers
+│   │   └── emoji-frequency.ts  # localStorage-backed emoji usage frequency tracker
 │   ├── components/
 │   │   ├── server-sidebar/
 │   │   │   └── ServerSidebar.svelte      # Server icon rail (create/join-via-invite)
@@ -63,9 +66,10 @@ src/
 │   │   ├── chat/
 │   │   │   ├── ChatArea.svelte           # Chat shell (header, feed, composer)
 │   │   │   ├── Composer.svelte           # Message input with send button
+│   │   │   ├── EmojiPicker.svelte        # Full emoji picker (search, categories, custom emojis, frequent)
 │   │   │   ├── ImagePreview.svelte       # Full-screen image lightbox overlay
 │   │   │   ├── LinkPreviewCard.svelte    # Open Graph link preview embed card
-│   │   │   ├── LinkifiedText.svelte      # Auto-linked URLs in message body
+│   │   │   ├── LinkifiedText.svelte      # Auto-linked URLs in message body (+ custom emoji rendering)
 │   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping
 │   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped)
 │   │   │   ├── ReactionBar.svelte        # Reaction pills (emoji + count)
@@ -92,7 +96,10 @@ src/
 │   │   │   ├── ProfileSettings.svelte     # Nickname + avatar management
 │   │   │   └── AccountSettings.svelte     # Read-only info + sign out
 │   │   ├── server-settings/
-│   │   │   └── ServerSettings.svelte      # Server management + global admin danger zone
+│   │   │   ├── ServerSettingsModal.svelte  # Modal shell with sidebar + content area
+│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Emojis)
+│   │   │   ├── ServerSettings.svelte      # Server management + global admin danger zone
+│   │   │   └── ServerEmojis.svelte        # Custom emoji upload, rename, delete (Owner/Admin)
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
@@ -142,8 +149,9 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 | `auth/` | Token lifecycle (persist, load, expire, clear) and Google SDK setup |
 | `services/` | External service integrations (SignalR hub connection management) |
 | `state/` | Central reactive application state; orchestrates API calls, auth, and hub events |
+| `data/` | Static datasets (emoji categories, keywords) |
 | `styles/` | Design tokens as CSS custom properties; global base styles |
-| `utils/` | Pure utility functions (formatting, etc.) |
+| `utils/` | Pure utility functions (formatting, frequency tracking, etc.) |
 | `components/` | Presentational Svelte 5 components grouped by feature area |
 
 ### API Server (ASP.NET Core)
