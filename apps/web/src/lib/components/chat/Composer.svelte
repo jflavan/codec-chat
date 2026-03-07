@@ -127,7 +127,9 @@
 
 	function syncOverlayScroll(): void {
 		if (overlayEl && inputEl) {
-			overlayEl.scrollLeft = inputEl.scrollLeft;
+			requestAnimationFrame(() => {
+				overlayEl.scrollLeft = inputEl.scrollLeft;
+			});
 		}
 	}
 
@@ -238,6 +240,7 @@
 					disabled={!app.selectedChannelId || app.isSending}
 					oninput={handleInput}
 					onkeydown={handleKeydown}
+					onscroll={syncOverlayScroll}
 					onpaste={handlePaste}
 				/>
 			</div>
