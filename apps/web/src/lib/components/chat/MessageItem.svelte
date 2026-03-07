@@ -243,6 +243,7 @@
 				onSelect={handleToggleReaction}
 				onClose={() => { showFullPicker = false; }}
 				customEmojis={app.customEmojis}
+				flipped={isFlipped}
 			/>
 		{/if}
 	</div>
