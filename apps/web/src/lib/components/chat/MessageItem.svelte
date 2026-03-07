@@ -66,10 +66,33 @@
 	/** Toolbar height (32px) + top offset (14px) + buffer (4px) */
 	const FLIP_THRESHOLD_PX = 50;
 
+	/** Cached reference to the nearest scrollable ancestor (overflow-y: auto/scroll). */
+	let scrollParent: HTMLElement | null = null;
+
+	function findScrollParent(): HTMLElement | null {
+		if (scrollParent) return scrollParent;
+		let el = messageEl?.parentElement ?? null;
+		while (el) {
+			const { overflowY } = getComputedStyle(el);
+			if (overflowY === 'auto' || overflowY === 'scroll') {
+				scrollParent = el;
+				return el;
+			}
+			el = el.parentElement;
+		}
+		return null;
+	}
+
 	function checkFlip() {
 		if (!messageEl) return;
 		const rect = messageEl.getBoundingClientRect();
-		isFlipped = rect.top < FLIP_THRESHOLD_PX;
+		const container = findScrollParent();
+		if (container) {
+			const containerRect = container.getBoundingClientRect();
+			isFlipped = rect.top - containerRect.top < FLIP_THRESHOLD_PX;
+		} else {
+			isFlipped = rect.top < FLIP_THRESHOLD_PX;
+		}
 	}
 
 	const quickEmojis = getFrequentEmojis(8);
