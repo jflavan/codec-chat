@@ -60,6 +60,14 @@
 
 	let showPicker = $state(false);
 	let showFullPicker = $state(false);
+	let isFlipped = $state(false);
+	let messageEl: HTMLElement | undefined = $state(undefined);
+
+	function checkFlip() {
+		if (!messageEl) return;
+		const rect = messageEl.getBoundingClientRect();
+		isFlipped = rect.top < 50;
+	}
 	const quickEmojis = getFrequentEmojis(8);
 
 	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
@@ -136,9 +144,15 @@
 	}
 </script>
 
-<article class="message" class:grouped class:mentioned={isMentioned}>
+<article
+	bind:this={messageEl}
+	class="message"
+	class:grouped
+	class:mentioned={isMentioned}
+	onmouseenter={checkFlip}
+>
 	<!-- Floating action bar — appears on hover at top-right of message -->
-	<div class="message-actions" class:picker-open={showPicker || showFullPicker}>
+	<div class="message-actions" class:picker-open={showPicker || showFullPicker} class:flipped={isFlipped}>
 		<button
 			class="action-btn"
 			onclick={handleReply}
@@ -412,6 +426,11 @@
 		pointer-events: auto;
 	}
 
+	.message-actions.flipped {
+		top: unset;
+		bottom: -14px;
+	}
+
 	.action-btn {
 		display: inline-flex;
 		align-items: center;
@@ -460,6 +479,11 @@
 		background: var(--bg-secondary);
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 		z-index: 10;
+	}
+
+	.message-actions.flipped .emoji-picker {
+		bottom: unset;
+		top: calc(100% + 4px);
 	}
 
 	.emoji-option {
