@@ -22,12 +22,14 @@
 	let searchInput = $state<HTMLInputElement>();
 	let containerEl = $state<HTMLDivElement>();
 
-	const dynamicMaxHeight = $derived.by(() => {
+	/** Compute max-height based on available viewport space below the picker.
+	 *  Called once at render — not reactive to scroll/resize (by design). */
+	function getMaxHeight(): string {
 		if (!flipped || !containerEl) return '420px';
 		const rect = containerEl.getBoundingClientRect();
 		const available = window.innerHeight - rect.top - 16;
 		return `${Math.min(420, Math.max(200, available))}px`;
-	});
+	}
 
 	const frequentEmojis = getFrequentEmojis(16);
 
@@ -111,7 +113,7 @@
 	bind:this={containerEl}
 	class="emoji-picker-container"
 	class:flipped
-	style:max-height={flipped ? dynamicMaxHeight : undefined}
+	style:max-height={flipped ? getMaxHeight() : undefined}
 	role="dialog"
 	aria-label="Emoji picker"
 >
@@ -302,11 +304,6 @@
 			padding-bottom: env(safe-area-inset-bottom);
 			animation: slide-up 200ms ease;
 			z-index: 100;
-		}
-
-		.emoji-picker-container.flipped {
-			top: unset;
-			bottom: 0;
 		}
 
 		.picker-backdrop {
