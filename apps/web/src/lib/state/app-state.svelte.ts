@@ -122,6 +122,7 @@ export class AppState {
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
 	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
+	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
 	serverSettingsCategory = $state<'general' | 'emojis' | 'members'>('general');
 	isUpdatingServerName = $state(false);
@@ -339,6 +340,12 @@ export class AppState {
 	/** Dismiss the alpha notification banner. */
 	dismissAlphaNotification(): void {
 		this.showAlphaNotification = false;
+	}
+
+	/** Submit a bug report to GitHub via the API proxy. */
+	async submitBugReport(title: string, description: string, userAgent: string, currentPage: string): Promise<{ issueUrl: string }> {
+		if (!this.idToken) throw new Error('Not authenticated');
+		return this.api.submitBugReport(this.idToken, title, description, userAgent, currentPage);
 	}
 
 	/* ═══════════════════ Auth ═══════════════════ */

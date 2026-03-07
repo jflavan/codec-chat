@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import DmList from '$lib/components/dm/DmList.svelte';
+	import UserPanel from '$lib/components/channel-sidebar/UserPanel.svelte';
 	import VoiceConnectedBar from '$lib/components/channel-sidebar/VoiceConnectedBar.svelte';
 
 	const app = getAppState();
@@ -45,6 +46,8 @@
 	{#if app.activeVoiceChannelId || app.activeCall}
 		<VoiceConnectedBar />
 	{/if}
+
+	<UserPanel />
 </aside>
 
 <style>

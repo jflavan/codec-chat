@@ -16,6 +16,7 @@
 	import LoginScreen from '$lib/components/LoginScreen.svelte';
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
+	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -128,6 +129,10 @@
 
 {#if app.serverSettingsOpen}
 	<ServerSettingsModal />
+{/if}
+
+{#if app.bugReportOpen}
+	<BugReportModal />
 {/if}
 
 <ImagePreview />

@@ -27,12 +27,21 @@
 			</li>
 		{/each}
 	</ul>
+	<div class="sidebar-footer">
+		<button
+			class="bug-report-btn"
+			onclick={() => { app.closeSettings(); app.bugReportOpen = true; }}
+		>
+			🐛 Report a Bug
+		</button>
+	</div>
 </nav>
 
 <style>
 	.settings-sidebar {
 		display: flex;
 		flex-direction: column;
+		height: 100%;
 	}
 
 	.category-list {
@@ -81,6 +90,34 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.sidebar-footer {
+		margin-top: auto;
+		padding: 16px 8px 0;
+		border-top: 1px solid var(--border);
+	}
+
+	.bug-report-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 8px 16px;
+		min-height: 44px;
+		border: none;
+		background: none;
+		color: var(--text-muted);
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		border-radius: 4px;
+		transition: background-color 150ms ease, color 150ms ease;
+	}
+
+	.bug-report-btn:hover {
+		background: var(--bg-message-hover);
+		color: var(--text-normal);
 	}
 
 	/* Responsive: horizontal tabs on small screens */
