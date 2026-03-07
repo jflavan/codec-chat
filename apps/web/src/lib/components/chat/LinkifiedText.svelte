@@ -1,12 +1,13 @@
 <script lang="ts">
-	import type { Mention } from '$lib/types/index.js';
+	import type { Mention, CustomEmoji } from '$lib/types/index.js';
 
-	let { text, mentions = [] }: { text: string; mentions?: Mention[] } = $props();
+	let { text, mentions = [], customEmojis = [] }: { text: string; mentions?: Mention[]; customEmojis?: CustomEmoji[] } = $props();
 
 	interface TextSegment {
-		type: 'text' | 'link' | 'mention' | 'bold' | 'italic';
+		type: 'text' | 'link' | 'mention' | 'bold' | 'italic' | 'custom-emoji';
 		value: string;
 		displayName?: string;
+		imageUrl?: string;
 	}
 
 	const COMBINED_REGEX = /(<@here>|<@[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}>|https?:\/\/[^\s<>"')\]},;]+)/gi;
@@ -40,6 +41,45 @@
 		}
 
 		return parts.length > 0 ? parts : [{ type: 'text', value }];
+	}
+
+	const CUSTOM_EMOJI_REGEX = /:([a-zA-Z0-9_]{2,32}):/g;
+
+	function parseCustomEmojis(segs: TextSegment[], emojiMap: Map<string, CustomEmoji>): TextSegment[] {
+		if (emojiMap.size === 0) return segs;
+
+		const result: TextSegment[] = [];
+		for (const seg of segs) {
+			if (seg.type !== 'text') {
+				result.push(seg);
+				continue;
+			}
+
+			let lastIndex = 0;
+			for (const match of seg.value.matchAll(CUSTOM_EMOJI_REGEX)) {
+				const name = match[1].toLowerCase();
+				const emoji = emojiMap.get(name);
+				if (!emoji) continue;
+
+				const matchIndex = match.index;
+				if (matchIndex > lastIndex) {
+					result.push({ type: 'text', value: seg.value.slice(lastIndex, matchIndex) });
+				}
+				result.push({
+					type: 'custom-emoji',
+					value: emoji.name,
+					imageUrl: emoji.imageUrl
+				});
+				lastIndex = matchIndex + match[0].length;
+			}
+
+			if (lastIndex === 0) {
+				result.push(seg);
+			} else if (lastIndex < seg.value.length) {
+				result.push({ type: 'text', value: seg.value.slice(lastIndex) });
+			}
+		}
+		return result;
 	}
 
 	const segments: TextSegment[] = $derived.by(() => {
@@ -83,16 +123,19 @@
 			rawSegments.push({ type: 'text', value: text });
 		}
 
-		const result: TextSegment[] = [];
+		// Pass 1: Parse formatting (bold/italic) in text segments
+		const formatted: TextSegment[] = [];
 		for (const seg of rawSegments) {
 			if (seg.type === 'text') {
-				result.push(...parseFormatting(seg.value));
+				formatted.push(...parseFormatting(seg.value));
 			} else {
-				result.push(seg);
+				formatted.push(seg);
 			}
 		}
 
-		return result;
+		// Pass 2: Parse custom emojis in remaining text segments
+		const emojiMap = new Map(customEmojis.map((e) => [e.name.toLowerCase(), e]));
+		return parseCustomEmojis(formatted, emojiMap);
 	});
 </script>
 
@@ -102,7 +145,15 @@
 			target="_blank"
 			rel="noopener noreferrer">{segment.value}</a>{:else if segment.type === 'mention'}<span
 			class="mention-badge"
-			title={segment.displayName}>@{segment.displayName}</span>{:else if segment.type === 'bold'}<strong class="format-bold">{segment.value}</strong>{:else if segment.type === 'italic'}<em class="format-italic">{segment.value}</em>{:else}{segment.value}{/if}{/each}
+			title={segment.displayName}>@{segment.displayName}</span>{:else if segment.type === 'custom-emoji'}<img
+			src={segment.imageUrl}
+			alt=":{segment.value}:"
+			title=":{segment.value}:"
+			class="custom-emoji-inline"
+			width="20"
+			height="20"
+			loading="lazy"
+		/>{:else if segment.type === 'bold'}<strong class="format-bold">{segment.value}</strong>{:else if segment.type === 'italic'}<em class="format-italic">{segment.value}</em>{:else}{segment.value}{/if}{/each}
 
 <style>
 	.message-link {
@@ -134,5 +185,11 @@
 
 	.format-italic {
 		font-style: italic;
+	}
+
+	.custom-emoji-inline {
+		display: inline;
+		vertical-align: middle;
+		margin: 0 1px;
 	}
 </style>

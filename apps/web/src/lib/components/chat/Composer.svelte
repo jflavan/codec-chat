@@ -3,11 +3,14 @@
 	import type { Member } from '$lib/types/index.js';
 	import ReplyComposerBar from './ReplyComposerBar.svelte';
 	import ComposerOverlay from './ComposerOverlay.svelte';
+	import EmojiPicker from './EmojiPicker.svelte';
+	import { recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 
 	const app = getAppState();
 	let inputEl: HTMLInputElement;
 	let fileInputEl: HTMLInputElement;
 	let overlayEl: HTMLDivElement;
+	let showEmojiPicker = $state(false);
 
 	/* ───── Mention autocomplete state ───── */
 	let showMentionPicker = $state(false);
@@ -66,6 +69,22 @@
 		showMentionPicker = false;
 		mentionQuery = '';
 		inputEl?.focus();
+	}
+
+	function handleEmojiInsert(emoji: string) {
+		recordEmojiUse(emoji);
+		if (!inputEl) return;
+		const start = inputEl.selectionStart ?? app.messageBody.length;
+		const end = inputEl.selectionEnd ?? start;
+		const before = app.messageBody.slice(0, start);
+		const after = app.messageBody.slice(end);
+		app.messageBody = before + emoji + after;
+		// Set cursor position after inserted emoji
+		const newPos = start + emoji.length;
+		requestAnimationFrame(() => {
+			inputEl.focus();
+			inputEl.setSelectionRange(newPos, newPos);
+		});
 	}
 
 	function handleKeydown(e: KeyboardEvent): void {
@@ -223,6 +242,18 @@
 				/>
 			</div>
 			<button
+				class="composer-emoji"
+				type="button"
+				onclick={() => (showEmojiPicker = !showEmojiPicker)}
+				disabled={!app.selectedChannelId || app.isSending}
+				aria-label="Add emoji"
+				title="Add emoji"
+			>
+				<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+					<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"/>
+				</svg>
+			</button>
+			<button
 				class="composer-send"
 				type="submit"
 				disabled={!app.selectedChannelId || (!app.messageBody.trim() && !app.pendingImage) || app.isSending}
@@ -233,6 +264,16 @@
 				</svg>
 			</button>
 		</div>
+		{#if showEmojiPicker}
+			<div class="composer-emoji-picker-wrapper">
+				<EmojiPicker
+					mode="insert"
+					onSelect={handleEmojiInsert}
+					onClose={() => { showEmojiPicker = false; }}
+					customEmojis={app.customEmojis}
+				/>
+			</div>
+		{/if}
 	{/if}
 </form>
 
@@ -351,6 +392,33 @@
 	.composer-send:disabled {
 		opacity: 0.3;
 		cursor: not-allowed;
+	}
+
+	.composer-emoji {
+		background: var(--input-bg);
+		border: none;
+		box-sizing: border-box;
+		padding: 12px 6px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease;
+	}
+
+	.composer-emoji:hover:not(:disabled) {
+		color: var(--accent);
+	}
+
+	.composer-emoji:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	.composer-emoji-picker-wrapper {
+		position: relative;
+		/* The EmojiPicker itself has position: absolute and will float above */
 	}
 
 	/* ───── Disconnected state ───── */
@@ -519,6 +587,11 @@
 
 		.composer-attach,
 		.composer-send {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.composer-emoji {
 			min-width: 44px;
 			min-height: 44px;
 		}
