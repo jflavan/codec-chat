@@ -1,20 +1,32 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import type { Reaction, Member } from '$lib/types/index.js';
+	import type { Reaction, Member, CustomEmoji } from '$lib/types/index.js';
 
 	let {
 		reactions,
 		currentUserId,
 		onToggle,
 		isPending = () => false,
-		members = []
+		members = [],
+		customEmojis = []
 	}: {
 		reactions: Reaction[];
 		currentUserId: string | null;
 		onToggle: (emoji: string) => void;
 		isPending?: (emoji: string) => boolean;
 		members?: Member[];
+		customEmojis?: CustomEmoji[];
 	} = $props();
+
+	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
+
+	const customEmojiMap = $derived(new Map(customEmojis.map((e) => [e.name.toLowerCase(), e])));
+
+	function getCustomEmoji(emoji: string): CustomEmoji | undefined {
+		const match = CUSTOM_EMOJI_REGEX.exec(emoji);
+		if (!match) return undefined;
+		return customEmojiMap.get(match[1].toLowerCase());
+	}
 
 	let hoveredEmoji: string | null = $state(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
@@ -93,6 +105,7 @@
 
 <div class="reaction-bar">
 	{#each reactions as reaction (reaction.emoji)}
+		{@const custom = getCustomEmoji(reaction.emoji)}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="reaction-pill-wrapper"
@@ -111,14 +124,26 @@
 				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
 				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
 			>
-				<span class="reaction-emoji">{reaction.emoji}</span>
+				<span class="reaction-emoji">
+					{#if custom}
+						<img src={custom.imageUrl} alt=":{custom.name}:" title=":{custom.name}:" class="custom-emoji-reaction" width="18" height="18" loading="lazy" />
+					{:else}
+						{reaction.emoji}
+					{/if}
+				</span>
 				<span class="reaction-count">{reaction.count}</span>
 			</button>
 
 			{#if hoveredEmoji === reaction.emoji}
 				{@const info = getReactorNames(reaction)}
 				<div class="reaction-popover" role="tooltip" id="popover-{reactions.indexOf(reaction)}">
-					<div class="popover-emoji">{reaction.emoji}</div>
+					<div class="popover-emoji">
+						{#if custom}
+							<img src={custom.imageUrl} alt=":{custom.name}:" title=":{custom.name}:" class="custom-emoji-popover" width="28" height="28" loading="lazy" />
+						{:else}
+							{reaction.emoji}
+						{/if}
+					</div>
 					{#if info.names.length > 0}
 						<ul class="popover-names">
 							{#each info.names as name}
@@ -191,6 +216,19 @@
 
 	.reaction-emoji {
 		font-size: 14px;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.custom-emoji-reaction {
+		display: block;
+		object-fit: contain;
+	}
+
+	.custom-emoji-popover {
+		display: block;
+		margin: 0 auto;
+		object-fit: contain;
 	}
 
 	.reaction-count {

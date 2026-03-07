@@ -154,6 +154,8 @@
 	.emoji-picker-container {
 		position: absolute;
 		z-index: 100;
+		bottom: calc(100% + 4px);
+		right: 0;
 		width: 352px;
 		max-height: 420px;
 		display: flex;
