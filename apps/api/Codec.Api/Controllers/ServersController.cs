@@ -554,34 +554,11 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureOwnerAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = await db.Servers
-            .Include(s => s.Channels)
-            .Include(s => s.Members)
-            .Include(s => s.Invites)
-            .FirstAsync(s => s.Id == serverId);
-
-        // Delete all messages and their associated data in server channels.
-        var channelIds = server.Channels.Select(c => c.Id).ToList();
-        if (channelIds.Count > 0)
-        {
-            var linkPreviews = await db.LinkPreviews
-                .Where(lp => lp.MessageId != null && db.Messages.Any(m => channelIds.Contains(m.ChannelId) && m.Id == lp.MessageId))
-                .ToListAsync();
-            db.LinkPreviews.RemoveRange(linkPreviews);
-
-            var reactions = await db.Reactions
-                .Where(r => db.Messages.Any(m => channelIds.Contains(m.ChannelId) && m.Id == r.MessageId))
-                .ToListAsync();
-            db.Reactions.RemoveRange(reactions);
-
-            var messages = await db.Messages
-                .Where(m => channelIds.Contains(m.ChannelId))
-                .ToListAsync();
-            db.Messages.RemoveRange(messages);
-        }
-
-        db.Servers.Remove(server);
-        await db.SaveChangesAsync();
+        // Bulk-delete the server in a single SQL statement; PostgreSQL cascade
+        // deletes handle channels, messages, reactions, link previews, members,
+        // invites, custom emojis, and voice states automatically.
+        var deleted = await db.Servers.Where(s => s.Id == serverId).ExecuteDeleteAsync();
+        if (deleted == 0) return NotFound();
 
         // Notify all connected clients that the server was deleted.
         await hub.Clients.Group($"server-{serverId}").SendAsync("ServerDeleted", new

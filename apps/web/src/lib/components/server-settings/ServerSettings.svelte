@@ -200,8 +200,10 @@
 				{#if confirmDeleteServer}
 					<p class="danger-warning">Are you sure? This will permanently delete the server and all its channels, messages, members, and invites.</p>
 					<div class="inline-actions">
-						<button type="button" class="btn-danger" onclick={handleDeleteServer}>Delete</button>
-						<button type="button" class="btn-secondary" onclick={() => (confirmDeleteServer = false)}>Cancel</button>
+						<button type="button" class="btn-danger" disabled={app.isDeletingServer} onclick={handleDeleteServer}>
+							{app.isDeletingServer ? 'Deleting…' : 'Delete'}
+						</button>
+						<button type="button" class="btn-secondary" disabled={app.isDeletingServer} onclick={() => (confirmDeleteServer = false)}>Cancel</button>
 					</div>
 				{:else}
 					<button type="button" class="btn-danger" onclick={() => (confirmDeleteServer = true)}>Delete Server</button>
