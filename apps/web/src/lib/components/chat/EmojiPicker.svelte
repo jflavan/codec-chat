@@ -20,6 +20,14 @@
 	let search = $state('');
 	let scrollContainer = $state<HTMLDivElement>();
 	let searchInput = $state<HTMLInputElement>();
+	let containerEl = $state<HTMLDivElement>();
+
+	const dynamicMaxHeight = $derived.by(() => {
+		if (!flipped || !containerEl) return '420px';
+		const rect = containerEl.getBoundingClientRect();
+		const available = window.innerHeight - rect.top - 16;
+		return `${Math.min(420, Math.max(200, available))}px`;
+	});
 
 	const frequentEmojis = getFrequentEmojis(16);
 
@@ -99,7 +107,14 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="picker-backdrop" onclick={onClose}></div>
 
-<div class="emoji-picker-container" class:flipped role="dialog" aria-label="Emoji picker">
+<div
+	bind:this={containerEl}
+	class="emoji-picker-container"
+	class:flipped
+	style:max-height={flipped ? dynamicMaxHeight : undefined}
+	role="dialog"
+	aria-label="Emoji picker"
+>
 	<div class="picker-search">
 		<input
 			bind:this={searchInput}
