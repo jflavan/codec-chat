@@ -22,7 +22,7 @@ public class GitHubIssueService(HttpClient httpClient, IConfiguration config) : 
             labels = new[] { "user-report" }
         });
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.github.com/repos/{owner}/{repo}/issues")
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/repos/{owner}/{repo}/issues")
         {
             Content = new StringContent(payload, Encoding.UTF8, "application/json")
         };

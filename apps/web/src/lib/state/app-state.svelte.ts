@@ -340,7 +340,8 @@ export class AppState {
 
 	/** Submit a bug report to GitHub via the API proxy. */
 	async submitBugReport(title: string, description: string, userAgent: string, currentPage: string): Promise<{ issueUrl: string }> {
-		return this.api.submitBugReport(this.idToken!, title, description, userAgent, currentPage);
+		if (!this.idToken) throw new Error('Not authenticated');
+		return this.api.submitBugReport(this.idToken, title, description, userAgent, currentPage);
 	}
 
 	/* ═══════════════════ Auth ═══════════════════ */
