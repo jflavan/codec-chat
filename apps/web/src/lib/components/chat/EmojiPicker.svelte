@@ -44,9 +44,17 @@
 		const query = search.toLowerCase().trim();
 		const cats: DisplayCategory[] = [];
 
+		const customByKey = new Map(customEmojis.map((c) => [`:${c.name}:`, c]));
+
 		// Frequent category
 		if (frequentEmojis.length > 0) {
-			const frequentItems = frequentEmojis.map((e) => ({ emoji: e, name: e, isCustom: false }));
+			const frequentItems = frequentEmojis.map((e) => {
+				const custom = customByKey.get(e);
+				if (custom) {
+					return { emoji: e, name: custom.name, isCustom: true, imageUrl: custom.imageUrl };
+				}
+				return { emoji: e, name: e, isCustom: false };
+			});
 			const filtered = query
 				? frequentItems.filter((item) => item.emoji.includes(query) || item.name.toLowerCase().includes(query))
 				: frequentItems;
@@ -151,7 +159,7 @@
 							onclick={() => handleSelect(item.emoji)}
 						>
 							{#if item.isCustom && item.imageUrl}
-								<img src={item.imageUrl} alt={item.name} width="24" height="24" />
+								<img src={item.imageUrl} alt={item.name} width="20" height="20" />
 							{:else}
 								{item.emoji}
 							{/if}
@@ -192,6 +200,7 @@
 	}
 
 	.picker-search {
+		flex-shrink: 0;
 		padding: 8px;
 		border-bottom: 1px solid var(--border);
 	}
@@ -217,6 +226,7 @@
 	}
 
 	.category-tabs {
+		flex-shrink: 0;
 		display: flex;
 		padding: 4px 8px;
 		gap: 2px;
@@ -277,8 +287,9 @@
 		border: none;
 		border-radius: 4px;
 		cursor: pointer;
-		font-size: 22px;
+		font-size: 20px;
 		line-height: 1;
+		padding: 0;
 		transition: background 0.12s;
 	}
 
@@ -287,8 +298,8 @@
 	}
 
 	.emoji-btn img {
-		width: 24px;
-		height: 24px;
+		width: 20px;
+		height: 20px;
 		object-fit: contain;
 	}
 
