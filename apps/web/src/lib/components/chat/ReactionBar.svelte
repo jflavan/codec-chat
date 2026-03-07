@@ -35,7 +35,7 @@
 		if (hoverTimeout) clearTimeout(hoverTimeout);
 		hoverTimeout = setTimeout(() => {
 			const rect = el.getBoundingClientRect();
-			popoverFlipped = rect.top < 80;
+			popoverFlipped = rect.top < POPOVER_FLIP_THRESHOLD_PX;
 			hoveredEmoji = emoji;
 		}, 250);
 	}
@@ -50,12 +50,15 @@
 	let touchTriggered = $state(false);
 	let popoverFlipped = $state(false);
 
+	/** Popover height (~80px) + buffer to avoid clipping at viewport top */
+	const POPOVER_FLIP_THRESHOLD_PX = 80;
+
 	function handleTouchStart(emoji: string, el: HTMLElement) {
 		touchTriggered = false;
 		touchTimeout = setTimeout(() => {
 			touchTriggered = true;
 			const rect = el.getBoundingClientRect();
-			popoverFlipped = rect.top < 80;
+			popoverFlipped = rect.top < POPOVER_FLIP_THRESHOLD_PX;
 			hoveredEmoji = emoji;
 		}, 500);
 	}

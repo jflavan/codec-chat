@@ -71,6 +71,7 @@
 		const rect = messageEl.getBoundingClientRect();
 		isFlipped = rect.top < FLIP_THRESHOLD_PX;
 	}
+
 	const quickEmojis = getFrequentEmojis(8);
 
 	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
@@ -153,6 +154,7 @@
 	class:grouped
 	class:mentioned={isMentioned}
 	onmouseenter={checkFlip}
+	onfocusin={checkFlip}
 >
 	<!-- Floating action bar — appears on hover at top-right of message -->
 	<div class="message-actions" class:picker-open={showPicker || showFullPicker} class:flipped={isFlipped}>
@@ -723,10 +725,8 @@
 			animation: slide-up 200ms ease;
 		}
 
-		.message-actions.flipped .emoji-picker {
-			top: unset;
-			bottom: 0;
-		}
+		/* Note: position: fixed on .emoji-picker requires no ancestor has
+		   transform/will-change — currently safe, but fragile if ancestors change. */
 
 		.picker-backdrop {
 			background: rgba(0, 0, 0, 0.5);
