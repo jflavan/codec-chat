@@ -282,6 +282,79 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
     }
 
     /// <summary>
+    /// Changes a member's role within a server.
+    /// Owner can promote to Admin or demote to Member.
+    /// Admin can promote Members to Admin but cannot demote other Admins.
+    /// Nobody can change the Owner's role or their own role.
+    /// </summary>
+    [HttpPatch("{serverId:guid}/members/{targetUserId:guid}/role")]
+    public async Task<IActionResult> UpdateMemberRole(Guid serverId, Guid targetUserId, [FromBody] UpdateMemberRoleRequest request)
+    {
+        if (!Enum.TryParse<ServerRole>(request.Role, ignoreCase: true, out var newRole)
+            || newRole is ServerRole.Owner)
+        {
+            return BadRequest(new { error = "Role must be 'Admin' or 'Member'." });
+        }
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        if (targetUserId == appUser.Id)
+        {
+            return BadRequest(new { error = "You cannot change your own role." });
+        }
+
+        var targetMembership = await db.ServerMembers
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+
+        if (targetMembership is null)
+        {
+            return NotFound(new { error = "User is not a member of this server." });
+        }
+
+        if (targetMembership.Role is ServerRole.Owner)
+        {
+            return BadRequest(new { error = "Cannot change the server owner's role." });
+        }
+
+        // Admins cannot demote other Admins (only Owner/GlobalAdmin can).
+        if (!appUser.IsGlobalAdmin
+            && callerMembership.Role is ServerRole.Admin
+            && targetMembership.Role is ServerRole.Admin
+            && newRole is ServerRole.Member)
+        {
+            return Forbid();
+        }
+
+        if (targetMembership.Role == newRole)
+        {
+            return Ok(new
+            {
+                targetMembership.UserId,
+                Role = targetMembership.Role.ToString(),
+                targetMembership.JoinedAt
+            });
+        }
+
+        targetMembership.Role = newRole;
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRoleChanged", new
+        {
+            serverId,
+            userId = targetUserId,
+            newRole = newRole.ToString()
+        });
+
+        return Ok(new
+        {
+            targetMembership.UserId,
+            Role = targetMembership.Role.ToString(),
+            targetMembership.JoinedAt
+        });
+    }
+
+    /// <summary>
     /// Lists channels within a server. Requires membership or global admin.
     /// </summary>
     [HttpGet("{serverId:guid}/channels")]

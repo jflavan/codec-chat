@@ -38,6 +38,9 @@
 		</div>
 	{/if}
 	<span class="member-name">{member.displayName}</span>
+	{#if member.role === 'Owner' || member.role === 'Admin'}
+		<span class="role-badge role-badge-{member.role.toLowerCase()}">{member.role}</span>
+	{/if}
 	{#if canKick}
 		{#if confirming}
 			<button class="kick-btn kick-confirm" onclick={handleKick} aria-label="Confirm kick {member.displayName}">
@@ -102,6 +105,27 @@
 
 	.member-item:hover .member-name {
 		color: var(--text-normal);
+	}
+
+	.role-badge {
+		font-size: 10px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		padding: 1px 5px;
+		border-radius: 3px;
+		flex-shrink: 0;
+		line-height: 1.4;
+	}
+
+	.role-badge-owner {
+		color: var(--accent);
+		background: rgba(var(--accent-rgb), 0.15);
+	}
+
+	.role-badge-admin {
+		color: #f0b232;
+		background: rgba(240, 178, 50, 0.15);
 	}
 
 	.kick-btn {

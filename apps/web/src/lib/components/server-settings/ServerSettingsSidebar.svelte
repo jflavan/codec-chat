@@ -9,11 +9,12 @@
 	);
 
 	const categories = $derived.by(() => {
-		const cats: { id: 'general' | 'emojis'; label: string }[] = [
+		const cats: { id: 'general' | 'emojis' | 'members'; label: string }[] = [
 			{ id: 'general', label: 'General' }
 		];
 		if (isAdminOrOwner) {
 			cats.push({ id: 'emojis', label: 'Emojis' });
+			cats.push({ id: 'members', label: 'Members' });
 		}
 		return cats;
 	});

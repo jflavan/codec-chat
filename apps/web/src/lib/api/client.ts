@@ -505,6 +505,14 @@ export class ApiClient {
 		);
 	}
 
+	/** Change a member's role in a server (requires Owner or Admin role). */
+	updateMemberRole(token: string, serverId: string, userId: string, role: 'Admin' | 'Member'): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/role`,
+			{ method: 'PATCH', headers: this.headers(token, true), body: JSON.stringify({ role }) }
+		);
+	}
+
 	/* ───── Server Invites ───── */
 
 	/** Create an invite code for a server (requires Owner or Admin role). */
