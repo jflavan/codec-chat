@@ -127,6 +127,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 
 ### Alpha Notification & Bug Reporting
 - ✅ Alpha notification modal shown on every login (ALPHA badge, welcome message, bug reporting guidance)
+- ✅ In-app bug report submission — `BugReportModal` dialog with title/description form; auto-collects browser/OS, display name, and current page as metadata; proxied to GitHub Issues API via `POST /issues` endpoint (server-side PAT, never exposed to frontend); accessible from alpha banner and settings sidebar "Report a Bug" button; loading/success/error states with link to created issue
 
 ### Global Admin
 - ✅ Configurable global admin role via `GlobalAdmin:Email` application setting
