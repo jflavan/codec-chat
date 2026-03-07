@@ -17,6 +17,9 @@
 param name string
 param location string
 
+@description('Include cloud-init customData in osProfile. Set to true only for the initial VM deployment. Azure does not allow changing customData on an existing VM.')
+param includeCustomData bool = false
+
 @description('SSH public key for the azureuser admin account.')
 @secure()
 param adminSshPublicKey string
@@ -186,6 +189,9 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
 }
 
 // ── cloud-init: install Docker only; docker-compose.yml is deployed by CI/CD ───
+// NOTE: customData can only be set on initial VM creation. Azure rejects changes
+// to osProfile.customData on existing VMs. Use includeCustomData=true only for
+// the first deployment.
 var cloudInit = '''
 #cloud-config
 
@@ -204,6 +210,22 @@ runcmd:
   - mkdir -p /opt/voice
   - chown azureuser:azureuser /opt/voice
 '''
+
+var baseOsProfile = {
+  computerName: name
+  adminUsername: adminUsername
+  linuxConfiguration: {
+    disablePasswordAuthentication: true
+    ssh: {
+      publicKeys: [
+        {
+          path: '/home/${adminUsername}/.ssh/authorized_keys'
+          keyData: adminSshPublicKey
+        }
+      ]
+    }
+  }
+}
 
 // ── Virtual Machine ─────────────────────────────────────────────────────────────
 resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
@@ -225,22 +247,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
         diskSizeGB: 30
       }
     }
-    osProfile: {
-      computerName: name
-      adminUsername: adminUsername
-      customData: base64(cloudInit)
-      linuxConfiguration: {
-        disablePasswordAuthentication: true
-        ssh: {
-          publicKeys: [
-            {
-              path: '/home/${adminUsername}/.ssh/authorized_keys'
-              keyData: adminSshPublicKey
-            }
-          ]
-        }
-      }
-    }
+    osProfile: includeCustomData ? union(baseOsProfile, { customData: base64(cloudInit) }) : baseOsProfile
     networkProfile: {
       networkInterfaces: [{ id: nic.id }]
     }
