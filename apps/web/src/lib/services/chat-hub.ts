@@ -92,6 +92,12 @@ export type MemberLeftEvent = {
 	serverId: string;
 };
 
+export type MemberRoleChangedEvent = {
+	serverId: string;
+	userId: string;
+	newRole: string;
+};
+
 export type MessageDeletedEvent = {
 	messageId: string;
 	channelId: string;
@@ -223,6 +229,7 @@ export type SignalRCallbacks = {
 	onMentionReceived?: (event: MentionReceivedEvent) => void;
 	onMemberJoined?: (event: MemberJoinedEvent) => void;
 	onMemberLeft?: (event: MemberLeftEvent) => void;
+	onMemberRoleChanged?: (event: MemberRoleChangedEvent) => void;
 	onMessageDeleted?: (event: MessageDeletedEvent) => void;
 	onDmMessageDeleted?: (event: DmMessageDeletedEvent) => void;
 	onMessageEdited?: (event: MessageEditedEvent) => void;
@@ -318,6 +325,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onMemberLeft) {
 			connection.on('MemberLeft', callbacks.onMemberLeft);
+		}
+		if (callbacks.onMemberRoleChanged) {
+			connection.on('MemberRoleChanged', callbacks.onMemberRoleChanged);
 		}
 		if (callbacks.onMessageDeleted) {
 			connection.on('MessageDeleted', callbacks.onMessageDeleted);
