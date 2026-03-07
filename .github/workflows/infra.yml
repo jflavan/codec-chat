@@ -84,7 +84,8 @@ jobs:
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
-              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}'
+              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         run: |
@@ -104,7 +105,8 @@ jobs:
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
-              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}'
+              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -124,7 +126,8 @@ jobs:
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
-              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}'
+              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
 
       - name: Show deployment outputs
         run: |

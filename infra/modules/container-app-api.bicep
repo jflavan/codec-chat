@@ -26,6 +26,9 @@ param voiceTurnKvUrl string = ''
 @description('Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled.')
 param voiceSfuInternalKeyKvUrl string = ''
 
+@description('Key Vault secret URL for the GitHub PAT. Leave empty to disable in-app bug reporting.')
+param gitHubTokenKvUrl string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -105,6 +108,12 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: voiceSfuInternalKeyKvUrl
           identity: 'system'
         }
+      ] : [], gitHubTokenKvUrl != '' ? [
+        {
+          name: 'github-token'
+          keyVaultUrl: gitHubTokenKvUrl
+          identity: 'system'
+        }
       ] : [])
       registries: [
         {
@@ -173,6 +182,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Voice__SfuInternalKey'
               secretRef: 'voice-sfu-internal-key'
+            }
+          ] : [], gitHubTokenKvUrl != '' ? [
+            {
+              name: 'GitHub__Token'
+              secretRef: 'github-token'
             }
           ] : [])
           probes: [

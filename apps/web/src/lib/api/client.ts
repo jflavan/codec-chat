@@ -638,4 +638,20 @@ export class ApiClient {
 			headers: this.headers(token)
 		});
 	}
+
+	/* ───── Bug Reports ───── */
+
+	submitBugReport(
+		token: string,
+		title: string,
+		description: string,
+		userAgent: string,
+		currentPage: string
+	): Promise<{ issueUrl: string }> {
+		return this.request(`${this.baseUrl}/issues`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ title, description, userAgent, currentPage })
+		});
+	}
 }

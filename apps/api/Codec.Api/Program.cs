@@ -225,6 +225,21 @@ builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =
     }
 });
 
+// GitHub Issues API client for in-app bug reports.
+var gitHubToken = builder.Configuration["GitHub:Token"];
+if (!string.IsNullOrWhiteSpace(gitHubToken))
+{
+    builder.Services.AddHttpClient<IGitHubIssueService, GitHubIssueService>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.github.com");
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gitHubToken);
+        client.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
+        client.DefaultRequestHeaders.Add("User-Agent", "CodecBot/1.0");
+        client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        client.Timeout = TimeSpan.FromSeconds(15);
+    });
+}
+
 var app = builder.Build();
 
 // Ensure the default "Codec HQ" server exists in every environment.

@@ -47,6 +47,10 @@ param voiceAdminSshPublicKey string = ''
 @description('Source IP or CIDR allowed to SSH into the voice VM. Set to your operator CIDR (e.g. "203.0.113.0/24"). Defaults to empty string; the voice-vm module will use "AzureCloud" (deny internet SSH) when this is empty and voiceVmEnabled is false.')
 param voiceSshAllowedSourcePrefix string = ''
 
+@description('GitHub fine-grained PAT with issues:write scope for in-app bug reporting. Leave empty to disable.')
+@secure()
+param gitHubToken string = ''
+
 @description('HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
 @secure()
 param voiceTurnSecret string = ''
@@ -148,6 +152,17 @@ module globalAdminEmailSecret 'modules/key-vault-secret.bicep' = {
   }
 }
 
+// ── GitHub PAT for in-app bug reporting ──────────────────────────────────────────
+
+module gitHubTokenSecret 'modules/key-vault-secret.bicep' = if (gitHubToken != '') {
+  name: 'github-token-secret'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'GitHub--Token'
+    secretValue: gitHubToken
+  }
+}
+
 // ── Voice VM (mediasoup SFU + coturn) ────────────────────────────────────────────
 // Deployed only when voiceVmEnabled = true. Both services require UDP port exposure
 // that Azure Container Apps cannot provide, so they run on a dedicated VM instead.
@@ -234,6 +249,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     turnServerUrl: voiceVm.?outputs.turnServerUrl ?? ''
     voiceTurnKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--TurnSecret' : ''
     voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
+    gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
   }
 }
 

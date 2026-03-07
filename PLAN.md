@@ -46,8 +46,9 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
 - **Global admin role** — configurable global admin with full access to all servers (see all servers, read/post/react in any channel, manage channels/invites, rename servers, delete any server/channel/message, kick any member); seeded from `GlobalAdmin:Email` config; Key Vault integration for production
 - Real-time member list updates via SignalR server-scoped groups
-- Alpha notification banner with GitHub bug report link shown on every login
+- Alpha notification banner with in-app bug report modal shown on every login
 - GitHub Issues bug report template for alpha testers (`.github/ISSUE_TEMPLATE/bug-report.yml`)
+- In-app bug report submission via `POST /issues` endpoint (proxied to GitHub Issues API with server-side PAT; `BugReportModal` accessible from alpha banner and settings sidebar)
 - **Deployed to Azure** via Container Apps (Central US)
 - Database migrated from SQLite to PostgreSQL (Azure Database for PostgreSQL Flexible Server)
 - File storage migrated to Azure Blob Storage (avatars + images containers)
