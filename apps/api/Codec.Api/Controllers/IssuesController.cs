@@ -8,7 +8,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("issues")]
-public class IssuesController(IGitHubIssueService gitHubIssueService, IUserService userService) : ControllerBase
+public class IssuesController(IGitHubIssueService? gitHubIssueService, IUserService userService) : ControllerBase
 {
     private const int MaxTitleLength = 200;
     private const int MaxDescriptionLength = 5000;
@@ -16,6 +16,9 @@ public class IssuesController(IGitHubIssueService gitHubIssueService, IUserServi
     [HttpPost]
     public async Task<IActionResult> CreateIssue([FromBody] CreateIssueRequest request, CancellationToken ct)
     {
+        if (gitHubIssueService is null)
+            return StatusCode(501, new { error = "Bug reporting is not configured on this server." });
+
         if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > MaxTitleLength)
             return BadRequest(new { error = $"Title is required and must be {MaxTitleLength} characters or fewer." });
 
