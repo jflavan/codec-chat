@@ -1,0 +1,109 @@
+<script lang="ts">
+	import { getAppState } from '$lib/state/app-state.svelte.js';
+
+	const app = getAppState();
+
+	// Only show Emojis tab if user is admin, owner, or global admin
+	const isAdminOrOwner = $derived(
+		app.isGlobalAdmin || app.currentServerRole === 'Admin' || app.currentServerRole === 'Owner'
+	);
+
+	const categories = $derived.by(() => {
+		const cats: { id: 'general' | 'emojis'; label: string }[] = [
+			{ id: 'general', label: 'General' }
+		];
+		if (isAdminOrOwner) {
+			cats.push({ id: 'emojis', label: 'Emojis' });
+		}
+		return cats;
+	});
+</script>
+
+<nav class="settings-sidebar" aria-label="Server settings categories">
+	<ul class="category-list" role="tablist" aria-orientation="vertical">
+		{#each categories as cat (cat.id)}
+			<li role="presentation">
+				<button
+					role="tab"
+					class="category-item"
+					class:active={app.serverSettingsCategory === cat.id}
+					aria-selected={app.serverSettingsCategory === cat.id}
+					onclick={() => { app.serverSettingsCategory = cat.id; }}
+				>
+					<span class="category-label">{cat.label}</span>
+				</button>
+			</li>
+		{/each}
+	</ul>
+</nav>
+
+<style>
+	.settings-sidebar {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.category-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.category-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 8px 16px;
+		border: none;
+		border-left: 3px solid transparent;
+		background: none;
+		color: var(--text-muted);
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		border-radius: 0 4px 4px 0;
+		transition: background-color 150ms ease, color 150ms ease;
+		text-align: left;
+	}
+
+	.category-item:hover {
+		background: var(--bg-message-hover);
+	}
+
+	.category-item.active {
+		background: var(--bg-message-hover);
+		color: var(--text-header);
+		border-left-color: var(--accent);
+	}
+
+	.category-label {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	@media (max-width: 899px) {
+		.category-list {
+			flex-direction: row;
+			gap: 0;
+		}
+
+		.category-item {
+			border-left: none;
+			border-bottom: 3px solid transparent;
+			border-radius: 4px 4px 0 0;
+			padding: 12px 16px;
+			min-height: 44px;
+			justify-content: center;
+		}
+
+		.category-item.active {
+			border-bottom-color: var(--accent);
+			border-left-color: transparent;
+		}
+	}
+</style>

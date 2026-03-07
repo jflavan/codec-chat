@@ -52,6 +52,30 @@ export type LinkPreviewsReadyEvent = {
 	linkPreviews: LinkPreview[];
 };
 
+export type CustomEmojiAddedEvent = {
+	serverId: string;
+	emoji: {
+		id: string;
+		name: string;
+		imageUrl: string;
+		contentType: string;
+		isAnimated: boolean;
+		createdAt: string;
+		uploadedByUserId: string;
+	};
+};
+
+export type CustomEmojiUpdatedEvent = {
+	serverId: string;
+	emojiId: string;
+	name: string;
+};
+
+export type CustomEmojiDeletedEvent = {
+	serverId: string;
+	emojiId: string;
+};
+
 export type MentionReceivedEvent = {
 	id: string;
 	channelId: string;
@@ -218,6 +242,9 @@ export type SignalRCallbacks = {
 	onCallDeclined?: (event: CallDeclinedEvent) => void;
 	onCallEnded?: (event: CallEndedEvent) => void;
 	onCallMissed?: (event: CallMissedEvent) => void;
+	onCustomEmojiAdded?: (event: CustomEmojiAddedEvent) => void;
+	onCustomEmojiUpdated?: (event: CustomEmojiUpdatedEvent) => void;
+	onCustomEmojiDeleted?: (event: CustomEmojiDeletedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -348,6 +375,15 @@ export class ChatHubService {
 		}
 		if (callbacks.onCallMissed) {
 			connection.on('CallMissed', callbacks.onCallMissed);
+		}
+		if (callbacks.onCustomEmojiAdded) {
+			connection.on('CustomEmojiAdded', callbacks.onCustomEmojiAdded);
+		}
+		if (callbacks.onCustomEmojiUpdated) {
+			connection.on('CustomEmojiUpdated', callbacks.onCustomEmojiUpdated);
+		}
+		if (callbacks.onCustomEmojiDeleted) {
+			connection.on('CustomEmojiDeleted', callbacks.onCustomEmojiDeleted);
 		}
 
 		if (callbacks.onReconnecting) {
