@@ -154,6 +154,8 @@ export class AppState {
 	/* ───── real-time ───── */
 	typingUsers = $state<string[]>([]);
 	isHubConnected = $state(false);
+	ignoredReactionUpdates = $state<Map<string, string[]>>(new Map());
+	pendingReactionKeys = $state<Set<string>>(new Set());
 
 	/* ───── voice ───── */
 	activeVoiceChannelId = $state<string | null>(null);
@@ -413,6 +415,8 @@ export class AppState {
 		this.customEmojis = [];
 		this.showInvitePanel = false;
 		this.typingUsers = [];
+		this.ignoredReactionUpdates = new Map();
+		this.pendingReactionKeys = new Set();
 		this.error = null;
 		this.showFriendsPanel = false;
 		this.friendsTab = 'all';
@@ -1101,16 +1105,104 @@ export class AppState {
 		this.lightboxImageUrl = null;
 	}
 
+	private static reactionToggleKey(messageId: string, emoji: string): string {
+		return `${messageId}:${emoji}`;
+	}
+
+	private static serializeReactionSnapshot(reactions: ReadonlyArray<Message['reactions'][number]>): string {
+		return JSON.stringify(
+			reactions
+				.map((reaction) => ({
+					emoji: reaction.emoji,
+					count: reaction.count,
+					userIds: [...reaction.userIds].sort()
+				}))
+				.sort((reactionA, reactionB) => reactionA.emoji.localeCompare(reactionB.emoji))
+		);
+	}
+
+	private _setReactionPending(reactionKey: string, pending: boolean): void {
+		const next = new Set(this.pendingReactionKeys);
+		if (pending) {
+			next.add(reactionKey);
+		} else {
+			next.delete(reactionKey);
+		}
+		this.pendingReactionKeys = next;
+	}
+
+	private _updateMessageReactions(messageId: string, reactions: Message['reactions']): void {
+		this.messages = this.messages.map((message) =>
+			message.id === messageId ? { ...message, reactions } : message
+		);
+	}
+
+	private _rememberReactionUpdate(messageId: string, reactions: Message['reactions']): void {
+		const serialized = AppState.serializeReactionSnapshot(reactions);
+		const next = new Map(this.ignoredReactionUpdates);
+		next.set(messageId, [...(next.get(messageId) ?? []), serialized]);
+		this.ignoredReactionUpdates = next;
+	}
+
+	private _matchAndRemoveReactionSnapshot(
+		messageId: string,
+		reactions: Message['reactions']
+	): boolean {
+		const queue = this.ignoredReactionUpdates.get(messageId);
+		if (!queue?.length) {
+			return false;
+		}
+
+		const serialized = AppState.serializeReactionSnapshot(reactions);
+		const matchedIndex = queue.indexOf(serialized);
+		if (matchedIndex === -1) {
+			return false;
+		}
+
+		const next = new Map(this.ignoredReactionUpdates);
+		const remaining = queue.filter((snapshot, index) => {
+			void snapshot;
+			return index !== matchedIndex;
+		});
+		if (remaining.length > 0) {
+			next.set(messageId, remaining);
+		} else {
+			next.delete(messageId);
+		}
+		this.ignoredReactionUpdates = next;
+
+		return true;
+	}
+
+	/** True when a specific message/emoji reaction toggle request is still in flight. */
+	isReactionPending(messageId: string, emoji: string): boolean {
+		return this.pendingReactionKeys.has(AppState.reactionToggleKey(messageId, emoji));
+	}
+
 	async toggleReaction(messageId: string, emoji: string): Promise<void> {
 		if (!this.idToken || !this.selectedChannelId) return;
+		const normalizedEmoji = emoji.trim();
+		if (!normalizedEmoji) return;
+		const reactionKey = AppState.reactionToggleKey(messageId, normalizedEmoji);
+		if (this.pendingReactionKeys.has(reactionKey)) return;
+		this._setReactionPending(reactionKey, true);
 		try {
-			await this.api.toggleReaction(this.idToken, this.selectedChannelId, messageId, emoji);
+			const result = await this.api.toggleReaction(
+				this.idToken,
+				this.selectedChannelId,
+				messageId,
+				normalizedEmoji
+			);
+			this._updateMessageReactions(messageId, result.reactions);
+			this._rememberReactionUpdate(messageId, result.reactions);
 			// Real-time update arrives via SignalR; fall back to reload if disconnected.
 			if (!this.hub.isConnected) {
 				await this.loadMessages(this.selectedChannelId);
 			}
 		} catch (e) {
 			this.setError(e);
+		} finally {
+			this._setReactionPending(reactionKey, false);
 		}
 	}
 
@@ -2045,10 +2137,11 @@ export class AppState {
 				}
 			},
 			onReactionUpdated: (update: ReactionUpdate) => {
+				if (this._matchAndRemoveReactionSnapshot(update.messageId, update.reactions)) {
+					return;
+				}
 				if (update.channelId === this.selectedChannelId) {
-					this.messages = this.messages.map((m) =>
-						m.id === update.messageId ? { ...m, reactions: update.reactions } : m
-					);
+					this._updateMessageReactions(update.messageId, update.reactions);
 				}
 			},
 			onFriendRequestReceived: () => {

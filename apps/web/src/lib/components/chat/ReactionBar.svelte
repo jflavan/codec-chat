@@ -6,11 +6,13 @@
 		reactions,
 		currentUserId,
 		onToggle,
+		isPending = () => false,
 		members = []
 	}: {
 		reactions: Reaction[];
 		currentUserId: string | null;
 		onToggle: (emoji: string) => void;
+		isPending?: (emoji: string) => boolean;
 		members?: Member[];
 	} = $props();
 
@@ -104,6 +106,8 @@
 			<button
 				class="reaction-pill"
 				class:reacted={hasReacted(reaction)}
+				class:pending={isPending(reaction.emoji)}
+				disabled={isPending(reaction.emoji)}
 				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
 				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
 			>
@@ -197,6 +201,11 @@
 
 	.reaction-pill.reacted .reaction-count {
 		color: var(--accent);
+	}
+
+	.reaction-pill.pending {
+		cursor: wait;
+		opacity: 0.7;
 	}
 
 	.reaction-pill-wrapper {

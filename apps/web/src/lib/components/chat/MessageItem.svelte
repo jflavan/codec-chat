@@ -63,10 +63,17 @@
 	const quickEmojis = getFrequentEmojis(8);
 
 	function handleToggleReaction(emoji: string) {
+		if (app.isReactionPending(message.id, emoji)) {
+			return;
+		}
 		recordEmojiUse(emoji);
 		app.toggleReaction(message.id, emoji);
 		showPicker = false;
 		showFullPicker = false;
+	}
+
+	function isReactionPending(emoji: string): boolean {
+		return app.isReactionPending(message.id, emoji);
 	}
 
 	function closePicker() {
@@ -179,6 +186,7 @@
 					<button
 						class="emoji-option"
 						onclick={() => handleToggleReaction(emoji)}
+						disabled={isReactionPending(emoji)}
 						role="menuitem"
 						aria-label="React with {emoji}"
 					>
@@ -270,6 +278,7 @@
 					reactions={message.reactions}
 					{currentUserId}
 					onToggle={handleToggleReaction}
+					isPending={isReactionPending}
 					members={app.members}
 				/>
 			{/if}
@@ -328,6 +337,7 @@
 					reactions={message.reactions}
 					{currentUserId}
 					onToggle={handleToggleReaction}
+					isPending={isReactionPending}
 					members={app.members}
 				/>
 			{/if}
