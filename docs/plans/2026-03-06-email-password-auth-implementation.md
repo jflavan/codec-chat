@@ -6,7 +6,7 @@
 
 **Architecture:** Hybrid Identity approach — use ASP.NET Core Identity's `PasswordHasher<T>` for password hashing and `System.Security.Cryptography` for token generation, but keep the existing `User` entity and `UserService` pattern. The API issues its own HMAC-SHA256 JWTs for local users while continuing to validate Google-issued JWTs. A policy scheme routes tokens to the correct validator based on the `iss` claim.
 
-**Tech Stack:** .NET 10, EF Core 10, `Microsoft.AspNetCore.Identity` (PasswordHasher only), `System.IdentityModel.Tokens.Jwt`, `Azure.Communication.Email`, SvelteKit/Svelte 5
+**Tech Stack:** .NET 10, EF Core 10, `Microsoft.Extensions.Identity.Core` (PasswordHasher only), `System.IdentityModel.Tokens.Jwt`, `Azure.Communication.Email`, SvelteKit/Svelte 5
 
 **Design Doc:** `docs/plans/2026-03-06-email-password-auth-design.md`
 
@@ -22,12 +22,12 @@
 Add these PackageReferences inside the existing `<ItemGroup>` at line 12 of `Codec.Api.csproj`:
 
 ```xml
-<PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.0" />
+<PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.3" />
 <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.7.0" />
 <PackageReference Include="Azure.Communication.Email" Version="1.0.1" />
 ```
 
-Note: `Microsoft.AspNetCore.Identity` provides `PasswordHasher<T>` without the full Identity framework. `System.IdentityModel.Tokens.Jwt` provides JWT creation (we already have `Microsoft.AspNetCore.Authentication.JwtBearer` for validation). `Azure.Communication.Email` provides the ACS email SDK.
+Note: `Microsoft.Extensions.Identity.Core` provides `PasswordHasher<T>` without the full Identity framework (the legacy `Microsoft.AspNetCore.Identity` 2.x package is incompatible with .NET 10). `System.IdentityModel.Tokens.Jwt` provides JWT creation (we already have `Microsoft.AspNetCore.Authentication.JwtBearer` for validation). `Azure.Communication.Email` provides the ACS email SDK.
 
 **Step 2: Restore packages**
 
@@ -726,12 +726,17 @@ public class AuthService(
 
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
-        var exists = await db.Users.AnyAsync(u =>
+        // Check if account already exists — but don't reveal this to the caller.
+        // Return normally either way to prevent user enumeration.
+        var existingUser = await db.Users.FirstOrDefaultAsync(u =>
             u.Email == normalizedEmail && u.AuthProvider == "local");
 
-        if (exists)
+        if (existingUser is not null)
         {
-            throw new ConflictException("An account with this email already exists.");
+            // Account exists. Don't reveal this — just return the existing user
+            // without sending a verification email. The caller always gets a
+            // "check your email" response regardless.
+            return existingUser;
         }
 
         var user = new User
@@ -772,7 +777,10 @@ public class AuthService(
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            throw new ConflictException("An account with this email already exists.");
+            // Race condition: account was created between our check and save.
+            // Swallow silently to prevent user enumeration.
+            return await db.Users.FirstAsync(u =>
+                u.Email == normalizedEmail && u.AuthProvider == "local");
         }
 
         await emailService.SendEmailVerificationAsync(normalizedEmail, user.DisplayName, token);
@@ -1057,16 +1065,13 @@ public class AuthController(IAuthService authService) : ControllerBase
             Token = token,
             User = new
             {
-                user = new
-                {
-                    id = user.Id,
-                    displayName = user.DisplayName,
-                    nickname = user.Nickname,
-                    effectiveDisplayName = user.EffectiveDisplayName,
-                    email = user.Email,
-                    avatarUrl = user.AvatarUrl,
-                    isGlobalAdmin = user.IsGlobalAdmin
-                }
+                id = user.Id,
+                displayName = user.DisplayName,
+                nickname = user.Nickname,
+                effectiveDisplayName = user.EffectiveDisplayName,
+                email = user.Email,
+                avatarUrl = user.AvatarUrl,
+                isGlobalAdmin = user.IsGlobalAdmin
             }
         });
     }
@@ -1902,6 +1907,7 @@ git commit -m "fix(api,web): fixes from end-to-end auth testing"
 - Modify: `docs/AUTH.md` (if exists, or create)
 - Modify: `docs/FEATURES.md` (if exists)
 - Modify: `docs/ARCHITECTURE.md` (if exists)
+- Modify: `PLAN.md`
 - Modify: `apps/web/.env.example`
 
 **Step 1: Update .env.example**
@@ -1921,6 +1927,6 @@ Update relevant docs to mention email/password auth alongside Google Sign-In. Ke
 **Step 3: Commit**
 
 ```bash
-git add docs/ apps/web/.env.example
+git add docs/ PLAN.md apps/web/.env.example
 git commit -m "docs: update documentation for email/password auth feature"
 ```
