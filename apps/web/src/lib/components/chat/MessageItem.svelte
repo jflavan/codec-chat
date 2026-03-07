@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Message, Mention } from '$lib/types/index.js';
+	import type { Message, Mention, CustomEmoji } from '$lib/types/index.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
@@ -61,6 +61,15 @@
 	let showPicker = $state(false);
 	let showFullPicker = $state(false);
 	const quickEmojis = getFrequentEmojis(8);
+
+	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
+	const customEmojiMap = $derived(new Map(app.customEmojis.map((e) => [e.name.toLowerCase(), e])));
+
+	function getCustomEmoji(emoji: string): CustomEmoji | undefined {
+		const match = CUSTOM_EMOJI_REGEX.exec(emoji);
+		if (!match) return undefined;
+		return customEmojiMap.get(match[1].toLowerCase());
+	}
 
 	function handleToggleReaction(emoji: string) {
 		if (app.isReactionPending(message.id, emoji)) {
@@ -183,14 +192,19 @@
 			<div class="picker-backdrop" onclick={closePicker} onkeydown={closePicker}></div>
 			<div class="emoji-picker" role="menu">
 				{#each quickEmojis as emoji}
+					{@const customEmoji = getCustomEmoji(emoji)}
 					<button
 						class="emoji-option"
 						onclick={() => handleToggleReaction(emoji)}
 						disabled={isReactionPending(emoji)}
 						role="menuitem"
-						aria-label="React with {emoji}"
+						aria-label="React with {customEmoji ? `:${customEmoji.name}:` : emoji}"
 					>
-						{emoji}
+						{#if customEmoji}
+							<img src={customEmoji.imageUrl} alt=":{customEmoji.name}:" title=":{customEmoji.name}:" class="custom-emoji-quick" width="22" height="22" loading="lazy" />
+						{:else}
+							{emoji}
+						{/if}
 					</button>
 				{/each}
 				<button
@@ -280,6 +294,7 @@
 					onToggle={handleToggleReaction}
 					isPending={isReactionPending}
 					members={app.members}
+					customEmojis={app.customEmojis}
 				/>
 			{/if}
 		</div>
@@ -339,6 +354,7 @@
 					onToggle={handleToggleReaction}
 					isPending={isReactionPending}
 					members={app.members}
+					customEmojis={app.customEmojis}
 				/>
 			{/if}
 		</div>
@@ -461,6 +477,11 @@
 
 	.emoji-option:hover {
 		background: var(--bg-message-hover);
+	}
+
+	.custom-emoji-quick {
+		display: block;
+		object-fit: contain;
 	}
 
 	.emoji-more {
