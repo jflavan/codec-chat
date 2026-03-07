@@ -3,6 +3,7 @@
 	import ServerSettingsSidebar from './ServerSettingsSidebar.svelte';
 	import ServerSettings from './ServerSettings.svelte';
 	import ServerEmojis from './ServerEmojis.svelte';
+	import ServerMembers from './ServerMembers.svelte';
 
 	const app = getAppState();
 
@@ -57,6 +58,8 @@
 			</button>
 			{#if app.serverSettingsCategory === 'emojis'}
 				<ServerEmojis />
+			{:else if app.serverSettingsCategory === 'members'}
+				<ServerMembers />
 			{:else}
 				<ServerSettings />
 			{/if}
