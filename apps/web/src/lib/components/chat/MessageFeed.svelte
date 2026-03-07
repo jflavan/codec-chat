@@ -180,6 +180,8 @@
 		{:else if app.messages.length === 0}
 			{#if app.selectedChannelName}
 				<ChannelWelcome channelName={app.selectedChannelName} />
+			{:else}
+				<p class="muted feed-status">No messages yet. Start the conversation!</p>
 			{/if}
 		{:else}
 			{#if !app.hasMoreMessages && !app.isLoadingOlderMessages && app.selectedChannelName}
