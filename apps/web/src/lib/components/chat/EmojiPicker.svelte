@@ -7,12 +7,14 @@
 		onSelect,
 		mode,
 		onClose,
-		customEmojis = []
+		customEmojis = [],
+		flipped = false
 	}: {
 		onSelect: (emoji: string) => void;
 		mode: 'reaction' | 'insert';
 		onClose: () => void;
 		customEmojis?: CustomEmoji[];
+		flipped?: boolean;
 	} = $props();
 
 	let search = $state('');
@@ -97,7 +99,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="picker-backdrop" onclick={onClose}></div>
 
-<div class="emoji-picker-container" role="dialog" aria-label="Emoji picker">
+<div class="emoji-picker-container" class:flipped role="dialog" aria-label="Emoji picker">
 	<div class="picker-search">
 		<input
 			bind:this={searchInput}
@@ -165,6 +167,11 @@
 		border-radius: 8px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 		overflow: hidden;
+	}
+
+	.emoji-picker-container.flipped {
+		bottom: unset;
+		top: calc(100% + 4px);
 	}
 
 	.picker-search {
