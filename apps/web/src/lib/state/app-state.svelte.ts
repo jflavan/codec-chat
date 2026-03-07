@@ -1117,7 +1117,7 @@ export class AppState {
 					count: reaction.count,
 					userIds: [...reaction.userIds].sort()
 				}))
-				.sort((left, right) => left.emoji.localeCompare(right.emoji))
+				.sort((reactionA, reactionB) => reactionA.emoji.localeCompare(reactionB.emoji))
 		);
 	}
 
@@ -1144,7 +1144,7 @@ export class AppState {
 		this.ignoredReactionUpdates = next;
 	}
 
-	private _consumeRememberedReactionUpdate(
+	private _matchAndRemoveReactionSnapshot(
 		messageId: string,
 		reactions: Message['reactions']
 	): boolean {
@@ -1160,7 +1160,10 @@ export class AppState {
 		}
 
 		const next = new Map(this.ignoredReactionUpdates);
-		const remaining = queue.filter((_, index) => index !== matchedIndex);
+		const remaining = queue.filter((snapshot, index) => {
+			void snapshot;
+			return index !== matchedIndex;
+		});
 		if (remaining.length > 0) {
 			next.set(messageId, remaining);
 		} else {
@@ -2134,7 +2137,7 @@ export class AppState {
 				}
 			},
 			onReactionUpdated: (update: ReactionUpdate) => {
-				if (this._consumeRememberedReactionUpdate(update.messageId, update.reactions)) {
+				if (this._matchAndRemoveReactionSnapshot(update.messageId, update.reactions)) {
 					return;
 				}
 				if (update.channelId === this.selectedChannelId) {
