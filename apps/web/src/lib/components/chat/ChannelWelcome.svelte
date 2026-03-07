@@ -46,7 +46,7 @@
 
 	.crt-illustration {
 		margin-bottom: 24px;
-		filter: drop-shadow(0 0 8px rgba(0, 255, 102, 0.3));
+		filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.3));
 	}
 
 	.power-led {
