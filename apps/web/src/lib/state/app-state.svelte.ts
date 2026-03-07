@@ -2095,11 +2095,24 @@ export class AppState {
 					if (!this.isHubConnected) window.location.reload();
 				}, 5000);
 			},
-			onReconnected: () => {
+			onReconnected: async () => {
 				this.isHubConnected = true;
 				if (this.reconnectTimer) {
 					clearTimeout(this.reconnectTimer);
 					this.reconnectTimer = null;
+				}
+
+				// Re-join SignalR groups lost during disconnection.
+				if (this.selectedServerId) {
+					await this.hub.joinServer(this.selectedServerId).catch(() => {});
+				}
+				if (this.selectedChannelId) {
+					await this.hub.joinChannel(this.selectedChannelId).catch(() => {});
+					// Reload messages to catch anything missed while disconnected.
+					await this.loadMessages(this.selectedChannelId).catch(() => {});
+				}
+				if (this.activeDmChannelId) {
+					await this.hub.joinDmChannel(this.activeDmChannelId).catch(() => {});
 				}
 			},
 			onClose: (error) => {
