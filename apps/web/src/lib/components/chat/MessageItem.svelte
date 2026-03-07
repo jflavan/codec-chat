@@ -63,10 +63,13 @@
 	let isFlipped = $state(false);
 	let messageEl: HTMLElement | undefined = $state(undefined);
 
+	/** Toolbar height (32px) + top offset (14px) + buffer (4px) */
+	const FLIP_THRESHOLD_PX = 50;
+
 	function checkFlip() {
 		if (!messageEl) return;
 		const rect = messageEl.getBoundingClientRect();
-		isFlipped = rect.top < 50;
+		isFlipped = rect.top < FLIP_THRESHOLD_PX;
 	}
 	const quickEmojis = getFrequentEmojis(8);
 
