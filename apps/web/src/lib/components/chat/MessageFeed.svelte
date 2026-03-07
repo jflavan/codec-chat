@@ -2,6 +2,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import MessageItem from './MessageItem.svelte';
+	import ChannelWelcome from './ChannelWelcome.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -177,8 +178,11 @@
 		{#if app.isLoadingMessages}
 			<p class="muted feed-status">Loading messages…</p>
 		{:else if app.messages.length === 0}
-			<p class="muted feed-status">No messages yet. Start the conversation!</p>
+			<ChannelWelcome channelName={app.selectedChannelName ?? 'unknown'} />
 		{:else}
+			{#if !app.hasMoreMessages && !app.isLoadingOlderMessages}
+				<ChannelWelcome channelName={app.selectedChannelName ?? 'unknown'} />
+			{/if}
 			{#if app.isLoadingOlderMessages}
 				<p class="muted feed-status loading-older">Loading older messages…</p>
 			{/if}
