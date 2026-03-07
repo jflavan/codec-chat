@@ -60,6 +60,18 @@
 
 	let showPicker = $state(false);
 	let showFullPicker = $state(false);
+	let isFlipped = $state(false);
+	let messageEl: HTMLElement | undefined = $state(undefined);
+
+	/** Toolbar height (32px) + top offset (14px) + buffer (4px) */
+	const FLIP_THRESHOLD_PX = 50;
+
+	function checkFlip() {
+		if (!messageEl) return;
+		const rect = messageEl.getBoundingClientRect();
+		isFlipped = rect.top < FLIP_THRESHOLD_PX;
+	}
+
 	const quickEmojis = getFrequentEmojis(8);
 
 	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
@@ -136,9 +148,16 @@
 	}
 </script>
 
-<article class="message" class:grouped class:mentioned={isMentioned}>
+<article
+	bind:this={messageEl}
+	class="message"
+	class:grouped
+	class:mentioned={isMentioned}
+	onmouseenter={checkFlip}
+	onfocusin={checkFlip}
+>
 	<!-- Floating action bar — appears on hover at top-right of message -->
-	<div class="message-actions" class:picker-open={showPicker || showFullPicker}>
+	<div class="message-actions" class:picker-open={showPicker || showFullPicker} class:flipped={isFlipped}>
 		<button
 			class="action-btn"
 			onclick={handleReply}
@@ -226,6 +245,7 @@
 				onSelect={handleToggleReaction}
 				onClose={() => { showFullPicker = false; }}
 				customEmojis={app.customEmojis}
+				flipped={isFlipped}
 			/>
 		{/if}
 	</div>
@@ -412,6 +432,11 @@
 		pointer-events: auto;
 	}
 
+	.message-actions.flipped {
+		top: unset;
+		bottom: -14px;
+	}
+
 	.action-btn {
 		display: inline-flex;
 		align-items: center;
@@ -460,6 +485,11 @@
 		background: var(--bg-secondary);
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 		z-index: 10;
+	}
+
+	.message-actions.flipped .emoji-picker {
+		bottom: unset;
+		top: calc(100% + 4px);
 	}
 
 	.emoji-option {
@@ -679,6 +709,37 @@
 		.message .message-time-inline {
 			color: var(--text-muted);
 			opacity: 0.5;
+		}
+
+		.emoji-picker {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			top: unset;
+			border-radius: 12px 12px 0 0;
+			justify-content: center;
+			padding: 12px;
+			padding-bottom: calc(12px + env(safe-area-inset-bottom));
+			z-index: 100;
+			animation: slide-up 200ms ease;
+		}
+
+		/* Note: position: fixed on .emoji-picker requires no ancestor has
+		   transform/will-change — currently safe, but fragile if ancestors change. */
+
+		.picker-backdrop {
+			background: rgba(0, 0, 0, 0.5);
+			z-index: 99;
+		}
+	}
+
+	@keyframes slide-up {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: translateY(0);
 		}
 	}
 </style>

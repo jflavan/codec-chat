@@ -31,9 +31,11 @@
 	let hoveredEmoji: string | null = $state(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
-	function showPopover(emoji: string) {
+	function showPopover(emoji: string, el: HTMLElement) {
 		if (hoverTimeout) clearTimeout(hoverTimeout);
 		hoverTimeout = setTimeout(() => {
+			const rect = el.getBoundingClientRect();
+			popoverFlipped = rect.top < POPOVER_FLIP_THRESHOLD_PX;
 			hoveredEmoji = emoji;
 		}, 250);
 	}
@@ -46,11 +48,17 @@
 
 	let touchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 	let touchTriggered = $state(false);
+	let popoverFlipped = $state(false);
 
-	function handleTouchStart(emoji: string) {
+	/** Popover height (~80px) + buffer to avoid clipping at viewport top */
+	const POPOVER_FLIP_THRESHOLD_PX = 80;
+
+	function handleTouchStart(emoji: string, el: HTMLElement) {
 		touchTriggered = false;
 		touchTimeout = setTimeout(() => {
 			touchTriggered = true;
+			const rect = el.getBoundingClientRect();
+			popoverFlipped = rect.top < POPOVER_FLIP_THRESHOLD_PX;
 			hoveredEmoji = emoji;
 		}, 500);
 	}
@@ -109,9 +117,9 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="reaction-pill-wrapper"
-			onmouseenter={() => showPopover(reaction.emoji)}
+			onmouseenter={(e) => showPopover(reaction.emoji, e.currentTarget)}
 			onmouseleave={hidePopover}
-			ontouchstart={() => handleTouchStart(reaction.emoji)}
+			ontouchstart={(e) => handleTouchStart(reaction.emoji, e.currentTarget)}
 			ontouchend={handleTouchEnd}
 			ontouchmove={handleTouchMove}
 			oncontextmenu={(e) => { if (touchTriggered) e.preventDefault(); }}
@@ -136,7 +144,7 @@
 
 			{#if hoveredEmoji === reaction.emoji}
 				{@const info = getReactorNames(reaction)}
-				<div class="reaction-popover" role="tooltip" id="popover-{reactions.indexOf(reaction)}">
+				<div class="reaction-popover" class:flipped={popoverFlipped} role="tooltip" id="popover-{reactions.indexOf(reaction)}">
 					<div class="popover-emoji">
 						{#if custom}
 							<img src={custom.imageUrl} alt=":{custom.name}:" title=":{custom.name}:" class="custom-emoji-popover" width="28" height="28" loading="lazy" />
@@ -270,6 +278,23 @@
 		from {
 			opacity: 0;
 			transform: translateX(-50%) translateY(4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
+	}
+
+	.reaction-popover.flipped {
+		bottom: unset;
+		top: calc(100% + 8px);
+		animation: popover-fade-in-flipped 150ms ease;
+	}
+
+	@keyframes popover-fade-in-flipped {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) translateY(-4px);
 		}
 		to {
 			opacity: 1;
