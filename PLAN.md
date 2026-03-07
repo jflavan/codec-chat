@@ -68,6 +68,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Content Security Policy with SvelteKit nonce-based inline script support
 - Progressive Web App (PWA) — installable via `@vite-pwa/sveltekit`, Workbox service worker with precached assets, user-prompted update toast, branded icons from favicon.ico
 - **Custom server emojis** — CRUD endpoints for custom emoji management (upload, list, rename, delete); 256 KB max, 50 per server; content-addressed storage; real-time SignalR sync
+- **Server admin role management** — PATCH endpoint to promote/demote members; Owner can promote Members to Admin and demote Admins to Member; Admins can promote Members but not demote other Admins; Members tab in server settings with promote/demote UI; Owner/Admin role badges in member sidebar; real-time `MemberRoleChanged` SignalR event
 - **DM reactions** — Reaction entity extended with nullable DirectMessageId (mutual exclusivity constraint with MessageId) to support emoji reactions on direct messages
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)

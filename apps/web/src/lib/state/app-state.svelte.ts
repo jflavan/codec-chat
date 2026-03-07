@@ -123,7 +123,7 @@ export class AppState {
 	settingsOpen = $state(false);
 	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'emojis'>('general');
+	serverSettingsCategory = $state<'general' | 'emojis' | 'members'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
@@ -222,6 +222,10 @@ export class AppState {
 	);
 
 	readonly canDeleteChannel = $derived(
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+	);
+
+	readonly canManageRoles = $derived(
 		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
@@ -854,6 +858,17 @@ export class AppState {
 		if (!this.idToken || !this.selectedServerId) return;
 		try {
 			await this.api.kickMember(this.idToken, this.selectedServerId, userId);
+			await this.loadMembers(this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Change a member's role in the currently selected server. */
+	async updateMemberRole(userId: string, role: 'Admin' | 'Member'): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.updateMemberRole(this.idToken, this.selectedServerId, userId, role);
 			await this.loadMembers(this.selectedServerId);
 		} catch (e) {
 			this.setError(e);
@@ -2269,6 +2284,17 @@ export class AppState {
 			onMemberLeft: (event) => {
 				if (event.serverId === this.selectedServerId) {
 					this.loadMembers(event.serverId);
+				}
+			},
+			onMemberRoleChanged: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.loadMembers(event.serverId);
+				}
+				// Update the caller's own role in the servers list if they were promoted/demoted
+				if (event.userId === this.me?.user.id) {
+					this.servers = this.servers.map((s) =>
+						s.serverId === event.serverId ? { ...s, role: event.newRole } : s
+					);
 				}
 			},
 			onMessageDeleted: (event) => {
