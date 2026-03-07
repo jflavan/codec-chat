@@ -318,7 +318,8 @@ public class ServersController(CodecDbContext db, IUserService userService, IAva
         }
 
         // Admins cannot demote other Admins (only Owner/GlobalAdmin can).
-        if (callerMembership.Role is ServerRole.Admin
+        if (!appUser.IsGlobalAdmin
+            && callerMembership.Role is ServerRole.Admin
             && targetMembership.Role is ServerRole.Admin
             && newRole is ServerRole.Member)
         {
