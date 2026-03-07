@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { Reaction, Member, CustomEmoji } from '$lib/types/index.js';
+	import { isNearScrollTop } from '$lib/utils/dom.js';
 
 	let {
 		reactions,
@@ -34,8 +35,7 @@
 	function showPopover(emoji: string, el: HTMLElement) {
 		if (hoverTimeout) clearTimeout(hoverTimeout);
 		hoverTimeout = setTimeout(() => {
-			const rect = el.getBoundingClientRect();
-			popoverFlipped = rect.top < POPOVER_FLIP_THRESHOLD_PX;
+			checkPopoverFlip(el);
 			hoveredEmoji = emoji;
 		}, 250);
 	}
@@ -52,13 +52,19 @@
 
 	/** Popover height (~80px) + buffer to avoid clipping at viewport top */
 	const POPOVER_FLIP_THRESHOLD_PX = 80;
+	let cachedScrollParent: HTMLElement | null = null;
+
+	function checkPopoverFlip(el: HTMLElement) {
+		const result = isNearScrollTop(el, POPOVER_FLIP_THRESHOLD_PX, cachedScrollParent);
+		cachedScrollParent = result.scrollParent;
+		popoverFlipped = result.flipped;
+	}
 
 	function handleTouchStart(emoji: string, el: HTMLElement) {
 		touchTriggered = false;
 		touchTimeout = setTimeout(() => {
 			touchTriggered = true;
-			const rect = el.getBoundingClientRect();
-			popoverFlipped = rect.top < POPOVER_FLIP_THRESHOLD_PX;
+			checkPopoverFlip(el);
 			hoveredEmoji = emoji;
 		}, 500);
 	}

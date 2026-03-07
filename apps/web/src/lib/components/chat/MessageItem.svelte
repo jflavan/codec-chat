@@ -10,6 +10,7 @@
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 	import EmojiPicker from './EmojiPicker.svelte';
 	import { getFrequentEmojis, recordEmojiUse } from '$lib/utils/emoji-frequency.js';
+	import { isNearScrollTop } from '$lib/utils/dom.js';
 
 	let {
 		message,
@@ -66,10 +67,13 @@
 	/** Toolbar height (32px) + top offset (14px) + buffer (4px) */
 	const FLIP_THRESHOLD_PX = 50;
 
+	let cachedScrollParent: HTMLElement | null = null;
+
 	function checkFlip() {
 		if (!messageEl) return;
-		const rect = messageEl.getBoundingClientRect();
-		isFlipped = rect.top < FLIP_THRESHOLD_PX;
+		const result = isNearScrollTop(messageEl, FLIP_THRESHOLD_PX, cachedScrollParent);
+		cachedScrollParent = result.scrollParent;
+		isFlipped = result.flipped;
 	}
 
 	const quickEmojis = getFrequentEmojis(8);
