@@ -807,16 +807,22 @@ export class AppState {
 	}
 
 	/** Delete a server. Requires Owner role or global admin privileges. */
+	isDeletingServer = $state(false);
+
 	async deleteServer(serverId: string): Promise<void> {
 		if (!this.idToken) return;
+		this.isDeletingServer = true;
 		try {
 			await this.api.deleteServer(this.idToken, serverId);
 			this.servers = this.servers.filter((s) => s.serverId !== serverId);
+			this.serverSettingsOpen = false;
 			if (this.selectedServerId === serverId) {
 				this.goHome();
 			}
 		} catch (e) {
 			this.setError(e);
+		} finally {
+			this.isDeletingServer = false;
 		}
 	}
 
@@ -2318,11 +2324,8 @@ export class AppState {
 			onServerDeleted: (event) => {
 				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
 				if (this.selectedServerId === event.serverId) {
-					this.selectedServerId = null;
-					this.selectedChannelId = null;
-					this.channels = [];
-					this.messages = [];
-					this.members = [];
+					this.serverSettingsOpen = false;
+					this.goHome();
 				}
 			},
 			onChannelDeleted: (event) => {
