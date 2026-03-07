@@ -244,6 +244,7 @@
 	.emoji-scroll {
 		flex: 1;
 		overflow-y: auto;
+		overflow-x: hidden;
 		padding: 4px 8px 8px;
 	}
 
