@@ -8,13 +8,16 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("issues")]
-public class IssuesController(IGitHubIssueService? gitHubIssueService, IUserService userService) : ControllerBase
+public class IssuesController(IUserService userService) : ControllerBase
 {
     private const int MaxTitleLength = 200;
     private const int MaxDescriptionLength = 5000;
 
     [HttpPost]
-    public async Task<IActionResult> CreateIssue([FromBody] CreateIssueRequest request, CancellationToken ct)
+    public async Task<IActionResult> CreateIssue(
+        [FromBody] CreateIssueRequest request,
+        [FromServices] IGitHubIssueService? gitHubIssueService,
+        CancellationToken ct)
     {
         if (gitHubIssueService is null)
             return StatusCode(501, new { error = "Bug reporting is not configured on this server." });
@@ -30,7 +33,7 @@ public class IssuesController(IGitHubIssueService? gitHubIssueService, IUserServ
         var body = $"""
             ## Description
 
-            {request.Description}
+            {request.Description.Replace("---", "\\---")}
 
             ---
 
