@@ -52,8 +52,8 @@
 				window.location.pathname
 			);
 			successUrl = result.issueUrl;
-		} catch (err: any) {
-			error = err?.message ?? 'Something went wrong. Please try again.';
+		} catch {
+			error = 'Something went wrong. Please try again.';
 		} finally {
 			submitting = false;
 		}
