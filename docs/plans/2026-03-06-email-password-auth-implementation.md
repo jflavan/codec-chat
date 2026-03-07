@@ -733,9 +733,10 @@ public class AuthService(
 
         if (existingUser is not null)
         {
-            // Account exists. Don't reveal this — just return the existing user
-            // without sending a verification email. The caller always gets a
-            // "check your email" response regardless.
+            // Account exists. Don't reveal this — perform equivalent work to
+            // the new-account path to prevent timing side-channel enumeration.
+            // The caller always gets a "check your email" response regardless.
+            PasswordHasher.HashPassword(existingUser, password);
             return existingUser;
         }
 
@@ -750,7 +751,7 @@ public class AuthService(
         user.PasswordHash = PasswordHasher.HashPassword(user, password);
 
         var token = GenerateSecureToken();
-        user.EmailConfirmationToken = token;
+        user.EmailConfirmationToken = HashToken(token);
         user.EmailConfirmationTokenExpiry = DateTimeOffset.UtcNow.Add(EmailConfirmationExpiry);
 
         db.Users.Add(user);
@@ -805,6 +806,13 @@ public class AuthService(
         {
             throw new TooManyRequestsException(
                 $"Account locked. Try again after {user.LockoutEnd.Value:HH:mm} UTC.");
+        }
+
+        // Reset failed attempt counter if a previous lockout has expired.
+        if (user.LockoutEnd.HasValue)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
         }
 
         // Verify password.
@@ -865,7 +873,9 @@ public class AuthService(
             return; // Already verified — idempotent.
         }
 
-        if (user.EmailConfirmationToken != token ||
+        var hashedToken = HashToken(token);
+
+        if (user.EmailConfirmationToken != hashedToken ||
             user.EmailConfirmationTokenExpiry < DateTimeOffset.UtcNow)
         {
             throw new BadRequestException("Invalid or expired verification link.");
@@ -893,7 +903,7 @@ public class AuthService(
         }
 
         var token = GenerateSecureToken();
-        user.EmailConfirmationToken = token;
+        user.EmailConfirmationToken = HashToken(token);
         user.EmailConfirmationTokenExpiry = DateTimeOffset.UtcNow.Add(EmailConfirmationExpiry);
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
