@@ -93,6 +93,7 @@ src/
 │   │   ├── settings/
 │   │   │   ├── UserSettingsModal.svelte   # Full-screen modal overlay shell
 │   │   │   ├── SettingsSidebar.svelte     # Category navigation sidebar
+│   │   │   ├── BugReportModal.svelte     # In-app bug report submission dialog
 │   │   │   ├── ProfileSettings.svelte     # Nickname + avatar management
 │   │   │   └── AccountSettings.svelte     # Read-only info + sign out
 │   │   ├── server-settings/
@@ -137,6 +138,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
       │   ├── SettingsSidebar  → getAppState()
       │   ├── ProfileSettings  → getAppState()
       │   └── AccountSettings  → getAppState()
+      ├── BugReportModal     → getAppState()  (shown when bugReportOpen)
       └── ImagePreview       → getAppState()  (shown when lightboxImageUrl is set)
 ```
 
@@ -324,6 +326,9 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 
 #### Voice Calls
 - `GET /voice/active-call` - Get the current user's active or ringing call (returns caller/recipient display info, call status, and timestamps; used on page load/reconnect to restore call state)
+
+#### Bug Reports
+- `POST /issues` - Submit a bug report (requires auth; proxied to GitHub Issues API with `user-report` label; returns `{ issueUrl }`; 501 if GitHub token not configured; 502 on upstream failure)
 
 #### Image Uploads
 - `POST /uploads/images` - Upload an image file (multipart/form-data; JPEG, PNG, WebP, GIF; 10 MB max; returns `{ imageUrl }`)
