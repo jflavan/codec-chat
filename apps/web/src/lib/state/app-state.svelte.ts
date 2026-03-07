@@ -1238,7 +1238,7 @@ export class AppState {
 
 		await this.loadChannels(serverId);
 		await this.loadMembers(serverId);
-		this.loadCustomEmojis(serverId);
+		await this.loadCustomEmojis(serverId);
 	}
 
 	async loadFriends(): Promise<void> {
@@ -2346,7 +2346,7 @@ export class AppState {
 				}
 			},
 			onCustomEmojiAdded: (event) => {
-				if (this.selectedServerId) {
+				if (this.selectedServerId === event.serverId) {
 					this.customEmojis = [...this.customEmojis, event.emoji];
 				}
 			},
