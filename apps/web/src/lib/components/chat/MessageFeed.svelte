@@ -178,10 +178,12 @@
 		{#if app.isLoadingMessages}
 			<p class="muted feed-status">Loading messages…</p>
 		{:else if app.messages.length === 0}
-			<ChannelWelcome channelName={app.selectedChannelName ?? 'unknown'} />
+			{#if app.selectedChannelName}
+				<ChannelWelcome channelName={app.selectedChannelName} />
+			{/if}
 		{:else}
-			{#if !app.hasMoreMessages && !app.isLoadingOlderMessages}
-				<ChannelWelcome channelName={app.selectedChannelName ?? 'unknown'} />
+			{#if !app.hasMoreMessages && !app.isLoadingOlderMessages && app.selectedChannelName}
+				<ChannelWelcome channelName={app.selectedChannelName} />
 			{/if}
 			{#if app.isLoadingOlderMessages}
 				<p class="muted feed-status loading-older">Loading older messages…</p>
