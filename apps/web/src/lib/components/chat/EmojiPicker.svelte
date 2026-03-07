@@ -7,17 +7,29 @@
 		onSelect,
 		mode,
 		onClose,
-		customEmojis = []
+		customEmojis = [],
+		flipped = false
 	}: {
 		onSelect: (emoji: string) => void;
 		mode: 'reaction' | 'insert';
 		onClose: () => void;
 		customEmojis?: CustomEmoji[];
+		flipped?: boolean;
 	} = $props();
 
 	let search = $state('');
 	let scrollContainer = $state<HTMLDivElement>();
 	let searchInput = $state<HTMLInputElement>();
+	let containerEl = $state<HTMLDivElement>();
+
+	/** Compute max-height based on available viewport space below the picker.
+	 *  Called once at render — not reactive to scroll/resize (by design). */
+	function getMaxHeight(): string {
+		if (!flipped || !containerEl) return '420px';
+		const rect = containerEl.getBoundingClientRect();
+		const available = window.innerHeight - rect.top - 16;
+		return `${Math.min(420, Math.max(200, available))}px`;
+	}
 
 	const frequentEmojis = getFrequentEmojis(16);
 
@@ -97,7 +109,14 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="picker-backdrop" onclick={onClose}></div>
 
-<div class="emoji-picker-container" role="dialog" aria-label="Emoji picker">
+<div
+	bind:this={containerEl}
+	class="emoji-picker-container"
+	class:flipped
+	style:max-height={flipped ? getMaxHeight() : undefined}
+	role="dialog"
+	aria-label="Emoji picker"
+>
 	<div class="picker-search">
 		<input
 			bind:this={searchInput}
@@ -165,6 +184,11 @@
 		border-radius: 8px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 		overflow: hidden;
+	}
+
+	.emoji-picker-container.flipped {
+		bottom: unset;
+		top: calc(100% + 4px);
 	}
 
 	.picker-search {
@@ -269,7 +293,30 @@
 
 	@media (max-width: 768px) {
 		.emoji-picker-container {
-			width: min(100vw, 320px);
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			top: unset;
+			width: 100%;
+			max-height: 60vh;
+			border-radius: 12px 12px 0 0;
+			padding-bottom: env(safe-area-inset-bottom);
+			animation: slide-up 200ms ease;
+			z-index: 100;
+		}
+
+		.picker-backdrop {
+			background: rgba(0, 0, 0, 0.5);
+		}
+	}
+
+	@keyframes slide-up {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: translateY(0);
 		}
 	}
 </style>
