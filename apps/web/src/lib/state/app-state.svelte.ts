@@ -865,7 +865,7 @@ export class AppState {
 	}
 
 	/** Change a member's role in the currently selected server. */
-	async updateMemberRole(userId: string, role: string): Promise<void> {
+	async updateMemberRole(userId: string, role: 'Admin' | 'Member'): Promise<void> {
 		if (!this.idToken || !this.selectedServerId) return;
 		try {
 			await this.api.updateMemberRole(this.idToken, this.selectedServerId, userId, role);
