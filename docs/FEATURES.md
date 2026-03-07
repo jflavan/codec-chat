@@ -45,6 +45,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ **Server deletion** — delete entire server (Owner or Global Admin; cascade-deletes all channels, messages, members, invites; real-time removal via SignalR)
 - ✅ **Server icons** — custom server icon upload (JPG, JPEG, PNG, WebP, GIF; 10 MB max); content-hash filenames; real-time sync via `ServerIconChanged` SignalR event; delete icon to revert to default
 - ✅ **Custom emojis** — upload, rename, and delete custom emojis per server (PNG, JPEG, WebP, GIF; 256 KB max; 50 per server); name validation (2–32 alphanumeric/underscore chars); content-addressed storage; real-time sync via `CustomEmojiAdded`, `CustomEmojiUpdated`, `CustomEmojiDeleted` SignalR events; Owner/Admin only for management; all members can list
+- ✅ **Role management** — Owner and Admin can promote Members to Admin via Members tab in server settings; Owner and Global Admin can demote Admins to Member; inline confirmation for demotions; real-time sync via `MemberRoleChanged` SignalR event; Owner/Admin role badges displayed in member sidebar
 
 ### Channel & Messaging
 - ✅ Channel list per server

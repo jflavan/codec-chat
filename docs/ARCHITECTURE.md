@@ -97,9 +97,10 @@ src/
 │   │   │   └── AccountSettings.svelte     # Read-only info + sign out
 │   │   ├── server-settings/
 │   │   │   ├── ServerSettingsModal.svelte  # Modal shell with sidebar + content area
-│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Emojis)
+│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Emojis, Members)
 │   │   │   ├── ServerSettings.svelte      # Server management + global admin danger zone
-│   │   │   └── ServerEmojis.svelte        # Custom emoji upload, rename, delete (Owner/Admin)
+│   │   │   ├── ServerEmojis.svelte        # Custom emoji upload, rename, delete (Owner/Admin)
+│   │   │   └── ServerMembers.svelte       # Member role management (promote/demote, Owner/Admin)
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
 │   │   └── members/
 │   │       ├── MembersSidebar.svelte     # Members grouped by role
@@ -280,6 +281,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name (requires Owner, Admin, or Global Admin role; broadcasts `ChannelNameChanged` via SignalR)
 - `POST /servers/{serverId}/avatar` - Upload a server-specific avatar (multipart/form-data, overrides global avatar in this server)
 - `DELETE /servers/{serverId}/avatar` - Remove server-specific avatar, fall back to global avatar
+- `PATCH /servers/{serverId}/members/{userId}/role` - Change a member's role (requires Owner, Admin, or Global Admin; Owner can promote/demote freely; Admin can promote Members but not demote other Admins; broadcasts `MemberRoleChanged` via SignalR)
 - `DELETE /servers/{serverId}/members/{userId}` - Kick a member from the server (requires Owner, Admin, or Global Admin role; broadcasts `KickedFromServer` via SignalR)
 - `DELETE /servers/{serverId}` - Delete a server and all associated data (requires Owner or Global Admin; cascade-deletes channels, messages, reactions, link previews, members, invites; broadcasts `ServerDeleted` via SignalR)
 - `DELETE /servers/{serverId}/channels/{channelId}` - Delete a channel and all associated data (requires Owner, Admin, or Global Admin; cascade-deletes messages, reactions, link previews; broadcasts `ChannelDeleted` via SignalR)
@@ -377,6 +379,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `KickedFromServer` | `{ serverId, serverName }` | User was kicked from a server (sent to kicked user's user group; displayed as transient overlay banner with 5s fade-out) |
 | `MemberJoined` | `{ serverId }` | A new member joined the server (sent to server group; triggers member list refresh) |
 | `MemberLeft` | `{ serverId }` | A member left or was kicked from the server (sent to server group; triggers member list refresh) |
+| `MemberRoleChanged` | `{ serverId, userId, newRole }` | A member's role was changed (sent to server group; triggers member list refresh; updates caller's own role if affected) |
 | `LinkPreviewsReady` | `{ messageId, channelId?, dmChannelId?, linkPreviews: [...] }` | Link preview metadata fetched — frontend patches the message's `linkPreviews` array |
 | `CustomEmojiAdded` | `{ serverId, emoji: { id, name, imageUrl, contentType, isAnimated, uploadedByUserId, createdAt } }` | A custom emoji was uploaded to a server (sent to server group) |
 | `CustomEmojiUpdated` | `{ serverId, emojiId, name }` | A custom emoji was renamed (sent to server group) |
