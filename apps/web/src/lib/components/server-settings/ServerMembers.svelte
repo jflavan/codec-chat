@@ -5,7 +5,7 @@
 
 	let demotingUserId = $state<string | null>(null);
 
-	const canDemote = (memberRole: string) =>
+	const canDemote = () =>
 		app.isGlobalAdmin || app.currentServerRole === 'Owner';
 
 	const canPromote = (memberRole: string) =>
@@ -52,7 +52,7 @@
 				<div class="member-actions">
 					{#if member.role === 'Owner' || member.userId === app.me?.user.id}
 						<!-- No actions for owner or self -->
-					{:else if member.role === 'Admin' && canDemote(member.role)}
+					{:else if member.role === 'Admin' && canDemote()}
 						{#if demotingUserId === member.userId}
 							<button class="role-btn role-btn-danger" onclick={() => demote(member.userId)}>
 								Are you sure?
