@@ -224,3 +224,35 @@ export type ServerInvite = {
 	createdAt: string;
 	createdByUserId: string;
 };
+
+/** A message search result, extending Message with context info. */
+export type SearchResult = Message & {
+	channelName?: string;
+	dmChannelId?: string;
+};
+
+/** Paginated response from the search endpoint. */
+export type PaginatedSearchResults = {
+	totalCount: number;
+	page: number;
+	pageSize: number;
+	results: SearchResult[];
+};
+
+/** Messages around a target message for jump-to-message. */
+export type AroundMessages = {
+	hasMoreBefore: boolean;
+	hasMoreAfter: boolean;
+	messages: Message[];
+};
+
+/** Filters for message search queries. */
+export type SearchFilters = {
+	channelId?: string;
+	authorId?: string;
+	before?: string;
+	after?: string;
+	has?: 'image' | 'link';
+	page?: number;
+	pageSize?: number;
+};

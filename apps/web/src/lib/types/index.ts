@@ -23,5 +23,9 @@ export type {
 	DmConversation,
 	DirectMessage,
 	ActiveCallResponse,
-	ServerInvite
+	ServerInvite,
+	SearchResult,
+	PaginatedSearchResults,
+	AroundMessages,
+	SearchFilters
 } from './models.js';
