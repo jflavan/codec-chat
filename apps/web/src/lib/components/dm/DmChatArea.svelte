@@ -532,23 +532,23 @@
 				</svg>
 			</button>
 		{/if}
-	</div>
 
-	<!-- Typing indicator -->
-	{#if app.dmTypingUsers.length > 0}
-		<div class="typing-indicator" aria-live="polite">
-			<span class="typing-dots" aria-hidden="true">
-				<span class="dot"></span><span class="dot"></span><span class="dot"></span>
-			</span>
-			<span class="typing-text">
-				{#if app.dmTypingUsers.length === 1}
-					<strong>{app.dmTypingUsers[0]}</strong> is typing…
-				{:else}
-					Several people are typing…
-				{/if}
-			</span>
-		</div>
-	{/if}
+		<!-- Typing indicator -->
+		{#if app.dmTypingUsers.length > 0}
+			<div class="typing-indicator" aria-live="polite">
+				<span class="typing-dots" aria-hidden="true">
+					<span class="dot"></span><span class="dot"></span><span class="dot"></span>
+				</span>
+				<span class="typing-text">
+					{#if app.dmTypingUsers.length === 1}
+						<strong>{app.dmTypingUsers[0]}</strong> is typing…
+					{:else}
+						Several people are typing…
+					{/if}
+				</span>
+			</div>
+		{/if}
+	</div>
 
 		<!-- Composer -->
 		<form class="composer" onsubmit={handleDmSubmit}>
@@ -921,7 +921,10 @@
 
 	/* ───── Typing indicator ───── */
 	.typing-indicator {
-		flex-shrink: 0;
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
 		padding: 2px 16px 4px;
 		display: flex;
 		align-items: center;
@@ -930,6 +933,7 @@
 		color: var(--text-muted);
 		background: var(--bg-primary);
 		min-height: 20px;
+		z-index: 2;
 	}
 
 	.typing-dots {
