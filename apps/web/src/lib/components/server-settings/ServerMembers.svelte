@@ -4,9 +4,16 @@
 	const app = getAppState();
 
 	let demotingUserId = $state<string | null>(null);
+	let kickingUserId = $state<string | null>(null);
 
 	const canDemote = () =>
 		app.isGlobalAdmin || app.currentServerRole === 'Owner';
+
+	const canKick = (member: { userId: string; role: string }) =>
+		app.canKickMembers &&
+		member.userId !== app.me?.user.id &&
+		member.role !== 'Owner' &&
+		!(app.currentServerRole === 'Admin' && member.role === 'Admin');
 
 	const canPromote = (memberRole: string) =>
 		memberRole === 'Member' && app.canManageRoles;
@@ -16,6 +23,7 @@
 	}
 
 	async function demote(userId: string): Promise<void> {
+		kickingUserId = null;
 		if (demotingUserId !== userId) {
 			demotingUserId = userId;
 			return;
@@ -27,7 +35,38 @@
 	function cancelDemote(): void {
 		demotingUserId = null;
 	}
+
+	async function kick(userId: string): Promise<void> {
+		demotingUserId = null;
+		if (kickingUserId !== userId) {
+			kickingUserId = userId;
+			return;
+		}
+		await app.kickMember(userId);
+		kickingUserId = null;
+	}
+
+	function cancelKick(): void {
+		kickingUserId = null;
+	}
 </script>
+
+{#snippet kickButton(member: { userId: string; displayName: string; role: string })}
+	{#if canKick(member)}
+		{#if kickingUserId === member.userId}
+			<button class="role-btn role-btn-danger" onclick={() => kick(member.userId)}>
+				Are you sure?
+			</button>
+			<button class="role-btn role-btn-cancel" onclick={cancelKick}>
+				Cancel
+			</button>
+		{:else}
+			<button class="role-btn role-btn-kick" onclick={() => kick(member.userId)} aria-label="Kick {member.displayName}">
+				Kick
+			</button>
+		{/if}
+	{/if}
+{/snippet}
 
 <section class="server-members-settings">
 	<h2 class="section-title">Members</h2>
@@ -65,10 +104,12 @@
 								Remove Admin
 							</button>
 						{/if}
+						{@render kickButton(member)}
 					{:else if canPromote(member.role)}
 						<button class="role-btn role-btn-promote" onclick={() => promote(member.userId)}>
 							Make Admin
 						</button>
+						{@render kickButton(member)}
 					{/if}
 				</div>
 			</li>
@@ -205,6 +246,18 @@
 	}
 
 	.role-btn-demote:hover {
+		background: var(--danger);
+		color: #fff;
+		border-color: var(--danger);
+	}
+
+	.role-btn-kick {
+		background: transparent;
+		color: var(--text-muted);
+		border-color: var(--text-muted);
+	}
+
+	.role-btn-kick:hover {
 		background: var(--danger);
 		color: #fff;
 		border-color: var(--danger);
