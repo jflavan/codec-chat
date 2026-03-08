@@ -905,7 +905,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
 - ~~Add richer validation and error surfaces in UI~~ (implemented: authorization helpers, global ProblemDetails exception handler, DataAnnotations on request DTOs, frontend ProblemDetails parsing, character counters on form inputs)
 - Presence indicators (online/offline/away)
-- Light mode theme toggle
+- ~~Light mode theme toggle~~ (implemented: 4-theme system — Phosphor Green, Midnight, Ember, Light — with Appearance settings, localStorage persistence, flash prevention)
 - Mobile slide-out navigation for server/channel sidebars
 - Comprehensive unit and integration tests
 - Container image vulnerability scanning (Trivy or Microsoft Defender)

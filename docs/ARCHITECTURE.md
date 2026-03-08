@@ -55,7 +55,8 @@ src/
 │   │   └── emojis.ts       # Static emoji dataset (categories, names, keywords)
 │   ├── utils/
 │   │   ├── format.ts       # Date/time formatting helpers
-│   │   └── emoji-frequency.ts  # localStorage-backed emoji usage frequency tracker
+│   │   ├── emoji-frequency.ts  # localStorage-backed emoji usage frequency tracker
+│   │   └── theme.ts        # Theme registry, persistence (localStorage), and DOM application
 │   ├── components/
 │   │   ├── server-sidebar/
 │   │   │   └── ServerSidebar.svelte      # Server icon rail (create/join-via-invite)
@@ -95,7 +96,8 @@ src/
 │   │   │   ├── SettingsSidebar.svelte     # Category navigation sidebar
 │   │   │   ├── BugReportModal.svelte     # In-app bug report submission dialog
 │   │   │   ├── ProfileSettings.svelte     # Nickname + avatar management
-│   │   │   └── AccountSettings.svelte     # Read-only info + sign out
+│   │   │   ├── AccountSettings.svelte     # Read-only info + sign out
+│   │   │   └── AppearanceSettings.svelte  # Theme picker (4 presets with preview cards)
 │   │   ├── server-settings/
 │   │   │   ├── ServerSettingsModal.svelte  # Modal shell with sidebar + content area
 │   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Emojis, Members)
@@ -153,7 +155,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 | `services/` | External service integrations (SignalR hub connection management) |
 | `state/` | Central reactive application state; orchestrates API calls, auth, and hub events |
 | `data/` | Static datasets (emoji categories, keywords) |
-| `styles/` | Design tokens as CSS custom properties; global base styles |
+| `styles/` | Design tokens as CSS custom properties (`[data-theme]` palettes for theming); global base styles |
 | `utils/` | Pure utility functions (formatting, frequency tracking, etc.) |
 | `components/` | Presentational Svelte 5 components grouped by feature area |
 
