@@ -904,7 +904,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
 - ~~Add richer validation and error surfaces in UI~~ (implemented: authorization helpers, global ProblemDetails exception handler, DataAnnotations on request DTOs, frontend ProblemDetails parsing, character counters on form inputs)
-- Presence indicators (online/offline/away)
+- ~~Presence indicators (online/offline/away)~~ (implemented: hybrid client+server heartbeat detection; PresenceTracker in-memory singleton with ConcurrentDictionary; PresenceBackgroundService for idle/offline scanning; PresenceState DB table; multi-tab support; push-based UserPresenceChanged SignalR events; PresenceDot component on member sidebar and DM list; online-first member sorting)
 - ~~Light mode theme toggle~~ (implemented: 4-theme system — Phosphor Green, Midnight, Ember, Light — with Appearance settings, localStorage persistence, flash prevention)
 - Mobile slide-out navigation for server/channel sidebars
 - Comprehensive unit and integration tests

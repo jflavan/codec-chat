@@ -180,6 +180,19 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Design specification documented in `docs/DESIGN.md`
 - ✅ **Client-side form validation** — character counters on server/channel name inputs, disabled submit states, inline error messages from API responses
 
+### Presence Indicators
+- ✅ Real-time presence status (Online, Idle, Offline) — automatic, no user-set statuses
+- ✅ Hybrid detection — client sends 30-second heartbeats with `isActive` flag; server tracks in-memory via `PresenceTracker` singleton with `ConcurrentDictionary`
+- ✅ `PresenceBackgroundService` — scans every 30 seconds; transitions to Idle after 5 minutes of inactivity, Offline after 2 minutes of missed heartbeats
+- ✅ `PresenceState` DB table — canonical status written only on transitions; purged on server startup
+- ✅ Multi-tab support — tracks multiple SignalR connections per user; aggregate status uses best across connections (Online > Idle > Offline)
+- ✅ Push-based broadcasting — `UserPresenceChanged` SignalR event sent to all `server-{serverId}` groups and `user-{friendId}` groups on status change
+- ✅ REST endpoints — `GET servers/{serverId}/presence` and `GET dm/presence` for initial presence load
+- ✅ `PresenceDot` component — colored indicator (green=online, yellow=idle, gray=offline) on member avatars
+- ✅ Member sidebar — presence dots on member avatars with online-first sorting within each role group
+- ✅ DM list — presence dots next to conversation participant avatars
+- ✅ Offline dimming — offline members shown at 50% opacity in member sidebar
+
 ### Connection Status
 - ✅ SignalR reconnection lifecycle tracking (`onReconnecting`, `onReconnected`, `onClose` callbacks)
 - ✅ `isHubConnected` reactive state in `AppState` — tracks real-time connection health
@@ -273,7 +286,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ~~Message search~~ (implemented)
 
 ### Real-time Features
-- Presence indicators (online/offline/away)
+- ~~Presence indicators~~ (implemented)
 
 ### Server Management
 - Server settings/configuration
