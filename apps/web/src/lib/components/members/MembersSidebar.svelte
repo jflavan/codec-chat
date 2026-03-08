@@ -1,36 +1,19 @@
 <script lang="ts">
+	import type { Member } from '$lib/types/index.js';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import MemberItem from './MemberItem.svelte';
 
 	const app = getAppState();
 
-	const owners = $derived(
-		app.members
-			.filter((m) => m.role === 'Owner')
-			.sort((a, b) => {
-				const aOnline = (app.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-				const bOnline = (app.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-				return aOnline - bOnline;
-			})
-	);
-	const admins = $derived(
-		app.members
-			.filter((m) => m.role === 'Admin')
-			.sort((a, b) => {
-				const aOnline = (app.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-				const bOnline = (app.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-				return aOnline - bOnline;
-			})
-	);
-	const regulars = $derived(
-		app.members
-			.filter((m) => m.role === 'Member')
-			.sort((a, b) => {
-				const aOnline = (app.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-				const bOnline = (app.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-				return aOnline - bOnline;
-			})
-	);
+	function byPresence(a: Member, b: Member): number {
+		const aOnline = (app.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
+		const bOnline = (app.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
+		return aOnline - bOnline;
+	}
+
+	const owners = $derived(app.members.filter((m) => m.role === 'Owner').sort(byPresence));
+	const admins = $derived(app.members.filter((m) => m.role === 'Admin').sort(byPresence));
+	const regulars = $derived(app.members.filter((m) => m.role === 'Member').sort(byPresence));
 </script>
 
 <aside class="members-sidebar" aria-label="Members">
