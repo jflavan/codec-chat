@@ -2637,13 +2637,13 @@ export class AppState {
 					this.idToken,
 					this.selectedServerId,
 					query,
-					{ ...filters, channelId: filters.channelId ?? this.selectedChannelId ?? undefined }
+					filters
 				);
 			} else if (this.activeDmChannelId) {
 				this.searchResults = await this.api.searchDmMessages(
 					this.idToken,
 					query,
-					{ ...filters, channelId: filters.channelId ?? this.activeDmChannelId ?? undefined }
+					filters
 				);
 			}
 		} catch (e) {
