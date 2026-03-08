@@ -195,6 +195,7 @@ export type DirectMessage = {
 	authorAvatarUrl?: string | null;
 	linkPreviews: LinkPreview[];
 	replyContext: ReplyContext | null;
+	reactions: Reaction[];
 	messageType?: number; // 0 = regular, 1 = voiceCallEvent
 };
 
