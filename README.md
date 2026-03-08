@@ -65,46 +65,17 @@ npm run dev
 The web app runs at `http://localhost:5174` by default.
 
 ## Features
-- ✅ Google Sign-In authentication with persistent sessions (1-week duration)
-- ✅ Automatic silent token refresh via Google One Tap
-- ✅ **Default server ("Codec HQ")** — created automatically on startup; every new user is auto-joined as a Member on first sign-in
-- ✅ Server creation and membership
-- ✅ Server membership and roles (Owner, Admin, Member)
-- ✅ Channel creation (Owner/Admin only)
-- ✅ Kick members from servers (Owner/Admin/Global Admin, with real-time overlay notification and fade-out)
-- ✅ Server invites — Owner/Admin can generate invite codes; any user can join via code
-- ✅ **Server Settings** — gear icon in channel sidebar opens server settings modal for Owners/Admins; edit server name, rename channels, delete channels, delete server, view member count; real-time sync via SignalR
-- ✅ Channel browsing within servers
-- ✅ Real-time message posting and viewing via SignalR (WebSockets)
-- ✅ Typing indicators (“X is typing…”)
-- ✅ User profile display
-- ✅ Custom avatar upload with server-specific overrides and fallback chain
-- ✅ Member lists for servers with real-time updates via SignalR (automatic refresh on member join/leave)
-- ✅ Friends system (send/accept/decline/cancel requests, friends list, remove friend)
-- ✅ User search for adding friends (by name or email)
-- ✅ Real-time friend request notifications via SignalR
-- ✅ Friends panel accessible from Home icon with notification badge
-- ✅ Direct messages — 1-on-1 private conversations with real-time delivery, typing indicators, and unread badges
-- ✅ Emoji reactions on messages (toggle, reaction pills with counts, real-time sync)
-- ✅ **Image uploads** — post images (PNG, JPEG, WebP, GIF) via file picker, clipboard paste, or drag-and-drop in both server channels and DMs
-- ✅ **Image lightbox** — click any inline image to view it full-size in an overlay with keyboard dismiss and open-original link
-- ✅ **Nicknames** — user-chosen display name that overrides Google name across all surfaces (messages, member lists, friends, typing indicators)
-- ✅ **User Settings** — full-screen modal with profile management (nickname editing, avatar upload/remove), account info, and Voice & Audio settings (input mode, PTT keybind)
-- ✅ **Link previews** — automatic URL detection in messages, Open Graph metadata fetching with SSRF protection, clickable embed cards with title/description/thumbnail, real-time delivery via SignalR; YouTube links render as click-to-play inline video players via `svelte-youtube-embed`
-- ✅ **@mentions** — autocomplete member picker in composer, @here to notify everyone, mention badge counts on server icons and channel names, badge clearing on navigation, mentioned message highlighting
-- ✅ **Message replies** — inline reply to any message in channels or DMs, reply context displayed above message body, click to scroll to original with highlight animation, Escape to cancel, graceful handling of deleted parent messages
-- ✅ **Global Admin** — configurable global admin role with full access to all servers (see all servers, read/post/react in any channel, manage channels and invites, delete any server/channel/message, kick any member) regardless of membership; configured via `GlobalAdmin:Email` application setting (Key Vault secret provisioned via Bicep in production) and seeded at startup
-- ✅ **Message deletion** — authors can delete their own messages in channels and DMs; global admin can delete any channel message; cascade-deletes reactions and link previews; real-time removal via SignalR; replies to deleted messages handled gracefully
-- ✅ **Message editing** — authors can edit their own messages in channels and DMs; inline edit mode with Enter to save and Escape to cancel; "(edited)" label on modified messages; real-time sync via SignalR
-- ✅ **Text formatting** — bold (`*text*` or `**text**`) and italic (`_text_`) in messages, with live preview in composer input
-- ✅ **Progressive message loading** — initially loads last 100 messages per channel and DM; older messages load seamlessly as the user scrolls up; cursor-based pagination with `hasMore` flag and scroll position preservation
-- ✅ **Connection status awareness** — composer shows "Codec connecting..." with animated ellipsis when the SignalR connection is lost; automatically restores full input when reconnected; auto-refreshes the page if the WebSocket cannot reconnect within 5 seconds
-- ✅ **Response compression** — API responses compressed with Brotli and Gzip for faster load times
-- ✅ **Loading screen** — branded full-screen splash with animated progress bar, CRT scanlines, and glowing logo during initial data bootstrap; fades out smoothly once servers, channels, and messages are loaded
-- ✅ **Alpha notification** — on every login, a modal notifies users of the app’s alpha status and links to the GitHub bug report template for easy issue reporting
-- ✅ **Progressive Web App (PWA)** — installable on desktop and mobile via browser "Add to Home Screen"; Workbox service worker precaches static assets for fast repeat visits; offline fallback page when network is unavailable; runtime Google Fonts caching; desktop/mobile install screenshots; app shortcuts, share target, and custom protocol handler; user-prompted update toast when a new version is available
-- ✅ **Voice channels** — real-time audio in server voice channels powered by a custom mediasoup SFU; join/leave freely, mute/unmute/deafen, participant list with avatars; per-user volume control via right-click context menu (Web Audio GainNode pipeline, localStorage persistence); push-to-talk with configurable keybind and Voice Activity / PTT mode toggle in Voice & Audio settings; mic permission errors surfaced clearly; audio-only (video planned)
-- ✅ **DM voice calls** — 1:1 voice calls from DM conversations with ringing/accept/decline flow; incoming call overlay with ring tone; call header with elapsed time display; automatic 30-second ringing timeout; system messages for call events (missed calls, call duration); call state recovery on reconnect
+
+- **Servers & channels** — create servers, invite members, manage roles (Owner/Admin/Member), organize conversations into channels
+- **Real-time messaging** — instant delivery via SignalR WebSockets with typing indicators, @mentions, message replies, editing, deletion, and text formatting
+- **Direct messages** — 1:1 private conversations with unread badges
+- **Voice** — voice channels in servers (mediasoup SFU) and 1:1 DM calls with ringing/accept/decline flow
+- **Rich media** — image uploads, emoji reactions, link previews with Open Graph metadata, inline YouTube embeds
+- **User profiles** — nicknames, custom avatars with server-specific overrides, friends system with real-time notifications
+- **PWA** — installable on desktop and mobile with offline fallback, app shortcuts, and share target
+- **Google Sign-In** — stateless JWT authentication with automatic silent token refresh
+
+For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and system design, see [Architecture](docs/ARCHITECTURE.md).
 
 ## Self-Hosting
 
@@ -128,7 +99,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 ## Documentation
 - [Self-Hosting Guide](docs/SELF_HOSTING.md) - Deploy Codec on your own server with Docker Compose
 - [Deployment (Azure)](docs/DEPLOYMENT.md) - Azure Container Apps deployment, rollback, and operations
-- [Azure Deployment Plan](docs/AZURE_DEPLOYMENT_PLAN.md) - Phased deployment plan (all 10 phases complete)
+- [Infrastructure](docs/INFRA.md) - Azure Bicep modules, resource configuration, and zero-downtime deploys
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
 - [Authentication](docs/AUTH.md) - How Google ID token validation works
 - [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints
