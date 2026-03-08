@@ -154,7 +154,7 @@
 		align-items: flex-start;
 		gap: 10px;
 		padding: 10px 12px;
-		background: var(--bg-secondary, #2f3136);
+		background: var(--bg-secondary);
 		border-radius: 6px;
 		cursor: pointer;
 		transition: background-color 150ms ease;
@@ -166,7 +166,7 @@
 
 	.radio-option input[type='radio'] {
 		margin-top: 3px;
-		accent-color: var(--accent, #5865f2);
+		accent-color: var(--accent);
 	}
 
 	.radio-content {
@@ -196,7 +196,7 @@
 		display: inline-flex;
 		align-items: center;
 		padding: 6px 14px;
-		background: var(--bg-secondary, #2f3136);
+		background: var(--bg-secondary);
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		font-size: 14px;
@@ -208,10 +208,10 @@
 
 	.record-btn {
 		padding: 6px 14px;
-		background: var(--accent, #5865f2);
-		color: #fff;
+		background: var(--accent);
+		color: var(--bg-tertiary);
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 13px;
 		font-weight: 500;
 		cursor: pointer;
@@ -219,7 +219,7 @@
 	}
 
 	.record-btn:hover {
-		background: var(--accent-hover, #4752c4);
+		background: var(--accent-hover);
 	}
 
 	.key-recorder {
@@ -227,8 +227,8 @@
 		align-items: center;
 		justify-content: center;
 		padding: 12px;
-		background: var(--bg-secondary, #2f3136);
-		border: 2px solid var(--accent, #5865f2);
+		background: var(--bg-secondary);
+		border: 2px solid var(--accent);
 		border-radius: 6px;
 		outline: none;
 	}
@@ -236,7 +236,7 @@
 	.recording-text {
 		font-size: 14px;
 		font-weight: 500;
-		color: var(--accent, #5865f2);
+		color: var(--accent);
 		animation: pulse 1.5s ease-in-out infinite;
 	}
 
