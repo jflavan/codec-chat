@@ -309,6 +309,7 @@ cd ../..
 | `Storage__Provider` | Env var | `AzureBlob` |
 | `Storage__AzureBlob__ServiceUri` | Env var | Blob storage endpoint URL |
 | `GlobalAdmin__Email` | Key Vault secret ref | Email of the global admin user |
+| `Redis__ConnectionString` | Key Vault secret ref | Azure Redis Cache connection string |
 
 ### Web Container App
 

@@ -97,7 +97,9 @@ This document tracks implemented and planned features for Codec.
 
 ### API & Infrastructure
 - Controller-based RESTful API with `[Authorize]` on all endpoints
-- Health endpoints: `/health/live` (liveness), `/health/ready` (readiness + DB check)
+- Health endpoints: `/health/live` (liveness), `/health/ready` (readiness + DB + Redis check)
+- Redis distributed cache — message history pages cached with 5-minute TTL; channel-level invalidation on send, edit, delete, purge, and reactions; graceful degradation when Redis is unavailable
+- SignalR Redis backplane — enables real-time events across multiple API instances for horizontal scaling
 - Rate limiting — fixed window, 100 req/min (429 on exceed)
 - Response compression (Brotli + Gzip)
 - Structured JSON logging via Serilog (Console → Container Apps → Log Analytics)
@@ -135,3 +137,4 @@ This document tracks implemented and planned features for Codec.
 - [x] Production database migration strategy (EF Core bundles in CD)
 - [x] Container deployment (Docker multi-stage builds, Azure Container Apps)
 - [x] CI/CD pipeline (GitHub Actions with OIDC, Bicep IaC)
+- [x] Response caching (Redis distributed cache for message history)

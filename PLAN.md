@@ -57,6 +57,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Response compression enabled (Brotli + Gzip) for faster API responses
 - User profile writes optimized — skips `SaveChangesAsync` when Google profile fields unchanged
 - Mention parsing cached per message batch to eliminate redundant regex execution
+- **Redis distributed cache** — message history pages cached with 5-minute TTL via `MessageCacheService`; channel-level invalidation on all mutations; SignalR Redis backplane for multi-instance scale-out; graceful degradation when Redis is unavailable
 - DM messages endpoint returns paginated `{ hasMore, messages }` response (matching channel pagination)
 - Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect; auto-refreshes the page on persistent WebSocket failure
 - SignalR reconnection lifecycle tracked via `isHubConnected` reactive state
@@ -623,6 +624,37 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `PaginatedDmMessages` type to frontend (`models.ts` + barrel export)
 - [x] Update `ApiClient.getDmMessages` return type to `Promise<PaginatedDmMessages>`
 - [x] Update `AppState.loadDmMessages` to destructure paginated response
+
+## Task breakdown: Redis Cache & SignalR Backplane
+
+### Infrastructure — Redis container
+- [x] Add `redis:8-alpine` to `docker-compose.yml` with healthcheck
+- [x] Update API `depends_on` to include Redis
+
+### API — NuGet packages and configuration
+- [x] Add `Microsoft.Extensions.Caching.StackExchangeRedis` and `Microsoft.AspNetCore.SignalR.StackExchangeRedis`
+- [x] Add `AspNetCore.HealthChecks.Redis` for health endpoint
+- [x] Add `Redis:ConnectionString` to `appsettings.json`
+
+### API — Redis registration in Program.cs
+- [x] Register `IDistributedCache` via `AddStackExchangeRedisCache` (conditional on config)
+- [x] Register `IConnectionMultiplexer` singleton with `abortConnect=false` for graceful degradation
+- [x] Add SignalR Redis backplane via `AddStackExchangeRedis` with `codec` channel prefix
+- [x] Add Redis health check to readiness probe
+
+### API — MessageCacheService
+- [x] Create `Services/MessageCacheService.cs` with `GetMessagesAsync`, `SetMessagesAsync`, `InvalidateChannelAsync`
+- [x] Channel-level invalidation via Redis tracking sets (bulk key deletion)
+- [x] 5-minute TTL with graceful degradation (try/catch on all Redis operations)
+- [x] Register as singleton (handles null dependencies when Redis is unavailable)
+
+### API — Cache integration in ChannelsController
+- [x] Cache-first read in `GetMessages` for paginated history pages (`before` cursor only)
+- [x] Skip caching "latest" page (no `before`) to avoid write amplification
+- [x] Cache write with pre-serialized JSON for zero double-serialization
+- [x] Awaited invalidation on PostMessage, DeleteMessage, EditMessage, PurgeChannel, ToggleReaction
+- [x] Invalidation in link preview background task after `SaveChangesAsync`
+- [x] Invalidation in `ServersController.DeleteChannel` for orphaned cache cleanup
 
 ## Task breakdown: Connection Status Awareness
 

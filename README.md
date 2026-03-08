@@ -79,7 +79,7 @@ For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and
 
 ## Self-Hosting
 
-Codec is designed to be easy to self-host. The repository includes a production-ready `docker-compose.yml` that starts the API, web frontend, PostgreSQL, and a local blob storage emulator.
+Codec is designed to be easy to self-host. The repository includes a production-ready `docker-compose.yml` that starts the API, web frontend, PostgreSQL, Redis, and a local blob storage emulator.
 
 ```bash
 git clone https://github.com/jflavan/codec-chat.git
@@ -123,6 +123,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 ## Technology Stack
 - **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management; installable PWA via `@vite-pwa/sveltekit` with offline fallback, runtime font caching, and OS integration (shortcuts, share target)
 - **Backend:** ASP.NET Core 10, Controller-based APIs
+- **Caching:** Redis 8 distributed cache (message history) + SignalR backplane (multi-instance scale-out)
 - **Real-time:** SignalR (WebSockets) for messaging and signaling; mediasoup-client + WebRTC for voice audio
 - **Voice SFU:** Node.js + mediasoup v3 on a dedicated Azure VM (UDP media plane requires native sockets)
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
