@@ -943,9 +943,14 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpGet("search")]
     public async Task<IActionResult> SearchMessages([FromQuery] SearchMessagesRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Q) || request.Q.Trim().Length < 2)
+        var trimmedQuery = request.Q?.Trim() ?? "";
+        if (trimmedQuery.Length < 2)
         {
             return BadRequest(new { error = "Search query must be at least 2 characters." });
+        }
+        if (trimmedQuery.Length > 200)
+        {
+            return BadRequest(new { error = "Search query must be 200 characters or less." });
         }
 
         var page = Math.Max(1, request.Page);
@@ -980,8 +985,9 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             dmChannelIds = accessibleChannelIds;
         }
 
-        // Build base query.
-        var searchTerm = $"%{request.Q.Trim()}%";
+        // Build base query. Escape ILIKE metacharacters to prevent wildcard injection.
+        var escaped = trimmedQuery.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var searchTerm = $"%{escaped}%";
         var query = db.DirectMessages
             .AsNoTracking()
             .Where(m => dmChannelIds.Contains(m.DmChannelId))

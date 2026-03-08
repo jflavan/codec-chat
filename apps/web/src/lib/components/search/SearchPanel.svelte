@@ -10,6 +10,10 @@
 	let inputValue = $state('');
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+	$effect(() => {
+		return () => { if (debounceTimer) clearTimeout(debounceTimer); };
+	});
+
 	function handleInput(e: Event): void {
 		inputValue = (e.target as HTMLInputElement).value;
 

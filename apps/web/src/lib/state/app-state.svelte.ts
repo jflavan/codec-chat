@@ -2635,7 +2635,7 @@ export class AppState {
 				this.searchResults = await this.api.searchDmMessages(
 					this.idToken,
 					query,
-					{ ...filters, channelId: this.activeDmChannelId }
+					{ ...filters, channelId: filters.channelId ?? this.activeDmChannelId ?? undefined }
 				);
 			}
 		} catch (e) {
