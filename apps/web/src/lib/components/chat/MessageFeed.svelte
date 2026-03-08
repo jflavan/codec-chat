@@ -120,6 +120,19 @@
 		};
 	});
 
+	// Scroll to highlighted message from search jump
+	$effect(() => {
+		const targetId = app.highlightedMessageId;
+		if (targetId && container) {
+			setTimeout(() => {
+				const el = container?.querySelector(`[data-message-id="${CSS.escape(targetId)}"]`);
+				if (el) {
+					el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				}
+			}, 100);
+		}
+	});
+
 	// Reset scroll state on channel change
 	$effect(() => {
 		const channelId = app.selectedChannelId;
@@ -193,7 +206,7 @@
 			{#each app.messages as message, i (message.id)}
 				{@const prev = i > 0 ? app.messages[i - 1] : null}
 				{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
-				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>
+				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={app.highlightedMessageId === message.id}>
 					<MessageItem {message} grouped={isGrouped} onScrollToMessage={scrollToMessage} />
 				</div>
 			{/each}
@@ -301,13 +314,23 @@
 		animation: reply-highlight-fade 1.5s ease-out;
 	}
 
+	.search-highlight {
+		animation: search-highlight-fade 2s ease-out;
+	}
+
+	@keyframes search-highlight-fade {
+		0% { background-color: rgba(var(--accent-rgb, 0, 255, 102), 0.15); }
+		100% { background-color: transparent; }
+	}
+
 	@keyframes reply-highlight-fade {
 		0% { background-color: rgba(var(--accent-rgb, 0, 255, 102), 0.15); }
 		100% { background-color: transparent; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.reply-highlight {
+		.reply-highlight,
+		.search-highlight {
 			animation: none;
 			background-color: rgba(var(--accent-rgb, 0, 255, 102), 0.1);
 		}
