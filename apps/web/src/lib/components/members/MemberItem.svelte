@@ -1,32 +1,7 @@
 <script lang="ts">
 	import type { Member } from '$lib/types/index.js';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	let { member }: { member: Member } = $props();
-
-	const app = getAppState();
-
-	const canKick = $derived(
-		app.canKickMembers &&
-			member.userId !== app.me?.user.id &&
-			member.role !== 'Owner' &&
-			!(app.currentServerRole === 'Admin' && member.role === 'Admin')
-	);
-
-	let confirming = $state(false);
-
-	async function handleKick(): Promise<void> {
-		if (!confirming) {
-			confirming = true;
-			return;
-		}
-		await app.kickMember(member.userId);
-		confirming = false;
-	}
-
-	function cancelKick(): void {
-		confirming = false;
-	}
 </script>
 
 <li class="member-item">
@@ -40,20 +15,6 @@
 	<span class="member-name">{member.displayName}</span>
 	{#if member.role === 'Owner' || member.role === 'Admin'}
 		<span class="role-badge role-badge-{member.role.toLowerCase()}">{member.role}</span>
-	{/if}
-	{#if canKick}
-		{#if confirming}
-			<button class="kick-btn kick-confirm" onclick={handleKick} aria-label="Confirm kick {member.displayName}">
-				Confirm
-			</button>
-			<button class="kick-btn kick-cancel" onclick={cancelKick} aria-label="Cancel kick">
-				✕
-			</button>
-		{:else}
-			<button class="kick-btn" onclick={handleKick} aria-label="Kick {member.displayName}">
-				Kick
-			</button>
-		{/if}
 	{/if}
 </li>
 
@@ -128,47 +89,4 @@
 		background: rgba(240, 178, 50, 0.15);
 	}
 
-	.kick-btn {
-		margin-left: auto;
-		padding: 6px 10px;
-		min-height: 36px;
-		font-size: 11px;
-		font-weight: 600;
-		border: 1px solid var(--text-muted);
-		border-radius: 3px;
-		background: transparent;
-		color: var(--text-muted);
-		cursor: pointer;
-		opacity: 0;
-		transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
-		flex-shrink: 0;
-	}
-
-	.member-item:hover .kick-btn {
-		opacity: 1;
-	}
-
-	.kick-btn:hover {
-		background: var(--danger);
-		color: #fff;
-		border-color: var(--danger);
-	}
-
-	.kick-confirm {
-		opacity: 1;
-		background: var(--danger);
-		color: #fff;
-		border-color: var(--danger);
-	}
-
-	.kick-cancel {
-		opacity: 1;
-		padding: 6px 8px;
-	}
-
-	@media (max-width: 768px) {
-		.kick-btn {
-			opacity: 1;
-		}
-	}
 </style>
