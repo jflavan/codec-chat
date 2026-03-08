@@ -29,7 +29,10 @@ builder.Host.UseSerilog((ctx, config) => config
 
 builder.Services.AddControllers();
 
-// Redis distributed cache.
+// Redis distributed cache + direct connection for tracking set operations.
+// Two connections are intentional: AddStackExchangeRedisCache manages its own internal
+// ConnectionMultiplexer, while the IConnectionMultiplexer singleton is needed for Redis SET
+// operations (tracking keys for bulk invalidation) that IDistributedCache does not support.
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
 if (!string.IsNullOrWhiteSpace(redisConnectionString))
 {
@@ -39,7 +42,7 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
     });
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-        ConnectionMultiplexer.Connect($"{redisConnectionString},abortConnect=false"));
+        ConnectionMultiplexer.Connect(redisConnectionString));
 }
 
 builder.Services.AddSingleton<MessageCacheService>();
@@ -139,7 +142,8 @@ var healthChecks = builder.Services.AddHealthChecks()
 
 if (!string.IsNullOrWhiteSpace(redisConnectionString))
 {
-    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"]);
+    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"],
+        failureStatus: HealthStatus.Degraded);
 }
 
 builder.Services.AddRateLimiter(options =>
