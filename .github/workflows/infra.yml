@@ -35,8 +35,10 @@ jobs:
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
             echo "Manual trigger — skipping diff check"
           else
-            # diff-tree --no-commit-id -r handles both regular and merge commits
-            if git diff-tree --no-commit-id -r HEAD -- 'infra/' | grep -q .; then
+            # Compare HEAD against its first parent to detect changed files.
+            # For merge commits, diff-tree's default combined diff produces empty
+            # output when the merge is clean, so we compare explicitly against HEAD~1.
+            if git diff --name-only HEAD~1 HEAD -- 'infra/' | grep -q .; then
               echo "has-changes=true" >> "$GITHUB_OUTPUT"
               echo "Infrastructure changes detected"
             else
