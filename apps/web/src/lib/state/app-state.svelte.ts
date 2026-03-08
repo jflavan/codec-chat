@@ -2649,20 +2649,25 @@ export class AppState {
 		await this.searchMessages(this.searchQuery, { ...this.searchFilters, page });
 	}
 
-	async jumpToMessage(messageId: string, channelId: string): Promise<void> {
+	async jumpToMessage(messageId: string, channelId: string, isDm: boolean): Promise<void> {
 		if (!this.idToken) return;
 
 		try {
-			const isDm = !!this.activeDmChannelId;
+			// Switch to the correct view if needed
+			if (isDm) {
+				if (this.activeDmChannelId !== channelId) {
+					await this.selectDmConversation(channelId);
+				}
+			} else {
+				if (this.selectedChannelId !== channelId) {
+					await this.selectChannel(channelId);
+				}
+			}
 
+			// Fetch the around-window for the target message
 			const result = isDm
 				? await this.api.getDmMessagesAround(this.idToken, channelId, messageId)
 				: await this.api.getMessagesAround(this.idToken, channelId, messageId);
-
-			// If we need to switch channels first
-			if (!isDm && this.selectedChannelId !== channelId) {
-				await this.selectChannel(channelId);
-			}
 
 			// Replace messages with the around-window
 			if (isDm) {
