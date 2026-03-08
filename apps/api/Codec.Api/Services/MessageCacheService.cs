@@ -65,6 +65,9 @@ public class MessageCacheService
             });
 
             // Track this key in a Redis set for bulk invalidation.
+            // The tracking set TTL resets on each write, so it may briefly outlive some
+            // member entries. This is acceptable: orphaned entries expire via their own
+            // TTL within DefaultExpiry, and KeyDeleteAsync on a missing key is a no-op.
             if (_redis is not null)
             {
                 var db = _redis.GetDatabase();

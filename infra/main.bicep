@@ -265,7 +265,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     voiceTurnKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--TurnSecret' : ''
     voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
-    redisConnectionStringKvUrl: redisEnabled ? '${keyVault.outputs.uri}secrets/Redis--ConnectionString' : ''
+    redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
   }
 }
 
