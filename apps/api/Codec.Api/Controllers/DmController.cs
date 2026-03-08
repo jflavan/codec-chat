@@ -202,13 +202,203 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     /// Supports cursor-based pagination with <c>before</c> and <c>limit</c> parameters.
     /// </summary>
     [HttpGet("channels/{channelId:guid}/messages")]
-    public async Task<IActionResult> GetMessages(Guid channelId, [FromQuery] DateTimeOffset? before, [FromQuery] int limit = 50)
+    public async Task<IActionResult> GetMessages(Guid channelId, [FromQuery] DateTimeOffset? before, [FromQuery] Guid? around = null, [FromQuery] int limit = 50)
     {
         limit = Math.Clamp(limit, 1, 100);
 
         var appUser = await userService.GetOrCreateUserAsync(User);
 
         await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
+
+        // --- Around-message mode: load messages centered on a target message ---
+        if (around.HasValue)
+        {
+            var targetMessage = await db.DirectMessages
+                .AsNoTracking()
+                .Where(m => m.Id == around.Value && m.DmChannelId == channelId)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.DmChannelId,
+                    m.AuthorUserId,
+                    m.AuthorName,
+                    m.Body,
+                    m.ImageUrl,
+                    m.CreatedAt,
+                    m.EditedAt,
+                    m.ReplyToDirectMessageId,
+                    m.MessageType,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                })
+                .FirstOrDefaultAsync();
+
+            if (targetMessage is null)
+            {
+                return NotFound(new { error = "Message not found." });
+            }
+
+            var half = limit / 2;
+
+            var beforeMessages = await db.DirectMessages
+                .AsNoTracking()
+                .Where(m => m.DmChannelId == channelId && m.CreatedAt < targetMessage.CreatedAt)
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(half)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.DmChannelId,
+                    m.AuthorUserId,
+                    m.AuthorName,
+                    m.Body,
+                    m.ImageUrl,
+                    m.CreatedAt,
+                    m.EditedAt,
+                    m.ReplyToDirectMessageId,
+                    m.MessageType,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                })
+                .ToListAsync();
+
+            beforeMessages.Reverse();
+
+            var afterMessages = await db.DirectMessages
+                .AsNoTracking()
+                .Where(m => m.DmChannelId == channelId && m.CreatedAt > targetMessage.CreatedAt)
+                .OrderBy(m => m.CreatedAt)
+                .Take(half)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.DmChannelId,
+                    m.AuthorUserId,
+                    m.AuthorName,
+                    m.Body,
+                    m.ImageUrl,
+                    m.CreatedAt,
+                    m.EditedAt,
+                    m.ReplyToDirectMessageId,
+                    m.MessageType,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                })
+                .ToListAsync();
+
+            var hasMoreBefore = beforeMessages.Count == half;
+            var hasMoreAfter = afterMessages.Count == half;
+
+            var allMessages = beforeMessages
+                .Append(targetMessage)
+                .Concat(afterMessages)
+                .ToList();
+
+            var aroundMessageIds = allMessages.Select(m => m.Id).ToArray();
+
+            // Batch-load link previews.
+            var aroundLinkPreviewLookup = new Dictionary<Guid, IReadOnlyList<LinkPreviewDto>>();
+            if (aroundMessageIds.Length > 0)
+            {
+                var linkPreviews = await db.LinkPreviews
+                    .AsNoTracking()
+                    .Where(lp => lp.DirectMessageId != null && aroundMessageIds.Contains(lp.DirectMessageId.Value)
+                        && lp.Status == Models.LinkPreviewStatus.Success)
+                    .ToListAsync();
+
+                aroundLinkPreviewLookup = linkPreviews
+                    .GroupBy(lp => lp.DirectMessageId!.Value)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyList<LinkPreviewDto>)group
+                            .Select(lp => new LinkPreviewDto(lp.Url, lp.Title, lp.Description, lp.ImageUrl, lp.SiteName, lp.CanonicalUrl))
+                            .ToList());
+            }
+
+            // Batch-load reactions.
+            var aroundReactionLookup = new Dictionary<Guid, IReadOnlyList<ReactionSummary>>();
+            if (aroundMessageIds.Length > 0)
+            {
+                var reactions = await db.Reactions
+                    .AsNoTracking()
+                    .Where(reaction => reaction.DirectMessageId != null && aroundMessageIds.Contains(reaction.DirectMessageId.Value))
+                    .ToListAsync();
+
+                aroundReactionLookup = reactions
+                    .GroupBy(reaction => reaction.DirectMessageId!.Value)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyList<ReactionSummary>)group
+                            .GroupBy(reaction => reaction.Emoji)
+                            .Select(emojiGroup => new ReactionSummary(
+                                emojiGroup.Key,
+                                emojiGroup.Count(),
+                                emojiGroup.Select(reaction => reaction.UserId).ToList()))
+                            .ToList());
+            }
+
+            // Batch-load reply context.
+            var aroundReplyToIds = allMessages
+                .Where(m => m.ReplyToDirectMessageId.HasValue)
+                .Select(m => m.ReplyToDirectMessageId!.Value)
+                .Distinct()
+                .ToList();
+
+            var aroundReplyContextLookup = new Dictionary<Guid, ReplyContextDto>();
+            if (aroundReplyToIds.Count > 0)
+            {
+                var parentMessages = await db.DirectMessages
+                    .AsNoTracking()
+                    .Where(dm => aroundReplyToIds.Contains(dm.Id))
+                    .Select(dm => new
+                    {
+                        dm.Id,
+                        dm.AuthorName,
+                        dm.AuthorUserId,
+                        AuthorCustomAvatarPath = dm.AuthorUser != null ? dm.AuthorUser.CustomAvatarPath : null,
+                        AuthorGoogleAvatarUrl = dm.AuthorUser != null ? dm.AuthorUser.AvatarUrl : null,
+                        dm.Body
+                    })
+                    .ToListAsync();
+
+                aroundReplyContextLookup = parentMessages.ToDictionary(
+                    p => p.Id,
+                    p => new ReplyContextDto(
+                        p.Id,
+                        p.AuthorName,
+                        avatarService.ResolveUrl(p.AuthorCustomAvatarPath) ?? p.AuthorGoogleAvatarUrl,
+                        p.AuthorUserId,
+                        p.Body.Length > 100 ? p.Body[..100] : p.Body,
+                        false));
+            }
+
+            var aroundResponse = allMessages.Select(m => new
+            {
+                m.Id,
+                m.DmChannelId,
+                m.AuthorUserId,
+                m.AuthorName,
+                m.Body,
+                m.ImageUrl,
+                m.CreatedAt,
+                m.EditedAt,
+                AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl,
+                LinkPreviews = aroundLinkPreviewLookup.TryGetValue(m.Id, out var previews)
+                    ? previews
+                    : Array.Empty<LinkPreviewDto>(),
+                Reactions = aroundReactionLookup.TryGetValue(m.Id, out var reactions)
+                    ? reactions
+                    : Array.Empty<ReactionSummary>(),
+                MessageType = (int)m.MessageType,
+                ReplyContext = m.ReplyToDirectMessageId.HasValue
+                    ? aroundReplyContextLookup.TryGetValue(m.ReplyToDirectMessageId.Value, out var ctx)
+                        ? ctx
+                        : new ReplyContextDto(m.ReplyToDirectMessageId.Value, string.Empty, null, null, string.Empty, true)
+                    : (ReplyContextDto?)null
+            });
+
+            return Ok(new { hasMoreBefore, hasMoreAfter, messages = aroundResponse });
+        }
 
         var query = db.DirectMessages
             .AsNoTracking()
@@ -745,6 +935,249 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Searches direct messages across all of the current user's DM channels (or a specific channel).
+    /// Supports filtering by author, date range, and content type.
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<IActionResult> SearchMessages([FromQuery] SearchMessagesRequest request)
+    {
+        var trimmedQuery = request.Q?.Trim() ?? "";
+        if (trimmedQuery.Length < 2)
+        {
+            return BadRequest(new { error = "Search query must be at least 2 characters." });
+        }
+        if (trimmedQuery.Length > 200)
+        {
+            return BadRequest(new { error = "Search query must be 200 characters or less." });
+        }
+
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+
+        // Get all DM channel IDs where the current user is a member.
+        var accessibleChannelIds = await db.DmChannelMembers
+            .AsNoTracking()
+            .Where(m => m.UserId == appUser.Id)
+            .Select(m => m.DmChannelId)
+            .ToListAsync();
+
+        if (accessibleChannelIds.Count == 0)
+        {
+            return Ok(new { totalCount = 0, page, pageSize, results = Array.Empty<object>() });
+        }
+
+        // Determine which channels to search.
+        IReadOnlyList<Guid> dmChannelIds;
+        if (request.ChannelId.HasValue)
+        {
+            if (!accessibleChannelIds.Contains(request.ChannelId.Value))
+            {
+                return NotFound(new { error = "DM channel not found." });
+            }
+            dmChannelIds = [request.ChannelId.Value];
+        }
+        else
+        {
+            dmChannelIds = accessibleChannelIds;
+        }
+
+        // Build base query. Escape ILIKE metacharacters to prevent wildcard injection.
+        var escaped = trimmedQuery.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var searchTerm = $"%{escaped}%";
+        var query = db.DirectMessages
+            .AsNoTracking()
+            .Where(m => dmChannelIds.Contains(m.DmChannelId))
+            .Where(m => EF.Functions.ILike(m.Body, searchTerm));
+
+        // Apply optional filters.
+        if (request.AuthorId.HasValue)
+        {
+            query = query.Where(m => m.AuthorUserId == request.AuthorId.Value);
+        }
+
+        if (request.Before.HasValue)
+        {
+            query = query.Where(m => m.CreatedAt < request.Before.Value);
+        }
+
+        if (request.After.HasValue)
+        {
+            query = query.Where(m => m.CreatedAt > request.After.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Has))
+        {
+            if (string.Equals(request.Has, "image", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(m => m.ImageUrl != null);
+            }
+            else if (string.Equals(request.Has, "link", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(m => db.LinkPreviews.Any(lp => lp.DirectMessageId == m.Id));
+            }
+        }
+
+        // Count total results.
+        var totalCount = await query.CountAsync();
+
+        // Fetch page.
+        var messages = await query
+            .OrderByDescending(m => m.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(m => new
+            {
+                m.Id,
+                m.DmChannelId,
+                m.AuthorName,
+                m.AuthorUserId,
+                m.Body,
+                m.ImageUrl,
+                m.CreatedAt,
+                m.EditedAt,
+                m.ReplyToDirectMessageId,
+                m.MessageType,
+                AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+            })
+            .ToListAsync();
+
+        var messageIds = messages.Select(m => m.Id).ToArray();
+
+        // Batch-load reactions.
+        var reactionLookup = new Dictionary<Guid, IReadOnlyList<SearchReactionSummary>>();
+        if (messageIds.Length > 0)
+        {
+            var reactions = await db.Reactions
+                .AsNoTracking()
+                .Where(r => r.DirectMessageId != null && messageIds.Contains(r.DirectMessageId.Value))
+                .ToListAsync();
+
+            reactionLookup = reactions
+                .GroupBy(r => r.DirectMessageId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<SearchReactionSummary>)group
+                        .GroupBy(r => r.Emoji)
+                        .Select(emojiGroup => new SearchReactionSummary(
+                            emojiGroup.Key,
+                            emojiGroup.Count(),
+                            emojiGroup.Select(r => r.UserId).ToList()))
+                        .ToList());
+        }
+
+        // Batch-load link previews.
+        var linkPreviewLookup = new Dictionary<Guid, IReadOnlyList<SearchLinkPreviewDto>>();
+        if (messageIds.Length > 0)
+        {
+            var linkPreviews = await db.LinkPreviews
+                .AsNoTracking()
+                .Where(lp => lp.DirectMessageId != null && messageIds.Contains(lp.DirectMessageId.Value)
+                    && lp.Status == Models.LinkPreviewStatus.Success)
+                .ToListAsync();
+
+            linkPreviewLookup = linkPreviews
+                .GroupBy(lp => lp.DirectMessageId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<SearchLinkPreviewDto>)group
+                        .Select(lp => new SearchLinkPreviewDto(lp.Url, lp.Title, lp.Description, lp.ImageUrl, lp.SiteName, lp.CanonicalUrl))
+                        .ToList());
+        }
+
+        // Batch-load reply context.
+        var replyToIds = messages
+            .Where(m => m.ReplyToDirectMessageId.HasValue)
+            .Select(m => m.ReplyToDirectMessageId!.Value)
+            .Distinct()
+            .ToList();
+
+        var replyContextLookup = new Dictionary<Guid, SearchReplyContextDto>();
+        if (replyToIds.Count > 0)
+        {
+            var parentMessages = await db.DirectMessages
+                .AsNoTracking()
+                .Where(dm => replyToIds.Contains(dm.Id))
+                .Select(dm => new
+                {
+                    dm.Id,
+                    dm.AuthorName,
+                    dm.AuthorUserId,
+                    AuthorCustomAvatarPath = dm.AuthorUser != null ? dm.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = dm.AuthorUser != null ? dm.AuthorUser.AvatarUrl : null,
+                    dm.Body
+                })
+                .ToListAsync();
+
+            replyContextLookup = parentMessages.ToDictionary(
+                p => p.Id,
+                p => new SearchReplyContextDto(
+                    p.Id,
+                    p.AuthorName,
+                    avatarService.ResolveUrl(p.AuthorCustomAvatarPath) ?? p.AuthorGoogleAvatarUrl,
+                    p.AuthorUserId,
+                    p.Body.Length > 100 ? p.Body[..100] : p.Body,
+                    false));
+        }
+
+        // Load DM channel display names (the other participant's name).
+        var resultChannelIds = messages.Select(m => m.DmChannelId).Distinct().ToList();
+        var channelNameLookup = new Dictionary<Guid, string>();
+        if (resultChannelIds.Count > 0)
+        {
+            var otherMembers = await db.DmChannelMembers
+                .AsNoTracking()
+                .Where(m => resultChannelIds.Contains(m.DmChannelId) && m.UserId != appUser.Id)
+                .Select(m => new
+                {
+                    m.DmChannelId,
+                    m.User!.DisplayName,
+                    m.User.Nickname
+                })
+                .ToListAsync();
+
+            channelNameLookup = otherMembers.ToDictionary(
+                m => m.DmChannelId,
+                m => string.IsNullOrWhiteSpace(m.Nickname) ? m.DisplayName : m.Nickname);
+        }
+
+        // Build enriched response.
+        var results = messages.Select(message => new
+        {
+            message.Id,
+            message.DmChannelId,
+            ChannelName = channelNameLookup.TryGetValue(message.DmChannelId, out var chName) ? chName : null,
+            message.AuthorName,
+            message.AuthorUserId,
+            AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
+            message.Body,
+            message.ImageUrl,
+            message.CreatedAt,
+            message.EditedAt,
+            MessageType = (int)message.MessageType,
+            Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
+                ? reactions
+                : Array.Empty<SearchReactionSummary>(),
+            LinkPreviews = linkPreviewLookup.TryGetValue(message.Id, out var previews)
+                ? previews
+                : Array.Empty<SearchLinkPreviewDto>(),
+            ReplyContext = message.ReplyToDirectMessageId.HasValue
+                ? replyContextLookup.TryGetValue(message.ReplyToDirectMessageId.Value, out var ctx)
+                    ? ctx
+                    : new SearchReplyContextDto(message.ReplyToDirectMessageId.Value, string.Empty, null, null, string.Empty, true)
+                : (SearchReplyContextDto?)null
+        });
+
+        return Ok(new { totalCount, page, pageSize, results });
+    }
+
+    private sealed record SearchReactionSummary(string Emoji, int Count, IReadOnlyList<Guid> UserIds);
+    private sealed record SearchLinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
+    private sealed record SearchReplyContextDto(Guid MessageId, string AuthorName, string? AuthorAvatarUrl, Guid? AuthorUserId, string BodyPreview, bool IsDeleted);
 
     private sealed record ReactionSummary(string Emoji, int Count, IReadOnlyList<Guid> UserIds);
 
