@@ -930,9 +930,14 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpGet("{serverId:guid}/search")]
     public async Task<IActionResult> SearchMessages(Guid serverId, [FromQuery] SearchMessagesRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Q) || request.Q.Trim().Length < 2)
+        var trimmedQuery = request.Q?.Trim() ?? "";
+        if (trimmedQuery.Length < 2)
         {
             return BadRequest(new { error = "Search query must be at least 2 characters." });
+        }
+        if (trimmedQuery.Length > 200)
+        {
+            return BadRequest(new { error = "Search query must be 200 characters or less." });
         }
 
         var page = Math.Max(1, request.Page);
@@ -963,8 +968,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             channelIds = serverChannelIds;
         }
 
-        // Build base query.
-        var searchTerm = $"%{request.Q.Trim()}%";
+        // Build base query. Escape ILIKE metacharacters to prevent wildcard injection.
+        var escaped = trimmedQuery.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var searchTerm = $"%{escaped}%";
         var query = db.Messages
             .AsNoTracking()
             .Where(m => channelIds.Contains(m.ChannelId))
