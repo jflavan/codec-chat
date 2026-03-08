@@ -123,7 +123,8 @@ jobs:
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
-              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
+              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
+              redisEnabled=true
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         if: steps.certs.outputs.certs-exist != 'true'
@@ -147,7 +148,8 @@ jobs:
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
-              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
+              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
+              redisEnabled=true
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -170,7 +172,8 @@ jobs:
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
-              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
+              gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
+              redisEnabled=true
 
       - name: Show deployment outputs
         run: |

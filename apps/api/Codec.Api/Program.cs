@@ -16,6 +16,7 @@ using Serilog.Formatting.Compact;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.RateLimiting;
+using StackExchange.Redis;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Services;
@@ -28,11 +29,37 @@ builder.Host.UseSerilog((ctx, config) => config
 
 builder.Services.AddControllers();
 
-builder.Services.AddSignalR()
+// Redis distributed cache + direct connection for tracking set operations.
+// Two connections are intentional: AddStackExchangeRedisCache manages its own internal
+// ConnectionMultiplexer, while the IConnectionMultiplexer singleton is needed for Redis SET
+// operations (tracking keys for bulk invalidation) that IDistributedCache does not support.
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+    });
+
+    builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+        ConnectionMultiplexer.Connect(redisConnectionString));
+}
+
+builder.Services.AddSingleton<MessageCacheService>();
+
+var signalRBuilder = builder.Services.AddSignalR()
     .AddJsonProtocol(options =>
     {
         options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    signalRBuilder.AddStackExchangeRedis(redisConnectionString, options =>
+    {
+        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("codec");
+    });
+}
 
 builder.Services.AddCors(options =>
 {
@@ -110,8 +137,14 @@ if (!builder.Environment.IsDevelopment())
         throw new InvalidOperationException("Voice:SfuInternalKey must be configured in production.");
 }
 
-builder.Services.AddHealthChecks()
+var healthChecks = builder.Services.AddHealthChecks()
     .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"],
+        failureStatus: HealthStatus.Degraded);
+}
 
 builder.Services.AddRateLimiter(options =>
 {

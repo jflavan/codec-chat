@@ -18,6 +18,7 @@ All resources are deployed to the `rg-codec-prod` resource group in `centralus` 
 | Container Apps Env | `cae-codec-prod` | Managed environment | Consumption (serverless) |
 | API App | `ca-codec-prod-api` | Container App | 0.5 CPU, 1 GB, 1 replica |
 | Web App | `ca-codec-prod-web` | Container App | 0.25 CPU, 0.5 GB, 1–2 replicas |
+| Redis Cache | `redis-codec-prod` | Azure Cache for Redis | Basic C0 (conditional) |
 | Voice VM | `vm-codec-prod-voice` | Virtual Machine | Standard_D2als_v7 (conditional) |
 
 ## Bicep Structure
@@ -37,6 +38,7 @@ infra/
 │   ├── container-app-api.bicep
 │   ├── container-app-web.bicep
 │   ├── managed-certificate.bicep
+│   ├── redis-cache.bicep
 │   └── voice-vm.bicep
 └── voice/
     └── docker-compose.yml  # SFU + coturn (deployed to voice VM by CI/CD)
@@ -54,6 +56,7 @@ keyVault ──┬──► postgresql (stores conn string)  │
            ├──► voiceTurnSecretKv (if voice)     │
            └──► voiceSfuInternalKeyKv (if voice) │
 storageAccount ─────────────────────────────────┘
+redisCache (if redisEnabled) ──► stores conn string in KV
 voiceVm (if voiceVmEnabled) ────────────────────┘
 ```
 
@@ -67,6 +70,7 @@ All sensitive values are stored in Key Vault and referenced at runtime via syste
 | `Google--ClientId` | GitHub Actions secret | API app |
 | `GlobalAdmin--Email` | GitHub Actions secret | API app |
 | `GitHub--Token` | GitHub Actions secret (optional) | API app |
+| `Redis--ConnectionString` | Redis Cache module (if Redis) | API app |
 | `Voice--TurnSecret` | GitHub Actions secret (if voice) | API app |
 | `Voice--SfuInternalKey` | GitHub Actions secret (if voice) | API app |
 
@@ -85,7 +89,7 @@ ASP.NET Core 10 Web API with SignalR.
   - AcrPull on Container Registry
   - Storage Blob Data Contributor on Storage Account
   - Key Vault Secrets User on Key Vault
-- **Environment variables:** `ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__Default` (secret ref), `Google__ClientId` (secret ref), `Api__BaseUrl`, `Cors__AllowedOrigins`, `Storage__Provider`, `Storage__AzureBlob__ServiceUri`, `GlobalAdmin__Email` (secret ref), plus optional voice and GitHub config
+- **Environment variables:** `ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__Default` (secret ref), `Google__ClientId` (secret ref), `Api__BaseUrl`, `Cors__AllowedOrigins`, `Storage__Provider`, `Storage__AzureBlob__ServiceUri`, `GlobalAdmin__Email` (secret ref), `Redis__ConnectionString` (secret ref), plus optional voice and GitHub config
 
 ### Web App (`ca-codec-prod-web`)
 
@@ -225,6 +229,7 @@ The full parameter list for `main.bicep`:
 | `webCustomDomain` | string | `''` | Custom domain for web app |
 | `apiCustomDomain` | string | `''` | Custom domain for API |
 | `bindCertificates` | bool | `false` | Bind managed TLS certificates |
+| `redisEnabled` | bool | `true` | Deploy Azure Cache for Redis |
 | `voiceVmEnabled` | bool | `false` | Deploy voice VM infrastructure |
 | `voiceAdminSshPublicKey` | secure string | `''` | SSH public key for voice VM |
 | `voiceSshAllowedSourcePrefix` | string | `''` | Source CIDR for SSH access |
