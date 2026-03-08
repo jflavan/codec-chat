@@ -155,6 +155,9 @@ else
 builder.Services.AddSingleton<VoiceCallTimeoutService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutService>());
 
+builder.Services.AddSingleton<PresenceTracker>();
+builder.Services.AddHostedService<PresenceBackgroundService>();
+
 builder.Services.AddSingleton<IAvatarService, AvatarService>();
 builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();
 builder.Services.AddScoped<ICustomEmojiService, CustomEmojiService>();

@@ -75,6 +75,26 @@ This document tracks implemented and planned features for Codec.
 - Responsive breakpoints (mobile, tablet, desktop)
 - Accessibility: focus-visible outlines, `prefers-reduced-motion`, semantic HTML, ARIA labels
 
+### Presence Indicators
+- ✅ Real-time presence status (Online, Idle, Offline) — automatic, no user-set statuses
+- ✅ Hybrid detection — client sends 30-second heartbeats with `isActive` flag; server tracks in-memory via `PresenceTracker` singleton with `ConcurrentDictionary`
+- ✅ `PresenceBackgroundService` — scans every 30 seconds; transitions to Idle after 5 minutes of inactivity, Offline after 2 minutes of missed heartbeats
+- ✅ `PresenceState` DB table — canonical status written only on transitions; purged on server startup
+- ✅ Multi-tab support — tracks multiple SignalR connections per user; aggregate status uses best across connections (Online > Idle > Offline)
+- ✅ Push-based broadcasting — `UserPresenceChanged` SignalR event sent to all `server-{serverId}` groups and `user-{friendId}` groups on status change
+- ✅ REST endpoints — `GET servers/{serverId}/presence` and `GET dm/presence` for initial presence load
+- ✅ `PresenceDot` component — colored indicator (green=online, yellow=idle, gray=offline) on member avatars
+- ✅ Member sidebar — presence dots on member avatars with online-first sorting within each role group
+- ✅ DM list — presence dots next to conversation participant avatars
+- ✅ Offline dimming — offline members shown at 50% opacity in member sidebar
+
+### Connection Status
+- ✅ SignalR reconnection lifecycle tracking (`onReconnecting`, `onReconnected`, `onClose` callbacks)
+- ✅ `isHubConnected` reactive state in `AppState` — tracks real-time connection health
+- ✅ Composer disconnected state — shows "Codec connecting..." with animated ellipsis when SignalR is not connected (both server channels and DMs)
+- ✅ Automatic restoration of full composer input on reconnection
+- ✅ Auto-refresh on persistent disconnect — if SignalR cannot reconnect within 5 seconds, or if the WebSocket closes with an error (e.g. status code 1006), the page refreshes automatically
+
 ### API & Infrastructure
 - Controller-based RESTful API with `[Authorize]` on all endpoints
 - Health endpoints: `/health/live` (liveness), `/health/ready` (readiness + DB check)
@@ -89,7 +109,8 @@ This document tracks implemented and planned features for Codec.
 ## Planned
 
 ### Near-Term
-- Presence indicators (online/offline/away)
+- ~~Presence indicators~~ (implemented)
+- Server settings/configuration
 - Channel categories/organization
 - Link preview caching and image proxying
 - Video embeds for Vimeo

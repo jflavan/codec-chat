@@ -104,10 +104,12 @@ src/
 │   │   │   ├── ServerSettings.svelte      # Server management + global admin danger zone
 │   │   │   ├── ServerEmojis.svelte        # Custom emoji upload, rename, delete (Owner/Admin)
 │   │   │   └── ServerMembers.svelte       # Member role management (promote/demote, Owner/Admin)
+│   │   ├── shared/
+│   │   │   └── PresenceDot.svelte        # Online/idle/offline indicator dot
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
 │   │   └── members/
-│   │       ├── MembersSidebar.svelte     # Members grouped by role
-│   │       └── MemberItem.svelte         # Single member card
+│   │       ├── MembersSidebar.svelte     # Members grouped by role (online-first sorting)
+│   │       └── MemberItem.svelte         # Single member card (with presence dot)
 │   └── index.ts            # Public barrel exports
 └── routes/
     ├── +layout.svelte      # Root layout (global CSS, font preconnect)
@@ -332,6 +334,10 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `GET /dm/channels/{channelId}/messages?around={messageId}` - Get DM messages around a target message (returns `{ hasMoreBefore, hasMoreAfter, messages }` centered on the target; used by jump-to-message)
 - `GET /dm/search?q=...` - Search messages across DM conversations (filters: `channelId`, `authorId`, `before`, `after`, `has`; paginated results with DM channel display names)
 
+#### Presence
+- `GET /servers/{serverId}/presence` - Get online/idle presence for all members of a server (returns `[{ userId, status }]`, excludes offline; requires membership or Global Admin)
+- `GET /dm/presence` - Get online/idle presence for the current user's DM contacts (returns `[{ userId, status }]`, excludes offline)
+
 #### Voice Calls
 - `GET /voice/active-call` - Get the current user's active or ringing call (returns caller/recipient display info, call status, and timestamps; used on page load/reconnect to restore call state)
 
@@ -354,6 +360,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `LeaveChannel` | `channelId: string` | Leave a channel group |
 | `JoinServer` | `serverId: string` | Join a server group to receive membership events (called after joining via invite) |
 | `LeaveServer` | `serverId: string` | Leave a server group (called after being kicked) |
+| `Heartbeat` | `isActive: boolean` | Send presence heartbeat (every 30s); `isActive` true if user had input since last heartbeat |
 | `StartTyping` | `channelId: string, displayName: string` | Broadcast typing indicator to channel |
 | `StopTyping` | `channelId: string, displayName: string` | Clear typing indicator |
 | `JoinDmChannel` | `dmChannelId: string` | Join a DM channel group for real-time events |
@@ -369,6 +376,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 #### Server → Client Events
 | Event | Payload | Description |
 |-------|---------|-------------|
+| `UserPresenceChanged` | `{ userId, status }` | User's presence status changed (online/idle/offline); sent to all server groups the user belongs to and friend user groups |
 | `ReceiveMessage` | `{ id, authorName, authorUserId, body, createdAt, channelId, reactions, imageUrl, linkPreviews, replyContext }` | New message posted to current channel |
 | `UserTyping` | `channelId: string, displayName: string` | Another user started typing |
 | `UserStoppedTyping` | `channelId: string, displayName: string` | Another user stopped typing |
@@ -524,8 +532,10 @@ User ────┬──── ServerMember ──── Server
          ├──── VoiceCall ──── DmChannel
          │    (Caller/Recipient)
          │
-         └──── VoiceState ──── Channel (nullable)
-                               DmChannel (nullable)
+         ├──── VoiceState ──── Channel (nullable)
+         │                     DmChannel (nullable)
+         │
+         └──── PresenceState (transient; one per connection)
 
 Message ───────┐
                ├──── LinkPreview
@@ -614,6 +624,13 @@ DirectMessage ─┘
 - Fields: Id, DmChannelId, CallerUserId, RecipientUserId, Status (Ringing=0, Active=1, Ended=2), EndReason (Answered, Declined, Missed, Timeout, Disconnected), StartedAt, AnsweredAt, EndedAt
 - One active call per DM channel at a time (enforced at API level)
 - `VoiceCallTimeoutService` monitors ringing calls — ends them after 30 seconds with `Timeout` reason and creates a "missed" system message
+
+#### PresenceState
+- Transient entity tracking a user's real-time presence per SignalR connection
+- Fields: Id, UserId (FK → User), Status (Online=0, Idle=1, Offline=2), ConnectionId, LastHeartbeatAt, LastActiveAt, ConnectedAt
+- Created on SignalR connect, deleted on disconnect; all rows purged on server startup
+- Multiple rows per user (one per browser tab/connection); aggregate status = best across connections
+- In-memory `PresenceTracker` singleton handles heartbeat timestamps; DB only updated on status transitions
 
 #### LinkPreview
 - URL metadata extracted from a message body (Open Graph + HTML meta fallbacks)

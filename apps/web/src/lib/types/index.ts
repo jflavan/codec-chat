@@ -27,5 +27,7 @@ export type {
 	SearchResult,
 	PaginatedSearchResults,
 	AroundMessages,
-	SearchFilters
+	SearchFilters,
+	PresenceStatus,
+	PresenceEntry
 } from './models.js';
