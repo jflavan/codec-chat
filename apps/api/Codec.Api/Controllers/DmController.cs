@@ -233,6 +233,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.CreatedAt,
                 m.EditedAt,
                 m.ReplyToDirectMessageId,
+                m.MessageType,
                 AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                 AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
             })
@@ -316,6 +317,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             LinkPreviews = linkPreviewLookup.TryGetValue(m.Id, out var previews)
                 ? previews
                 : Array.Empty<LinkPreviewDto>(),
+            MessageType = (int)m.MessageType,
             ReplyContext = m.ReplyToDirectMessageId.HasValue
                 ? replyContextLookup.TryGetValue(m.ReplyToDirectMessageId.Value, out var ctx)
                     ? ctx
