@@ -17,7 +17,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("servers")]
-public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config) : ControllerBase
+public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config, MessageCacheService messageCache) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -713,6 +713,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         db.Channels.Remove(channel);
         await db.SaveChangesAsync();
+
+        // Clean up any cached message pages for this channel.
+        await messageCache.InvalidateChannelAsync(channelId);
 
         // Notify all server members of the channel deletion via SignalR.
         await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", new
