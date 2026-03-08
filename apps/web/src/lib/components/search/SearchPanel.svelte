@@ -21,7 +21,7 @@
 		}
 
 		debounceTimer = setTimeout(() => {
-			app.searchMessages(inputValue);
+			app.searchMessages(inputValue, app.searchFilters);
 		}, 300);
 	}
 

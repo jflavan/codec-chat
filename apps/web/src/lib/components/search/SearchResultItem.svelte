@@ -90,16 +90,16 @@
 	}
 
 	.result-avatar {
-		width: 20px;
-		height: 20px;
+		width: 24px;
+		height: 24px;
 		border-radius: 50%;
 		object-fit: cover;
 		flex-shrink: 0;
 	}
 
 	.result-avatar-placeholder {
-		width: 20px;
-		height: 20px;
+		width: 24px;
+		height: 24px;
 		border-radius: 50%;
 		background: var(--accent);
 		color: var(--bg-tertiary);
