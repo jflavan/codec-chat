@@ -102,8 +102,10 @@
 			<div class="error-banner" role="alert">{app.error}</div>
 		{/if}
 
-		<MessageFeed />
-		<TypingIndicator />
+		<div class="feed-container">
+			<MessageFeed />
+			<TypingIndicator />
+		</div>
 		<Composer />
 	</div>
 </main>
@@ -258,6 +260,15 @@
 		flex-direction: column;
 		overflow: hidden;
 		min-height: 0;
+	}
+
+	.feed-container {
+		flex: 1;
+		position: relative;
+		overflow: hidden;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 
 	/* Mobile: Ensure composer stays at bottom of viewport */
