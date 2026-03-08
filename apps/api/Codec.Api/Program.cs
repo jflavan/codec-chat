@@ -16,6 +16,7 @@ using Serilog.Formatting.Compact;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.RateLimiting;
+using StackExchange.Redis;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Services;
@@ -37,7 +38,12 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
         options.Configuration = redisConnectionString;
         options.InstanceName = "codec:";
     });
+
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        ConnectionMultiplexer.Connect(redisConnectionString));
 }
+
+builder.Services.AddSingleton<MessageCacheService>();
 
 var signalRBuilder = builder.Services.AddSignalR()
     .AddJsonProtocol(options =>
