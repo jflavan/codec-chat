@@ -1,3 +1,12 @@
+/** User presence status. */
+export type PresenceStatus = 'online' | 'idle' | 'offline';
+
+/** A single user's presence entry. */
+export interface PresenceEntry {
+	userId: string;
+	status: PresenceStatus;
+}
+
 /** Server the current user is a member of (or visible to global admins). */
 export type MemberServer = {
 	serverId: string;
