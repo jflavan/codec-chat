@@ -268,6 +268,28 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                         .ToList());
         }
 
+        // Batch-load reactions for returned messages.
+        var reactionLookup = new Dictionary<Guid, IReadOnlyList<ReactionSummary>>();
+        if (messageIds.Length > 0)
+        {
+            var reactions = await db.Reactions
+                .AsNoTracking()
+                .Where(reaction => reaction.DirectMessageId != null && messageIds.Contains(reaction.DirectMessageId.Value))
+                .ToListAsync();
+
+            reactionLookup = reactions
+                .GroupBy(reaction => reaction.DirectMessageId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<ReactionSummary>)group
+                        .GroupBy(reaction => reaction.Emoji)
+                        .Select(emojiGroup => new ReactionSummary(
+                            emojiGroup.Key,
+                            emojiGroup.Count(),
+                            emojiGroup.Select(reaction => reaction.UserId).ToList()))
+                        .ToList());
+        }
+
         // Batch-load referenced parent DMs for reply context.
         var replyToIds = messages
             .Where(m => m.ReplyToDirectMessageId.HasValue)
@@ -317,6 +339,9 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             LinkPreviews = linkPreviewLookup.TryGetValue(m.Id, out var previews)
                 ? previews
                 : Array.Empty<LinkPreviewDto>(),
+            Reactions = reactionLookup.TryGetValue(m.Id, out var reactions)
+                ? reactions
+                : Array.Empty<ReactionSummary>(),
             MessageType = (int)m.MessageType,
             ReplyContext = m.ReplyToDirectMessageId.HasValue
                 ? replyContextLookup.TryGetValue(m.ReplyToDirectMessageId.Value, out var ctx)
@@ -581,6 +606,80 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     }
 
     /// <summary>
+    /// Toggles a reaction (add/remove) on a direct message.
+    /// </summary>
+    [HttpPost("channels/{channelId:guid}/messages/{messageId:guid}/reactions")]
+    public async Task<IActionResult> ToggleReaction(Guid channelId, Guid messageId, [FromBody] ToggleReactionRequest request)
+    {
+        var emoji = request.Emoji.Trim();
+
+        var appUser = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
+
+        var messageExists = await db.DirectMessages.AnyAsync(m => m.Id == messageId && m.DmChannelId == channelId);
+        if (!messageExists)
+        {
+            return NotFound(new { error = "Message not found." });
+        }
+
+        var existing = await db.Reactions.FirstOrDefaultAsync(
+            r => r.DirectMessageId == messageId && r.UserId == appUser.Id && r.Emoji == emoji);
+
+        string action;
+        if (existing is not null)
+        {
+            db.Reactions.Remove(existing);
+            action = "removed";
+        }
+        else
+        {
+            db.Reactions.Add(new Reaction
+            {
+                DirectMessageId = messageId,
+                UserId = appUser.Id,
+                Emoji = emoji
+            });
+            action = "added";
+        }
+
+        await db.SaveChangesAsync();
+
+        var updatedReactions = await db.Reactions
+            .AsNoTracking()
+            .Where(r => r.DirectMessageId == messageId)
+            .GroupBy(r => r.Emoji)
+            .Select(g => new
+            {
+                Emoji = g.Key,
+                Count = g.Count(),
+                UserIds = g.Select(r => r.UserId).ToList()
+            })
+            .ToListAsync();
+
+        var reactionPayload = new
+        {
+            MessageId = messageId,
+            DmChannelId = channelId,
+            Reactions = updatedReactions
+        };
+
+        await chatHub.Clients.Group($"dm-{channelId}").SendAsync("DmReactionUpdated", reactionPayload);
+
+        var otherUserId = await db.DmChannelMembers
+            .AsNoTracking()
+            .Where(m => m.DmChannelId == channelId && m.UserId != appUser.Id)
+            .Select(m => m.UserId)
+            .FirstOrDefaultAsync();
+
+        if (otherUserId != Guid.Empty)
+        {
+            await chatHub.Clients.Group($"user-{otherUserId}").SendAsync("DmReactionUpdated", reactionPayload);
+        }
+
+        return Ok(new { action, reactions = updatedReactions });
+    }
+
+    /// <summary>
     /// Deletes a direct message. Only the author of the message can delete it.
     /// Cascade-deletes associated link previews. Replies referencing this message
     /// will have their <c>ReplyToDirectMessageId</c> set to <c>null</c> automatically.
@@ -646,6 +745,8 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
 
         return NoContent();
     }
+
+    private sealed record ReactionSummary(string Emoji, int Count, IReadOnlyList<Guid> UserIds);
 
     private sealed record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName, string? CanonicalUrl);
 

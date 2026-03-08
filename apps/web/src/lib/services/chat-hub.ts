@@ -8,6 +8,12 @@ export type ReactionUpdate = {
 	reactions: Reaction[];
 };
 
+export type DmReactionUpdate = {
+	messageId: string;
+	dmChannelId: string;
+	reactions: Reaction[];
+};
+
 export type FriendRequestReceivedEvent = {
 	requestId: string;
 	requester: FriendUser;
@@ -234,6 +240,7 @@ export type SignalRCallbacks = {
 	onDmMessageDeleted?: (event: DmMessageDeletedEvent) => void;
 	onMessageEdited?: (event: MessageEditedEvent) => void;
 	onDmMessageEdited?: (event: DmMessageEditedEvent) => void;
+	onDmReactionUpdated?: (update: DmReactionUpdate) => void;
 	onServerNameChanged?: (event: ServerNameChangedEvent) => void;
 	onServerIconChanged?: (event: ServerIconChangedEvent) => void;
 	onChannelNameChanged?: (event: ChannelNameChangedEvent) => void;
@@ -340,6 +347,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onDmMessageEdited) {
 			connection.on('DmMessageEdited', callbacks.onDmMessageEdited);
+		}
+		if (callbacks.onDmReactionUpdated) {
+			connection.on('DmReactionUpdated', callbacks.onDmReactionUpdated);
 		}
 		if (callbacks.onServerNameChanged) {
 			connection.on('ServerNameChanged', callbacks.onServerNameChanged);
