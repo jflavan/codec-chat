@@ -731,8 +731,14 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 
                      ┌─────────────────────────────────────────────────────┐
                      │                  GitHub Actions                     │
-                     │  CI → CD (build, push, migrate, deploy, smoke)      │
-                     │  Infra (Bicep what-if → deploy)                     │
+                     │                                                     │
+                     │  CI ──► Infra (if infra/ changed) ──► CD            │
+                     │    └──► CD (if no infra changes)                    │
+                     │                                                     │
+                     │  Infra: zero-downtime Bicep deploy (preserves       │
+                     │         running container images), then triggers CD  │
+                     │  CD: build, push, migrate, blue-green deploy, smoke │
+                     │  Shared concurrency group prevents pipeline races    │
                      │  OIDC federated credentials (no long-lived secrets) │
                      └─────────────────────────────────────────────────────┘
 ```
