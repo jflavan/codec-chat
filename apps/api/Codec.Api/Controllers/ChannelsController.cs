@@ -26,7 +26,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     /// Requires server membership.
     /// </summary>
     [HttpGet("{channelId:guid}/messages")]
-    public async Task<IActionResult> GetMessages(Guid channelId, [FromQuery] DateTimeOffset? before = null, [FromQuery] int limit = 100)
+    public async Task<IActionResult> GetMessages(Guid channelId, [FromQuery] DateTimeOffset? before = null, [FromQuery] Guid? around = null, [FromQuery] int limit = 100)
     {
         // Clamp limit to a safe range to prevent abuse.
         limit = Math.Clamp(limit, 1, 200);
@@ -39,6 +39,220 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+
+        // --- Around-message mode: load messages centered on a target message ---
+        if (around.HasValue)
+        {
+            var targetMessage = await db.Messages
+                .AsNoTracking()
+                .Where(m => m.Id == around.Value && m.ChannelId == channelId)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.AuthorName,
+                    m.AuthorUserId,
+                    m.Body,
+                    m.ImageUrl,
+                    m.CreatedAt,
+                    m.EditedAt,
+                    m.ChannelId,
+                    m.ReplyToMessageId,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                })
+                .FirstOrDefaultAsync();
+
+            if (targetMessage is null)
+            {
+                return NotFound(new { error = "Message not found." });
+            }
+
+            var half = limit / 2;
+
+            var beforeMessages = await db.Messages
+                .AsNoTracking()
+                .Where(m => m.ChannelId == channelId && m.CreatedAt < targetMessage.CreatedAt)
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(half)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.AuthorName,
+                    m.AuthorUserId,
+                    m.Body,
+                    m.ImageUrl,
+                    m.CreatedAt,
+                    m.EditedAt,
+                    m.ChannelId,
+                    m.ReplyToMessageId,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                })
+                .ToListAsync();
+
+            beforeMessages.Reverse();
+
+            var afterMessages = await db.Messages
+                .AsNoTracking()
+                .Where(m => m.ChannelId == channelId && m.CreatedAt > targetMessage.CreatedAt)
+                .OrderBy(m => m.CreatedAt)
+                .Take(half)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.AuthorName,
+                    m.AuthorUserId,
+                    m.Body,
+                    m.ImageUrl,
+                    m.CreatedAt,
+                    m.EditedAt,
+                    m.ChannelId,
+                    m.ReplyToMessageId,
+                    AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                })
+                .ToListAsync();
+
+            var hasMoreBefore = beforeMessages.Count == half;
+            var hasMoreAfter = afterMessages.Count == half;
+
+            var allMessages = beforeMessages
+                .Append(targetMessage)
+                .Concat(afterMessages)
+                .ToList();
+
+            var aroundMessageIds = allMessages.Select(m => m.Id).ToArray();
+
+            // Batch-load reactions.
+            var aroundReactionLookup = new Dictionary<Guid, IReadOnlyList<ReactionSummary>>();
+            if (aroundMessageIds.Length > 0)
+            {
+                var reactions = await db.Reactions
+                    .AsNoTracking()
+                    .Where(reaction => reaction.MessageId != null && aroundMessageIds.Contains(reaction.MessageId.Value))
+                    .ToListAsync();
+
+                aroundReactionLookup = reactions
+                    .GroupBy(reaction => reaction.MessageId!.Value)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyList<ReactionSummary>)group
+                            .GroupBy(reaction => reaction.Emoji)
+                            .Select(emojiGroup => new ReactionSummary(
+                                emojiGroup.Key,
+                                emojiGroup.Count(),
+                                emojiGroup.Select(reaction => reaction.UserId).ToList()))
+                            .ToList());
+            }
+
+            // Batch-load link previews.
+            var aroundLinkPreviewLookup = new Dictionary<Guid, IReadOnlyList<LinkPreviewDto>>();
+            if (aroundMessageIds.Length > 0)
+            {
+                var linkPreviews = await db.LinkPreviews
+                    .AsNoTracking()
+                    .Where(lp => lp.MessageId != null && aroundMessageIds.Contains(lp.MessageId.Value)
+                        && lp.Status == LinkPreviewStatus.Success)
+                    .ToListAsync();
+
+                aroundLinkPreviewLookup = linkPreviews
+                    .GroupBy(lp => lp.MessageId!.Value)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyList<LinkPreviewDto>)group
+                            .Select(lp => new LinkPreviewDto(lp.Url, lp.Title, lp.Description, lp.ImageUrl, lp.SiteName, lp.CanonicalUrl))
+                            .ToList());
+            }
+
+            // Batch-load mentions.
+            var aroundMentionsByMessage = allMessages.ToDictionary(m => m.Id, m => ParseMentionUserIds(m.Body));
+            var aroundAllMentionedIds = aroundMentionsByMessage.Values
+                .SelectMany(ids => ids)
+                .Distinct()
+                .ToList();
+
+            var aroundMentionUserLookup = new Dictionary<Guid, MentionDto>();
+            if (aroundAllMentionedIds.Count > 0)
+            {
+                aroundMentionUserLookup = await db.Users
+                    .AsNoTracking()
+                    .Where(u => aroundAllMentionedIds.Contains(u.Id))
+                    .ToDictionaryAsync(
+                        u => u.Id,
+                        u => new MentionDto(u.Id, string.IsNullOrWhiteSpace(u.Nickname) ? u.DisplayName : u.Nickname));
+            }
+
+            // Batch-load reply context.
+            var aroundReplyToIds = allMessages
+                .Where(m => m.ReplyToMessageId.HasValue)
+                .Select(m => m.ReplyToMessageId!.Value)
+                .Distinct()
+                .ToList();
+
+            var aroundReplyContextLookup = new Dictionary<Guid, ReplyContextDto>();
+            if (aroundReplyToIds.Count > 0)
+            {
+                var parentMessages = await db.Messages
+                    .AsNoTracking()
+                    .Where(m => aroundReplyToIds.Contains(m.Id))
+                    .Select(m => new
+                    {
+                        m.Id,
+                        m.AuthorName,
+                        m.AuthorUserId,
+                        AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
+                        AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
+                        m.Body
+                    })
+                    .ToListAsync();
+
+                aroundReplyContextLookup = parentMessages.ToDictionary(
+                    p => p.Id,
+                    p => new ReplyContextDto(
+                        p.Id,
+                        p.AuthorName,
+                        avatarService.ResolveUrl(p.AuthorCustomAvatarPath) ?? p.AuthorGoogleAvatarUrl,
+                        p.AuthorUserId,
+                        p.Body.Length > 100 ? p.Body[..100] : p.Body,
+                        false));
+            }
+
+            var aroundResponse = allMessages.Select(message =>
+            {
+                var mentionIds = aroundMentionsByMessage.TryGetValue(message.Id, out var cached) ? cached : [];
+                var mentions = mentionIds
+                    .Where(id => aroundMentionUserLookup.ContainsKey(id))
+                    .Select(id => aroundMentionUserLookup[id])
+                    .ToList();
+
+                return new
+                {
+                    message.Id,
+                    message.AuthorName,
+                    message.AuthorUserId,
+                    message.Body,
+                    message.ImageUrl,
+                    message.CreatedAt,
+                    message.EditedAt,
+                    message.ChannelId,
+                    AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
+                    Reactions = aroundReactionLookup.TryGetValue(message.Id, out var reactions)
+                        ? reactions
+                        : Array.Empty<ReactionSummary>(),
+                    LinkPreviews = aroundLinkPreviewLookup.TryGetValue(message.Id, out var previews)
+                        ? previews
+                        : Array.Empty<LinkPreviewDto>(),
+                    Mentions = (IReadOnlyList<MentionDto>)mentions,
+                    ReplyContext = message.ReplyToMessageId.HasValue
+                        ? aroundReplyContextLookup.TryGetValue(message.ReplyToMessageId.Value, out var ctx)
+                            ? ctx
+                            : new ReplyContextDto(message.ReplyToMessageId.Value, string.Empty, null, null, string.Empty, true)
+                        : (ReplyContextDto?)null
+                };
+            });
+
+            return Ok(new { hasMoreBefore, hasMoreAfter, messages = aroundResponse });
+        }
 
         var query = db.Messages
             .AsNoTracking()
