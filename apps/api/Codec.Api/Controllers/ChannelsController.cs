@@ -18,6 +18,10 @@ namespace Codec.Api.Controllers;
 [Route("channels")]
 public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache) : ControllerBase
 {
+    private static readonly System.Text.Json.JsonSerializerOptions CamelCaseJsonOptions = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+    };
     /// <summary>
     /// Returns messages for a channel, ordered by creation time (ascending).
     /// Supports cursor-based pagination via the <c>before</c> and <c>limit</c> query parameters.
@@ -435,10 +439,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         var result = new { hasMore, messages = response };
 
         // Cache the serialized response for future requests.
-        var json = System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
-        {
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-        });
+        var json = System.Text.Json.JsonSerializer.Serialize(result, CamelCaseJsonOptions);
         _ = messageCache.SetMessagesAsync(channelId, before, limit, json);
 
         return Content(json, "application/json");
@@ -546,6 +547,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
+        _ = messageCache.InvalidateChannelAsync(channelId);
 
         // Notify each mentioned user who is a member of this server.
         var notifiedUserIds = new HashSet<Guid> { appUser.Id }; // skip author
@@ -700,6 +702,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             MessageId = messageId,
             ChannelId = channelId
         });
+        _ = messageCache.InvalidateChannelAsync(channelId);
 
         return NoContent();
     }
@@ -739,6 +742,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         {
             ChannelId = channelId
         });
+        _ = messageCache.InvalidateChannelAsync(channelId);
 
         return NoContent();
     }
@@ -781,6 +785,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             Body = message.Body,
             EditedAt = message.EditedAt
         });
+        _ = messageCache.InvalidateChannelAsync(channelId);
 
         return Ok(new { message.Id, message.Body, message.EditedAt });
     }
@@ -852,6 +857,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReactionUpdated", reactionPayload);
+        _ = messageCache.InvalidateChannelAsync(channelId);
 
         return Ok(new { action, reactions = updatedReactions });
     }
