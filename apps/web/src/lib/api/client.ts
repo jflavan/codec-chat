@@ -18,7 +18,8 @@ import type {
 	CustomEmoji,
 	SearchFilters,
 	PaginatedSearchResults,
-	AroundMessages
+	AroundMessages,
+	PresenceEntry
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -726,6 +727,24 @@ export class ApiClient {
 	): Promise<AroundMessages> {
 		return this.request(
 			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages?around=${encodeURIComponent(messageId)}&limit=${limit}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Presence ───── */
+
+	/** Get online/idle/offline presence for all members of a server. */
+	getServerPresence(token: string, serverId: string): Promise<PresenceEntry[]> {
+		return this.request<PresenceEntry[]>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/presence`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Get presence for users the current user has DM conversations with. */
+	getDmPresence(token: string): Promise<PresenceEntry[]> {
+		return this.request<PresenceEntry[]>(
+			`${this.baseUrl}/dm/presence`,
 			{ headers: this.headers(token) }
 		);
 	}
