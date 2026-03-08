@@ -472,6 +472,8 @@ export class ChatHubService {
 	}
 
 	startHeartbeat(): void {
+		this.stopHeartbeat();
+		if (typeof document === 'undefined') return;
 		// Listen for user activity
 		document.addEventListener('mousemove', this.activityHandler);
 		document.addEventListener('keydown', this.activityHandler);
@@ -495,9 +497,11 @@ export class ChatHubService {
 			clearInterval(this.heartbeatInterval);
 			this.heartbeatInterval = null;
 		}
-		document.removeEventListener('mousemove', this.activityHandler);
-		document.removeEventListener('keydown', this.activityHandler);
-		document.removeEventListener('pointerdown', this.activityHandler);
+		if (typeof document !== 'undefined') {
+			document.removeEventListener('mousemove', this.activityHandler);
+			document.removeEventListener('keydown', this.activityHandler);
+			document.removeEventListener('pointerdown', this.activityHandler);
+		}
 		this.isUserActive = false;
 	}
 

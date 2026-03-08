@@ -238,7 +238,7 @@
 	.message-feed {
 		flex: 1;
 		overflow-y: auto;
-		padding: 16px 0 8px;
+		padding: 16px 0 26px;
 		scrollbar-width: thin;
 		scrollbar-color: var(--border) transparent;
 		-webkit-overflow-scrolling: touch;
