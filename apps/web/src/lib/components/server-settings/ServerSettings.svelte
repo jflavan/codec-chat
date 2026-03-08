@@ -615,12 +615,12 @@
 	}
 
 	.btn-danger-sm {
-		padding: 4px 10px;
+		padding: 6px 12px;
 		background: var(--danger);
 		color: #fff;
 		border: none;
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 13px;
 		font-weight: 500;
 		cursor: pointer;
 		transition: opacity 150ms ease;
@@ -636,12 +636,12 @@
 	}
 
 	.btn-secondary-sm {
-		padding: 4px 10px;
+		padding: 6px 12px;
 		background: transparent;
 		color: var(--text-normal);
 		border: none;
 		border-radius: 3px;
-		font-size: 12px;
+		font-size: 13px;
 		font-weight: 500;
 		cursor: pointer;
 		transition: color 150ms ease;
