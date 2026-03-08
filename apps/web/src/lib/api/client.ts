@@ -372,6 +372,22 @@ export class ApiClient {
 		);
 	}
 
+	toggleDmReaction(
+		token: string,
+		dmChannelId: string,
+		messageId: string,
+		emoji: string
+	): Promise<{ action: string; reactions: Reaction[] }> {
+		return this.request(
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(dmChannelId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+			{
+				method: 'POST',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ emoji })
+			}
+		);
+	}
+
 	/* ───── Friends ───── */
 
 	getFriends(token: string): Promise<Friend[]> {

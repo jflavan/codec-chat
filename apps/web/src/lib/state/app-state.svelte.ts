@@ -17,7 +17,7 @@ import type {
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
-import type { ReactionUpdate } from '$lib/services/chat-hub.js';
+import type { ReactionUpdate, DmReactionUpdate } from '$lib/services/chat-hub.js';
 import { VoiceService } from '$lib/services/voice-service.js';
 import {
 	persistToken,
@@ -1165,6 +1165,12 @@ export class AppState {
 		);
 	}
 
+	private _updateDmMessageReactions(messageId: string, reactions: DirectMessage['reactions']): void {
+		this.dmMessages = this.dmMessages.map((message) =>
+			message.id === messageId ? { ...message, reactions } : message
+		);
+	}
+
 	private _rememberReactionUpdate(messageId: string, reactions: Message['reactions']): void {
 		const serialized = AppState.serializeReactionSnapshot(reactions);
 		const next = new Map(this.ignoredReactionUpdates);
@@ -1308,6 +1314,33 @@ export class AppState {
 			}
 		} catch (e) {
 			this.setError(e);
+		}
+	}
+
+	/** Toggle a reaction on a DM message. */
+	async toggleDmReaction(messageId: string, emoji: string): Promise<void> {
+		if (!this.idToken || !this.activeDmChannelId) return;
+		const normalizedEmoji = emoji.trim();
+		if (!normalizedEmoji) return;
+		const reactionKey = AppState.reactionToggleKey(messageId, normalizedEmoji);
+		if (this.pendingReactionKeys.has(reactionKey)) return;
+		this._setReactionPending(reactionKey, true);
+		try {
+			const result = await this.api.toggleDmReaction(
+				this.idToken,
+				this.activeDmChannelId,
+				messageId,
+				normalizedEmoji
+			);
+			this._updateDmMessageReactions(messageId, result.reactions);
+			this._rememberReactionUpdate(messageId, result.reactions);
+			if (!this.hub.isConnected) {
+				await this.loadDmMessages(this.activeDmChannelId);
+			}
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this._setReactionPending(reactionKey, false);
 		}
 	}
 
@@ -2332,6 +2365,14 @@ export class AppState {
 					this.dmMessages = this.dmMessages.map((m) =>
 						m.id === event.messageId ? { ...m, body: event.body, editedAt: event.editedAt } : m
 					);
+				}
+			},
+			onDmReactionUpdated: (update) => {
+				if (this._matchAndRemoveReactionSnapshot(update.messageId, update.reactions)) {
+					return;
+				}
+				if (update.dmChannelId === this.activeDmChannelId) {
+					this._updateDmMessageReactions(update.messageId, update.reactions);
 				}
 			},
 			onServerNameChanged: (event) => {
