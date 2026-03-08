@@ -44,8 +44,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
-        // Cache-first path for standard pagination (not around-mode).
-        if (!around.HasValue)
+        // Cache-first path for paginated history (not around-mode, not latest page).
+        // Skip caching the latest page (before == null) since new messages invalidate it immediately.
+        if (!around.HasValue && before.HasValue)
         {
             var cached = await messageCache.GetMessagesAsync(channelId, before, limit);
             if (cached is not null)
@@ -438,11 +439,15 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var result = new { hasMore, messages = response };
 
-        // Cache the serialized response for future requests.
-        var json = System.Text.Json.JsonSerializer.Serialize(result, CamelCaseJsonOptions);
-        _ = messageCache.SetMessagesAsync(channelId, before, limit, json);
+        // Cache paginated history pages (not the latest page, which is invalidated too frequently).
+        if (before.HasValue)
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(result, CamelCaseJsonOptions);
+            await messageCache.SetMessagesAsync(channelId, before, limit, json);
+            return Content(json, "application/json");
+        }
 
-        return Content(json, "application/json");
+        return Ok(result);
     }
 
     /// <summary>
@@ -547,7 +552,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
-        _ = messageCache.InvalidateChannelAsync(channelId);
+        await messageCache.InvalidateChannelAsync(channelId);
 
         // Notify each mentioned user who is a member of this server.
         var notifiedUserIds = new HashSet<Guid> { appUser.Id }; // skip author
@@ -642,6 +647,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 scopedDb.LinkPreviews.AddRange(previews);
                 await scopedDb.SaveChangesAsync();
 
+                // Invalidate message cache so subsequent reads include link previews.
+                await messageCache.InvalidateChannelAsync(channelId);
+
                 var successPreviews = previews
                     .Where(p => p.Status == LinkPreviewStatus.Success)
                     .Select(p => new LinkPreviewDto(p.Url, p.Title, p.Description, p.ImageUrl, p.SiteName, p.CanonicalUrl))
@@ -702,7 +710,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             MessageId = messageId,
             ChannelId = channelId
         });
-        _ = messageCache.InvalidateChannelAsync(channelId);
+        await messageCache.InvalidateChannelAsync(channelId);
 
         return NoContent();
     }
@@ -742,7 +750,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         {
             ChannelId = channelId
         });
-        _ = messageCache.InvalidateChannelAsync(channelId);
+        await messageCache.InvalidateChannelAsync(channelId);
 
         return NoContent();
     }
@@ -785,7 +793,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             Body = message.Body,
             EditedAt = message.EditedAt
         });
-        _ = messageCache.InvalidateChannelAsync(channelId);
+        await messageCache.InvalidateChannelAsync(channelId);
 
         return Ok(new { message.Id, message.Body, message.EditedAt });
     }
@@ -857,7 +865,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReactionUpdated", reactionPayload);
-        _ = messageCache.InvalidateChannelAsync(channelId);
+        await messageCache.InvalidateChannelAsync(channelId);
 
         return Ok(new { action, reactions = updatedReactions });
     }
