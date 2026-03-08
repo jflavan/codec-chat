@@ -1,17 +1,22 @@
 <script lang="ts">
 	import type { Member } from '$lib/types/index.js';
+	import type { PresenceStatus } from '$lib/types/models.js';
+	import PresenceDot from '$lib/components/shared/PresenceDot.svelte';
 
-	let { member }: { member: Member } = $props();
+	let { member, presence = 'offline' }: { member: Member; presence?: PresenceStatus } = $props();
 </script>
 
-<li class="member-item">
-	{#if member.avatarUrl}
-		<img class="member-avatar-img" src={member.avatarUrl} alt="" />
-	{:else}
-		<div class="member-avatar-placeholder" aria-hidden="true">
-			{member.displayName.slice(0, 1).toUpperCase()}
-		</div>
-	{/if}
+<li class="member-item" class:offline={presence === 'offline'}>
+	<div class="avatar-wrapper">
+		{#if member.avatarUrl}
+			<img class="member-avatar-img" src={member.avatarUrl} alt="" />
+		{:else}
+			<div class="member-avatar-placeholder" aria-hidden="true">
+				{member.displayName.slice(0, 1).toUpperCase()}
+			</div>
+		{/if}
+		<PresenceDot status={presence} />
+	</div>
 	<span class="member-name">{member.displayName}</span>
 	{#if member.role === 'Owner' || member.role === 'Admin'}
 		<span class="role-badge role-badge-{member.role.toLowerCase()}">{member.role}</span>
@@ -32,6 +37,21 @@
 
 	.member-item:hover {
 		background: var(--bg-message-hover);
+	}
+
+	.avatar-wrapper {
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.avatar-wrapper :global(.presence-dot) {
+		position: absolute;
+		bottom: -2px;
+		right: -2px;
+	}
+
+	.offline {
+		opacity: 0.5;
 	}
 
 	.member-avatar-img {
@@ -88,5 +108,4 @@
 		color: #f0b232;
 		background: rgba(240, 178, 50, 0.15);
 	}
-
 </style>

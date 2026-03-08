@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import PresenceDot from '$lib/components/shared/PresenceDot.svelte';
 
 	const app = getAppState();
 
@@ -24,13 +25,16 @@
 						onclick={() => app.selectDmConversation(conversation.id)}
 						aria-label="Open conversation with {conversation.participant.displayName}"
 					>
-						{#if conversation.participant.avatarUrl}
-							<img class="avatar" src={conversation.participant.avatarUrl} alt="" />
-						{:else}
-							<div class="avatar-placeholder" aria-hidden="true">
-								{conversation.participant.displayName.slice(0, 1).toUpperCase()}
-							</div>
-						{/if}
+						<div class="avatar-wrapper">
+							{#if conversation.participant.avatarUrl}
+								<img class="avatar" src={conversation.participant.avatarUrl} alt="" />
+							{:else}
+								<div class="avatar-placeholder" aria-hidden="true">
+									{conversation.participant.displayName.slice(0, 1).toUpperCase()}
+								</div>
+							{/if}
+							<PresenceDot status={app.userPresence.get(conversation.participant.id) ?? 'offline'} />
+						</div>
 						<div class="dm-details">
 							<span class="dm-name">{conversation.participant.displayName}</span>
 							{#if conversation.lastMessage}
@@ -38,11 +42,13 @@
 									{truncate(conversation.lastMessage.body, 40)}
 								</span>
 							{/if}
-						</div>					{#if app.unreadDmCounts.get(conversation.id)}
-						<span class="unread-badge" aria-label="{app.unreadDmCounts.get(conversation.id)} unread messages">
-							{app.unreadDmCounts.get(conversation.id)}
-						</span>
-					{/if}					</button>
+						</div>
+						{#if app.unreadDmCounts.get(conversation.id)}
+							<span class="unread-badge" aria-label="{app.unreadDmCounts.get(conversation.id)} unread messages">
+								{app.unreadDmCounts.get(conversation.id)}
+							</span>
+						{/if}
+					</button>
 					<button
 						class="close-btn"
 						onclick={(e: MouseEvent) => { e.stopPropagation(); app.closeDmConversation(conversation.id); }}
@@ -116,6 +122,17 @@
 		min-width: 0;
 		text-align: left;
 		font-family: inherit;
+	}
+
+	.avatar-wrapper {
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.avatar-wrapper :global(.presence-dot) {
+		position: absolute;
+		bottom: -2px;
+		right: -2px;
 	}
 
 	.avatar {
