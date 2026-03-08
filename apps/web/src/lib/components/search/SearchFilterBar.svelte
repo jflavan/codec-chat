@@ -121,7 +121,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		padding: 8px 0;
+		padding: 8px 12px;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.filter-row {
