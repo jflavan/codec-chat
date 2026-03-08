@@ -27,6 +27,7 @@ import {
 	isSessionExpired
 } from '$lib/auth/session.js';
 import { initGoogleIdentity, renderGoogleButton, requestFreshToken } from '$lib/auth/google.js';
+import { getTheme, applyTheme, type ThemeId } from '$lib/utils/theme.js';
 
 const CTX_KEY = Symbol('app-state');
 
@@ -121,7 +122,8 @@ export class AppState {
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
-	settingsCategory = $state<'profile' | 'account' | 'voice-audio'>('profile');
+	settingsCategory = $state<'profile' | 'account' | 'voice-audio' | 'appearance'>('profile');
+	theme = $state<ThemeId>(getTheme());
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
 	serverSettingsCategory = $state<'general' | 'emojis' | 'members'>('general');
@@ -328,6 +330,11 @@ export class AppState {
 		this.settingsOpen = false;
 	}
 
+	setTheme(id: ThemeId): void {
+		this.theme = id;
+		applyTheme(id);
+	}
+
 	openServerSettings(): void {
 		this.serverSettingsOpen = true;
 		this.serverSettingsCategory = 'general';
@@ -352,6 +359,7 @@ export class AppState {
 
 	/** Bootstrap auth: restore session or show sign-in UI. */
 	init(): void {
+		applyTheme(this.theme);
 		this._loadUserVolumes();
 		this._loadVoicePreferences();
 		if (!isSessionExpired()) {
