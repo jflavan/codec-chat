@@ -1,12 +1,19 @@
 <script lang="ts">
+	import type { Member } from '$lib/types/index.js';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import MemberItem from './MemberItem.svelte';
 
 	const app = getAppState();
 
-	const owners = $derived(app.members.filter((m) => m.role === 'Owner'));
-	const admins = $derived(app.members.filter((m) => m.role === 'Admin'));
-	const regulars = $derived(app.members.filter((m) => m.role === 'Member'));
+	function byPresence(a: Member, b: Member): number {
+		const aOnline = (app.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
+		const bOnline = (app.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
+		return aOnline - bOnline;
+	}
+
+	const owners = $derived(app.members.filter((m) => m.role === 'Owner').sort(byPresence));
+	const admins = $derived(app.members.filter((m) => m.role === 'Admin').sort(byPresence));
+	const regulars = $derived(app.members.filter((m) => m.role === 'Member').sort(byPresence));
 </script>
 
 <aside class="members-sidebar" aria-label="Members">
@@ -23,7 +30,7 @@
 			<h3 class="member-group-heading">Owner — {owners.length}</h3>
 			<ul class="member-list" role="list">
 				{#each owners as member (member.userId)}
-					<MemberItem {member} />
+					<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
 				{/each}
 			</ul>
 		{/if}
@@ -32,7 +39,7 @@
 			<h3 class="member-group-heading">Admin — {admins.length}</h3>
 			<ul class="member-list" role="list">
 				{#each admins as member (member.userId)}
-					<MemberItem {member} />
+					<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
 				{/each}
 			</ul>
 		{/if}
@@ -41,7 +48,7 @@
 			<h3 class="member-group-heading">Other — {regulars.length}</h3>
 			<ul class="member-list" role="list">
 				{#each regulars as member (member.userId)}
-					<MemberItem {member} />
+					<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
 				{/each}
 			</ul>
 		{/if}

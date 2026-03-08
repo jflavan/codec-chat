@@ -300,6 +300,40 @@ namespace Codec.Api.Migrations
                     b.ToTable("Messages");
                 });
 
+            modelBuilder.Entity("Codec.Api.Models.PresenceState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ConnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConnectionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("LastActiveAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastHeartbeatAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PresenceStates");
+                });
+
             modelBuilder.Entity("Codec.Api.Models.Reaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -691,6 +725,17 @@ namespace Codec.Api.Migrations
                     b.Navigation("AuthorUser");
 
                     b.Navigation("Channel");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.PresenceState", b =>
+                {
+                    b.HasOne("Codec.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.Reaction", b =>

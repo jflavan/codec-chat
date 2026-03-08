@@ -15,7 +15,7 @@ namespace Codec.Api.Hubs;
 /// Clients join channel-scoped, user-scoped, server-scoped, and voice-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
@@ -48,6 +48,40 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             .Select(serverId => Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}"));
 
         await Task.WhenAll(groupJoinTasks);
+
+        // Register presence
+        var presenceStatus = presenceTracker.Connect(appUser.Id, Context.ConnectionId);
+
+        // Save to DB
+        var presenceState = new PresenceState
+        {
+            Id = Guid.NewGuid(),
+            UserId = appUser.Id,
+            Status = presenceStatus,
+            ConnectionId = Context.ConnectionId,
+            LastHeartbeatAt = DateTimeOffset.UtcNow,
+            LastActiveAt = DateTimeOffset.UtcNow,
+            ConnectedAt = DateTimeOffset.UtcNow
+        };
+        db.PresenceStates.Add(presenceState);
+        await db.SaveChangesAsync();
+
+        // Broadcast online status to all user's servers (serverIds already fetched above)
+        var presencePayload = new { userId = appUser.Id.ToString(), status = presenceStatus.ToString().ToLowerInvariant() };
+        var presenceBroadcastTasks = serverIds.Select(serverId =>
+            Clients.Group($"server-{serverId}").SendAsync("UserPresenceChanged", presencePayload));
+
+        // Also broadcast to friends/DM contacts
+        var friendUserIds = await db.Friendships
+            .Where(f => f.RequesterId == appUser.Id || f.RecipientId == appUser.Id)
+            .Select(f => f.RequesterId == appUser.Id ? f.RecipientId : f.RequesterId)
+            .Distinct()
+            .ToListAsync();
+        var friendPresenceTasks = friendUserIds.Select(friendId =>
+            Clients.Group($"user-{friendId}").SendAsync("UserPresenceChanged", presencePayload));
+
+        await Task.WhenAll(presenceBroadcastTasks.Concat(friendPresenceTasks));
+
         await base.OnConnectedAsync();
     }
 
@@ -904,6 +938,45 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         {
             var appUser = await userService.GetOrCreateUserAsync(Context.User!);
 
+            // Update presence on disconnect
+            var (previousPresence, currentPresence, remainingConnections) = presenceTracker.Disconnect(Context.ConnectionId);
+
+            // Remove this connection's DB row
+            await db.PresenceStates
+                .Where(ps => ps.ConnectionId == Context.ConnectionId)
+                .ExecuteDeleteAsync();
+
+            if (previousPresence != currentPresence)
+            {
+                if (currentPresence == PresenceStatus.Offline)
+                {
+                    await db.PresenceStates
+                        .Where(ps => ps.UserId == appUser.Id)
+                        .ExecuteDeleteAsync();
+                }
+
+                var presencePayload = new { userId = appUser.Id.ToString(), status = currentPresence.ToString().ToLowerInvariant() };
+                var disconnectServerIds = await db.ServerMembers
+                    .AsNoTracking()
+                    .Where(sm => sm.UserId == appUser.Id)
+                    .Select(sm => sm.ServerId)
+                    .ToListAsync();
+                foreach (var serverId in disconnectServerIds)
+                {
+                    await Clients.Group($"server-{serverId}").SendAsync("UserPresenceChanged", presencePayload);
+                }
+
+                var disconnectFriendIds = await db.Friendships
+                    .Where(f => f.RequesterId == appUser.Id || f.RecipientId == appUser.Id)
+                    .Select(f => f.RequesterId == appUser.Id ? f.RecipientId : f.RequesterId)
+                    .Distinct()
+                    .ToListAsync();
+                foreach (var friendId in disconnectFriendIds)
+                {
+                    await Clients.Group($"user-{friendId}").SendAsync("UserPresenceChanged", presencePayload);
+                }
+            }
+
             var voiceState = await db.VoiceStates
                 .FirstOrDefaultAsync(vs => vs.ConnectionId == Context.ConnectionId);
 
@@ -974,6 +1047,44 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         }
 
         await base.OnDisconnectedAsync(exception);
+    }
+
+    public async Task Heartbeat(bool isActive)
+    {
+        var change = presenceTracker.Heartbeat(Context.ConnectionId, isActive);
+        if (change is null) return;
+
+        var (userId, previous, current) = change.Value;
+
+        // Update DB
+        await db.PresenceStates
+            .Where(ps => ps.ConnectionId == Context.ConnectionId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(ps => ps.Status, current)
+                .SetProperty(ps => ps.LastHeartbeatAt, DateTimeOffset.UtcNow)
+                .SetProperty(ps => ps.LastActiveAt, ps => isActive ? DateTimeOffset.UtcNow : ps.LastActiveAt));
+
+        // Broadcast
+        var payload = new { userId = userId.ToString(), status = current.ToString().ToLowerInvariant() };
+        var serverIds = await db.ServerMembers
+            .AsNoTracking()
+            .Where(sm => sm.UserId == userId)
+            .Select(sm => sm.ServerId)
+            .ToListAsync();
+        foreach (var serverId in serverIds)
+        {
+            await Clients.Group($"server-{serverId}").SendAsync("UserPresenceChanged", payload);
+        }
+
+        var friendUserIds = await db.Friendships
+            .Where(f => f.RequesterId == userId || f.RecipientId == userId)
+            .Select(f => f.RequesterId == userId ? f.RecipientId : f.RequesterId)
+            .Distinct()
+            .ToListAsync();
+        foreach (var friendId in friendUserIds)
+        {
+            await Clients.Group($"user-{friendId}").SendAsync("UserPresenceChanged", payload);
+        }
     }
 
     private async Task LeaveVoiceChannelInternal(Models.User appUser, VoiceState voiceState)
