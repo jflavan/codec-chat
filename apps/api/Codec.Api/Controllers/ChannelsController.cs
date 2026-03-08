@@ -16,7 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
+public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache) : ControllerBase
 {
     /// <summary>
     /// Returns messages for a channel, ordered by creation time (ascending).
@@ -39,6 +39,16 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var appUser = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+
+        // Cache-first path for standard pagination (not around-mode).
+        if (!around.HasValue)
+        {
+            var cached = await messageCache.GetMessagesAsync(channelId, before, limit);
+            if (cached is not null)
+            {
+                return Content(cached, "application/json");
+            }
+        }
 
         // --- Around-message mode: load messages centered on a target message ---
         if (around.HasValue)
@@ -422,7 +432,16 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             };
         });
 
-        return Ok(new { hasMore, messages = response });
+        var result = new { hasMore, messages = response };
+
+        // Cache the serialized response for future requests.
+        var json = System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
+        _ = messageCache.SetMessagesAsync(channelId, before, limit, json);
+
+        return Content(json, "application/json");
     }
 
     /// <summary>
