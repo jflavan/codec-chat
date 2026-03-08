@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
 
@@ -11,10 +10,6 @@ public class MessageCacheService
     private readonly ILogger<MessageCacheService> _logger;
 
     private static readonly TimeSpan DefaultExpiry = TimeSpan.FromMinutes(5);
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public MessageCacheService(ILogger<MessageCacheService> logger, IDistributedCache? cache = null, IConnectionMultiplexer? redis = null)
     {
