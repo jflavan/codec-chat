@@ -221,6 +221,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
                 scheme: 'HTTP'
               }
               periodSeconds: 10
+              timeoutSeconds: 5
             }
           ]
         }
