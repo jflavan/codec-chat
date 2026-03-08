@@ -8,6 +8,8 @@
 	import ReplyReference from '$lib/components/chat/ReplyReference.svelte';
 	import ReplyComposerBar from '$lib/components/chat/ReplyComposerBar.svelte';
 	import ComposerOverlay from '$lib/components/chat/ComposerOverlay.svelte';
+	import MessageActionBar from '$lib/components/chat/MessageActionBar.svelte';
+	import ReactionBar from '$lib/components/chat/ReactionBar.svelte';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 	import DmCallHeader from '$lib/components/voice/DmCallHeader.svelte';
 
@@ -353,27 +355,16 @@
 					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
 					{@const coveredIds = new Set((message.linkPreviews ?? []).map((lp) => { const m = /[\w-]{11}/.exec(lp.url); return m?.[0] ?? ''; }).filter(Boolean))}
 					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
-					<!-- Reply action bar -->
-					<div class="dm-message-actions">
-						<button class="dm-action-btn" aria-label="Reply" onclick={() => handleReply(message)}>
-							<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-								<path d="M6.598 2.152a.5.5 0 0 1 .049.703L3.354 6.5H9.5A4.5 4.5 0 0 1 14 11v1a.5.5 0 0 1-1 0v-1A3.5 3.5 0 0 0 9.5 7.5H3.354l3.293 3.645a.5.5 0 0 1-.742.67l-4-4.43a.5.5 0 0 1 0-.67l4-4.43a.5.5 0 0 1 .703-.049z"/>
-							</svg>
-						</button>
-						{#if message.authorUserId === app.me?.user.id}
-							<button class="dm-action-btn" aria-label="Edit message" onclick={() => startDmEdit(message)}>
-								<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-									<path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/>
-								</svg>
-							</button>
-							<button class="dm-action-btn dm-action-btn-danger" aria-label="Delete message" onclick={() => app.deleteDmMessage(message.id)}>
-								<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-									<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
-									<path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
-								</svg>
-							</button>
-						{/if}
-					</div>
+					<!-- Floating action bar -->
+					<MessageActionBar
+						isOwnMessage={message.authorUserId === app.me?.user.id}
+						canDelete={message.authorUserId === app.me?.user.id}
+						onReply={() => handleReply(message)}
+						onReact={(emoji) => app.toggleDmReaction(message.id, emoji)}
+						onEdit={() => startDmEdit(message)}
+						onDelete={() => app.deleteDmMessage(message.id)}
+						isReactionPending={(emoji) => app.isReactionPending(message.id, emoji)}
+					/>
 
 					{#if !isGrouped}
 						<div class="message-avatar-col">
@@ -429,6 +420,15 @@
 									{/each}
 								</div>
 							{/if}
+							{#if (message.reactions ?? []).length > 0}
+								<ReactionBar
+									reactions={message.reactions}
+									currentUserId={app.me?.user.id ?? null}
+									onToggle={(emoji) => app.toggleDmReaction(message.id, emoji)}
+									isPending={(emoji) => app.isReactionPending(message.id, emoji)}
+									customEmojis={app.customEmojis}
+								/>
+							{/if}
 						</div>
 					{:else}
 						<div class="message-avatar-col">
@@ -475,6 +475,15 @@
 										<YouTubeEmbed videoId={yt.videoId} />
 									{/each}
 								</div>
+							{/if}
+							{#if (message.reactions ?? []).length > 0}
+								<ReactionBar
+									reactions={message.reactions}
+									currentUserId={app.me?.user.id ?? null}
+									onToggle={(emoji) => app.toggleDmReaction(message.id, emoji)}
+									isPending={(emoji) => app.isReactionPending(message.id, emoji)}
+									customEmojis={app.customEmojis}
+								/>
 							{/if}
 							</div>
 						{/if}
@@ -1189,47 +1198,6 @@
 		text-decoration: underline;
 	}
 
-	/* ───── Reply action bar ───── */
-
-	.dm-message-actions {
-		position: absolute;
-		top: -14px;
-		right: 16px;
-		display: none;
-		gap: 2px;
-		padding: 2px 4px;
-		border-radius: 4px;
-		border: 1px solid var(--border);
-		background: var(--bg-secondary);
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-		z-index: 2;
-	}
-
-	.message:hover .dm-message-actions { display: flex; }
-
-	.dm-action-btn {
-		display: grid;
-		place-items: center;
-		width: 28px;
-		height: 28px;
-		border: none;
-		border-radius: 3px;
-		background: transparent;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: background-color 100ms ease, color 100ms ease;
-	}
-
-	.dm-action-btn:hover {
-		background: var(--bg-message-hover);
-		color: var(--text-normal);
-	}
-
-	.dm-action-btn-danger:hover {
-		color: var(--danger);
-		background: rgba(var(--danger-rgb, 255, 59, 59), 0.1);
-	}
-
 	/* ───── Reply highlight ───── */
 
 	:global(.reply-highlight) {
@@ -1307,11 +1275,6 @@
 			margin: 4px 16px;
 			padding: 10px 16px;
 			font-size: 14px;
-		}
-
-		.dm-action-btn {
-			min-width: 44px;
-			min-height: 44px;
 		}
 
 		.dm-chat .composer-input {
