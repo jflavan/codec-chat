@@ -28,11 +28,30 @@ builder.Host.UseSerilog((ctx, config) => config
 
 builder.Services.AddControllers();
 
-builder.Services.AddSignalR()
+// Redis distributed cache.
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "codec:";
+    });
+}
+
+var signalRBuilder = builder.Services.AddSignalR()
     .AddJsonProtocol(options =>
     {
         options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    signalRBuilder.AddStackExchangeRedis(redisConnectionString, options =>
+    {
+        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("codec");
+    });
+}
 
 builder.Services.AddCors(options =>
 {
@@ -110,8 +129,13 @@ if (!builder.Environment.IsDevelopment())
         throw new InvalidOperationException("Voice:SfuInternalKey must be configured in production.");
 }
 
-builder.Services.AddHealthChecks()
+var healthChecks = builder.Services.AddHealthChecks()
     .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"]);
+}
 
 builder.Services.AddRateLimiter(options =>
 {
