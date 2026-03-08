@@ -1,115 +1,95 @@
-# Infrastructure Workflow Fix - Revision Deactivation
+# Infrastructure Pipeline — Zero-Downtime Deploys
 
-> **Update (June 2025):** The `isQuickstart` conditional pattern described below has been **fully removed** from both container app Bicep files. Secrets, environment variables, `targetPort`, probes, and registries are now always set to production values regardless of the container image. The revision deactivation step in `infra.yml` remains as a defensive measure but the original root cause (quickstart-mode wiping configuration) no longer applies.
+## Overview
 
-## Issue Summary
+The `infra.yml` pipeline deploys Azure infrastructure via Bicep without causing production downtime. It auto-triggers on `infra/` changes after CI passes on `main`, and chains into the CD pipeline when complete.
 
-The `infra` GitHub Actions workflow was failing during infrastructure deployment with the following errors:
+## How It Works
 
-```
-ContainerAppSecretInUse: Container App 'ca-codec-prod-api' has an active revision 
-referencing a secret you are trying to delete. Please add secrets: connection-string,
-google-client-id or deactive the revisions: ca-codec-prod-api--gh6032dfdr1 referencing 
-this secret.
+### Zero-Downtime Image Preservation
 
-ContainerAppRegistryInUse: Container App 'ca-codec-prod-web' has active revisions 
-pulling images from the registries you are trying to delete. Please add back registries 
-acrcodecprod.azurecr.io or deactive the revisions: ca-codec-prod-web--gh6032dfdr1 
-pulling images from these registries.
-```
+The key problem with infrastructure deploys was that Bicep container app modules use a default quickstart image (`mcr.microsoft.com/k8se/quickstart:latest`). Deploying Bicep without specifying the currently running image would reset containers to the placeholder, taking the site down.
 
-## Root Cause Analysis
-
-The infrastructure workflow performs a two-step deployment process to handle TLS certificate provisioning for custom domains:
-
-1. **Step 1** (`bindCertificates=false`): Deploy infrastructure to register custom domain hostnames and create managed certificates
-   - Uses default quickstart images (`mcr.microsoft.com/k8se/quickstart:latest`)
-   - When using quickstart images, the bicep templates set `isQuickstart=true`
-   - This causes the templates to remove all secrets and container registry configurations
-
-2. **Step 2** (`bindCertificates=true`): Redeploy to bind the certificates to the custom domains
-   - Uses actual application images with full configuration
-
-The problem occurred because:
-- Active revisions from previous deployments were still running
-- These revisions referenced secrets (connection strings, OAuth client IDs) and container registries
-- Azure Container Apps prevents deletion of resources that are actively referenced
-- This caused the deployment to fail in Step 1
-
-## Solution
-
-Added a new workflow step to deactivate all active revisions before infrastructure deployment:
+**Solution:** Before deploying, the pipeline queries Azure for the currently running container images and passes them as parameters to the Bicep template:
 
 ```yaml
-- name: Deactivate old container app revisions
+- name: Resolve current container images
   run: |
-    # Deactivate all old revisions before infrastructure update to prevent conflicts
-    # with secrets and registries being removed during the quickstart phase
-    echo "Checking for active revisions on ca-codec-prod-api..."
-    ACTIVE_API_REVISIONS=$(az containerapp revision list \
+    API_IMAGE=$(az containerapp show \
       --name ca-codec-prod-api \
       --resource-group rg-codec-prod \
-      --query "[?properties.active].name" -o tsv 2>/dev/null || echo "")
-    
-    if [ -n "$ACTIVE_API_REVISIONS" ]; then
-      for rev in $ACTIVE_API_REVISIONS; do
-        echo "Deactivating API revision: $rev"
-        az containerapp revision deactivate \
-          --name ca-codec-prod-api \
-          --resource-group rg-codec-prod \
-          --revision "$rev" || echo "Failed to deactivate $rev (may not exist)"
-      done
-    else
-      echo "No active API revisions found or container app doesn't exist yet"
-    fi
-
-    # Similar logic for web app...
+      --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+    # Falls back to quickstart placeholder for first-time deployments
 ```
 
-### Key Features of the Solution
+This ensures the running application images are preserved through infrastructure changes.
 
-1. **Proactive Deactivation**: Deactivates all active revisions before attempting infrastructure changes
-2. **Error Handling**: Uses `|| echo ""` pattern to handle cases where apps don't exist yet (first deployment)
-3. **Clear Logging**: Provides informative output for troubleshooting
-4. **Consistency**: Follows the same pattern used successfully in the `cd.yml` workflow
-5. **Non-Disruptive**: Only deactivates revisions during infrastructure updates, not during normal application deployments
+### Smart Certificate Deployment
 
-## Alternative Approaches Considered
+Azure managed TLS certificates require a two-pass deployment: first register hostnames, then bind certificates. The pipeline checks whether certificates already exist and skips the first pass when they do:
 
-1. **Use actual images instead of quickstart**: Would require always providing image tags, complicating the workflow
-2. **Change to single-revision mode**: Would prevent zero-downtime deployments for application updates
-3. **Modify bicep templates**: Would require complex conditional logic and state management
+```yaml
+- name: Check if managed certificates exist
+  run: |
+    CERT_LIST=$(az containerapp env certificate list ...)
+    if echo "$CERT_LIST" | grep -q "cert-api" && ...; then
+      echo "certs-exist=true" >> "$GITHUB_OUTPUT"
+    fi
+```
 
-The chosen solution is minimal, surgical, and maintains the existing deployment architecture.
+On established environments, this reduces the deploy to a single Bicep pass.
 
-## Testing Recommendations
+### Auto-Trigger with Change Detection
 
-To verify the fix:
+The pipeline uses `workflow_run` to trigger after CI completes on `main`, then checks for `infra/` changes using `git diff-tree`:
 
-1. Trigger the infra workflow via workflow_dispatch
-2. Verify the "Deactivate old container app revisions" step executes successfully
-3. Confirm both deployment steps complete without secret/registry errors
-4. Verify certificates are properly bound to custom domains
-5. Verify application remains accessible after infrastructure update
+```yaml
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [ci]
+    branches: [main]
+    types: [completed]
+```
+
+The `check-infra` job gates the actual deployment:
+- **Manual dispatch** — always runs (skips change detection)
+- **CI trigger** — only runs if `infra/` files changed in the commit
+- **CI failure** — skipped entirely (`workflow_run.conclusion == 'success'` guard)
+
+### Pipeline Chaining
+
+After infrastructure deploys, the pipeline triggers CD to deploy any pending application changes:
+
+```yaml
+- name: Trigger CD pipeline
+  run: gh workflow run cd.yml --ref main
+```
+
+The CD pipeline has a corresponding `check-skip` job that yields to the infra pipeline when `infra/` changes are detected, preventing duplicate runs.
+
+### Shared Concurrency Group
+
+Both `infra.yml` and `cd.yml` share the `deploy-prod` concurrency group with `cancel-in-progress: false`. This prevents race conditions where both pipelines try to modify the same Azure resources simultaneously.
+
+## Pipeline Flow
+
+```
+Push to main → CI
+                 │
+                 ├─ infra/ changes? → Infra pipeline → CD pipeline
+                 │
+                 └─ No infra changes → CD pipeline (directly)
+```
+
+## Previous Approach (Superseded)
+
+The original infra pipeline deactivated all active container app revisions before deploying Bicep. This solved secret/registry conflicts but caused production downtime during every infrastructure deployment. The current approach (image resolution) preserves running revisions and avoids any service interruption.
 
 ## Related Files
 
-- `.github/workflows/infra.yml`: Infrastructure deployment workflow (fixed)
-- `.github/workflows/cd.yml`: Application deployment workflow (reference implementation)
-- `infra/modules/container-app-api.bicep`: API container app bicep template
-- `infra/modules/container-app-web.bicep`: Web container app bicep template
-
-## Prevention
-
-To prevent similar issues in the future:
-
-1. Always deactivate old revisions when modifying secrets or registries
-2. Use `activeRevisionsMode: 'Multiple'` carefully, understanding revision lifecycle
-3. Test infrastructure changes in a staging environment first
-4. Consider using separate resource groups for staging/production infrastructure testing
-
-## References
-
-- [Azure Container Apps Revisions](https://learn.microsoft.com/en-us/azure/container-apps/revisions)
-- [Azure Container Apps Multiple Revisions](https://learn.microsoft.com/en-us/azure/container-apps/revisions-manage)
-- GitHub Actions workflow run: https://github.com/jflavan/codec-chat/actions/runs/22081522161
+- `.github/workflows/infra.yml` — Infrastructure deployment workflow
+- `.github/workflows/cd.yml` — Application deployment workflow
+- `infra/main.bicep` — Main Bicep orchestrator (accepts `apiContainerImage` / `webContainerImage` params)
+- `infra/modules/container-app-api.bicep` — API container app module
+- `infra/modules/container-app-web.bicep` — Web container app module
