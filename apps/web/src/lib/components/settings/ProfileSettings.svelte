@@ -352,7 +352,7 @@
 	}
 
 	.save-btn {
-		padding: 10px 16px;
+		padding: 8px 16px;
 		min-height: 44px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
