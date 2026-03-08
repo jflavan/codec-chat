@@ -358,7 +358,7 @@
 					<!-- Floating action bar -->
 					<MessageActionBar
 						isOwnMessage={message.authorUserId === app.me?.user.id}
-						canDelete={message.authorUserId === app.me?.user.id || app.isGlobalAdmin}
+						canDelete={message.authorUserId === app.me?.user.id}
 						onReply={() => handleReply(message)}
 						onReact={(emoji) => app.toggleDmReaction(message.id, emoji)}
 						onEdit={() => startDmEdit(message)}
