@@ -191,11 +191,11 @@
 
 	.role-btn-promote {
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg-tertiary);
 	}
 
 	.role-btn-promote:hover {
-		filter: brightness(1.1);
+		background: var(--accent-hover);
 	}
 
 	.role-btn-demote {

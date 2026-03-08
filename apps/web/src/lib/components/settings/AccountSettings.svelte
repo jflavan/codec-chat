@@ -75,7 +75,7 @@
 	}
 
 	.sign-out-btn {
-		padding: 10px 20px;
+		padding: 8px 16px;
 		min-height: 44px;
 		background: var(--danger);
 		color: #fff;
