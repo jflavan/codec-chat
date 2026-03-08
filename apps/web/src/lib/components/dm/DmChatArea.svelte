@@ -12,6 +12,7 @@
 	import ReactionBar from '$lib/components/chat/ReactionBar.svelte';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 	import DmCallHeader from '$lib/components/voice/DmCallHeader.svelte';
+	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
 
 	const app = getAppState();
 	const BOTTOM_THRESHOLD = 50;
@@ -130,6 +131,19 @@
 		return () => {
 			container?.removeEventListener('load', handleContentLoad, true);
 		};
+	});
+
+	// Scroll to highlighted message from search jump
+	$effect(() => {
+		const targetId = app.highlightedMessageId;
+		if (targetId && container) {
+			setTimeout(() => {
+				const el = container?.querySelector(`[data-message-id="${CSS.escape(targetId)}"]`);
+				if (el) {
+					el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				}
+			}, 100);
+		}
 	});
 
 	// Reset scroll on channel change
@@ -261,6 +275,7 @@
 	}
 </script>
 
+<div class="dm-chat-wrapper" class:search-open={app.isSearchOpen}>
 <main
 	class="dm-chat"
 	aria-label="Direct message conversation"
@@ -288,6 +303,18 @@
 			</h1>
 		</div>
 		<div class="dm-header-right">
+			<button
+				class="search-btn"
+				onclick={() => app.toggleSearch()}
+				title="Search messages"
+				aria-label="Search messages"
+				class:active={app.isSearchOpen}
+			>
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<circle cx="11" cy="11" r="8"/>
+					<path d="m21 21-4.3-4.3"/>
+				</svg>
+			</button>
 			<button
 				class="call-btn-header"
 				disabled={!!app.activeCall || !!app.incomingCall}
@@ -354,7 +381,7 @@
 					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
 					{@const coveredIds = new Set((message.linkPreviews ?? []).map((lp) => { const m = /[\w-]{11}/.exec(lp.url); return m?.[0] ?? ''; }).filter(Boolean))}
-					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
+					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={app.highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
 					<!-- Floating action bar -->
 					<MessageActionBar
 						isOwnMessage={message.authorUserId === app.me?.user.id}
@@ -594,14 +621,26 @@
 		</form>
 	</div>
 </main>
+{#if app.isSearchOpen}
+	<SearchPanel isDm />
+{/if}
+</div>
 
 <style>
+	.dm-chat-wrapper {
+		display: flex;
+		height: 100%;
+		overflow: hidden;
+	}
+
 	.dm-chat {
 		background: var(--bg-primary);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
 		position: relative;
+		flex: 1;
+		min-width: 0;
 	}
 
 	/* ───── Drop overlay ───── */
@@ -1198,10 +1237,14 @@
 		text-decoration: underline;
 	}
 
-	/* ───── Reply highlight ───── */
+	/* ───── Reply / search highlight ───── */
 
 	:global(.reply-highlight) {
 		animation: dm-reply-highlight-fade 1.5s ease-out;
+	}
+
+	:global(.search-highlight) {
+		animation: dm-search-highlight-fade 2s ease-out;
 	}
 
 	@keyframes dm-reply-highlight-fade {
@@ -1209,11 +1252,41 @@
 		100% { background: transparent; }
 	}
 
+	@keyframes dm-search-highlight-fade {
+		0%   { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+		100% { background: transparent; }
+	}
+
 	@media (prefers-reduced-motion: reduce) {
-		:global(.reply-highlight) {
+		:global(.reply-highlight),
+		:global(.search-highlight) {
 			animation: none;
 			background: color-mix(in srgb, var(--accent) 10%, transparent);
 		}
+	}
+
+	/* ───── Search button ───── */
+
+	.search-btn {
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.search-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
+	}
+
+	.search-btn.active {
+		color: var(--accent);
 	}
 
 	/* ───── Call button in header ───── */

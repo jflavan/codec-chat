@@ -3,6 +3,7 @@
 	import MessageFeed from './MessageFeed.svelte';
 	import TypingIndicator from './TypingIndicator.svelte';
 	import Composer from './Composer.svelte';
+	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
 
 	const app = getAppState();
 
@@ -43,6 +44,7 @@
 	}
 </script>
 
+<div class="chat-wrapper" class:search-open={app.isSearchOpen}>
 <main
 	class="chat-main"
 	aria-label="Chat"
@@ -65,6 +67,18 @@
 				{app.selectedChannelName ?? 'Select a channel'}
 			</h1>
 		</div>
+		<button
+			class="search-btn"
+			onclick={() => app.toggleSearch()}
+			title="Search messages"
+			aria-label="Search messages"
+			class:active={app.isSearchOpen}
+		>
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<circle cx="11" cy="11" r="8"/>
+				<path d="m21 21-4.3-4.3"/>
+			</svg>
+		</button>
 		<button class="mobile-members-btn" onclick={() => { app.mobileMembersOpen = true; }} aria-label="Show members">
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
@@ -93,8 +107,18 @@
 		<Composer />
 	</div>
 </main>
+{#if app.isSearchOpen}
+	<SearchPanel />
+{/if}
+</div>
 
 <style>
+	.chat-wrapper {
+		display: flex;
+		height: 100%;
+		overflow: hidden;
+	}
+
 	.chat-main {
 		background: var(--bg-primary);
 		display: flex;
@@ -102,6 +126,8 @@
 		overflow: hidden;
 		position: relative;
 		height: 100%;
+		flex: 1;
+		min-width: 0;
 	}
 
 	.chat-header {
@@ -169,6 +195,30 @@
 			min-width: 44px;
 			min-height: 44px;
 		}
+	}
+
+	/* ───── Search button ───── */
+
+	.search-btn {
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.search-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
+	}
+
+	.search-btn.active {
+		color: var(--accent);
 	}
 
 	/* ───── Drop overlay ───── */
