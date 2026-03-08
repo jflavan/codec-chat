@@ -65,7 +65,8 @@ jobs:
 
       - name: Ensure resource providers are registered
         run: |
-          az provider register --namespace Microsoft.Cache --wait
+          az provider register --namespace Microsoft.Cache --wait || \
+            echo "::warning::Could not register Microsoft.Cache — ensure it is registered at the subscription level"
 
       - name: Resolve current container images
         id: images
