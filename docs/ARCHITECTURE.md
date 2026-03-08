@@ -6,7 +6,8 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 ### Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
 - **Backend:** ASP.NET Core 10 Web API (Controller-based APIs)
-- **Real-time:** SignalR (WebSockets with automatic fallback)
+- **Real-time:** SignalR (WebSockets with automatic fallback); Redis backplane for multi-instance scale-out
+- **Caching:** Redis 8 distributed cache (`IDistributedCache`) for message history with channel-level invalidation
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID token validation)
 - **Deployment:** Containerized on Azure Container Apps (Docker multi-stage builds)
@@ -183,6 +184,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 ### Real-time Layer (SignalR)
 - **Hub endpoint:** `/hubs/chat`
 - **Transport:** WebSockets (with automatic fallback to Server-Sent Events / Long Polling)
+- **Backplane:** Redis pub/sub (when configured) — enables SignalR events to broadcast across multiple API instances; channel prefix `codec` prevents key collisions
 - **Authentication:** JWT passed via `access_token` query parameter for WebSocket connections
 - **JSON serialization:** camelCase payload naming (configured via `AddJsonProtocol`) to match REST API conventions
 - **Key Features:**
@@ -767,6 +769,8 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 ### Current Optimizations
 - Async/await throughout API
 - Efficient EF Core queries (AsNoTracking)
+- Redis distributed cache for message history — paginated history pages cached with 5-minute TTL via `MessageCacheService`; channel-level invalidation on all mutations (send, edit, delete, purge, reactions); skips caching the "latest" page to avoid write amplification; graceful degradation when Redis is unavailable
+- SignalR Redis backplane — enables horizontal scaling across multiple API instances via Redis pub/sub
 - Response compression (Brotli + Gzip, `CompressionLevel.Fastest`) for `application/json` payloads
 - Optimized user profile writes — `UserService.GetOrCreateUserAsync` skips `SaveChangesAsync` when Google profile fields are unchanged
 - Cached mention parsing — regex results cached per message batch via `ToDictionary` to eliminate redundant execution
@@ -778,7 +782,6 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 - Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends; auto-refreshes on persistent failure
 
 ### Future Improvements
-- Response caching
 - Database indexing strategy
 - CDN for static assets
 - Connection pooling
