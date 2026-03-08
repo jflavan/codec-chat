@@ -157,6 +157,11 @@ export type ChannelDeletedEvent = {
 	channelId: string;
 };
 
+export type UserPresenceChangedEvent = {
+	userId: string;
+	status: 'online' | 'idle' | 'offline';
+};
+
 export type UserJoinedVoiceEvent = {
 	channelId: string;
 	userId: string;
@@ -259,6 +264,7 @@ export type SignalRCallbacks = {
 	onCustomEmojiAdded?: (event: CustomEmojiAddedEvent) => void;
 	onCustomEmojiUpdated?: (event: CustomEmojiUpdatedEvent) => void;
 	onCustomEmojiDeleted?: (event: CustomEmojiDeletedEvent) => void;
+	onUserPresenceChanged?: (event: UserPresenceChangedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -273,6 +279,9 @@ export type SignalRCallbacks = {
 export class ChatHubService {
 	private connection: HubConnection | null = null;
 	private typingTimeout: ReturnType<typeof setTimeout> | null = null;
+	private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+	private isUserActive = false;
+	private activityHandler = () => { this.isUserActive = true; };
 
 	constructor(private readonly hubUrl: string) {}
 
@@ -405,26 +414,52 @@ export class ChatHubService {
 		if (callbacks.onCustomEmojiDeleted) {
 			connection.on('CustomEmojiDeleted', callbacks.onCustomEmojiDeleted);
 		}
+		if (callbacks.onUserPresenceChanged) {
+			connection.on('UserPresenceChanged', callbacks.onUserPresenceChanged);
+		}
 
 		if (callbacks.onReconnecting) {
-			connection.onreconnecting(callbacks.onReconnecting);
+			connection.onreconnecting(() => {
+				this.stopHeartbeat();
+				callbacks.onReconnecting!();
+			});
+		} else {
+			connection.onreconnecting(() => {
+				this.stopHeartbeat();
+			});
 		}
 		if (callbacks.onReconnected) {
-			connection.onreconnected(callbacks.onReconnected);
+			connection.onreconnected(() => {
+				this.startHeartbeat();
+				callbacks.onReconnected!();
+			});
+		} else {
+			connection.onreconnected(() => {
+				this.startHeartbeat();
+			});
 		}
 		if (callbacks.onClose) {
-			connection.onclose((error) => callbacks.onClose!(error));
+			connection.onclose((error) => {
+				this.stopHeartbeat();
+				callbacks.onClose!(error);
+			});
+		} else {
+			connection.onclose(() => {
+				this.stopHeartbeat();
+			});
 		}
 
 		try {
 			await connection.start();
 			this.connection = connection;
+			this.startHeartbeat();
 		} catch {
 			// SignalR unavailable; real-time features will be disabled.
 		}
 	}
 
 	async stop(): Promise<void> {
+		this.stopHeartbeat();
 		if (this.typingTimeout) clearTimeout(this.typingTimeout);
 		if (this.connection) {
 			try {
@@ -434,6 +469,36 @@ export class ChatHubService {
 			}
 			this.connection = null;
 		}
+	}
+
+	startHeartbeat(): void {
+		// Listen for user activity
+		document.addEventListener('mousemove', this.activityHandler);
+		document.addEventListener('keydown', this.activityHandler);
+		document.addEventListener('pointerdown', this.activityHandler);
+
+		// Send heartbeat every 30s
+		this.heartbeatInterval = setInterval(async () => {
+			if (this.connection?.state === HubConnectionState.Connected) {
+				try {
+					await this.connection.invoke('Heartbeat', this.isUserActive);
+				} catch (e) {
+					console.warn('Heartbeat failed:', e);
+				}
+			}
+			this.isUserActive = false;
+		}, 30_000);
+	}
+
+	stopHeartbeat(): void {
+		if (this.heartbeatInterval) {
+			clearInterval(this.heartbeatInterval);
+			this.heartbeatInterval = null;
+		}
+		document.removeEventListener('mousemove', this.activityHandler);
+		document.removeEventListener('keydown', this.activityHandler);
+		document.removeEventListener('pointerdown', this.activityHandler);
+		this.isUserActive = false;
 	}
 
 	async joinChannel(channelId: string): Promise<void> {
