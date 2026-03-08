@@ -918,3 +918,9 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
   - WebRTC transport setup via mediasoup SFU with call-specific room IDs
   - Incoming call overlay with ring tone, DM call header with elapsed time
   - System messages for voice call events (missed calls, call duration)
+- Message search (completed)
+  - PostgreSQL trigram indexes (`pg_trgm` extension) on `Messages.Body` and `DirectMessages.Body` for fast ILIKE search
+  - Server search endpoint (`GET /servers/{serverId}/search`) and DM search endpoint (`GET /dm/search`) with filters (channel, author, date range, content type)
+  - Around-message endpoints for jump-to-message navigation
+  - Search panel UI with debounced input, filter bar, paginated results with highlighted matches
+  - Jump-to-message with 2-second highlight animation and smooth scroll

@@ -5,7 +5,7 @@
 	let { result, query, onJump }: {
 		result: SearchResult;
 		query: string;
-		onJump: (messageId: string, channelId: string) => void;
+		onJump: (messageId: string, channelId: string, isDm: boolean) => void;
 	} = $props();
 
 	function highlightMatches(text: string, q: string): string {
@@ -24,12 +24,13 @@
 			.replace(/"/g, '&quot;');
 	}
 
+	const isDm = $derived(!!result.dmChannelId);
 	const channelId = $derived(result.channelId ?? result.dmChannelId ?? '');
 </script>
 
 <button
 	class="search-result-item"
-	onclick={() => onJump(result.id, channelId)}
+	onclick={() => onJump(result.id, channelId, isDm)}
 	type="button"
 >
 	<div class="result-header">

@@ -71,6 +71,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Message editing — authors can edit their own messages via inline edit mode; "(edited)" label displayed on modified messages; real-time sync via SignalR
 - ✅ Text formatting — bold (`*text*` or `**text**`) and italic (`_text_`) with live preview in composer
 - ✅ Progressive message loading — initially loads last 100 messages; older messages load seamlessly on scroll-up via cursor-based pagination (`before`/`limit` query params); scroll position preserved during prepend; DM messages use same paginated `{ hasMore, messages }` response shape
+- ✅ Message search — full-text search across server channels and DM conversations using PostgreSQL trigram indexes; right-side search panel with 300ms debounce; filters by scope (this channel/server or this DM/all DMs), date range, content type (image/link); paginated results with highlighted query matches; jump-to-message loads an around-window and scrolls to the target with a 2-second highlight animation
 
 ### Friends ([detailed spec](FRIENDS.md))
 - ✅ Friend requests (send, accept, decline, cancel)
@@ -268,7 +269,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 ## 📋 Planned (Near-term)
 
 ### Messaging Features
-- Message search
+- ~~Message search~~ (implemented)
 
 ### Real-time Features
 - Presence indicators (online/offline/away)

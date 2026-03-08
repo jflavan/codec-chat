@@ -37,8 +37,8 @@
 		}
 	}
 
-	function handleJump(messageId: string, channelId: string): void {
-		app.jumpToMessage(messageId, channelId);
+	function handleJump(messageId: string, channelId: string, isDm: boolean): void {
+		app.jumpToMessage(messageId, channelId, isDm);
 	}
 
 	const totalPages = $derived(
