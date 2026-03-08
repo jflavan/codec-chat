@@ -308,6 +308,8 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `DELETE /channels/{channelId}/messages/{messageId}` - Delete a channel message (author or Global Admin; cascade-deletes reactions and link previews; broadcasts `MessageDeleted` via SignalR)
 - `DELETE /channels/{channelId}/messages` - Purge all messages in a channel (Global Admin only; cascade-deletes reactions and link previews; broadcasts `ChannelPurged` via SignalR)
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership or Global Admin; broadcasts via SignalR)
+- `GET /channels/{channelId}/messages?around={messageId}` - Get messages around a target message (returns `{ hasMoreBefore, hasMoreAfter, messages }` centered on the target; used by jump-to-message)
+- `GET /servers/{serverId}/search?q=...` - Search messages across server channels (requires membership or Global Admin; filters: `channelId`, `authorId`, `before`, `after`, `has`; paginated results with channel names, reactions, reply context)
 
 #### Friends
 - `GET /friends` - List confirmed friends (returns the other user + friendship date)
@@ -327,6 +329,8 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `POST /dm/channels/{channelId}/messages` - Send a direct message (accepts optional `imageUrl`, `replyToDirectMessageId`; broadcasts `ReceiveDm` via SignalR; reopens closed conversations)
 - `DELETE /dm/channels/{channelId}/messages/{messageId}` - Delete a direct message (author only; cascade-deletes link previews; broadcasts `DmMessageDeleted` via SignalR)
 - `DELETE /dm/channels/{channelId}` - Close a DM conversation (sets `IsOpen = false` for current user; messages preserved)
+- `GET /dm/channels/{channelId}/messages?around={messageId}` - Get DM messages around a target message (returns `{ hasMoreBefore, hasMoreAfter, messages }` centered on the target; used by jump-to-message)
+- `GET /dm/search?q=...` - Search messages across DM conversations (filters: `channelId`, `authorId`, `before`, `after`, `has`; paginated results with DM channel display names)
 
 #### Voice Calls
 - `GET /voice/active-call` - Get the current user's active or ringing call (returns caller/recipient display info, call status, and timestamps; used on page load/reconnect to restore call state)

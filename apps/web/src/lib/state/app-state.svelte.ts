@@ -13,7 +13,9 @@ import type {
 	DirectMessage,
 	ServerInvite,
 	VoiceChannelMember,
-	CustomEmoji
+	CustomEmoji,
+	SearchFilters,
+	PaginatedSearchResults
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -132,6 +134,14 @@ export class AppState {
 	isUploadingServerIcon = $state(false);
 	customEmojis = $state<CustomEmoji[]>([]);
 	isUploadingEmoji = $state(false);
+
+	/* ───── search ───── */
+	isSearchOpen = $state(false);
+	searchQuery = $state('');
+	searchFilters = $state<SearchFilters>({});
+	searchResults = $state<PaginatedSearchResults | null>(null);
+	isSearching = $state(false);
+	highlightedMessageId = $state<string | null>(null);
 
 	/* ───── mobile navigation ───── */
 	mobileNavOpen = $state(false);
@@ -2598,6 +2608,89 @@ export class AppState {
 			if (this.error === message) this.error = null;
 			this.transientErrorTimer = null;
 		}, durationMs);
+	}
+
+	/* ───── Search ───── */
+
+	toggleSearch(): void {
+		this.isSearchOpen = !this.isSearchOpen;
+		if (!this.isSearchOpen) {
+			this.searchQuery = '';
+			this.searchFilters = {};
+			this.searchResults = null;
+		}
+	}
+
+	async searchMessages(query: string, filters: SearchFilters = {}): Promise<void> {
+		if (!this.idToken || query.trim().length < 2) {
+			this.searchResults = null;
+			return;
+		}
+
+		this.searchQuery = query;
+		this.searchFilters = filters;
+		this.isSearching = true;
+
+		try {
+			if (this.selectedServerId) {
+				this.searchResults = await this.api.searchServerMessages(
+					this.idToken,
+					this.selectedServerId,
+					query,
+					filters
+				);
+			} else if (this.activeDmChannelId) {
+				this.searchResults = await this.api.searchDmMessages(
+					this.idToken,
+					query,
+					filters
+				);
+			}
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isSearching = false;
+		}
+	}
+
+	async searchPage(page: number): Promise<void> {
+		await this.searchMessages(this.searchQuery, { ...this.searchFilters, page });
+	}
+
+	async jumpToMessage(messageId: string, channelId: string, isDm: boolean): Promise<void> {
+		if (!this.idToken) return;
+
+		try {
+			// Switch to the correct view if needed
+			if (isDm) {
+				if (this.activeDmChannelId !== channelId) {
+					await this.selectDmConversation(channelId);
+				}
+			} else {
+				if (this.selectedChannelId !== channelId) {
+					await this.selectChannel(channelId);
+				}
+			}
+
+			// Fetch the around-window for the target message
+			const result = isDm
+				? await this.api.getDmMessagesAround(this.idToken, channelId, messageId)
+				: await this.api.getMessagesAround(this.idToken, channelId, messageId);
+
+			// Replace messages with the around-window
+			if (isDm) {
+				this.dmMessages = result.messages as unknown as DirectMessage[];
+			} else {
+				this.messages = result.messages;
+				this.hasMoreMessages = result.hasMoreBefore;
+			}
+
+			// Highlight the target message
+			this.highlightedMessageId = messageId;
+			setTimeout(() => { this.highlightedMessageId = null; }, 2000);
+		} catch (e) {
+			this.setError(e);
+		}
 	}
 
 	private setError(e: unknown): void {
