@@ -7,9 +7,12 @@
 	import { recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 
 	const app = getAppState();
-	let inputEl: HTMLInputElement;
+	let inputEl: HTMLTextAreaElement;
 	let fileInputEl: HTMLInputElement;
 	let overlayEl: HTMLDivElement;
+
+	const LINE_HEIGHT = 20;
+	const MAX_LINES = 5;
 	let showEmojiPicker = $state(false);
 
 	/* ───── Mention autocomplete state ───── */
@@ -106,6 +109,19 @@
 			return;
 		}
 
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			if (app.messageBody.trim() || app.pendingImage) {
+				app.sendMessage();
+				requestAnimationFrame(() => autoResize());
+			}
+			return;
+		}
+
+		if (e.key === 'Enter' && e.shiftKey) {
+			requestAnimationFrame(() => autoResize());
+		}
+
 		if (e.key === 'Escape' && app.replyingTo?.context === 'channel') {
 			e.preventDefault();
 			app.cancelReply();
@@ -116,19 +132,31 @@
 		e.preventDefault();
 		if (showMentionPicker) return;
 		await app.sendMessage();
+		requestAnimationFrame(() => autoResize());
 		inputEl?.focus();
 	}
 
 	function handleInput(): void {
 		app.handleComposerInput();
 		detectMentionTrigger();
+		autoResize();
 		syncOverlayScroll();
+	}
+
+	function autoResize(): void {
+		if (!inputEl) return;
+		inputEl.style.height = 'auto';
+		const maxHeight = LINE_HEIGHT * MAX_LINES;
+		const scrollHeight = inputEl.scrollHeight;
+		inputEl.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+		inputEl.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
 	}
 
 	function syncOverlayScroll(): void {
 		if (overlayEl && inputEl) {
 			requestAnimationFrame(() => {
 				overlayEl.scrollLeft = inputEl.scrollLeft;
+				overlayEl.scrollTop = inputEl.scrollTop;
 			});
 		}
 	}
@@ -229,10 +257,10 @@
 			</button>
 			<div class="composer-input-wrapper">
 				<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} /></div>
-				<input
+				<textarea
 					bind:this={inputEl}
 					class="composer-input"
-					type="text"
+					rows="1"
 					inputmode="text"
 					autocomplete="off"
 					placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
@@ -242,7 +270,7 @@
 					onkeydown={handleKeydown}
 					onscroll={syncOverlayScroll}
 					onpaste={handlePaste}
-				/>
+				></textarea>
 			</div>
 			<button
 				class="composer-emoji"
@@ -292,7 +320,7 @@
 
 	.composer-row {
 		display: flex;
-		align-items: center;
+		align-items: flex-end;
 		gap: 0;
 	}
 
@@ -338,7 +366,8 @@
 		line-height: 20px;
 		color: var(--text-normal);
 		pointer-events: none;
-		white-space: nowrap;
+		white-space: pre-wrap;
+		word-wrap: break-word;
 		overflow: hidden;
 	}
 
@@ -356,6 +385,8 @@
 		line-height: 20px;
 		outline: none;
 		min-height: 20px;
+		resize: none;
+		overflow-y: hidden;
 	}
 
 	.composer-input::placeholder {
@@ -603,6 +634,7 @@
 			font-size: 16px;
 			min-height: 44px;
 			padding: 12px 16px;
+			resize: none;
 		}
 
 		.composer-input-overlay {
