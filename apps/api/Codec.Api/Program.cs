@@ -36,11 +36,14 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = redisConnectionString;
-        options.InstanceName = "codec:";
     });
 
-    builder.Services.AddSingleton<IConnectionMultiplexer>(
+    builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         ConnectionMultiplexer.Connect(redisConnectionString));
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
 }
 
 builder.Services.AddSingleton<MessageCacheService>();
