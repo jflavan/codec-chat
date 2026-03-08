@@ -154,6 +154,7 @@
 				<div class="emoji-grid">
 					{#each cat.items as item (item.emoji)}
 						<button
+							type="button"
 							class="emoji-btn"
 							title={item.name}
 							onclick={() => handleSelect(item.emoji)}
