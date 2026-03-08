@@ -41,10 +41,6 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
     builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         ConnectionMultiplexer.Connect(redisConnectionString));
 }
-else
-{
-    builder.Services.AddDistributedMemoryCache();
-}
 
 builder.Services.AddSingleton<MessageCacheService>();
 
