@@ -4,6 +4,7 @@
 	import ProfileSettings from './ProfileSettings.svelte';
 	import AccountSettings from './AccountSettings.svelte';
 	import VoiceAudioSettings from './VoiceAudioSettings.svelte';
+	import AppearanceSettings from './AppearanceSettings.svelte';
 
 	const app = getAppState();
 
@@ -60,6 +61,8 @@
 				<ProfileSettings />
 			{:else if app.settingsCategory === 'voice-audio'}
 				<VoiceAudioSettings />
+			{:else if app.settingsCategory === 'appearance'}
+				<AppearanceSettings />
 			{:else}
 				<AccountSettings />
 			{/if}

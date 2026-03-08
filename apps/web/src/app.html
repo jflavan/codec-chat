@@ -8,6 +8,16 @@
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" sizes="180x180" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="#050B07" />
+		<script>
+			(function () {
+				var t = '';
+				try { t = localStorage.getItem('codec-theme') || ''; } catch (e) {}
+				if (t && t !== 'phosphor') document.documentElement.dataset.theme = t;
+				var colors = { phosphor: '#050B07', midnight: '#111525', ember: '#110D08', light: '#E8E8ED' };
+				var meta = document.querySelector('meta[name="theme-color"]');
+				if (meta && colors[t]) meta.setAttribute('content', colors[t]);
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
