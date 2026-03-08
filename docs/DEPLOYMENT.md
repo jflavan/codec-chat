@@ -326,6 +326,7 @@ cd ../..
 | `ConnectionStrings--Default` | PostgreSQL connection string |
 | `Google--ClientId` | Google OAuth 2.0 client ID |
 | `GlobalAdmin--Email` | Email address of the platform-wide global admin |
+| `Redis--ConnectionString` | Azure Cache for Redis connection string (auto-provisioned by Bicep) |
 
 ## Monitoring
 
@@ -424,5 +425,6 @@ Container Apps supports WebSocket connections natively. If SignalR fails:
 | Storage Account | < 1 GB | ~$0.02 |
 | Container Registry | Basic, < 5 GB | ~$5 |
 | Key Vault | < 10 secrets | ~$0.03 |
+| Redis Cache | Basic C0, 250 MB | ~$16 |
 | Log Analytics | Free tier (5 GB/month) | ~$0 |
-| **Total** | | **~$37–58/month** |
+| **Total** | | **~$53–74/month** |

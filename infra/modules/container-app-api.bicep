@@ -29,6 +29,9 @@ param voiceSfuInternalKeyKvUrl string = ''
 @description('Key Vault secret URL for the GitHub PAT. Leave empty to disable in-app bug reporting.')
 param gitHubTokenKvUrl string = ''
 
+@description('Key Vault secret URL for the Redis connection string. Leave empty to disable Redis caching and SignalR backplane.')
+param redisConnectionStringKvUrl string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -114,6 +117,12 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: gitHubTokenKvUrl
           identity: 'system'
         }
+      ] : [], redisConnectionStringKvUrl != '' ? [
+        {
+          name: 'redis-connection-string'
+          keyVaultUrl: redisConnectionStringKvUrl
+          identity: 'system'
+        }
       ] : [])
       registries: [
         {
@@ -187,6 +196,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'GitHub__Token'
               secretRef: 'github-token'
+            }
+          ] : [], redisConnectionStringKvUrl != '' ? [
+            {
+              name: 'Redis__ConnectionString'
+              secretRef: 'redis-connection-string'
             }
           ] : [])
           probes: [

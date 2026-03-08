@@ -38,6 +38,7 @@ infra/
 │   ├── container-app-api.bicep
 │   ├── container-app-web.bicep
 │   ├── managed-certificate.bicep
+│   ├── redis-cache.bicep
 │   └── voice-vm.bicep
 └── voice/
     └── docker-compose.yml  # SFU + coturn (deployed to voice VM by CI/CD)
@@ -55,6 +56,7 @@ keyVault ──┬──► postgresql (stores conn string)  │
            ├──► voiceTurnSecretKv (if voice)     │
            └──► voiceSfuInternalKeyKv (if voice) │
 storageAccount ─────────────────────────────────┘
+redisCache (if redisEnabled) ──► stores conn string in KV
 voiceVm (if voiceVmEnabled) ────────────────────┘
 ```
 
@@ -227,6 +229,7 @@ The full parameter list for `main.bicep`:
 | `webCustomDomain` | string | `''` | Custom domain for web app |
 | `apiCustomDomain` | string | `''` | Custom domain for API |
 | `bindCertificates` | bool | `false` | Bind managed TLS certificates |
+| `redisEnabled` | bool | `true` | Deploy Azure Cache for Redis |
 | `voiceVmEnabled` | bool | `false` | Deploy voice VM infrastructure |
 | `voiceAdminSshPublicKey` | secure string | `''` | SSH public key for voice VM |
 | `voiceSshAllowedSourcePrefix` | string | `''` | Source CIDR for SSH access |
