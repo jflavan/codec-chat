@@ -126,6 +126,7 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - ✅ Keyboard accessible: Escape to close, focus trapping via `<dialog>`
 - ✅ Responsive layout: two-column (≥ 900px), tabbed (< 900px)
 - ✅ Extensible for future categories (notifications, privacy, appearance)
+- ✅ **Appearance settings** — theme picker with 4 preset themes: Phosphor Green (default CRT), Midnight (dark navy/blue), Ember (warm amber/orange), Light (Apple-inspired light mode); live preview cards; localStorage persistence; flash-prevention via inline script; `theme-color` meta tag sync for mobile browsers
 
 ### Alpha Notification & Bug Reporting
 - ✅ Alpha notification modal shown on every login (ALPHA badge, welcome message, bug reporting guidance)
@@ -303,7 +304,6 @@ This document tracks implemented, in-progress, and planned features for Codec.
 - Granular permissions
 
 ### Customization
-- Web client themes
 - Status messages
 
 ### Enterprise Features
