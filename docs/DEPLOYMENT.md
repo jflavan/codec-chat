@@ -90,29 +90,11 @@ Create a `prod` environment in Settings > Environments with:
 
 ## Pipelines
 
-### Infrastructure Pipeline (`infra.yml`)
-
-Provisions Azure resources via Bicep.
-
-**Triggers:**
-- Manual dispatch (`workflow_dispatch`) only
-
-> **Note:** The `infra.yml` push trigger on `infra/**` was removed to prevent deployment conflicts with `cd.yml`. Infrastructure changes should be deployed manually or via the CD pipeline.
-
-**Steps:**
-1. Login to Azure via OIDC
-2. Run `what-if` to preview changes
-3. Deploy Bicep template to `rg-codec-prod`
-
-**First-time provisioning:**
-```bash
-# Trigger manually from GitHub Actions UI
-gh workflow run infra.yml
-```
+All deployment pipelines share the `deploy-prod` concurrency group with `cancel-in-progress: false`, ensuring that infrastructure and application deployments never run simultaneously.
 
 ### CI Pipeline (`ci.yml`)
 
-Runs on every push and pull request.
+Runs on every push to `main`, pull request, and manual dispatch.
 
 **Jobs:**
 - `build-api` — Restore and build .NET project
@@ -121,14 +103,44 @@ Runs on every push and pull request.
 - `docker-build-api` — Validate API Dockerfile builds
 - `docker-build-web` — Validate Web Dockerfile builds
 
-### CD Pipeline (`cd.yml`)
+### Infrastructure Pipeline (`infra.yml`)
 
-Deploys to production after CI passes on `main` using a blue-green deployment strategy.
+Provisions Azure resources via Bicep with zero-downtime deploys.
+
+**Triggers:**
+- Automatic — runs after CI completes on `main` (via `workflow_run`), but only if files under `infra/` changed
+- Manual dispatch (`workflow_dispatch`) — always runs, skips change detection
 
 **Jobs:**
-1. `build-and-push` — Build Docker images and push to ACR
-2. `migrate-database` — Run EF Core migration bundle against production PostgreSQL
-3. `deploy` — Blue-green deployment to Container Apps (requires `prod` environment approval):
+1. `check-infra` — Detects `infra/` changes using `git diff-tree`. Skipped commits (no infra changes) exit early.
+2. `deploy-infra` — Runs only when `check-infra` reports changes:
+   - Login to Azure via OIDC
+   - **Resolve current container images** — queries the running API and Web container apps for their current image tags, preserving them through the Bicep deployment (prevents downtime from image resets)
+   - **Check managed certificates** — determines if TLS certs already exist to avoid unnecessary two-pass deployments
+   - Run `what-if` to preview changes
+   - Deploy Bicep template (single pass if certs exist, two-pass if not)
+   - **Trigger CD pipeline** — chains into `cd.yml` after infrastructure completes
+
+**First-time provisioning:**
+```bash
+# Trigger manually from GitHub Actions UI
+gh workflow run infra.yml
+```
+
+### CD Pipeline (`cd.yml`)
+
+Deploys application code to production using a blue-green deployment strategy.
+
+**Triggers:**
+- Automatic — runs after CI completes on `main` (via `workflow_run`), but skips if `infra/` files changed (the infra pipeline handles those commits and triggers CD afterwards)
+- Manual dispatch (`workflow_dispatch`)
+- Triggered by the infra pipeline after infrastructure deployment completes
+
+**Jobs:**
+1. `check-skip` — Skips the pipeline if this commit contains `infra/` changes (the infra pipeline will trigger CD after it finishes)
+2. `build-and-push` — Build Docker images and push to ACR
+3. `migrate-database` — Run EF Core migration bundle against production PostgreSQL
+4. `deploy` — Blue-green deployment to Container Apps (requires `prod` environment approval):
    - Ensure multiple revision mode and ACR registry configuration
    - Deploy new staging revisions (with unique suffix per commit + run number)
    - Wait for revisions to reach a running state (`Running`, `Degraded`, or `RunningAtMaxScale`) with a healthy health state (`Healthy` or `None`)
@@ -136,7 +148,27 @@ Deploys to production after CI passes on `main` using a blue-green deployment st
    - Switch 100% traffic to the new revisions
    - Deactivate old revisions
    - On failure: rollback by deactivating the failed staging revisions
-4. `smoke-test` — Verify health endpoints respond with 200
+5. `smoke-test` — Verify health endpoints respond with 200
+
+### Pipeline Flow
+
+```
+Push to main
+    │
+    ▼
+   CI ─────────────────────────────────────┐
+    │                                       │
+    ▼                                       ▼
+ infra/ changes?                      No infra changes
+    │                                       │
+    ▼                                       ▼
+ Infra pipeline                         CD pipeline
+ (zero-downtime)                     (blue-green deploy)
+    │
+    ▼
+ Triggers CD pipeline
+ (blue-green deploy)
+```
 
 ## Deploying
 
@@ -144,28 +176,31 @@ Deploys to production after CI passes on `main` using a blue-green deployment st
 
 1. Merge a PR to `main`
 2. CI pipeline runs automatically
-3. On CI success, CD pipeline triggers
-4. Images are built and pushed to ACR, then database migrations run
-5. Review and approve the deployment in the `prod` environment
-6. New staging revisions are deployed and verified healthy before traffic is switched
-7. Smoke tests verify the deployment
+3. If `infra/` files changed: infra pipeline runs first (zero-downtime), then triggers CD
+4. If no `infra/` changes: CD pipeline runs directly
+5. Images are built and pushed to ACR, then database migrations run
+6. Review and approve the deployment in the `prod` environment
+7. New staging revisions are deployed and verified healthy before traffic is switched
+8. Smoke tests verify the deployment
 
 ### Manual Deployment
 
 ```bash
 # Trigger CD pipeline manually
 gh workflow run cd.yml
+
+# Trigger infrastructure deployment manually
+gh workflow run infra.yml
 ```
 
 ### Infrastructure Updates
 
-Edit files under `infra/` and push to `main`. Then trigger the `infra.yml` workflow manually:
+Edit files under `infra/` and push to `main`. The infra pipeline detects the changes automatically and runs before CD. No manual intervention is needed.
 
+For emergency infrastructure changes, trigger manually:
 ```bash
 gh workflow run infra.yml
 ```
-
-> **Note:** Infrastructure changes are managed separately via the `infra.yml` workflow. The CD pipeline (`cd.yml`) only handles application deployment (image updates and revision management), not infrastructure provisioning.
 
 ### Custom Domain
 

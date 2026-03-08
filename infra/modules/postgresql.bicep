@@ -33,6 +33,16 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   }
 }
 
+// Allow-list extensions required by EF Core migrations.
+resource extensionsConfig 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  parent: server
+  name: 'azure.extensions'
+  properties: {
+    value: 'PG_TRGM'
+    source: 'user-override'
+  }
+}
+
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
   parent: server
   name: databaseName

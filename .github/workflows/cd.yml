@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cd-prod
+  group: deploy-prod
   cancel-in-progress: false
 
 env:
@@ -23,9 +23,39 @@ env:
   VOICE_VM_NAME: vm-codec-prod-voice
 
 jobs:
-  build-and-push:
+  check-skip:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if infra pipeline handles this commit
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Dispatch trigger, proceeding"
+          else
+            # diff-tree --no-commit-id -r handles both regular and merge commits
+            CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD -- 'infra/' || echo "")
+            if [ -n "$CHANGED" ]; then
+              echo "should-run=false" >> "$GITHUB_OUTPUT"
+              echo "Infra changes detected — deferring to infra pipeline"
+            else
+              echo "should-run=true" >> "$GITHUB_OUTPUT"
+              echo "No infra changes, proceeding with CD"
+            fi
+          fi
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: check-skip
+    if: needs.check-skip.outputs.should-run == 'true'
     outputs:
       image-tag: ${{ github.sha }}
     steps:
