@@ -187,6 +187,14 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Allow-list pg_trgm extension
+        run: |
+          az postgres flexible-server parameter set \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --server-name psql-codec-prod \
+            --name azure.extensions \
+            --value PG_TRGM
+
       - name: Open PostgreSQL firewall for runner
         id: firewall
         run: |
