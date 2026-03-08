@@ -15,7 +15,10 @@ import type {
 	ServerInvite,
 	VoiceChannelMember,
 	ActiveCallResponse,
-	CustomEmoji
+	CustomEmoji,
+	SearchFilters,
+	PaginatedSearchResults,
+	AroundMessages
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -669,5 +672,74 @@ export class ApiClient {
 			headers: this.headers(token, true),
 			body: JSON.stringify({ title, description, userAgent, currentPage })
 		});
+	}
+
+	/* ───── Message Search ───── */
+
+	/** Search messages within a server. */
+	searchServerMessages(
+		token: string,
+		serverId: string,
+		query: string,
+		filters: SearchFilters = {}
+	): Promise<PaginatedSearchResults> {
+		const params = new URLSearchParams({ q: query });
+		if (filters.channelId) params.set('channelId', filters.channelId);
+		if (filters.authorId) params.set('authorId', filters.authorId);
+		if (filters.before) params.set('before', filters.before);
+		if (filters.after) params.set('after', filters.after);
+		if (filters.has) params.set('has', filters.has);
+		if (filters.page) params.set('page', String(filters.page));
+		if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/search?${params}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Search messages across the current user's DM conversations. */
+	searchDmMessages(
+		token: string,
+		query: string,
+		filters: SearchFilters = {}
+	): Promise<PaginatedSearchResults> {
+		const params = new URLSearchParams({ q: query });
+		if (filters.channelId) params.set('channelId', filters.channelId);
+		if (filters.authorId) params.set('authorId', filters.authorId);
+		if (filters.before) params.set('before', filters.before);
+		if (filters.after) params.set('after', filters.after);
+		if (filters.has) params.set('has', filters.has);
+		if (filters.page) params.set('page', String(filters.page));
+		if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
+		return this.request(
+			`${this.baseUrl}/dm/search?${params}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Get messages around a target message in a channel. */
+	getMessagesAround(
+		token: string,
+		channelId: string,
+		messageId: string,
+		limit: number = 50
+	): Promise<AroundMessages> {
+		return this.request(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/messages?around=${encodeURIComponent(messageId)}&limit=${limit}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Get messages around a target message in a DM channel. */
+	getDmMessagesAround(
+		token: string,
+		dmChannelId: string,
+		messageId: string,
+		limit: number = 50
+	): Promise<AroundMessages> {
+		return this.request(
+			`${this.baseUrl}/dm/${encodeURIComponent(dmChannelId)}/messages?around=${encodeURIComponent(messageId)}&limit=${limit}`,
+			{ headers: this.headers(token) }
+		);
 	}
 }
