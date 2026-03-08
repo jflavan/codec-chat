@@ -15,7 +15,8 @@ import type {
 	VoiceChannelMember,
 	CustomEmoji,
 	SearchFilters,
-	PaginatedSearchResults
+	PaginatedSearchResults,
+	PresenceStatus
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -169,6 +170,9 @@ export class AppState {
 	isHubConnected = $state(false);
 	ignoredReactionUpdates = $state<Map<string, string[]>>(new Map());
 	pendingReactionKeys = $state<Set<string>>(new Set());
+
+	/* ───── presence ───── */
+	userPresence = $state<Map<string, PresenceStatus>>(new Map());
 
 	/* ───── voice ───── */
 	activeVoiceChannelId = $state<string | null>(null);
@@ -454,6 +458,7 @@ export class AppState {
 		this.serverSettingsOpen = false;
 		this.replyingTo = null;
 		this.lightboxImageUrl = null;
+		this.userPresence = new Map();
 		this.activeVoiceChannelId = null;
 		this.voiceChannelMembers = new Map();
 		this.isMuted = false;
@@ -1410,6 +1415,7 @@ export class AppState {
 		await this.loadChannels(serverId);
 		await this.loadMembers(serverId);
 		await this.loadCustomEmojis(serverId);
+		this.loadServerPresence(serverId);
 	}
 
 	async loadFriends(): Promise<void> {
@@ -1527,6 +1533,31 @@ export class AppState {
 			this.setError(e);
 		} finally {
 			this.isLoadingDmConversations = false;
+		}
+		this.loadDmPresence();
+	}
+
+	async loadServerPresence(serverId: string): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			const entries = await this.api.getServerPresence(this.idToken, serverId);
+			for (const entry of entries) {
+				this.userPresence.set(entry.userId, entry.status);
+			}
+		} catch (e) {
+			console.warn('Failed to load server presence:', e);
+		}
+	}
+
+	async loadDmPresence(): Promise<void> {
+		if (!this.idToken) return;
+		try {
+			const entries = await this.api.getDmPresence(this.idToken);
+			for (const entry of entries) {
+				this.userPresence.set(entry.userId, entry.status);
+			}
+		} catch (e) {
+			console.warn('Failed to load DM presence:', e);
 		}
 	}
 
@@ -2463,6 +2494,13 @@ export class AppState {
 				);
 				memberMap.set(event.channelId, members);
 				this.voiceChannelMembers = memberMap;
+			},
+			onUserPresenceChanged: (event) => {
+				if (event.status === 'offline') {
+					this.userPresence.delete(event.userId);
+				} else {
+					this.userPresence.set(event.userId, event.status);
+				}
 			},
 			onNewProducer: async (event) => {
 				// Handle both server voice channels and DM calls.
