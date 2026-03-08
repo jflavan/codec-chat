@@ -220,12 +220,12 @@
 
 	.submit-btn {
 		width: 100%;
-		padding: 10px 16px;
+		padding: 8px 16px;
 		min-height: 44px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
 		border: none;
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 0.9rem;
 		font-weight: 600;
 		cursor: pointer;
@@ -260,12 +260,12 @@
 		display: block;
 		width: 100%;
 		margin-top: 12px;
-		padding: 10px 16px;
+		padding: 8px 16px;
 		min-height: 44px;
 		background: transparent;
 		border: 1px solid var(--border);
 		color: var(--text-muted);
-		border-radius: 4px;
+		border-radius: 3px;
 		font-size: 0.85rem;
 		cursor: pointer;
 		transition: border-color 150ms, color 150ms;
