@@ -23,7 +23,10 @@
 
 <style>
 	.typing-indicator {
-		flex-shrink: 0;
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
 		padding: 2px 16px 4px;
 		display: flex;
 		align-items: center;
@@ -32,6 +35,7 @@
 		color: var(--text-muted);
 		background: var(--bg-primary);
 		min-height: 20px;
+		z-index: 2;
 	}
 
 	.typing-dots {
