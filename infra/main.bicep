@@ -51,6 +51,9 @@ param voiceSshAllowedSourcePrefix string = ''
 @secure()
 param gitHubToken string = ''
 
+@description('Deploy Azure Cache for Redis for distributed caching and SignalR backplane.')
+param redisEnabled bool = true
+
 @description('HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
 @secure()
 param voiceTurnSecret string = ''
@@ -72,6 +75,7 @@ var keyVaultName = 'kv-${baseName}'
 var containerAppsEnvName = 'cae-${baseName}'
 var apiAppName = 'ca-${baseName}-api'
 var webAppName = 'ca-${baseName}-web'
+var redisCacheName = 'redis-${baseName}'
 var voiceVmName = 'vm-${baseName}-voice'
 
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
@@ -149,6 +153,17 @@ module globalAdminEmailSecret 'modules/key-vault-secret.bicep' = {
     keyVaultName: keyVault.outputs.name
     secretName: 'GlobalAdmin--Email'
     secretValue: globalAdminEmail
+  }
+}
+
+// ── Redis Cache (distributed cache + SignalR backplane) ──────────────────────────
+
+module redisCache 'modules/redis-cache.bicep' = if (redisEnabled) {
+  name: 'redis-cache'
+  params: {
+    name: redisCacheName
+    location: location
+    keyVaultName: keyVault.outputs.name
   }
 }
 
@@ -250,6 +265,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     voiceTurnKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--TurnSecret' : ''
     voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
+    redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
   }
 }
 

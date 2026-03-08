@@ -34,8 +34,9 @@ This guide explains how to deploy Codec on your own infrastructure using Docker 
 
 5. Open `http://localhost:3000` in your browser.
 
-That's it. The `docker-compose.yml` starts four services:
+That's it. The `docker-compose.yml` starts five services:
 - **PostgreSQL 16** — database on port `5433` (internal `5432`)
+- **Redis 8** — distributed cache and SignalR backplane on port `6379`
 - **Azurite** — local blob storage emulator on port `10000`
 - **API** — ASP.NET Core backend on port `5050`
 - **Web** — SvelteKit frontend on port `3000`
@@ -80,6 +81,7 @@ These are configured in `docker-compose.yml` and generally don't need changes fo
 | `Cors__AllowedOrigins__0` | `http://localhost:3000` | Allowed CORS origin (must match web app URL) |
 | `Storage__Provider` | `AzureBlob` | File storage backend: `Local` or `AzureBlob` |
 | `Storage__AzureBlob__ServiceUri` | (Azurite URL) | Blob storage endpoint (Azurite in dev, Azure in prod) |
+| `Redis__ConnectionString` | `redis:6379` | Redis connection string for distributed cache and SignalR backplane |
 
 ### Web Container
 
@@ -316,7 +318,7 @@ Every new user who signs in is automatically joined to "Codec HQ" as a Member.
 | Endpoint | Service | Description |
 |----------|---------|-------------|
 | `http://localhost:5050/health/live` | API | Liveness — process is running |
-| `http://localhost:5050/health/ready` | API | Readiness — database connectivity OK |
+| `http://localhost:5050/health/ready` | API | Readiness — database and Redis connectivity OK |
 | `http://localhost:3000/health` | Web | Liveness — Node.js process running |
 
 ## Updating
