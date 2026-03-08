@@ -2,17 +2,52 @@ name: infra
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [ci]
+    branches: [main]
+    types: [completed]
 
 permissions:
   id-token: write
   contents: read
+  actions: write
 
 concurrency:
-  group: infra-prod
+  group: deploy-prod
   cancel-in-progress: false
 
 jobs:
+  check-infra:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      has-changes: ${{ steps.check.outputs.has-changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for infra changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+            echo "Manual trigger — skipping diff check"
+          else
+            # diff-tree --no-commit-id -r handles both regular and merge commits
+            if git diff-tree --no-commit-id -r HEAD -- 'infra/' | grep -q .; then
+              echo "has-changes=true" >> "$GITHUB_OUTPUT"
+              echo "Infrastructure changes detected"
+            else
+              echo "has-changes=false" >> "$GITHUB_OUTPUT"
+              echo "No infrastructure changes detected"
+            fi
+          fi
+
   deploy-infra:
+    needs: check-infra
+    if: needs.check-infra.outputs.has-changes == 'true'
     runs-on: ubuntu-latest
     environment: prod
     steps:
@@ -26,44 +61,45 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deactivate old container app revisions
+      - name: Resolve current container images
+        id: images
         run: |
-          # Deactivate all old revisions before infrastructure update to prevent conflicts
-          # with secrets and registries being removed during the quickstart phase
-          echo "Checking for active revisions on ca-codec-prod-api..."
-          ACTIVE_API_REVISIONS=$(az containerapp revision list \
+          FALLBACK="mcr.microsoft.com/k8se/quickstart:latest"
+
+          API_IMAGE=$(az containerapp show \
             --name ca-codec-prod-api \
             --resource-group rg-codec-prod \
-            --query "[?properties.active].name" -o tsv 2>/dev/null || echo "")
-          
-          if [ -n "$ACTIVE_API_REVISIONS" ]; then
-            for rev in $ACTIVE_API_REVISIONS; do
-              echo "Deactivating API revision: $rev"
-              az containerapp revision deactivate \
-                --name ca-codec-prod-api \
-                --resource-group rg-codec-prod \
-                --revision "$rev" || echo "Failed to deactivate $rev (may not exist)"
-            done
-          else
-            echo "No active API revisions found or container app doesn't exist yet"
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+          if [ -z "$API_IMAGE" ]; then
+            API_IMAGE="$FALLBACK"
           fi
+          echo "api-image=$API_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "API image: $API_IMAGE"
 
-          echo "Checking for active revisions on ca-codec-prod-web..."
-          ACTIVE_WEB_REVISIONS=$(az containerapp revision list \
+          WEB_IMAGE=$(az containerapp show \
             --name ca-codec-prod-web \
             --resource-group rg-codec-prod \
-            --query "[?properties.active].name" -o tsv 2>/dev/null || echo "")
-          
-          if [ -n "$ACTIVE_WEB_REVISIONS" ]; then
-            for rev in $ACTIVE_WEB_REVISIONS; do
-              echo "Deactivating Web revision: $rev"
-              az containerapp revision deactivate \
-                --name ca-codec-prod-web \
-                --resource-group rg-codec-prod \
-                --revision "$rev" || echo "Failed to deactivate $rev (may not exist)"
-            done
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+          if [ -z "$WEB_IMAGE" ]; then
+            WEB_IMAGE="$FALLBACK"
+          fi
+          echo "web-image=$WEB_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "Web image: $WEB_IMAGE"
+
+      - name: Check if managed certificates exist
+        id: certs
+        run: |
+          CERT_LIST=$(az containerapp env certificate list \
+            --name cae-codec-prod \
+            --resource-group rg-codec-prod \
+            --query "[].name" -o tsv 2>/dev/null || echo "")
+
+          if echo "$CERT_LIST" | grep -q "cert-api" && echo "$CERT_LIST" | grep -q "cert-web"; then
+            echo "certs-exist=true" >> "$GITHUB_OUTPUT"
+            echo "Both managed certificates exist"
           else
-            echo "No active Web revisions found or container app doesn't exist yet"
+            echo "certs-exist=false" >> "$GITHUB_OUTPUT"
+            echo "One or more managed certificates missing"
           fi
 
       - name: Preview infrastructure changes
@@ -80,6 +116,8 @@ jobs:
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
               bindCertificates=true \
+              apiContainerImage='${{ steps.images.outputs.api-image }}' \
+              webContainerImage='${{ steps.images.outputs.web-image }}' \
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
@@ -88,6 +126,7 @@ jobs:
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}'
 
       - name: Deploy infrastructure (register hostnames and create certificates)
+        if: steps.certs.outputs.certs-exist != 'true'
         run: |
           az deployment group create \
             --resource-group rg-codec-prod \
@@ -101,6 +140,8 @@ jobs:
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
               bindCertificates=false \
+              apiContainerImage='${{ steps.images.outputs.api-image }}' \
+              webContainerImage='${{ steps.images.outputs.web-image }}' \
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
@@ -122,6 +163,8 @@ jobs:
               webCustomDomain='codec-chat.com' \
               apiCustomDomain='api.codec-chat.com' \
               bindCertificates=true \
+              apiContainerImage='${{ steps.images.outputs.api-image }}' \
+              webContainerImage='${{ steps.images.outputs.web-image }}' \
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
@@ -136,3 +179,8 @@ jobs:
             --name main \
             --query properties.outputs \
             --output table
+
+      - name: Trigger CD pipeline
+        run: gh workflow run cd.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
