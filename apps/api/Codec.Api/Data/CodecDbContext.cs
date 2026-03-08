@@ -24,6 +24,7 @@ public class CodecDbContext : DbContext
     public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
     public DbSet<VoiceCall> VoiceCalls => Set<VoiceCall>();
     public DbSet<CustomEmoji> CustomEmojis => Set<CustomEmoji>();
+    public DbSet<PresenceState> PresenceStates => Set<PresenceState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -303,5 +304,17 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<CustomEmoji>()
             .Property(e => e.Name)
             .HasMaxLength(32);
+
+        // PresenceState relationships and indexes.
+        modelBuilder.Entity<PresenceState>(entity =>
+        {
+            entity.HasOne(ps => ps.User)
+                .WithMany()
+                .HasForeignKey(ps => ps.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(ps => ps.UserId);
+            entity.HasIndex(ps => ps.ConnectionId);
+        });
     }
 }
