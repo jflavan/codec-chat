@@ -39,7 +39,7 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
     });
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-        ConnectionMultiplexer.Connect(redisConnectionString));
+        ConnectionMultiplexer.Connect($"{redisConnectionString},abortConnect=false"));
 }
 
 builder.Services.AddSingleton<MessageCacheService>();
