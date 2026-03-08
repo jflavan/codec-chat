@@ -15,6 +15,16 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     command: "azurite-blob --blobHost 0.0.0.0 --blobPort 10000"
@@ -35,8 +45,11 @@ services:
       Cors__AllowedOrigins__0: "http://localhost:3000"
       Storage__Provider: "AzureBlob"
       Storage__AzureBlob__ServiceUri: "http://azurite:10000/devstoreaccount1"
+      Redis__ConnectionString: "redis:6379"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
