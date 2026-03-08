@@ -91,6 +91,7 @@
 		{:else if noResults}
 			<p class="search-status">No results found.</p>
 		{:else if app.searchResults && app.searchResults.results.length > 0}
+			<p class="results-count">{app.searchResults.totalCount} result{app.searchResults.totalCount === 1 ? '' : 's'}</p>
 			<div class="results-list">
 				{#each app.searchResults.results as result (result.id)}
 					<SearchResultItem {result} query={app.searchQuery} onJump={handleJump} />
@@ -126,6 +127,8 @@
 			{/if}
 		{:else if app.searchQuery.trim().length < 2 && app.searchQuery.length > 0}
 			<p class="search-status">Type at least 2 characters to search.</p>
+		{:else if app.searchQuery.length === 0}
+			<p class="search-status search-hint">Search messages in {isDm ? 'this conversation' : 'this channel'}</p>
 		{/if}
 	</div>
 </aside>
@@ -215,7 +218,7 @@
 	.search-results {
 		flex: 1;
 		overflow-y: auto;
-		padding: 4px 8px;
+		padding: 4px 12px;
 		scrollbar-width: thin;
 		scrollbar-color: var(--border) transparent;
 	}
@@ -226,6 +229,20 @@
 		font-size: 13px;
 		padding: 24px 12px;
 		margin: 0;
+	}
+
+	.search-hint {
+		color: var(--text-dim);
+	}
+
+	.results-count {
+		margin: 0;
+		padding: 6px 0 4px;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
 	}
 
 	.results-list {
