@@ -738,7 +738,7 @@ export class ApiClient {
 		limit: number = 50
 	): Promise<AroundMessages> {
 		return this.request(
-			`${this.baseUrl}/dm/${encodeURIComponent(dmChannelId)}/messages?around=${encodeURIComponent(messageId)}&limit=${limit}`,
+			`${this.baseUrl}/dm/channels/${encodeURIComponent(dmChannelId)}/messages?around=${encodeURIComponent(messageId)}&limit=${limit}`,
 			{ headers: this.headers(token) }
 		);
 	}
