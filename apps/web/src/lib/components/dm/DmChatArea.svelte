@@ -1050,7 +1050,7 @@
 		font-family: inherit;
 		line-height: 20px;
 		outline: none;
-		min-height: 44px;
+		height: 44px;
 	}
 
 	.composer-input::placeholder { color: var(--text-dim); }
@@ -1369,7 +1369,7 @@
 
 		.dm-chat .composer-input {
 			font-size: 16px;
-			min-height: 44px;
+			height: 44px;
 		}
 
 		.dm-chat .composer-attach,
