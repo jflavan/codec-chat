@@ -256,7 +256,7 @@
 				</svg>
 			</button>
 			<div class="composer-input-wrapper">
-				<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} /></div>
+				<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} customEmojis={app.customEmojis} /></div>
 				<textarea
 					bind:this={inputEl}
 					class="composer-input"
@@ -311,7 +311,7 @@
 <style>
 	.composer {
 		flex-shrink: 0;
-		padding: 0 16px 24px;
+		padding: 8px 16px 24px;
 		display: flex;
 		flex-direction: column;
 		gap: 0;
@@ -375,6 +375,7 @@
 		position: relative;
 		width: 100%;
 		box-sizing: border-box;
+		margin: 0;
 		padding: 12px 16px;
 		border: none;
 		background: transparent;
@@ -384,7 +385,7 @@
 		font-family: inherit;
 		line-height: 20px;
 		outline: none;
-		min-height: 20px;
+		min-height: 44px;
 		resize: none;
 		overflow-y: hidden;
 	}

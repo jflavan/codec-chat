@@ -4,6 +4,7 @@
 	import EmojiPicker from './EmojiPicker.svelte';
 	import { getFrequentEmojis, recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 	import { isNearScrollTop } from '$lib/utils/dom.js';
+	import { CUSTOM_EMOJI_EXACT_REGEX } from '$lib/utils/emoji-regex.js';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	let {
@@ -37,11 +38,10 @@
 
 	const quickEmojis = getFrequentEmojis(8);
 
-	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
 	const customEmojiMap = $derived(new Map(app.customEmojis.map((e) => [e.name.toLowerCase(), e])));
 
 	function getCustomEmoji(emoji: string): CustomEmoji | undefined {
-		const match = CUSTOM_EMOJI_REGEX.exec(emoji);
+		const match = CUSTOM_EMOJI_EXACT_REGEX.exec(emoji);
 		if (!match) return undefined;
 		return customEmojiMap.get(match[1].toLowerCase());
 	}

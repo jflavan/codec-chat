@@ -271,10 +271,10 @@
 		flex-direction: column;
 	}
 
-	/* Mobile: Ensure composer stays at bottom of viewport */
+	/* Mobile: Ensure chat fills the grid cell (parent already sets dvh height) */
 	@media (max-width: 899px) {
 		.chat-main {
-			height: 100vh;
+			height: 100%;
 		}
 	}
 
