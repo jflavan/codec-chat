@@ -27,7 +27,8 @@ builder.Host.UseSerilog((ctx, config) => config
     .ReadFrom.Configuration(ctx.Configuration)
     .WriteTo.Console(new RenderedCompactJsonFormatter()));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    options.Filters.Add(new Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute()));
 
 // Redis distributed cache + direct connection for tracking set operations.
 // Two connections are intentional: AddStackExchangeRedisCache manages its own internal
