@@ -1,12 +1,10 @@
 using System.IO.Compression;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Azure.Identity;
@@ -20,8 +18,11 @@ using StackExchange.Redis;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Services;
+using Codec.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
 
 builder.Host.UseSerilog((ctx, config) => config
     .ReadFrom.Configuration(ctx.Configuration)
@@ -138,14 +139,8 @@ if (!builder.Environment.IsDevelopment())
         throw new InvalidOperationException("Voice:SfuInternalKey must be configured in production.");
 }
 
-var healthChecks = builder.Services.AddHealthChecks()
+builder.Services.AddHealthChecks()
     .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
-
-if (!string.IsNullOrWhiteSpace(redisConnectionString))
-{
-    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"],
-        failureStatus: HealthStatus.Degraded);
-}
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -376,35 +371,6 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 
-// Liveness probe: always 200 — proves the process is running.
-app.MapHealthChecks("/health/live", new HealthCheckOptions
-{
-    Predicate = _ => false,
-    ResponseWriter = WriteHealthResponse
-});
-
-// Readiness probe: includes DB connectivity check.
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = WriteHealthResponse
-});
-
-static Task WriteHealthResponse(HttpContext context, HealthReport report)
-{
-    context.Response.ContentType = "application/json";
-    var result = new
-    {
-        status = report.Status.ToString(),
-        checks = report.Entries.Select(e => new
-        {
-            name = e.Key,
-            status = e.Value.Status.ToString(),
-            description = e.Value.Description
-        })
-    };
-
-    return context.Response.WriteAsJsonAsync(result);
-}
+app.MapDefaultEndpoints();
 
 app.Run();
