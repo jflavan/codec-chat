@@ -438,7 +438,7 @@
 									</div>
 								</div>
 							{:else if message.body}
-								<p class="message-body"><LinkifiedText text={message.body} /></p>
+								<p class="message-body"><LinkifiedText text={message.body} customEmojis={app.customEmojis} /></p>
 							{/if}
 							{#if message.imageUrl}
 								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
@@ -490,7 +490,7 @@
 								</div>
 							{:else if message.body}
 								<p class="message-body">
-									<LinkifiedText text={message.body} />
+									<LinkifiedText text={message.body} customEmojis={app.customEmojis} />
 									{#if message.editedAt}
 										<span class="edited-label">(edited)</span>
 									{/if}
@@ -603,7 +603,7 @@
 				</svg>
 			</button>
 			<div class="composer-input-wrapper">
-				<div class="composer-input-overlay" bind:this={dmOverlayEl} aria-hidden="true"><ComposerOverlay text={app.dmMessageBody} /></div>
+				<div class="composer-input-overlay" bind:this={dmOverlayEl} aria-hidden="true"><ComposerOverlay text={app.dmMessageBody} customEmojis={app.customEmojis} /></div>
 				<input
 					bind:this={dmInputEl}
 					class="composer-input"
@@ -979,7 +979,7 @@
 	/* ───── Composer ───── */
 	.composer {
 		flex-shrink: 0;
-		padding: 0 16px 24px;
+		padding: 8px 16px 24px;
 		display: flex;
 		flex-direction: column;
 		gap: 0;
@@ -1040,6 +1040,7 @@
 		position: relative;
 		width: 100%;
 		box-sizing: border-box;
+		margin: 0;
 		padding: 12px 16px;
 		border: none;
 		background: transparent;
@@ -1049,7 +1050,7 @@
 		font-family: inherit;
 		line-height: 20px;
 		outline: none;
-		min-height: 20px;
+		min-height: 44px;
 	}
 
 	.composer-input::placeholder { color: var(--text-dim); }
