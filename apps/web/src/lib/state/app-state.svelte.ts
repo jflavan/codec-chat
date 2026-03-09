@@ -1,5 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import { tick } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import type {
 	MemberServer,
 	Channel,
@@ -177,7 +178,7 @@ export class AppState {
 	pendingReactionKeys = $state<Set<string>>(new Set());
 
 	/* ───── presence ───── */
-	userPresence = $state<Map<string, PresenceStatus>>(new Map());
+	userPresence = $state(new SvelteMap<string, PresenceStatus>());
 
 	/* ───── voice ───── */
 	activeVoiceChannelId = $state<string | null>(null);
@@ -471,7 +472,7 @@ export class AppState {
 		this.serverSettingsOpen = false;
 		this.replyingTo = null;
 		this.lightboxImageUrl = null;
-		this.userPresence = new Map();
+		this.userPresence = new SvelteMap();
 		this.activeVoiceChannelId = null;
 		this.voiceChannelMembers = new Map();
 		this.isMuted = false;
@@ -2369,7 +2370,9 @@ export class AppState {
 			},
 			onMentionReceived: (event) => {
 				// Track channel→server mapping for badge aggregation
-				this.channelServerMap.set(event.channelId, event.serverId);
+				const mapCopy = new Map(this.channelServerMap);
+				mapCopy.set(event.channelId, event.serverId);
+				this.channelServerMap = mapCopy;
 
 				// Don't increment badge for the channel the user is currently viewing
 				if (event.channelId === this.selectedChannelId) return;
