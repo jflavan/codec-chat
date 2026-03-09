@@ -151,6 +151,7 @@
 		display: grid;
 		grid-template-columns: 72px 240px minmax(0, 1fr) 240px;
 		height: 100vh;
+		height: 100dvh;
 		overflow: hidden;
 	}
 
@@ -192,6 +193,7 @@
 		.app-shell:not(.home-mode) > :global(:nth-child(3)),
 		.app-shell.home-mode > :global(:nth-child(3)) {
 			height: 100vh;
+			height: 100dvh;
 		}
 	}
 

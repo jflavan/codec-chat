@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import type { Reaction, Member, CustomEmoji } from '$lib/types/index.js';
 	import { isNearScrollTop } from '$lib/utils/dom.js';
+	import { CUSTOM_EMOJI_EXACT_REGEX } from '$lib/utils/emoji-regex.js';
 
 	let {
 		reactions,
@@ -19,12 +20,10 @@
 		customEmojis?: CustomEmoji[];
 	} = $props();
 
-	const CUSTOM_EMOJI_REGEX = /^:([a-zA-Z0-9_]{2,32}):$/;
-
 	const customEmojiMap = $derived(new Map(customEmojis.map((e) => [e.name.toLowerCase(), e])));
 
 	function getCustomEmoji(emoji: string): CustomEmoji | undefined {
-		const match = CUSTOM_EMOJI_REGEX.exec(emoji);
+		const match = CUSTOM_EMOJI_EXACT_REGEX.exec(emoji);
 		if (!match) return undefined;
 		return customEmojiMap.get(match[1].toLowerCase());
 	}
