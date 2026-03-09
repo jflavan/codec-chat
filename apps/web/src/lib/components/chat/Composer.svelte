@@ -170,6 +170,10 @@
 		input.value = '';
 	}
 
+	$effect(() => {
+		if (inputEl) autoResize();
+	});
+
 	function handlePaste(e: ClipboardEvent) {
 		const items = e.clipboardData?.items;
 		if (!items) return;
@@ -385,7 +389,7 @@
 		font-family: inherit;
 		line-height: 20px;
 		outline: none;
-		min-height: 44px;
+		height: 44px;
 		resize: none;
 		overflow-y: hidden;
 	}
@@ -633,7 +637,6 @@
 
 		.composer-input {
 			font-size: 16px;
-			min-height: 44px;
 			padding: 12px 16px;
 			resize: none;
 		}
