@@ -29,7 +29,12 @@ import {
 	isTokenExpired,
 	isSessionExpired
 } from '$lib/auth/session.js';
-import { initGoogleIdentity, renderGoogleButton, requestFreshToken } from '$lib/auth/google.js';
+import {
+	initGoogleIdentity,
+	renderGoogleButton,
+	requestFreshToken,
+	consumeRedirectCredential
+} from '$lib/auth/google.js';
 import { getTheme, applyTheme, type ThemeId } from '$lib/utils/theme.js';
 
 const CTX_KEY = Symbol('app-state');
@@ -376,6 +381,14 @@ export class AppState {
 		applyTheme(this.theme);
 		this._loadUserVolumes();
 		this._loadVoicePreferences();
+
+		// Check for credential from Google redirect flow (Android PWA)
+		const redirectCredential = consumeRedirectCredential();
+		if (redirectCredential) {
+			this.handleCredential(redirectCredential);
+			return;
+		}
+
 		if (!isSessionExpired()) {
 			const stored = loadStoredToken();
 			if (stored && !isTokenExpired(stored)) {
