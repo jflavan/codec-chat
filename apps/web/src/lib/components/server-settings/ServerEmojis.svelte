@@ -10,6 +10,7 @@
 	let selectedFile = $state<File | null>(null);
 	let filePreviewUrl = $state('');
 	let fileInputEl = $state<HTMLInputElement>();
+	let fileInputKey = $state(0);
 
 	// Rename state
 	let renamingId = $state('');
@@ -42,7 +43,7 @@
 		selectedFile = null;
 		if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
 		filePreviewUrl = '';
-		if (fileInputEl) fileInputEl.value = '';
+		fileInputKey++;
 	}
 
 	function startRename(id: string, currentName: string) {
@@ -101,13 +102,15 @@
 			<div class="form-group">
 				<span class="label" id="emoji-image-label">Image</span>
 				<div class="file-select-area" role="group" aria-labelledby="emoji-image-label">
-					<input
-						bind:this={fileInputEl}
-						type="file"
-						accept="image/png,image/jpeg,image/webp,image/gif"
-						class="hidden-file-input"
-						onchange={handleFileSelect}
-					/>
+					{#key fileInputKey}
+						<input
+							bind:this={fileInputEl}
+							type="file"
+							accept="image/png,image/jpeg,image/webp,image/gif"
+							class="hidden-file-input"
+							onchange={handleFileSelect}
+						/>
+					{/key}
 					<button type="button" class="btn-secondary" onclick={() => fileInputEl?.click()}>
 						{selectedFile ? selectedFile.name : 'Choose File'}
 					</button>
