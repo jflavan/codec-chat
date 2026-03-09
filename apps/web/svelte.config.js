@@ -17,6 +17,7 @@ const config = {
 				'connect-src': ['self'],
 				'object-src': ['none'],
 				'base-uri': ['self'],
+				'form-action': ['self', 'https://accounts.google.com'],
 				'worker-src': ['self']
 			}
 		}
