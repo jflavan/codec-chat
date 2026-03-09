@@ -128,8 +128,20 @@
 			}
 		}
 		container?.addEventListener('load', handleContentLoad, true);
+
+		// Keep the feed pinned to the bottom when the container shrinks (e.g. the
+		// composer grows taller as the user adds line breaks). Without this, the
+		// visible area shrinks from the bottom and recent messages scroll out of view.
+		const resizeObserver = new ResizeObserver(() => {
+			if (isLockedToBottom && !isAtBottom()) {
+				scrollToBottom(true);
+			}
+		});
+		if (container) resizeObserver.observe(container);
+
 		return () => {
 			container?.removeEventListener('load', handleContentLoad, true);
+			resizeObserver.disconnect();
 		};
 	});
 
