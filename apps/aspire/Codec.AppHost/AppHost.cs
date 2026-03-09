@@ -2,7 +2,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume()
-    .AddDatabase("codec-dev");
+    .AddDatabase("Default");
 
 var redis = builder.AddRedis("redis");
 
@@ -16,6 +16,9 @@ var api = builder.AddProject<Projects.Codec_Api>("api")
     .WithReference(blobs)
     .WaitFor(postgres)
     .WaitFor(redis)
+    // The API reads Redis from "Redis:ConnectionString" (not the standard ConnectionStrings section),
+    // so map the Aspire-injected connection string to the key the API expects.
+    .WithEnvironment("Redis__ConnectionString", redis.Resource.ConnectionStringExpression)
     .WithHttpHealthCheck("/health/ready");
 
 builder.AddViteApp("web", "../../web")
