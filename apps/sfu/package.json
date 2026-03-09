@@ -11,6 +11,11 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.55.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.57.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
+    "@opentelemetry/sdk-node": "^0.57.0",
     "express": "^5.0.3",
     "express-rate-limit": "^7.5.0",
     "mediasoup": "^3.14.19"

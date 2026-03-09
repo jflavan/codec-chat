@@ -1,6 +1,9 @@
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { Router } from 'express';
 import type { Worker, WebRtcTransport, Producer, Consumer, DtlsParameters, MediaKind, RtpParameters, RtpCapabilities } from 'mediasoup/types';
 import { MEDIA_CODECS, WEBRTC_TRANSPORT_OPTIONS } from './worker.js';
+
+const tracer = trace.getTracer('codec-sfu');
 
 interface Participant {
   sendTransport?: WebRtcTransport;
@@ -34,11 +37,22 @@ export function createRoomRouter(worker: Worker): Router {
     const { roomId } = req.params;
     let room = rooms.get(roomId);
     if (!room) {
-      const sfuRouter = await worker.createRouter({ mediaCodecs: MEDIA_CODECS });
-      room = { router: sfuRouter, participants: new Map() };
-      rooms.set(roomId, room);
+      await tracer.startActiveSpan('sfu.room.create', async (span) => {
+        try {
+          span.setAttribute('room.id', roomId);
+          const sfuRouter = await worker.createRouter({ mediaCodecs: MEDIA_CODECS });
+          room = { router: sfuRouter, participants: new Map() };
+          rooms.set(roomId, room);
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+          throw err;
+        } finally {
+          span.end();
+        }
+      });
     }
-    res.json({ routerRtpCapabilities: room.router.rtpCapabilities });
+    res.json({ routerRtpCapabilities: room!.router.rtpCapabilities });
   });
 
   /* ── DELETE /rooms/:roomId ── close room ── */
@@ -46,8 +60,19 @@ export function createRoomRouter(worker: Worker): Router {
     const { roomId } = req.params;
     const room = rooms.get(roomId);
     if (room) {
-      room.router.close();
-      rooms.delete(roomId);
+      tracer.startActiveSpan('sfu.room.destroy', (span) => {
+        try {
+          span.setAttribute('room.id', roomId);
+          room.router.close();
+          rooms.delete(roomId);
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+          throw err;
+        } finally {
+          span.end();
+        }
+      });
     }
     res.status(204).send();
   });
@@ -67,22 +92,36 @@ export function createRoomRouter(worker: Worker): Router {
     const room = rooms.get(roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
-    const transport = await room.router.createWebRtcTransport(WEBRTC_TRANSPORT_OPTIONS);
+    await tracer.startActiveSpan('sfu.transport.create', async (span) => {
+      try {
+        span.setAttribute('room.id', roomId);
+        span.setAttribute('participant.id', participantId);
+        span.setAttribute('transport.direction', direction);
 
-    const participant = getOrCreateParticipant(room, participantId);
-    if (direction === 'send') {
-      participant.sendTransport?.close();
-      participant.sendTransport = transport;
-    } else {
-      participant.recvTransport?.close();
-      participant.recvTransport = transport;
-    }
+        const transport = await room.router.createWebRtcTransport(WEBRTC_TRANSPORT_OPTIONS);
 
-    res.json({
-      id: transport.id,
-      iceParameters: transport.iceParameters,
-      iceCandidates: transport.iceCandidates,
-      dtlsParameters: transport.dtlsParameters,
+        const participant = getOrCreateParticipant(room, participantId);
+        if (direction === 'send') {
+          participant.sendTransport?.close();
+          participant.sendTransport = transport;
+        } else {
+          participant.recvTransport?.close();
+          participant.recvTransport = transport;
+        }
+
+        res.json({
+          id: transport.id,
+          iceParameters: transport.iceParameters,
+          iceCandidates: transport.iceCandidates,
+          dtlsParameters: transport.dtlsParameters,
+        });
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        throw err;
+      } finally {
+        span.end();
+      }
     });
   });
 
@@ -134,16 +173,31 @@ export function createRoomRouter(worker: Worker): Router {
       return res.status(403).json({ error: 'Transport not found or not owned by participant' });
     }
 
-    participant.producer?.close();
-    const producer = await participant.sendTransport.produce({ kind, rtpParameters });
-    participant.producer = producer;
+    await tracer.startActiveSpan('sfu.producer.create', async (span) => {
+      try {
+        span.setAttribute('room.id', roomId);
+        span.setAttribute('participant.id', participantId);
+        span.setAttribute('media.kind', kind);
 
-    producer.on('transportclose', () => {
-      producer.close();
-      participant.producer = undefined;
+        participant.producer?.close();
+        const producer = await participant.sendTransport!.produce({ kind, rtpParameters });
+        participant.producer = producer;
+
+        producer.on('transportclose', () => {
+          producer.close();
+          participant.producer = undefined;
+        });
+
+        span.setAttribute('producer.id', producer.id);
+        res.json({ producerId: producer.id });
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        throw err;
+      } finally {
+        span.end();
+      }
     });
-
-    res.json({ producerId: producer.id });
   });
 
   /* ── POST /rooms/:roomId/consumers ── create a consumer for a producer ── */
@@ -179,27 +233,42 @@ export function createRoomRouter(worker: Worker): Router {
       return res.status(403).json({ error: 'Recv transport not found or not owned by participant' });
     }
 
-    const consumer = await consumerParticipant.recvTransport!.consume({
-      producerId,
-      rtpCapabilities,
-      paused: false, // Start unpaused so RTP flows immediately to the client.
-    });
+    await tracer.startActiveSpan('sfu.consumer.create', async (span) => {
+      try {
+        span.setAttribute('room.id', roomId);
+        span.setAttribute('participant.id', participantId);
+        span.setAttribute('producer.id', producerId);
 
-    consumerParticipant.consumers.set(consumer.id, consumer);
-    consumer.on('transportclose', () => {
-      consumer.close();
-      consumerParticipant.consumers.delete(consumer.id);
-    });
-    consumer.on('producerclose', () => {
-      consumer.close();
-      consumerParticipant.consumers.delete(consumer.id);
-    });
+        const consumer = await consumerParticipant.recvTransport!.consume({
+          producerId,
+          rtpCapabilities,
+          paused: false, // Start unpaused so RTP flows immediately to the client.
+        });
 
-    res.json({
-      id: consumer.id,
-      producerId,
-      kind: consumer.kind,
-      rtpParameters: consumer.rtpParameters,
+        consumerParticipant.consumers.set(consumer.id, consumer);
+        consumer.on('transportclose', () => {
+          consumer.close();
+          consumerParticipant.consumers.delete(consumer.id);
+        });
+        consumer.on('producerclose', () => {
+          consumer.close();
+          consumerParticipant.consumers.delete(consumer.id);
+        });
+
+        span.setAttribute('consumer.id', consumer.id);
+        res.json({
+          id: consumer.id,
+          producerId,
+          kind: consumer.kind,
+          rtpParameters: consumer.rtpParameters,
+        });
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        throw err;
+      } finally {
+        span.end();
+      }
     });
   });
 
