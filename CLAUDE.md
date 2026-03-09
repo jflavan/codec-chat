@@ -51,13 +51,14 @@ dotnet ef migrations script                # View SQL
 ### Repository Layout
 ```
 apps/
-  api/Codec.Api/     # ASP.NET Core 10 Web API
-    Controllers/     # One controller per resource area
-    Models/          # EF Core entities + request DTOs
-    Data/            # CodecDbContext, SeedData, DesignTimeDbContextFactory
-    Hubs/            # ChatHub (SignalR)
-    Services/        # UserService, AvatarService, ImageUploadService, LinkPreviewService, file storage
-    Migrations/      # EF Core code-first migrations
+  api/
+    Codec.Api/       # ASP.NET Core 10 Web API
+      Controllers/   # One controller per resource area
+      Models/        # EF Core entities + request DTOs
+      Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
+      Hubs/          # ChatHub (SignalR)
+      Services/      # UserService, AvatarService, ImageUploadService, LinkPreviewService, file storage
+      Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
   aspire/
     Codec.AppHost/   # Aspire orchestrator (local dev only)

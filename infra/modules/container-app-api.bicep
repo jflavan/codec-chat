@@ -32,7 +32,7 @@ param gitHubTokenKvUrl string = ''
 @description('Key Vault secret URL for the Redis connection string. Leave empty to disable Redis caching and SignalR backplane.')
 param redisConnectionStringKvUrl string = ''
 
-@description('Application Insights connection string for OpenTelemetry export. Leave empty to disable.')
+@description('Application Insights connection string for OpenTelemetry export. Leave empty to disable. Passed as a plain value (not Key Vault) because the ingestion key is write-only and not a security-sensitive credential.')
 param appInsightsConnectionString string = ''
 
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
