@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	const app = getAppState();
@@ -19,6 +20,11 @@
 	// Delete confirmation state
 	let deletingId = $state('');
 
+	// Inline upload error state
+	let uploadError = $state('');
+	let errorTimeout: ReturnType<typeof setTimeout> | undefined;
+	onDestroy(() => clearTimeout(errorTimeout));
+
 	const nameValid = $derived(/^[a-zA-Z0-9_]{2,32}$/.test(emojiName));
 	const canUpload = $derived(
 		nameValid && selectedFile !== null && !app.isUploadingEmoji && app.customEmojis.length < MAX_EMOJIS
@@ -37,13 +43,20 @@
 
 	async function handleUpload() {
 		if (!canUpload || !selectedFile) return;
-		await app.uploadCustomEmoji(emojiName, selectedFile);
-		// Reset form
-		emojiName = '';
-		selectedFile = null;
-		if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
-		filePreviewUrl = '';
-		fileInputKey++;
+		uploadError = '';
+		clearTimeout(errorTimeout);
+		try {
+			await app.uploadCustomEmoji(emojiName, selectedFile);
+			// Reset form only on success
+			emojiName = '';
+			selectedFile = null;
+			if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+			filePreviewUrl = '';
+			fileInputKey++;
+		} catch (e) {
+			uploadError = e instanceof Error ? e.message : 'Upload failed. Please try again.';
+			errorTimeout = setTimeout(() => { uploadError = ''; }, 5000);
+		}
 	}
 
 	function startRename(id: string, currentName: string) {
@@ -118,7 +131,7 @@
 						<img src={filePreviewUrl} alt="Preview" class="upload-preview" />
 					{/if}
 				</div>
-				<span class="form-hint">PNG, JPEG, WebP, or GIF. Max 256KB.</span>
+				<span class="form-hint">PNG, JPEG, WebP, or GIF. Max 512KB.</span>
 			</div>
 		</div>
 		<button
@@ -129,6 +142,9 @@
 		>
 			{app.isUploadingEmoji ? 'Uploading...' : 'Upload Emoji'}
 		</button>
+		{#if uploadError}
+			<p class="upload-error" role="alert">{uploadError}</p>
+		{/if}
 	</div>
 
 	<!-- Emoji list -->
@@ -278,6 +294,12 @@
 		height: 32px;
 		object-fit: contain;
 		border-radius: 4px;
+	}
+
+	.upload-error {
+		color: var(--danger);
+		font-size: 13px;
+		margin: 8px 0 0;
 	}
 
 	.emoji-list {
