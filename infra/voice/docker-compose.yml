@@ -22,6 +22,8 @@ services:
       RTC_MAX_PORT: "40100"
       SFU_PORT: "3001"
       SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+      OTEL_SERVICE_NAME: "codec-sfu"
 
   coturn:
     # Pinned to a specific version tag (4.6.2). Note: this is a mutable tag, not a digest pin.
