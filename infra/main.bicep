@@ -77,6 +77,7 @@ var apiAppName = 'ca-${baseName}-api'
 var webAppName = 'ca-${baseName}-web'
 var redisCacheName = 'redis-${baseName}'
 var voiceVmName = 'vm-${baseName}-voice'
+var appInsightsName = 'appi-${baseName}'
 
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
 var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
@@ -89,6 +90,15 @@ module logAnalytics 'modules/log-analytics.bicep' = {
   params: {
     name: logAnalyticsName
     location: location
+  }
+}
+
+module appInsights 'modules/application-insights.bicep' = {
+  name: 'application-insights'
+  params: {
+    name: appInsightsName
+    location: location
+    logAnalyticsWorkspaceId: logAnalytics.outputs.id
   }
 }
 
@@ -266,6 +276,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
+    appInsightsConnectionString: appInsights.outputs.connectionString
   }
 }
 
@@ -297,3 +308,4 @@ output voiceVmPublicIp string = voiceVm.?outputs.publicIpAddress ?? ''
 output voiceVmFqdn string = voiceVm.?outputs.fqdn ?? ''
 output sfuApiUrl string = voiceVm.?outputs.sfuApiUrl ?? ''
 output turnServerUrl string = voiceVm.?outputs.turnServerUrl ?? ''
+output appInsightsConnectionString string = appInsights.outputs.connectionString

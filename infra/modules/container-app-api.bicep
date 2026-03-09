@@ -32,6 +32,9 @@ param gitHubTokenKvUrl string = ''
 @description('Key Vault secret URL for the Redis connection string. Leave empty to disable Redis caching and SignalR backplane.')
 param redisConnectionStringKvUrl string = ''
 
+@description('Application Insights connection string for OpenTelemetry export. Leave empty to disable.')
+param appInsightsConnectionString string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -201,6 +204,15 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Redis__ConnectionString'
               secretRef: 'redis-connection-string'
+            }
+          ] : [], appInsightsConnectionString != '' ? [
+            {
+              name: 'OTEL_SERVICE_NAME'
+              value: 'codec-api'
+            }
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsightsConnectionString
             }
           ] : [])
           probes: [
