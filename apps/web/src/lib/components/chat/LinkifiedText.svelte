@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Mention, CustomEmoji } from '$lib/types/index.js';
+	import { CUSTOM_EMOJI_GLOBAL_REGEX } from '$lib/utils/emoji-regex.js';
 
 	let { text, mentions = [], customEmojis = [] }: { text: string; mentions?: Mention[]; customEmojis?: CustomEmoji[] } = $props();
 
@@ -43,8 +44,6 @@
 		return parts.length > 0 ? parts : [{ type: 'text', value }];
 	}
 
-	const CUSTOM_EMOJI_REGEX = /:([a-zA-Z0-9_]{2,32}):/g;
-
 	function parseCustomEmojis(segs: TextSegment[], emojiMap: Map<string, CustomEmoji>): TextSegment[] {
 		if (emojiMap.size === 0) return segs;
 
@@ -56,7 +55,7 @@
 			}
 
 			let lastIndex = 0;
-			for (const match of seg.value.matchAll(CUSTOM_EMOJI_REGEX)) {
+			for (const match of seg.value.matchAll(CUSTOM_EMOJI_GLOBAL_REGEX)) {
 				const name = match[1].toLowerCase();
 				const emoji = emojiMap.get(name);
 				if (!emoji) continue;
