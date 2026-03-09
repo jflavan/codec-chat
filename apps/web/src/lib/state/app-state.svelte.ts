@@ -2602,7 +2602,9 @@ export class AppState {
 			},
 			onCustomEmojiAdded: (event) => {
 				if (this.selectedServerId === event.serverId) {
-					this.customEmojis = [...this.customEmojis, event.emoji];
+					if (!this.customEmojis.some(e => e.id === event.emoji.id)) {
+						this.customEmojis = [...this.customEmojis, event.emoji];
+					}
 				}
 			},
 			onCustomEmojiUpdated: (event) => {
