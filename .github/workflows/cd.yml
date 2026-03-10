@@ -117,6 +117,15 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Fetch App Insights connection string
+        id: appinsights
+        run: |
+          CONN_STR=$(az monitor app-insights component show \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --app appi-codec-prod \
+            --query connectionString -o tsv 2>/dev/null || echo "")
+          echo "connection-string=$CONN_STR" >> "$GITHUB_OUTPUT"
+
       - name: Substitute variables in docker-compose template
         env:
           ACR_SERVER: ${{ env.ACR_NAME }}.azurecr.io
@@ -124,8 +133,9 @@ jobs:
           ANNOUNCED_IP: ${{ secrets.VOICE_VM_IP }}
           TURN_SECRET: ${{ secrets.VOICE_TURN_SECRET }}
           SFU_INTERNAL_KEY: ${{ secrets.VOICE_SFU_INTERNAL_KEY }}
+          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ steps.appinsights.outputs.connection-string }}
         run: |
-          envsubst '${ACR_SERVER} ${IMAGE_TAG} ${ANNOUNCED_IP} ${TURN_SECRET} ${SFU_INTERNAL_KEY}' \
+          envsubst '${ACR_SERVER} ${IMAGE_TAG} ${ANNOUNCED_IP} ${TURN_SECRET} ${SFU_INTERNAL_KEY} ${APPLICATIONINSIGHTS_CONNECTION_STRING}' \
             < infra/voice/docker-compose.yml \
             | base64 -w 0 > /tmp/compose-b64.txt
 
