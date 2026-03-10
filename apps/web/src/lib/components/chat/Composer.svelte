@@ -143,17 +143,20 @@
 		syncOverlayScroll();
 	}
 
-	const BASE_HEIGHT = 38; // must match .composer-input CSS height
-
 	function autoResize(): void {
 		if (!inputEl) return;
-		// Reset to single-line height so scrollHeight reflects true content size.
-		// Using 'auto' here causes browsers to use the rows attr default, which can
-		// be taller than our desired baseline.
-		inputEl.style.height = `${BASE_HEIGHT}px`;
-		const maxHeight = LINE_HEIGHT * MAX_LINES + (BASE_HEIGHT - LINE_HEIGHT);
+		// Clear any inline height so the CSS-defined height applies for measurement.
+		inputEl.style.height = '';
+		const cssHeight = inputEl.offsetHeight;
 		const scrollHeight = inputEl.scrollHeight;
-		inputEl.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+		const maxHeight = LINE_HEIGHT * MAX_LINES + (cssHeight - LINE_HEIGHT);
+
+		// Only set an inline height if content genuinely needs more than one line.
+		// Browsers may report scrollHeight a few pixels larger than offsetHeight
+		// even for single-line content, so require at least half a line of overflow.
+		if (scrollHeight > cssHeight + LINE_HEIGHT * 0.5) {
+			inputEl.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+		}
 		inputEl.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
 	}
 
