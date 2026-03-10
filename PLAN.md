@@ -41,6 +41,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Global admin: Configurable via `GlobalAdmin:Email` setting (Key Vault in production, appsettings in development); has full access to all servers — can see all servers, read/post/react in any channel, manage channels and invites, rename servers, delete any server/channel/message, and kick any member
 - File storage: Azure Blob Storage (production), local disk (development)
 - Logging: Serilog with structured JSON → Log Analytics
+- Observability: OpenTelemetry (traces, metrics, logs) via Codec.ServiceDefaults; Azure Monitor / Application Insights in production
+- Local dev: .NET Aspire AppHost for single-command orchestration
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
@@ -72,6 +74,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **Custom server emojis** — CRUD endpoints for custom emoji management (upload, list, rename, delete); 256 KB max, 50 per server; content-addressed storage; real-time SignalR sync
 - **Server admin role management** — PATCH endpoint to promote/demote members; Owner can promote Members to Admin and demote Admins to Member; Admins can promote Members but not demote other Admins; Members tab in server settings with promote/demote UI; Owner/Admin role badges in member sidebar; real-time `MemberRoleChanged` SignalR event
 - **DM reactions** — Reaction entity extended with nullable DirectMessageId (mutual exclusivity constraint with MessageId) to support emoji reactions on direct messages
+- **.NET Aspire AppHost** — single-command local dev orchestration (Postgres, Redis, Azurite, API, Web) with dashboard at `https://localhost:17222`
+- **OpenTelemetry observability** — `Codec.ServiceDefaults` shared project with distributed traces, metrics, and structured logs; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard; SFU instrumented with custom spans on room/transport/producer/consumer operations; Application Insights Bicep module wired to API container app; CD pipeline passes connection string to voice VM
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`

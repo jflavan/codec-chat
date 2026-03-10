@@ -2,6 +2,7 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
@@ -139,8 +140,14 @@ if (!builder.Environment.IsDevelopment())
         throw new InvalidOperationException("Voice:SfuInternalKey must be configured in production.");
 }
 
-builder.Services.AddHealthChecks()
+var healthChecks = builder.Services.AddHealthChecks()
     .AddDbContextCheck<CodecDbContext>("database", tags: ["ready"]);
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"],
+        failureStatus: HealthStatus.Degraded);
+}
 
 builder.Services.AddRateLimiter(options =>
 {
