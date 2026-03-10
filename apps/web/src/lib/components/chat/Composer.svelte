@@ -384,6 +384,7 @@
 	}
 
 	.composer-input {
+		display: block;
 		position: relative;
 		width: 100%;
 		box-sizing: border-box;
