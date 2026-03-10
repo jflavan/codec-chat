@@ -49,14 +49,24 @@ async function createSdk(): Promise<NodeSDK | null> {
   return null;
 }
 
-const sdk = await createSdk();
+let sdk: NodeSDK | null = null;
+try {
+  sdk = await createSdk();
+} catch (err) {
+  console.error('Failed to initialize OpenTelemetry — continuing without telemetry', err);
+}
 
 if (sdk) {
   sdk.start();
   const target = appInsightsCs ? 'Azure Monitor' : otlpEndpoint;
   console.log(`OpenTelemetry initialized — exporting to ${target}`);
 
-  process.on('SIGTERM', () => sdk.shutdown());
+  const shutdown = async () => {
+    await sdk!.shutdown();
+    process.exit(0);
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 } else {
   console.log('OpenTelemetry disabled — no APPLICATIONINSIGHTS_CONNECTION_STRING or OTEL_EXPORTER_OTLP_ENDPOINT set');
 }

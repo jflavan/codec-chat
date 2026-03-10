@@ -97,7 +97,7 @@ This document tracks implemented and planned features for Codec.
 
 ### API & Infrastructure
 - Controller-based RESTful API with `[Authorize]` on all endpoints
-- Health endpoints: `/health/live` (liveness), `/health/ready` (readiness + DB + Redis check)
+- Health endpoints: `/health/live` (liveness), `/health/ready` (readiness + DB + Redis check), `/alive` (simple alive check)
 - Redis distributed cache — message history pages cached with 5-minute TTL; channel-level invalidation on send, edit, delete, purge, and reactions; graceful degradation when Redis is unavailable
 - SignalR Redis backplane — enables real-time events across multiple API instances for horizontal scaling
 - Rate limiting — fixed window, 100 req/min (429 on exceed)
@@ -107,6 +107,9 @@ This document tracks implemented and planned features for Codec.
 - Global exception handler with RFC 7807 ProblemDetails responses
 - EF Core with automatic migrations (dev) and migration bundles (prod CD pipeline)
 - Azure deployment: Container Apps, Key Vault secrets, Bicep IaC, GitHub Actions CI/CD
+- .NET Aspire AppHost for single-command local dev orchestration (Postgres, Redis, Azurite, API, Web; dashboard at `https://localhost:17222`)
+- OpenTelemetry observability — distributed traces, metrics, and structured logs exported to Azure Monitor (Application Insights) in production and OTLP (Aspire dashboard) locally
+- SFU telemetry — custom spans on room/transport/producer/consumer operations with Azure Monitor export
 
 ## Planned
 

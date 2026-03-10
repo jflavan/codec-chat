@@ -20,7 +20,6 @@ public static class Extensions
         builder.Services.AddServiceDiscovery();
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            http.AddStandardResilienceHandler();
             http.AddServiceDiscovery();
         });
 
@@ -95,6 +94,10 @@ public static class Extensions
                 .WithMetrics(metrics => metrics.AddAzureMonitorMetricExporter(o =>
                     o.ConnectionString = appInsightsConnectionString))
                 .WithTracing(tracing => tracing.AddAzureMonitorTraceExporter(o =>
+                    o.ConnectionString = appInsightsConnectionString));
+
+            builder.Logging.AddOpenTelemetry(logging =>
+                logging.AddAzureMonitorLogExporter(o =>
                     o.ConnectionString = appInsightsConnectionString));
         }
 

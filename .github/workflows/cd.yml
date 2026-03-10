@@ -124,6 +124,9 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --app appi-codec-prod \
             --query connectionString -o tsv 2>/dev/null || echo "")
+          if [ -z "$CONN_STR" ]; then
+            echo "::warning::Could not fetch App Insights connection string — SFU telemetry will be disabled"
+          fi
           echo "connection-string=$CONN_STR" >> "$GITHUB_OUTPUT"
 
       - name: Substitute variables in docker-compose template
