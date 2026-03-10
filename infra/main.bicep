@@ -308,4 +308,3 @@ output voiceVmPublicIp string = voiceVm.?outputs.publicIpAddress ?? ''
 output voiceVmFqdn string = voiceVm.?outputs.fqdn ?? ''
 output sfuApiUrl string = voiceVm.?outputs.sfuApiUrl ?? ''
 output turnServerUrl string = voiceVm.?outputs.turnServerUrl ?? ''
-output appInsightsConnectionString string = appInsights.outputs.connectionString
