@@ -22,7 +22,6 @@ var api = builder.AddProject<Projects.Codec_Api>("api")
     .WithHttpHealthCheck("/health/ready");
 
 builder.AddViteApp("web", "../../web")
-    .WithHttpEndpoint(port: 5174, env: "PORT")
     .WithReference(api)
     .WaitFor(api);
 
