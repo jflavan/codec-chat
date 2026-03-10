@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY Codec.Api/Codec.Api.csproj Codec.Api/
+COPY Codec.ServiceDefaults/Codec.ServiceDefaults.csproj Codec.ServiceDefaults/
 RUN dotnet restore Codec.Api/Codec.Api.csproj
 COPY . .
 WORKDIR /src/Codec.Api
