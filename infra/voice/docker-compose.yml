@@ -8,6 +8,7 @@
 #   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
 #   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
 #   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
+#   APPLICATIONINSIGHTS_CONNECTION_STRING — App Insights connection string for OTel export
 
 services:
   sfu:
@@ -22,7 +23,7 @@ services:
       RTC_MAX_PORT: "40100"
       SFU_PORT: "3001"
       SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+      APPLICATIONINSIGHTS_CONNECTION_STRING: "${APPLICATIONINSIGHTS_CONNECTION_STRING}"
       OTEL_SERVICE_NAME: "codec-sfu"
 
   coturn:
