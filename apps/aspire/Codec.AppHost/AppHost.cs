@@ -11,17 +11,16 @@ var storage = builder.AddAzureStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 
 var api = builder.AddProject<Projects.Codec_Api>("api")
+    .WithEndpoint("http", e => { e.Port = 5050; e.IsProxied = false; })
     .WithReference(postgres)
     .WithReference(redis)
     .WithReference(blobs)
     .WaitFor(postgres)
     .WaitFor(redis)
-    // The API reads Redis from "Redis:ConnectionString" (not the standard ConnectionStrings section),
-    // so map the Aspire-injected connection string to the key the API expects.
-    .WithEnvironment("Redis__ConnectionString", redis.Resource.ConnectionStringExpression)
     .WithHttpHealthCheck("/health/ready");
 
-builder.AddViteApp("web", "../../web")
+var web = builder.AddViteApp("web", "../../web")
+    .WithEndpoint("http", e => { e.Port = 5174; e.IsProxied = false; })
     .WithReference(api)
     .WaitFor(api);
 

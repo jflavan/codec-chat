@@ -36,16 +36,29 @@ builder.Services.AddControllers(options =>
 // Two connections are intentional: AddStackExchangeRedisCache manages its own internal
 // ConnectionMultiplexer, while the IConnectionMultiplexer singleton is needed for Redis SET
 // operations (tracking keys for bulk invalidation) that IDistributedCache does not support.
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+// Prefer the standard Aspire-injected connection string (includes ssl=true for TLS containers),
+// falling back to the legacy Redis:ConnectionString key for non-Aspire environments.
+var redisConnectionString = builder.Configuration.GetConnectionString("redis")
+    ?? builder.Configuration["Redis:ConnectionString"];
+ConfigurationOptions? redisOptions = null;
 if (!string.IsNullOrWhiteSpace(redisConnectionString))
 {
+    redisOptions = ConfigurationOptions.Parse(redisConnectionString);
+
+    // In development, Aspire's Redis container uses a self-signed TLS certificate.
+    // Accept it so the connection succeeds locally.
+    if (builder.Environment.IsDevelopment())
+    {
+        redisOptions.CertificateValidation += (_, _, _, _) => true;
+    }
+
     builder.Services.AddStackExchangeRedisCache(options =>
     {
-        options.Configuration = redisConnectionString;
+        options.ConfigurationOptions = redisOptions;
     });
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-        ConnectionMultiplexer.Connect(redisConnectionString));
+        ConnectionMultiplexer.Connect(redisOptions));
 }
 
 builder.Services.AddSingleton<MessageCacheService>();
@@ -56,10 +69,11 @@ var signalRBuilder = builder.Services.AddSignalR()
         options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
-if (!string.IsNullOrWhiteSpace(redisConnectionString))
+if (redisOptions is not null)
 {
-    signalRBuilder.AddStackExchangeRedis(redisConnectionString, options =>
+    signalRBuilder.AddStackExchangeRedis(options =>
     {
+        options.Configuration = redisOptions;
         options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("codec");
     });
 }
@@ -145,7 +159,8 @@ var healthChecks = builder.Services.AddHealthChecks()
 
 if (!string.IsNullOrWhiteSpace(redisConnectionString))
 {
-    healthChecks.AddRedis(redisConnectionString, name: "redis", tags: ["ready"],
+    healthChecks.AddRedis(sp => sp.GetRequiredService<IConnectionMultiplexer>(),
+        name: "redis", tags: ["ready"],
         failureStatus: HealthStatus.Degraded);
 }
 
