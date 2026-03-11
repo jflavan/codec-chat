@@ -176,19 +176,86 @@ jobs:
               docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
             "
 
+      - name: Ensure nginx TLS proxy is configured
+        run: |
+          az vm run-command invoke \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VOICE_VM_NAME }} \
+            --command-id RunShellScript \
+            --scripts "
+              set -e
+              if command -v nginx &>/dev/null && [ -f /etc/letsencrypt/live/sfu.codec-chat.com/fullchain.pem ]; then
+                echo 'nginx + certbot already configured, reloading'
+                systemctl reload nginx
+                exit 0
+              fi
+
+              echo 'Installing nginx and certbot...'
+              apt-get update -qq
+              apt-get install -y -qq nginx certbot python3-certbot-nginx
+
+              cat > /etc/nginx/sites-available/sfu-proxy <<'NGINX'
+      server {
+          listen 80 default_server;
+          server_name _;
+          location /.well-known/acme-challenge/ {
+              root /var/www/html;
+          }
+          location / {
+              return 444;
+          }
+      }
+      server {
+          listen 443 ssl default_server;
+          server_name sfu.codec-chat.com;
+
+          ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+          ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_prefer_server_ciphers on;
+
+          location / {
+              proxy_pass http://127.0.0.1:3001;
+              proxy_set_header Host \$host;
+              proxy_set_header X-Real-IP \$remote_addr;
+              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$scheme;
+              proxy_read_timeout 30s;
+              proxy_connect_timeout 5s;
+          }
+
+          location /health {
+              proxy_pass http://127.0.0.1:3001/health;
+          }
+      }
+      NGINX
+              ln -sf /etc/nginx/sites-available/sfu-proxy /etc/nginx/sites-enabled/sfu-proxy
+              rm -f /etc/nginx/sites-enabled/default
+              systemctl enable nginx
+              systemctl restart nginx
+
+              certbot --nginx -d sfu.codec-chat.com \
+                --non-interactive --agree-tos \
+                --email '${{ secrets.CERTBOT_EMAIL }}' \
+                --redirect
+
+              systemctl reload nginx
+              echo 'nginx TLS proxy configured successfully'
+            "
+
       - name: Verify SFU health
         run: |
           STATUS=$(az vm run-command invoke \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "curl -sf http://localhost:3001/health && echo OK" \
+            --scripts "curl -sf http://localhost:3001/health && curl -sf https://sfu.codec-chat.com/health && echo OK" \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
           if [[ "$STATUS" != *"OK"* ]]; then
             echo "::error::SFU health check failed: $STATUS"
             exit 1
           fi
-          echo "SFU health check passed"
+          echo "SFU health check passed (direct + nginx TLS)"
 
   migrate-database:
     runs-on: ubuntu-latest
