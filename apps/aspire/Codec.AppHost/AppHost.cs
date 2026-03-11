@@ -10,6 +10,12 @@ var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator();
 var blobs = storage.AddBlobs("blobs");
 
+var sfu = builder.AddNodeApp("sfu", "../../sfu", "src/index.ts")
+    .WithNpm()
+    .WithRunScript("dev")
+    .WithEndpoint("http", e => { e.Port = 3001; e.Transport = "http"; e.UriScheme = "http"; e.IsProxied = false; })
+    .WithHttpHealthCheck("/health");
+
 var api = builder.AddProject<Projects.Codec_Api>("api")
     .WithEndpoint("http", e => { e.Port = 5050; e.IsProxied = false; })
     .WithReference(postgres)
@@ -17,6 +23,7 @@ var api = builder.AddProject<Projects.Codec_Api>("api")
     .WithReference(blobs)
     .WaitFor(postgres)
     .WaitFor(redis)
+    .WaitFor(sfu)
     .WithHttpHealthCheck("/health/ready");
 
 var web = builder.AddViteApp("web", "../../web")
