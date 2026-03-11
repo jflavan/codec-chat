@@ -14,7 +14,7 @@ param storageBlobEndpoint string
 param corsAllowedOrigins string
 param apiBaseUrl string
 
-@description('Internal URL of the mediasoup SFU (e.g., http://<voice-vm-ip>:3001).')
+@description('URL of the mediasoup SFU (e.g., https://sfu.codec-chat.com).')
 param sfuApiUrl string = ''
 
 @description('TURN server URL for WebRTC ICE (e.g., turn:<voice-vm-ip>:3478).')
@@ -176,6 +176,10 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'GlobalAdmin__Email'
               secretRef: 'global-admin-email'
             }
+            {
+              name: 'OTEL_SERVICE_NAME'
+              value: 'codec-api'
+            }
           ], sfuApiUrl != '' ? [
             {
               name: 'Voice__MediasoupApiUrl'
@@ -206,10 +210,6 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               secretRef: 'redis-connection-string'
             }
           ] : [], appInsightsConnectionString != '' ? [
-            {
-              name: 'OTEL_SERVICE_NAME'
-              value: 'codec-api'
-            }
             {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
               value: appInsightsConnectionString
