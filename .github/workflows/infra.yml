@@ -131,7 +131,9 @@ jobs:
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
-              redisEnabled=true
+              redisEnabled=true \
+              sfuDomainName='sfu.codec-chat.com' \
+              certbotEmail='${{ secrets.CERTBOT_EMAIL }}'
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         if: steps.certs.outputs.certs-exist != 'true'
@@ -156,7 +158,9 @@ jobs:
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
-              redisEnabled=true
+              redisEnabled=true \
+              sfuDomainName='sfu.codec-chat.com' \
+              certbotEmail='${{ secrets.CERTBOT_EMAIL }}'
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -180,7 +184,9 @@ jobs:
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
-              redisEnabled=true
+              redisEnabled=true \
+              sfuDomainName='sfu.codec-chat.com' \
+              certbotEmail='${{ secrets.CERTBOT_EMAIL }}'
 
       - name: Show deployment outputs
         run: |
