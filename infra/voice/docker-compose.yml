@@ -15,7 +15,7 @@ services:
     image: ${ACR_SERVER}/codec-sfu:${IMAGE_TAG}
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
       - "40000-40100:40000-40100/udp"
     environment:
       ANNOUNCED_IP: "${ANNOUNCED_IP}"
