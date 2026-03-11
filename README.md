@@ -12,10 +12,13 @@ Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core W
 ```
 codec/
 ├── apps/
-│   ├── api/          # ASP.NET Core 10 Web API
-│   │   └── Codec.Api/
-│   ├── sfu/          # mediasoup SFU for voice channels
-│   └── web/          # SvelteKit web front-end
+│   ├── api/
+│   │   ├── Codec.Api/            # ASP.NET Core 10 Web API
+│   │   └── Codec.ServiceDefaults/ # Shared OpenTelemetry, health checks, resilience
+│   ├── aspire/
+│   │   └── Codec.AppHost/        # .NET Aspire orchestrator (local dev)
+│   ├── sfu/                      # mediasoup SFU for voice channels
+│   └── web/                      # SvelteKit web front-end
 ├── docs/             # Project documentation
 ├── infra/            # Bicep IaC modules (Azure infrastructure)
 ├── .github/          # Copilot agent guidance, CI/CD workflows
@@ -24,45 +27,50 @@ codec/
 
 ## Quick Start
 
-### 1. Install Prerequisites
+### Prerequisites
 - **Node.js** 20+ and npm — [download](https://nodejs.org/)
 - **.NET SDK** 10.x — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
-- **Docker** — for local PostgreSQL via Docker Compose
-- **Google Cloud Console** project with OAuth 2.0 credentials
+- **Docker** — for containers (PostgreSQL, Redis, Azurite)
+- **Google Cloud Console** project with an OAuth 2.0 Client ID ([setup](https://console.cloud.google.com/apis/credentials) — add `http://localhost:5174` as an authorized JavaScript origin)
 
-### 2. Configure Google Sign-In
-1. Create an OAuth 2.0 Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Add authorized JavaScript origins:
-   - `http://localhost:5174` (for development)
-3. Copy your Client ID for the next steps
+### Start with Aspire (recommended)
 
-### 3. Start PostgreSQL
+Aspire orchestrates all services with a single command and provides a dashboard with distributed tracing, logs, and metrics.
+
 ```bash
-docker compose -f docker-compose.dev.yml up -d
-```
-This starts PostgreSQL 16 on `localhost:5433` with database `codec_dev`, user `codec`, password `codec_dev_password`.
+# Set your Google Client ID (persists in user secrets)
+cd apps/aspire/Codec.AppHost
+dotnet user-secrets set "Google:ClientId" "YOUR_GOOGLE_CLIENT_ID"
 
-### 4. Start the API
-```bash
-cd apps/api/Codec.Api
-# Edit appsettings.Development.json - set Google:ClientId
+# Configure the web app
+cd ../../../apps/web
+cp .env.example .env
+# Edit .env — set PUBLIC_GOOGLE_CLIENT_ID and PUBLIC_API_BASE_URL=http://localhost:5050
+
+# Start everything
+cd ../../apps/aspire/Codec.AppHost
 dotnet run
 ```
-The API runs at `http://localhost:5050` by default.
 
-**Note:** The API will fail fast if `Google:ClientId` is missing. PostgreSQL database migrations run automatically in development.
+- **Web:** http://localhost:5174
+- **API:** http://localhost:5050
+- **Aspire Dashboard:** https://localhost:17222
 
-> **macOS users:** Port 5000 is reserved by AirPlay Receiver. The API uses port 5050 to avoid this conflict.
+### Start without Aspire (alternative)
 
-### 5. Start the Web App
 ```bash
-cd apps/web
+docker compose up -d postgres azurite    # Start PostgreSQL + Azurite
+cd apps/api/Codec.Api
+# Edit appsettings.Development.json — set Google:ClientId
+dotnet run                                # API at http://localhost:5050
+
+cd ../../apps/web
 cp .env.example .env
-# Edit .env and set PUBLIC_GOOGLE_CLIENT_ID and PUBLIC_API_BASE_URL (http://localhost:5050)
-npm install
-npm run dev
+# Edit .env — set PUBLIC_GOOGLE_CLIENT_ID and PUBLIC_API_BASE_URL
+npm install && npm run dev                # Web at http://localhost:5174
 ```
-The web app runs at `http://localhost:5174` by default.
+
+For full setup details, see [Development Setup](docs/DEV_SETUP.md).
 
 ## Features
 
@@ -128,6 +136,8 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - **Voice SFU:** Node.js + mediasoup v3 on a dedicated Azure VM (UDP media plane requires native sockets)
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID tokens)
+- **Observability:** OpenTelemetry (traces, metrics, logs) via `Codec.ServiceDefaults`; Azure Monitor / Application Insights in production; OTLP export to local Aspire dashboard in dev
+- **Local Dev:** .NET Aspire AppHost for single-command orchestration (Postgres, Redis, Azurite, API, Web) with developer dashboard
 - **Infrastructure:** Azure Container Apps + dedicated VM (voice SFU), Bicep IaC, GitHub Actions CI/CD
 
 ## License & Quality Checks
