@@ -2,7 +2,9 @@ import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 
 const appInsightsCs = process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
 const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -18,7 +20,7 @@ async function createSdk(): Promise<NodeSDK | null> {
 
   // Prefer Azure Monitor when connection string is available (production).
   if (appInsightsCs) {
-    const { AzureMonitorTraceExporter, AzureMonitorMetricExporter } = await import('@azure/monitor-opentelemetry-exporter');
+    const { AzureMonitorTraceExporter, AzureMonitorMetricExporter, AzureMonitorLogExporter } = await import('@azure/monitor-opentelemetry-exporter');
     return new NodeSDK({
       serviceName,
       // The Azure Monitor exporter bundles its own OTel types which may differ
@@ -29,6 +31,9 @@ async function createSdk(): Promise<NodeSDK | null> {
         exporter: new AzureMonitorMetricExporter({ connectionString: appInsightsCs }) as any,
         exportIntervalMillis: 30_000,
       }),
+      logRecordProcessors: [
+        new BatchLogRecordProcessor(new AzureMonitorLogExporter({ connectionString: appInsightsCs }) as any),
+      ],
       instrumentations,
     });
   }
@@ -42,6 +47,9 @@ async function createSdk(): Promise<NodeSDK | null> {
         exporter: new OTLPMetricExporter({ url: `${otlpEndpoint}/v1/metrics` }),
         exportIntervalMillis: 30_000,
       }),
+      logRecordProcessors: [
+        new BatchLogRecordProcessor(new OTLPLogExporter({ url: `${otlpEndpoint}/v1/logs` })),
+      ],
       instrumentations,
     });
   }
