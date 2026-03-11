@@ -69,7 +69,8 @@ All resources use the pattern `{abbreviation}-codec-{env}`:
    ```bash
    az group create --name rg-codec-prod --location centralus
    ```
-3. **Microsoft Entra ID App Registration** for GitHub Actions OIDC:
+3. **DNS zone**: `codec-chat.com` DNS zone must exist in the resource group with NS records delegated at the registrar (required for the SFU A record `sfu.codec-chat.com`)
+4. **Microsoft Entra ID App Registration** for GitHub Actions OIDC:
    - Create an App Registration in Microsoft Entra ID
    - Add Federated Identity Credentials for the `main` branch and `prod` environment
    - Grant the App Registration **Contributor** and **User Access Administrator** roles on `rg-codec-prod`
@@ -88,6 +89,7 @@ Configure these secrets in the repository's Settings > Secrets and variables > A
 | `PUBLIC_API_BASE_URL` | API URL baked into SvelteKit build (`https://api.codec-chat.com`) |
 | `PUBLIC_GOOGLE_CLIENT_ID` | Google client ID baked into SvelteKit build |
 | `GLOBAL_ADMIN_EMAIL` | Email address of the platform-wide global admin |
+| `CERTBOT_EMAIL` | Email for Let's Encrypt certificate notifications (voice VM TLS) |
 
 ### GitHub Environment
 
