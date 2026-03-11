@@ -11,6 +11,7 @@ All resources are deployed to the `rg-codec-prod` resource group in `centralus` 
 | Resource | Name | Type | SKU / Size |
 |----------|------|------|------------|
 | Log Analytics | `log-codec-prod` | Workspace | PerGB2018 (30-day retention) |
+| Application Insights | `appi-codec-prod` | Insights component | Web (LogAnalytics ingestion) |
 | Container Registry | `acrcodecprod` | ACR | Basic |
 | Key Vault | `kv-codec-prod` | Secrets store | Standard (soft delete 7d) |
 | PostgreSQL | `psql-codec-prod` | Flexible Server | Standard_B1ms, 32 GB, PG 16 |
@@ -29,6 +30,7 @@ infra/
 ├── main.bicepparam         # Production parameter defaults
 ├── modules/
 │   ├── log-analytics.bicep
+│   ├── application-insights.bicep  # OpenTelemetry sink (traces, metrics, logs)
 │   ├── container-registry.bicep
 │   ├── key-vault.bicep
 │   ├── key-vault-secret.bicep    # Reusable helper (called per secret)
@@ -47,8 +49,9 @@ infra/
 ### Module Dependency Graph
 
 ```
-logAnalytics ────────────► containerAppsEnv ──┬──► apiApp ──► apiCert
-containerRegistry ──────────────────────────┤  └──► webApp ──► webCert
+logAnalytics ──┬─────────► containerAppsEnv ──┬──► apiApp ──► apiCert
+               └─► appInsights (conn string)──┘  └──► webApp ──► webCert
+containerRegistry ──────────────────────────┤
 keyVault ──┬──► postgresql (stores conn string)  │
            ├──► googleClientIdSecret             │
            ├──► globalAdminEmailSecret           │
@@ -59,6 +62,8 @@ storageAccount ─────────────────────�
 redisCache (if redisEnabled) ──► stores conn string in KV
 voiceVm (if voiceVmEnabled) ────────────────────┘
 ```
+
+> **Note:** The Application Insights connection string is passed to the API container app as a plain environment variable (not via Key Vault) because the ingestion key is write-only — it can only send telemetry, not read data.
 
 ## Key Vault Secrets
 
@@ -84,12 +89,12 @@ ASP.NET Core 10 Web API with SignalR.
 
 - **Port:** 8080
 - **Ingress:** External HTTP, CORS restricted to web app origin
-- **Health probes:** Liveness (`/health/live`, 30s), Readiness (`/health/ready`, 10s)
+- **Health probes:** Liveness (`/health/live`, 30s), Readiness (`/health/ready`, 10s, 5s timeout)
 - **RBAC roles:**
   - AcrPull on Container Registry
   - Storage Blob Data Contributor on Storage Account
   - Key Vault Secrets User on Key Vault
-- **Environment variables:** `ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__Default` (secret ref), `Google__ClientId` (secret ref), `Api__BaseUrl`, `Cors__AllowedOrigins`, `Storage__Provider`, `Storage__AzureBlob__ServiceUri`, `GlobalAdmin__Email` (secret ref), `Redis__ConnectionString` (secret ref), plus optional voice and GitHub config
+- **Environment variables:** `ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__Default` (secret ref), `Google__ClientId` (secret ref), `Api__BaseUrl`, `Cors__AllowedOrigins`, `Storage__Provider`, `Storage__AzureBlob__ServiceUri`, `GlobalAdmin__Email` (secret ref), `Redis__ConnectionString` (secret ref), `OTEL_SERVICE_NAME`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, plus optional voice and GitHub config
 
 ### Web App (`ca-codec-prod-web`)
 
