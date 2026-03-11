@@ -41,7 +41,8 @@ infra/
 │   ├── container-app-web.bicep
 │   ├── managed-certificate.bicep
 │   ├── redis-cache.bicep
-│   └── voice-vm.bicep
+│   ├── voice-vm.bicep
+│   └── dns-record.bicep        # Reusable DNS A record helper
 └── voice/
     └── docker-compose.yml  # SFU + coturn (deployed to voice VM by CI/CD)
 ```
@@ -160,7 +161,9 @@ Deployed only when `voiceVmEnabled = true`. Both the SFU (mediasoup) and TURN se
 - **Size:** Standard_D2als_v7 (2 vCPU, 4 GB RAM)
 - **Network:** VNet 10.1.0.0/24, static public IP with DNS label
 - **Identity:** System-assigned (AcrPull role for pulling SFU image)
-- **cloud-init:** Installs Docker and Docker Compose on first deployment
+- **cloud-init:** Installs Docker, Docker Compose, nginx, and certbot on first deployment
+- **TLS:** nginx reverse proxy terminates TLS on port 443 and forwards to the SFU on `127.0.0.1:3001`. Certbot manages Let's Encrypt certificate provisioning and automatic renewal via systemd timer.
+- **DNS:** An Azure DNS A record (`sfu.codec-chat.com`) points to the VM's static public IP, managed by the `dns-record.bicep` module.
 
 ### Network Security Group Rules
 
@@ -171,13 +174,14 @@ Deployed only when `voiceVmEnabled = true`. Both the SFU (mediasoup) and TURN se
 | 1200 | TURN-TCP | 3478 | TCP | Any | TURN TCP fallback |
 | 1300 | coturn-relay | 49152–49200 | UDP | Any | TURN relay media |
 | 1400 | mediasoup-RTC | 40000–40100 | UDP | Any | WebRTC media |
-| 1500 | SFU-API | 3001 | TCP | AzureCloud | Internal SFU HTTP API |
+| 1500 | SFU-HTTPS | 443 | TCP | AzureCloud | SFU API (nginx TLS) |
+| 1600 | certbot-HTTP01 | 80 | TCP | Any | Let's Encrypt validation |
 
 ### Voice Services (Docker Compose)
 
 Deployed to `/opt/voice/docker-compose.yml` on the VM by CI/CD, with secrets injected via `envsubst`.
 
-- **SFU (mediasoup):** Custom image from ACR, port 3001 HTTP + ports 40000–40100 UDP. Authenticates internal API calls via `SFU_INTERNAL_KEY`.
+- **SFU (mediasoup):** Custom image from ACR, bound to `127.0.0.1:3001` (localhost only, nginx handles external TLS) + ports 40000–40100 UDP. Authenticates internal API calls via `SFU_INTERNAL_KEY` header (encrypted in transit via TLS).
 - **coturn:** `coturn/coturn:4.6.2`, host networking, HMAC-SHA256 time-limited credentials. Realm: `codec-chat.com`.
 
 ## Zero-Downtime Infrastructure Deploys
