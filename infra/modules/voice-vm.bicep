@@ -6,13 +6,11 @@
 ///
 /// Deployment flow:
 ///   1. Bicep provisions the VM, VNet, NSG, and static public IP.
-///   2. cloud-init installs Docker on first boot.
-///   3. CI/CD SSHs in, writes /opt/voice/docker-compose.yml (with ANNOUNCED_IP and
-///      TURN_SECRET injected from GitHub Actions secrets / Bicep outputs), then runs
+///   2. cloud-init installs Docker, nginx, and certbot on first boot.
+///   3. CI/CD writes /opt/voice/docker-compose.yml (with secrets injected), then runs
 ///      `docker compose up -d` to start both containers.
-///
-/// The SFU HTTP API (port 3001) is exposed publicly so the API Container App can
-/// reach it. Restrict this further once Container Apps VNet integration is added.
+///   4. nginx terminates TLS on port 443 and proxies to the SFU on localhost:3001.
+///      Certbot manages Let's Encrypt certificate provisioning and renewal.
 
 param name string
 param location string
@@ -33,8 +31,14 @@ param adminUsername string = 'azureuser'
 @description('Source IP prefix allowed to SSH into the VM. Set to your operator CIDR (e.g. "203.0.113.0/24"). When empty, SSH is restricted to the AzureCloud service tag (Azure datacenter IPs). Defaults to empty string so non-voice deployments (voiceVmEnabled = false) do not require this parameter.')
 param sshAllowedSourcePrefix string = ''
 
-@description('Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only). Restrict further once VNet integration with the Container App is in place.')
+@description('Source address prefix allowed to call the SFU HTTPS API (port 443). Defaults to the AzureCloud service tag (Azure datacenter IPs only).')
 param sfuApiAllowedSourcePrefix string = 'AzureCloud'
+
+@description('Fully qualified domain name for the SFU API (e.g., sfu.codec-chat.com). Used for the nginx TLS proxy and certbot certificate.')
+param sfuDomainName string = ''
+
+@description('Email address for Let\'s Encrypt certificate notifications. Required when sfuDomainName is set.')
+param certbotEmail string = ''
 
 @description('VM SKU size. Must be an x86-based SKU available in the target region.')
 param vmSize string = 'Standard_D2als_v7'
@@ -133,11 +137,10 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           destinationPortRange: '${rtcMinPort}-${rtcMaxPort}'
         }
       }
-      // SFU HTTP API — called by the API Container App
-      // TODO: move behind private VNet integration so this port is not internet-reachable.
-      // Currently restricted to AzureCloud IPs via sfuApiAllowedSourcePrefix.
+      // SFU HTTPS API — nginx TLS termination, called by the API Container App.
+      // Restricted to AzureCloud IPs via sfuApiAllowedSourcePrefix.
       {
-        name: 'allow-sfu-api'
+        name: 'allow-sfu-https'
         properties: {
           priority: 300
           protocol: 'Tcp'
@@ -146,7 +149,22 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           sourceAddressPrefix: sfuApiAllowedSourcePrefix
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
-          destinationPortRange: string(sfuPort)
+          destinationPortRange: '443'
+        }
+      }
+      // Let's Encrypt HTTP-01 challenge validation (certbot).
+      // Must be open to the internet; nginx serves only ACME challenges on port 80.
+      {
+        name: 'allow-certbot-http01'
+        properties: {
+          priority: 310
+          protocol: 'Tcp'
+          access: 'Allow'
+          direction: 'Inbound'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '80'
         }
       }
     ]
@@ -188,11 +206,11 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   }
 }
 
-// ── cloud-init: install Docker only; docker-compose.yml is deployed by CI/CD ───
+// ── cloud-init: install Docker, nginx, and certbot; docker-compose.yml is deployed by CI/CD ───
 // NOTE: customData can only be set on initial VM creation. Azure rejects changes
 // to osProfile.customData on existing VMs. Use includeCustomData=true only for
 // the first deployment.
-var cloudInit = '''
+var cloudInitTemplate = '''
 #cloud-config
 
 package_update: true
@@ -203,13 +221,62 @@ packages:
   - docker-compose-v2
   - curl
   - jq
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+
+write_files:
+  - path: /etc/nginx/sites-available/sfu-proxy
+    content: |
+      server {
+          listen 80 default_server;
+          server_name _;
+          location /.well-known/acme-challenge/ {
+              root /var/www/html;
+          }
+          location / {
+              return 444;
+          }
+      }
+      server {
+          listen 443 ssl default_server;
+          server_name __SFU_DOMAIN__;
+
+          ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+          ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_prefer_server_ciphers on;
+
+          location / {
+              proxy_pass http://127.0.0.1:3001;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_read_timeout 30s;
+              proxy_connect_timeout 5s;
+          }
+
+          location /health {
+              proxy_pass http://127.0.0.1:3001/health;
+          }
+      }
 
 runcmd:
   - systemctl enable docker
   - systemctl start docker
   - mkdir -p /opt/voice
   - chown azureuser:azureuser /opt/voice
+  - ln -sf /etc/nginx/sites-available/sfu-proxy /etc/nginx/sites-enabled/sfu-proxy
+  - rm -f /etc/nginx/sites-enabled/default
+  - systemctl enable nginx
+  - systemctl start nginx
+  - certbot --nginx -d __SFU_DOMAIN__ --non-interactive --agree-tos --email __CERTBOT_EMAIL__ --redirect
+  - systemctl reload nginx
 '''
+
+var cloudInit = replace(replace(cloudInitTemplate, '__SFU_DOMAIN__', sfuDomainName), '__CERTBOT_EMAIL__', certbotEmail)
 
 var baseOsProfile = {
   computerName: name
@@ -273,9 +340,5 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // ── Outputs ─────────────────────────────────────────────────────────────────────
 output publicIpAddress string = publicIp.properties.ipAddress
 output fqdn string = publicIp.properties.dnsSettings.fqdn
-// TODO: Terminate TLS in front of the SFU (e.g. add an nginx reverse-proxy with a cert)
-// and change this URL to https:// so that the X-Internal-Key header and all SFU traffic
-// are encrypted in transit. Until then, deploy within a private VNet to avoid exposing
-// the plain-HTTP endpoint to the public internet.
-output sfuApiUrl string = 'http://${publicIp.properties.ipAddress}:${sfuPort}'
+output sfuApiUrl string = sfuDomainName != '' ? 'https://${sfuDomainName}' : 'http://${publicIp.properties.ipAddress}:${sfuPort}'
 output turnServerUrl string = 'turn:${publicIp.properties.ipAddress}:${turnPort}'
