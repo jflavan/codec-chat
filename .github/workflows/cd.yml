@@ -195,40 +195,40 @@ jobs:
               apt-get install -y -qq nginx certbot python3-certbot-nginx
 
               cat > /etc/nginx/sites-available/sfu-proxy <<'NGINX'
-      server {
-          listen 80 default_server;
-          server_name _;
-          location /.well-known/acme-challenge/ {
-              root /var/www/html;
-          }
-          location / {
-              return 444;
-          }
-      }
-      server {
-          listen 443 ssl default_server;
-          server_name sfu.codec-chat.com;
+              server {
+                  listen 80 default_server;
+                  server_name _;
+                  location /.well-known/acme-challenge/ {
+                      root /var/www/html;
+                  }
+                  location / {
+                      return 444;
+                  }
+              }
+              server {
+                  listen 443 ssl default_server;
+                  server_name sfu.codec-chat.com;
 
-          ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
-          ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
-          ssl_protocols TLSv1.2 TLSv1.3;
-          ssl_prefer_server_ciphers on;
+                  ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+                  ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+                  ssl_protocols TLSv1.2 TLSv1.3;
+                  ssl_prefer_server_ciphers on;
 
-          location / {
-              proxy_pass http://127.0.0.1:3001;
-              proxy_set_header Host \$host;
-              proxy_set_header X-Real-IP \$remote_addr;
-              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto \$scheme;
-              proxy_read_timeout 30s;
-              proxy_connect_timeout 5s;
-          }
+                  location / {
+                      proxy_pass http://127.0.0.1:3001;
+                      proxy_set_header Host \$host;
+                      proxy_set_header X-Real-IP \$remote_addr;
+                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto \$scheme;
+                      proxy_read_timeout 30s;
+                      proxy_connect_timeout 5s;
+                  }
 
-          location /health {
-              proxy_pass http://127.0.0.1:3001/health;
-          }
-      }
-      NGINX
+                  location /health {
+                      proxy_pass http://127.0.0.1:3001/health;
+                  }
+              }
+              NGINX
               ln -sf /etc/nginx/sites-available/sfu-proxy /etc/nginx/sites-enabled/sfu-proxy
               rm -f /etc/nginx/sites-enabled/default
               systemctl enable nginx
