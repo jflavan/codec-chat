@@ -241,10 +241,11 @@ jobs:
             --scripts "
               set -e
               apt-get update -qq
-              apt-get install -y -qq nginx certbot python3-certbot-nginx
+              apt-get install -y -qq nginx ssl-cert certbot python3-certbot-nginx
               echo '${NGINX_B64}' | base64 -d > /etc/nginx/sites-available/sfu-proxy
               ln -sf /etc/nginx/sites-available/sfu-proxy /etc/nginx/sites-enabled/sfu-proxy
               rm -f /etc/nginx/sites-enabled/default
+              nginx -t
               systemctl enable nginx
               systemctl restart nginx
               if certbot --nginx -d sfu.codec-chat.com --non-interactive --agree-tos --email '${{ secrets.CERTBOT_EMAIL }}' --redirect; then
