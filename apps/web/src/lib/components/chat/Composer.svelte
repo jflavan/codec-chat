@@ -143,10 +143,12 @@
 		syncOverlayScroll();
 	}
 
+	const BASE_HEIGHT = 38; // must match .composer-input CSS height
+
 	function autoResize(): void {
 		if (!inputEl) return;
-		inputEl.style.height = 'auto';
-		const maxHeight = LINE_HEIGHT * MAX_LINES;
+		inputEl.style.height = `${BASE_HEIGHT}px`;
+		const maxHeight = LINE_HEIGHT * MAX_LINES + (BASE_HEIGHT - LINE_HEIGHT);
 		const scrollHeight = inputEl.scrollHeight;
 		inputEl.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
 		inputEl.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
@@ -332,7 +334,7 @@
 		background: var(--input-bg);
 		border: none;
 		box-sizing: border-box;
-		padding: 12px 10px;
+		padding: 9px 10px;
 		border-radius: 8px 0 0 8px;
 		color: var(--text-muted);
 		cursor: pointer;
@@ -364,7 +366,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		padding: 12px 16px;
+		padding: 9px 16px;
 		font-size: 15px;
 		font-family: inherit;
 		line-height: 20px;
@@ -376,11 +378,12 @@
 	}
 
 	.composer-input {
+		display: block;
 		position: relative;
 		width: 100%;
 		box-sizing: border-box;
 		margin: 0;
-		padding: 12px 16px;
+		padding: 9px 16px;
 		border: none;
 		background: transparent;
 		color: transparent;
@@ -389,7 +392,7 @@
 		font-family: inherit;
 		line-height: 20px;
 		outline: none;
-		height: 44px;
+		height: 38px;
 		resize: none;
 		overflow-y: hidden;
 	}
@@ -414,7 +417,7 @@
 		background: var(--input-bg);
 		border: none;
 		box-sizing: border-box;
-		padding: 12px 12px;
+		padding: 9px 12px;
 		border-radius: 0 8px 8px 0;
 		color: var(--text-muted);
 		cursor: pointer;
@@ -437,7 +440,7 @@
 		background: var(--input-bg);
 		border: none;
 		box-sizing: border-box;
-		padding: 12px 6px;
+		padding: 9px 6px;
 		color: var(--text-muted);
 		cursor: pointer;
 		display: grid;
@@ -470,7 +473,7 @@
 	}
 
 	.connecting-message {
-		padding: 12px 16px;
+		padding: 9px 16px;
 		font-size: 15px;
 		color: var(--text-dim);
 		line-height: 20px;
@@ -637,7 +640,7 @@
 
 		.composer-input {
 			font-size: 16px;
-			padding: 12px 16px;
+			padding: 9px 16px;
 			resize: none;
 		}
 

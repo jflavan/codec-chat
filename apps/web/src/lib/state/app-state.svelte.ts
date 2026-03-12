@@ -809,8 +809,6 @@ export class AppState {
 		try {
 			const emoji = await this.api.uploadCustomEmoji(this.idToken, this.selectedServerId, name, file);
 			this.customEmojis = [...this.customEmojis, emoji];
-		} catch (e) {
-			this.setError(e);
 		} finally {
 			this.isUploadingEmoji = false;
 		}
