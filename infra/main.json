@@ -1,11 +1,12 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
   "contentVersion": "1.0.0.0",
   "metadata": {
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "6607898756118251830"
+      "templateHash": "6813127065713115571"
     }
   },
   "parameters": {
@@ -92,8 +93,23 @@
     },
     "voiceSshAllowedSourcePrefix": {
       "type": "string",
+      "defaultValue": "",
       "metadata": {
-        "description": "Source IP or CIDR allowed to SSH into the voice VM. Required; set to your operator CIDR (e.g. \"203.0.113.0/24\"). No default is provided to prevent accidental open access."
+        "description": "Source IP or CIDR allowed to SSH into the voice VM. Set to your operator CIDR (e.g. \"203.0.113.0/24\"). Defaults to empty string; the voice-vm module will use \"AzureCloud\" (deny internet SSH) when this is empty and voiceVmEnabled is false."
+      }
+    },
+    "gitHubToken": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "GitHub fine-grained PAT with issues:write scope for in-app bug reporting. Leave empty to disable."
+      }
+    },
+    "redisEnabled": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy Azure Cache for Redis for distributed caching and SignalR backplane."
       }
     },
     "voiceTurnSecret": {
@@ -109,6 +125,20 @@
       "metadata": {
         "description": "Shared secret for the SFU internal API. Required when voiceVmEnabled is true."
       }
+    },
+    "sfuDomainName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "FQDN for the SFU API TLS endpoint (e.g., sfu.codec-chat.com). Required when voiceVmEnabled is true."
+      }
+    },
+    "certbotEmail": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Email for Let's Encrypt certificate notifications. Required when voiceVmEnabled is true."
+      }
     }
   },
   "variables": {
@@ -121,10 +151,15 @@
     "containerAppsEnvName": "[format('cae-{0}', variables('baseName'))]",
     "apiAppName": "[format('ca-{0}-api', variables('baseName'))]",
     "webAppName": "[format('ca-{0}-web', variables('baseName'))]",
-    "voiceVmName": "[format('vm-{0}-voice', variables('baseName'))]"
+    "redisCacheName": "[format('redis-{0}', variables('baseName'))]",
+    "voiceVmName": "[format('vm-{0}-voice', variables('baseName'))]",
+    "appInsightsName": "[format('appi-{0}', variables('baseName'))]",
+    "sfuDomainParts": "[split(if(not(equals(parameters('sfuDomainName'), '')), parameters('sfuDomainName'), 'placeholder.invalid'), '.')]",
+    "sfuDnsZoneName": "[format('{0}.{1}', variables('sfuDomainParts')[1], variables('sfuDomainParts')[2])]",
+    "sfuDnsRecordName": "[variables('sfuDomainParts')[0]]"
   },
-  "resources": [
-    {
+  "resources": {
+    "logAnalytics": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "log-analytics",
@@ -186,7 +221,75 @@
         }
       }
     },
-    {
+    "appInsights": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "application-insights",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('appInsightsName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference('logAnalytics').outputs.id.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "4317968150241116789"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "resources": {
+            "appInsights": {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "kind": "web",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "IngestionMode": "LogAnalytics"
+              }
+            }
+          },
+          "outputs": {
+            "connectionString": {
+              "type": "securestring",
+              "value": "[reference('appInsights').ConnectionString]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalytics"
+      ]
+    },
+    "containerRegistry": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "container-registry",
@@ -252,7 +355,7 @@
         }
       }
     },
-    {
+    "keyVault": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "key-vault",
@@ -322,7 +425,7 @@
         }
       }
     },
-    {
+    "postgresql": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "postgresql",
@@ -342,7 +445,7 @@
             "value": "[parameters('postgresqlAdminPassword')]"
           },
           "keyVaultName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('keyVault').outputs.name.value]"
           }
         },
         "template": {
@@ -352,7 +455,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "1527153066957220568"
+              "templateHash": "10950469805271398241"
             }
           },
           "parameters": {
@@ -402,6 +505,18 @@
                   "mode": "Disabled"
                 }
               }
+            },
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+              "apiVersion": "2024-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'azure.extensions')]",
+              "properties": {
+                "value": "PG_TRGM",
+                "source": "user-override"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('name'))]"
+              ]
             },
             {
               "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
@@ -456,10 +571,10 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "keyVault"
       ]
     },
-    {
+    "storageAccount": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "storage-account",
@@ -560,7 +675,7 @@
         }
       }
     },
-    {
+    "containerAppsEnv": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "container-apps-env",
@@ -577,7 +692,7 @@
             "value": "[parameters('location')]"
           },
           "logAnalyticsCustomerId": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'log-analytics'), '2025-04-01').outputs.customerId.value]"
+            "value": "[reference('logAnalytics').outputs.customerId.value]"
           },
           "logAnalyticsWorkspaceName": {
             "value": "[variables('logAnalyticsName')]"
@@ -647,10 +762,10 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'log-analytics')]"
+        "logAnalytics"
       ]
     },
-    {
+    "googleClientIdSecret": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "google-client-id-secret",
@@ -661,7 +776,7 @@
         "mode": "Incremental",
         "parameters": {
           "keyVaultName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('keyVault').outputs.name.value]"
           },
           "secretName": {
             "value": "Google--ClientId"
@@ -710,10 +825,10 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "keyVault"
       ]
     },
-    {
+    "globalAdminEmailSecret": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "global-admin-email-secret",
@@ -724,7 +839,7 @@
         "mode": "Incremental",
         "parameters": {
           "keyVaultName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('keyVault').outputs.name.value]"
           },
           "secretName": {
             "value": "GlobalAdmin--Email"
@@ -773,10 +888,167 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "keyVault"
       ]
     },
-    {
+    "redisCache": {
+      "condition": "[parameters('redisEnabled')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "redis-cache",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('redisCacheName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "8623599555009055222"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "keyVaultName": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Cache/redis",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "sku": {
+                  "name": "Basic",
+                  "family": "C",
+                  "capacity": 0
+                },
+                "enableNonSslPort": false,
+                "minimumTlsVersion": "1.2",
+                "redisConfiguration": {
+                  "maxmemory-policy": "allkeys-lru"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'Redis--ConnectionString')]",
+              "properties": {
+                "value": "[format('{0}.redis.cache.windows.net:6380,password={1},ssl=True,abortConnect=False', parameters('name'), listKeys(resourceId('Microsoft.Cache/redis', parameters('name')), '2024-03-01').primaryKey)]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Cache/redis', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Cache/redis', parameters('name'))]"
+            },
+            "hostName": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Cache/redis', parameters('name')), '2024-03-01').hostName]"
+            },
+            "connectionStringSecretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'Redis--ConnectionString'), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "gitHubTokenSecret": {
+      "condition": "[not(equals(parameters('gitHubToken'), ''))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "github-token-secret",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "GitHub--Token"
+          },
+          "secretValue": {
+            "value": "[parameters('gitHubToken')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "voiceVm": {
       "condition": "[parameters('voiceVmEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -801,6 +1073,12 @@
           },
           "sshAllowedSourcePrefix": {
             "value": "[parameters('voiceSshAllowedSourcePrefix')]"
+          },
+          "sfuDomainName": {
+            "value": "[parameters('sfuDomainName')]"
+          },
+          "certbotEmail": {
+            "value": "[parameters('certbotEmail')]"
           }
         },
         "template": {
@@ -810,7 +1088,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "616378294393445261"
+              "templateHash": "9466678379272008156"
             }
           },
           "parameters": {
@@ -819,6 +1097,13 @@
             },
             "location": {
               "type": "string"
+            },
+            "includeCustomData": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Include cloud-init customData in osProfile. Set to true only for the initial VM deployment. Azure does not allow changing customData on an existing VM."
+              }
             },
             "adminSshPublicKey": {
               "type": "securestring",
@@ -841,15 +1126,37 @@
             },
             "sshAllowedSourcePrefix": {
               "type": "string",
+              "defaultValue": "",
               "metadata": {
-                "description": "Source IP prefix allowed to SSH into the VM. Must be set to your operator CIDR (e.g. \"203.0.113.0/24\"). No default is provided to prevent accidental exposure."
+                "description": "Source IP prefix allowed to SSH into the VM. Set to your operator CIDR (e.g. \"203.0.113.0/24\"). When empty, SSH is restricted to the AzureCloud service tag (Azure datacenter IPs). Defaults to empty string so non-voice deployments (voiceVmEnabled = false) do not require this parameter."
               }
             },
             "sfuApiAllowedSourcePrefix": {
               "type": "string",
               "defaultValue": "AzureCloud",
               "metadata": {
-                "description": "Source address prefix allowed to call the SFU API (port 3001). Defaults to the AzureCloud service tag (Azure datacenter IPs only)."
+                "description": "Source address prefix allowed to call the SFU HTTPS API (port 443). Defaults to the AzureCloud service tag (Azure datacenter IPs only)."
+              }
+            },
+            "sfuDomainName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Fully qualified domain name for the SFU API (e.g., sfu.codec-chat.com). Used for the nginx TLS proxy and certbot certificate."
+              }
+            },
+            "certbotEmail": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Email address for Let's Encrypt certificate notifications. Required when sfuDomainName is set."
+              }
+            },
+            "vmSize": {
+              "type": "string",
+              "defaultValue": "Standard_D2als_v7",
+              "metadata": {
+                "description": "VM SKU size. Must be an x86-based SKU available in the target region."
               }
             }
           },
@@ -860,7 +1167,23 @@
             "rtcMaxPort": 40100,
             "relayMinPort": 49152,
             "relayMaxPort": 49200,
-            "cloudInit": "#cloud-config\r\n\r\npackage_update: true\r\npackage_upgrade: false\r\n\r\npackages:\r\n  - docker.io\r\n  - docker-compose-plugin\r\n  - curl\r\n  - jq\r\n\r\nruncmd:\r\n  - systemctl enable docker\r\n  - systemctl start docker\r\n  - mkdir -p /opt/voice\r\n  - chown azureuser:azureuser /opt/voice\r\n"
+            "cloudInitTemplate": "#cloud-config\r\n\r\npackage_update: true\r\npackage_upgrade: false\r\n\r\npackages:\r\n  - docker.io\r\n  - docker-compose-v2\r\n  - curl\r\n  - jq\r\n  - nginx\r\n  - certbot\r\n  - python3-certbot-nginx\r\n\r\nwrite_files:\r\n  - path: /etc/nginx/sites-available/sfu-proxy\r\n    content: |\r\n      server {\r\n          listen 80 default_server;\r\n          server_name _;\r\n          location /.well-known/acme-challenge/ {\r\n              root /var/www/html;\r\n          }\r\n          location / {\r\n              return 444;\r\n          }\r\n      }\r\n      server {\r\n          listen 443 ssl default_server;\r\n          server_name __SFU_DOMAIN__;\r\n\r\n          ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;\r\n          ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;\r\n\r\n          ssl_protocols TLSv1.2 TLSv1.3;\r\n          ssl_prefer_server_ciphers on;\r\n\r\n          location / {\r\n              proxy_pass http://127.0.0.1:3001;\r\n              proxy_set_header Host $host;\r\n              proxy_set_header X-Real-IP $remote_addr;\r\n              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\r\n              proxy_set_header X-Forwarded-Proto $scheme;\r\n              proxy_read_timeout 30s;\r\n              proxy_connect_timeout 5s;\r\n          }\r\n\r\n          location /health {\r\n              proxy_pass http://127.0.0.1:3001/health;\r\n          }\r\n      }\r\n\r\nruncmd:\r\n  - systemctl enable docker\r\n  - systemctl start docker\r\n  - mkdir -p /opt/voice\r\n  - chown azureuser:azureuser /opt/voice\r\n  - ln -sf /etc/nginx/sites-available/sfu-proxy /etc/nginx/sites-enabled/sfu-proxy\r\n  - rm -f /etc/nginx/sites-enabled/default\r\n  - systemctl enable nginx\r\n  - systemctl start nginx\r\n  - certbot --nginx -d __SFU_DOMAIN__ --non-interactive --agree-tos --email __CERTBOT_EMAIL__ --redirect\r\n  - systemctl reload nginx\r\n",
+            "cloudInit": "[replace(replace(variables('cloudInitTemplate'), '__SFU_DOMAIN__', parameters('sfuDomainName')), '__CERTBOT_EMAIL__', parameters('certbotEmail'))]",
+            "baseOsProfile": {
+              "computerName": "[parameters('name')]",
+              "adminUsername": "[parameters('adminUsername')]",
+              "linuxConfiguration": {
+                "disablePasswordAuthentication": true,
+                "ssh": {
+                  "publicKeys": [
+                    {
+                      "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
+                      "keyData": "[parameters('adminSshPublicKey')]"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "resources": [
             {
@@ -892,7 +1215,7 @@
                       "protocol": "Tcp",
                       "access": "Allow",
                       "direction": "Inbound",
-                      "sourceAddressPrefix": "[parameters('sshAllowedSourcePrefix')]",
+                      "sourceAddressPrefix": "[if(not(empty(parameters('sshAllowedSourcePrefix'))), parameters('sshAllowedSourcePrefix'), 'AzureCloud')]",
                       "sourcePortRange": "*",
                       "destinationAddressPrefix": "*",
                       "destinationPortRange": "22"
@@ -951,7 +1274,7 @@
                     }
                   },
                   {
-                    "name": "allow-sfu-api",
+                    "name": "allow-sfu-https",
                     "properties": {
                       "priority": 300,
                       "protocol": "Tcp",
@@ -960,7 +1283,20 @@
                       "sourceAddressPrefix": "[parameters('sfuApiAllowedSourcePrefix')]",
                       "sourcePortRange": "*",
                       "destinationAddressPrefix": "*",
-                      "destinationPortRange": "[string(variables('sfuPort'))]"
+                      "destinationPortRange": "443"
+                    }
+                  },
+                  {
+                    "name": "allow-certbot-http01",
+                    "properties": {
+                      "priority": 310,
+                      "protocol": "Tcp",
+                      "access": "Allow",
+                      "direction": "Inbound",
+                      "sourceAddressPrefix": "*",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "80"
                     }
                   }
                 ]
@@ -1029,13 +1365,13 @@
               },
               "properties": {
                 "hardwareProfile": {
-                  "vmSize": "Standard_B2s"
+                  "vmSize": "[parameters('vmSize')]"
                 },
                 "storageProfile": {
                   "imageReference": {
                     "publisher": "Canonical",
-                    "offer": "0001-com-ubuntu-server-noble",
-                    "sku": "24_04-lts-gen2",
+                    "offer": "ubuntu-24_04-lts",
+                    "sku": "server",
                     "version": "latest"
                   },
                   "osDisk": {
@@ -1046,22 +1382,7 @@
                     "diskSizeGB": 30
                   }
                 },
-                "osProfile": {
-                  "computerName": "[parameters('name')]",
-                  "adminUsername": "[parameters('adminUsername')]",
-                  "customData": "[base64(variables('cloudInit'))]",
-                  "linuxConfiguration": {
-                    "disablePasswordAuthentication": true,
-                    "ssh": {
-                      "publicKeys": [
-                        {
-                          "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
-                          "keyData": "[parameters('adminSshPublicKey')]"
-                        }
-                      ]
-                    }
-                  }
-                },
+                "osProfile": "[if(parameters('includeCustomData'), union(variables('baseOsProfile'), createObject('customData', base64(variables('cloudInit')))), variables('baseOsProfile'))]",
                 "networkProfile": {
                   "networkInterfaces": [
                     {
@@ -1100,7 +1421,7 @@
             },
             "sfuApiUrl": {
               "type": "string",
-              "value": "[format('http://{0}:{1}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress, variables('sfuPort'))]"
+              "value": "[if(not(equals(parameters('sfuDomainName'), '')), format('https://{0}', parameters('sfuDomainName')), format('http://{0}:{1}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress, variables('sfuPort')))]"
             },
             "turnServerUrl": {
               "type": "string",
@@ -1110,7 +1431,70 @@
         }
       }
     },
-    {
+    "sfuDnsRecord": {
+      "condition": "[and(parameters('voiceVmEnabled'), not(equals(parameters('sfuDomainName'), '')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "sfu-dns-record",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "zoneName": {
+            "value": "[variables('sfuDnsZoneName')]"
+          },
+          "recordName": {
+            "value": "[variables('sfuDnsRecordName')]"
+          },
+          "ipAddress": {
+            "value": "[reference('voiceVm').outputs.publicIpAddress.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "13972147568669960121"
+            }
+          },
+          "parameters": {
+            "zoneName": {
+              "type": "string"
+            },
+            "recordName": {
+              "type": "string"
+            },
+            "ipAddress": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/dnsZones/A",
+              "apiVersion": "2018-05-01",
+              "name": "[format('{0}/{1}', parameters('zoneName'), parameters('recordName'))]",
+              "properties": {
+                "TTL": 300,
+                "ARecords": [
+                  {
+                    "ipv4Address": "[parameters('ipAddress')]"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "voiceVm"
+      ]
+    },
+    "voiceTurnSecretKv": {
       "condition": "[parameters('voiceVmEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -1122,7 +1506,7 @@
         "mode": "Incremental",
         "parameters": {
           "keyVaultName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('keyVault').outputs.name.value]"
           },
           "secretName": {
             "value": "Voice--TurnSecret"
@@ -1171,10 +1555,10 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "keyVault"
       ]
     },
-    {
+    "voiceSfuInternalKeyKv": {
       "condition": "[parameters('voiceVmEnabled')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -1186,7 +1570,7 @@
         "mode": "Incremental",
         "parameters": {
           "keyVaultName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('keyVault').outputs.name.value]"
           },
           "secretName": {
             "value": "Voice--SfuInternalKey"
@@ -1235,10 +1619,10 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "keyVault"
       ]
     },
-    {
+    "apiCert": {
       "condition": "[not(equals(parameters('apiCustomDomain'), ''))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -1250,7 +1634,7 @@
         "mode": "Incremental",
         "parameters": {
           "environmentName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('containerAppsEnv').outputs.name.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1307,11 +1691,11 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'container-app-api')]",
-        "[resourceId('Microsoft.Resources/deployments', 'container-apps-env')]"
+        "apiApp",
+        "containerAppsEnv"
       ]
     },
-    {
+    "webCert": {
       "condition": "[not(equals(parameters('webCustomDomain'), ''))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -1323,7 +1707,7 @@
         "mode": "Incremental",
         "parameters": {
           "environmentName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('containerAppsEnv').outputs.name.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1380,11 +1764,11 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'container-apps-env')]",
-        "[resourceId('Microsoft.Resources/deployments', 'container-app-web')]"
+        "containerAppsEnv",
+        "webApp"
       ]
     },
-    {
+    "apiApp": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "container-app-api",
@@ -1401,43 +1785,48 @@
             "value": "[parameters('location')]"
           },
           "environmentId": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.id.value]"
+            "value": "[reference('containerAppsEnv').outputs.id.value]"
           },
           "containerRegistryLoginServer": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-registry'), '2025-04-01').outputs.loginServer.value]"
+            "value": "[reference('containerRegistry').outputs.loginServer.value]"
           },
           "containerRegistryName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-registry'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('containerRegistry').outputs.name.value]"
           },
           "containerImage": {
             "value": "[parameters('apiContainerImage')]"
           },
           "keyVaultName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('keyVault').outputs.name.value]"
           },
           "keyVaultUri": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value]"
+            "value": "[reference('keyVault').outputs.uri.value]"
           },
           "storageAccountName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage-account'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('storageAccount').outputs.name.value]"
           },
           "storageBlobEndpoint": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage-account'), '2025-04-01').outputs.blobEndpoint.value]"
+            "value": "[reference('storageAccount').outputs.blobEndpoint.value]"
           },
-          "apiBaseUrl": "[if(not(equals(parameters('apiCustomDomain'), '')), createObject('value', format('https://{0}', parameters('apiCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('apiAppName'), reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.defaultDomain.value)))]",
-          "corsAllowedOrigins": "[if(not(equals(parameters('webCustomDomain'), '')), createObject('value', format('https://{0}', parameters('webCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('webAppName'), reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.defaultDomain.value)))]",
+          "apiBaseUrl": "[if(not(equals(parameters('apiCustomDomain'), '')), createObject('value', format('https://{0}', parameters('apiCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('apiAppName'), reference('containerAppsEnv').outputs.defaultDomain.value)))]",
+          "corsAllowedOrigins": "[if(not(equals(parameters('webCustomDomain'), '')), createObject('value', format('https://{0}', parameters('webCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('webAppName'), reference('containerAppsEnv').outputs.defaultDomain.value)))]",
           "customDomainName": {
             "value": "[parameters('apiCustomDomain')]"
           },
-          "managedCertificateId": "[if(and(parameters('bindCertificates'), not(equals(parameters('apiCustomDomain'), ''))), createObject('value', format('{0}/managedCertificates/cert-api', reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.id.value)), createObject('value', ''))]",
+          "managedCertificateId": "[if(and(parameters('bindCertificates'), not(equals(parameters('apiCustomDomain'), ''))), createObject('value', format('{0}/managedCertificates/cert-api', reference('containerAppsEnv').outputs.id.value)), createObject('value', ''))]",
           "sfuApiUrl": {
-            "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'sfuApiUrl', 'value'), '')]"
+            "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference('voiceVm'), null()), 'outputs', 'sfuApiUrl', 'value'), '')]"
           },
           "turnServerUrl": {
-            "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'turnServerUrl', 'value'), '')]"
+            "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference('voiceVm'), null()), 'outputs', 'turnServerUrl', 'value'), '')]"
           },
-          "voiceTurnKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--TurnSecret', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value)), createObject('value', ''))]",
-          "voiceSfuInternalKeyKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--SfuInternalKey', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value)), createObject('value', ''))]"
+          "voiceTurnKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--TurnSecret', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
+          "voiceSfuInternalKeyKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--SfuInternalKey', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
+          "gitHubTokenKvUrl": "[if(not(equals(parameters('gitHubToken'), '')), createObject('value', format('{0}secrets/GitHub--Token', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
+          "redisConnectionStringKvUrl": "[if(parameters('redisEnabled'), createObject('value', reference('redisCache').outputs.connectionStringSecretUri.value), createObject('value', ''))]",
+          "appInsightsConnectionString": {
+            "value": "[listOutputsWithSecureValues('appInsights', '2025-04-01').connectionString]"
+          }
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -1446,7 +1835,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "12952861129033102760"
+              "templateHash": "7879231019898027263"
             }
           },
           "parameters": {
@@ -1491,7 +1880,7 @@
               "type": "string",
               "defaultValue": "",
               "metadata": {
-                "description": "Internal URL of the mediasoup SFU (e.g., http://<voice-vm-ip>:3001)."
+                "description": "URL of the mediasoup SFU (e.g., https://sfu.codec-chat.com)."
               }
             },
             "turnServerUrl": {
@@ -1513,6 +1902,27 @@
               "defaultValue": "",
               "metadata": {
                 "description": "Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled."
+              }
+            },
+            "gitHubTokenKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the GitHub PAT. Leave empty to disable in-app bug reporting."
+              }
+            },
+            "redisConnectionStringKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the Redis connection string. Leave empty to disable Redis caching and SignalR backplane."
+              }
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Application Insights connection string for OpenTelemetry export. Leave empty to disable. Passed as a plain value (not Key Vault) because the ingestion key is write-only and not a security-sensitive credential."
               }
             },
             "customDomainName": {
@@ -1566,7 +1976,7 @@
                       "allowCredentials": true
                     }
                   },
-                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()))]",
+                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()))]",
                   "registries": [
                     {
                       "server": "[parameters('containerRegistryLoginServer')]",
@@ -1583,7 +1993,7 @@
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"
                       },
-                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()))]",
+                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()))]",
                       "probes": [
                         {
                           "type": "Liveness",
@@ -1601,7 +2011,8 @@
                             "port": 8080,
                             "scheme": "HTTP"
                           },
-                          "periodSeconds": 10
+                          "periodSeconds": 10,
+                          "timeoutSeconds": 5
                         }
                       ]
                     }
@@ -1677,14 +2088,16 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'container-apps-env')]",
-        "[resourceId('Microsoft.Resources/deployments', 'container-registry')]",
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
-        "[resourceId('Microsoft.Resources/deployments', 'storage-account')]",
-        "[resourceId('Microsoft.Resources/deployments', 'voice-vm')]"
+        "appInsights",
+        "containerAppsEnv",
+        "containerRegistry",
+        "keyVault",
+        "redisCache",
+        "storageAccount",
+        "voiceVm"
       ]
     },
-    {
+    "webApp": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "container-app-web",
@@ -1701,25 +2114,25 @@
             "value": "[parameters('location')]"
           },
           "environmentId": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.id.value]"
+            "value": "[reference('containerAppsEnv').outputs.id.value]"
           },
           "containerRegistryLoginServer": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-registry'), '2025-04-01').outputs.loginServer.value]"
+            "value": "[reference('containerRegistry').outputs.loginServer.value]"
           },
           "containerRegistryName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-registry'), '2025-04-01').outputs.name.value]"
+            "value": "[reference('containerRegistry').outputs.name.value]"
           },
           "containerImage": {
             "value": "[parameters('webContainerImage')]"
           },
-          "publicApiBaseUrl": "[if(not(equals(parameters('apiCustomDomain'), '')), createObject('value', format('https://{0}', parameters('apiCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('apiAppName'), reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.defaultDomain.value)))]",
+          "publicApiBaseUrl": "[if(not(equals(parameters('apiCustomDomain'), '')), createObject('value', format('https://{0}', parameters('apiCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('apiAppName'), reference('containerAppsEnv').outputs.defaultDomain.value)))]",
           "publicGoogleClientId": {
             "value": "[parameters('googleClientId')]"
           },
           "customDomainName": {
             "value": "[parameters('webCustomDomain')]"
           },
-          "managedCertificateId": "[if(and(parameters('bindCertificates'), not(equals(parameters('webCustomDomain'), ''))), createObject('value', format('{0}/managedCertificates/cert-web', reference(resourceId('Microsoft.Resources/deployments', 'container-apps-env'), '2025-04-01').outputs.id.value)), createObject('value', ''))]"
+          "managedCertificateId": "[if(and(parameters('bindCertificates'), not(equals(parameters('webCustomDomain'), ''))), createObject('value', format('{0}/managedCertificates/cert-web', reference('containerAppsEnv').outputs.id.value)), createObject('value', ''))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -1877,51 +2290,51 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'container-apps-env')]",
-        "[resourceId('Microsoft.Resources/deployments', 'container-registry')]"
+        "containerAppsEnv",
+        "containerRegistry"
       ]
     }
-  ],
+  },
   "outputs": {
     "apiAppFqdn": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-app-api'), '2025-04-01').outputs.fqdn.value]"
+      "value": "[reference('apiApp').outputs.fqdn.value]"
     },
     "webAppFqdn": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-app-web'), '2025-04-01').outputs.fqdn.value]"
+      "value": "[reference('webApp').outputs.fqdn.value]"
     },
     "containerRegistryLoginServer": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'container-registry'), '2025-04-01').outputs.loginServer.value]"
+      "value": "[reference('containerRegistry').outputs.loginServer.value]"
     },
     "postgresqlFqdn": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'postgresql'), '2025-04-01').outputs.fqdn.value]"
+      "value": "[reference('postgresql').outputs.fqdn.value]"
     },
     "storageBlobEndpoint": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage-account'), '2025-04-01').outputs.blobEndpoint.value]"
+      "value": "[reference('storageAccount').outputs.blobEndpoint.value]"
     },
     "keyVaultUri": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.uri.value]"
+      "value": "[reference('keyVault').outputs.uri.value]"
     },
     "voiceVmPublicIp": {
       "type": "string",
-      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'publicIpAddress', 'value'), '')]"
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference('voiceVm'), null()), 'outputs', 'publicIpAddress', 'value'), '')]"
     },
     "voiceVmFqdn": {
       "type": "string",
-      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'fqdn', 'value'), '')]"
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference('voiceVm'), null()), 'outputs', 'fqdn', 'value'), '')]"
     },
     "sfuApiUrl": {
       "type": "string",
-      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'sfuApiUrl', 'value'), '')]"
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference('voiceVm'), null()), 'outputs', 'sfuApiUrl', 'value'), '')]"
     },
     "turnServerUrl": {
       "type": "string",
-      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference(resourceId('Microsoft.Resources/deployments', 'voice-vm'), '2025-04-01'), null()), 'outputs', 'turnServerUrl', 'value'), '')]"
+      "value": "[coalesce(tryGet(if(parameters('voiceVmEnabled'), reference('voiceVm'), null()), 'outputs', 'turnServerUrl', 'value'), '')]"
     }
   }
 }

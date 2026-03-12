@@ -62,6 +62,12 @@ param voiceTurnSecret string = ''
 @secure()
 param voiceSfuInternalKey string = ''
 
+@description('FQDN for the SFU API TLS endpoint (e.g., sfu.codec-chat.com). Required when voiceVmEnabled is true.')
+param sfuDomainName string = ''
+
+@description('Email for Let\'s Encrypt certificate notifications. Required when voiceVmEnabled is true.')
+param certbotEmail string = ''
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -77,6 +83,7 @@ var apiAppName = 'ca-${baseName}-api'
 var webAppName = 'ca-${baseName}-web'
 var redisCacheName = 'redis-${baseName}'
 var voiceVmName = 'vm-${baseName}-voice'
+var appInsightsName = 'appi-${baseName}'
 
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
 var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
@@ -89,6 +96,15 @@ module logAnalytics 'modules/log-analytics.bicep' = {
   params: {
     name: logAnalyticsName
     location: location
+  }
+}
+
+module appInsights 'modules/application-insights.bicep' = {
+  name: 'application-insights'
+  params: {
+    name: appInsightsName
+    location: location
+    logAnalyticsWorkspaceId: logAnalytics.outputs.id
   }
 }
 
@@ -190,6 +206,25 @@ module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
     adminSshPublicKey: voiceAdminSshPublicKey
     containerRegistryName: containerRegistryName
     sshAllowedSourcePrefix: voiceSshAllowedSourcePrefix
+    sfuDomainName: sfuDomainName
+    certbotEmail: certbotEmail
+  }
+}
+
+// ── DNS A record for the SFU TLS endpoint ─────────────────────────────────────
+// The parent DNS zone (e.g., codec-chat.com) must already exist in this resource
+// group with NS records delegated at the domain registrar.
+// Extract zone name (e.g., 'codec-chat.com') and record name (e.g., 'sfu') from the FQDN.
+var sfuDomainParts = split(sfuDomainName != '' ? sfuDomainName : 'placeholder.invalid', '.')
+var sfuDnsZoneName = '${sfuDomainParts[1]}.${sfuDomainParts[2]}'
+var sfuDnsRecordName = sfuDomainParts[0]
+
+module sfuDnsRecord 'modules/dns-record.bicep' = if (voiceVmEnabled && sfuDomainName != '') {
+  name: 'sfu-dns-record'
+  params: {
+    zoneName: sfuDnsZoneName
+    recordName: sfuDnsRecordName
+    ipAddress: voiceVm.outputs.publicIpAddress
   }
 }
 
@@ -266,6 +301,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
+    appInsightsConnectionString: appInsights.outputs.connectionString
   }
 }
 

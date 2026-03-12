@@ -141,7 +141,7 @@ export default defineConfig({
 		})
 	],
 	server: {
-		port: 5174,
+		port: parseInt(process.env.PORT || '5174'),
 		strictPort: true
 	}
 });

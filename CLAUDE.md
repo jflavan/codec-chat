@@ -8,7 +8,13 @@ Codec is a Discord-like chat application — a monorepo with a SvelteKit fronten
 
 ## Development Commands
 
-### Start PostgreSQL (required before API)
+### Start with Aspire (recommended)
+```bash
+cd apps/aspire/Codec.AppHost
+dotnet run          # Starts Postgres, Redis, Azurite, API, and Web — dashboard at https://localhost:17222
+```
+
+### Start without Aspire (alternative)
 ```bash
 docker compose up -d postgres azurite
 # PostgreSQL 16 on localhost:5433, DB: codec_dev, user: codec, password: codec_dev_password
@@ -45,13 +51,17 @@ dotnet ef migrations script                # View SQL
 ### Repository Layout
 ```
 apps/
-  api/Codec.Api/     # ASP.NET Core 10 Web API
-    Controllers/     # One controller per resource area
-    Models/          # EF Core entities + request DTOs
-    Data/            # CodecDbContext, SeedData, DesignTimeDbContextFactory
-    Hubs/            # ChatHub (SignalR)
-    Services/        # UserService, AvatarService, ImageUploadService, LinkPreviewService, file storage
-    Migrations/      # EF Core code-first migrations
+  api/
+    Codec.Api/       # ASP.NET Core 10 Web API
+      Controllers/   # One controller per resource area
+      Models/        # EF Core entities + request DTOs
+      Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
+      Hubs/          # ChatHub (SignalR)
+      Services/      # UserService, AvatarService, ImageUploadService, LinkPreviewService, file storage
+      Migrations/    # EF Core code-first migrations
+    Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
+  aspire/
+    Codec.AppHost/   # Aspire orchestrator (local dev only)
   web/src/
     lib/
       api/           # ApiClient class (typed HTTP client)

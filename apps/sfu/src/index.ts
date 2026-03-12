@@ -1,3 +1,4 @@
+import './instrumentation.js';
 import { timingSafeEqual } from 'crypto';
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';

@@ -10,6 +10,8 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Caching:** Redis 8 distributed cache (`IDistributedCache`) for message history with channel-level invalidation
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID token validation)
+- **Observability:** OpenTelemetry (traces, metrics, logs) via `Codec.ServiceDefaults`; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard
+- **Local Dev:** .NET Aspire AppHost for single-command orchestration (Postgres, Redis, Azurite, API, Web)
 - **Deployment:** Containerized on Azure Container Apps (Docker multi-stage builds)
 
 ## System Components

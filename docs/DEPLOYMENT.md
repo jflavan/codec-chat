@@ -30,6 +30,11 @@ This document covers deploying Codec to **Azure Container Apps** using the infra
                      │  │  Container     │  │  Key Vault               │   │
                      │  │  Registry      │  │  (secrets)               │   │
                      │  └────────────────┘  └──────────────────────────┘   │
+                     │  ┌────────────────┐  ┌──────────────────────────┐   │
+                     │  │  Redis Cache   │  │  Application Insights    │   │
+                     │  │  (cache +      │  │  (traces, metrics, logs) │   │
+                     │  │   backplane)   │  └──────────────────────────┘   │
+                     │  └────────────────┘                                 │
                      │  ┌──────────────────────────────────────────────┐   │
                      │  │  Log Analytics Workspace                     │   │
                      │  └──────────────────────────────────────────────┘   │
@@ -44,6 +49,7 @@ All resources use the pattern `{abbreviation}-codec-{env}`:
 |----------|------|
 | Resource Group | `rg-codec-prod` |
 | Log Analytics | `log-codec-prod` |
+| Application Insights | `appi-codec-prod` |
 | Container Registry | `acrcodecprod` |
 | PostgreSQL Server | `psql-codec-prod` |
 | Database | `codec` |
@@ -52,6 +58,7 @@ All resources use the pattern `{abbreviation}-codec-{env}`:
 | Container Apps Env | `cae-codec-prod` |
 | API Container App | `ca-codec-prod-api` |
 | Web Container App | `ca-codec-prod-web` |
+| Redis Cache | `redis-codec-prod` |
 
 ## Prerequisites
 
@@ -62,7 +69,8 @@ All resources use the pattern `{abbreviation}-codec-{env}`:
    ```bash
    az group create --name rg-codec-prod --location centralus
    ```
-3. **Microsoft Entra ID App Registration** for GitHub Actions OIDC:
+3. **DNS zone**: `codec-chat.com` DNS zone must exist in the resource group with NS records delegated at the registrar (required for the SFU A record `sfu.codec-chat.com`)
+4. **Microsoft Entra ID App Registration** for GitHub Actions OIDC:
    - Create an App Registration in Microsoft Entra ID
    - Add Federated Identity Credentials for the `main` branch and `prod` environment
    - Grant the App Registration **Contributor** and **User Access Administrator** roles on `rg-codec-prod`
@@ -81,6 +89,7 @@ Configure these secrets in the repository's Settings > Secrets and variables > A
 | `PUBLIC_API_BASE_URL` | API URL baked into SvelteKit build (`https://api.codec-chat.com`) |
 | `PUBLIC_GOOGLE_CLIENT_ID` | Google client ID baked into SvelteKit build |
 | `GLOBAL_ADMIN_EMAIL` | Email address of the platform-wide global admin |
+| `CERTBOT_EMAIL` | Email for Let's Encrypt certificate notifications (voice VM TLS) |
 
 ### GitHub Environment
 
@@ -310,6 +319,8 @@ cd ../..
 | `Storage__AzureBlob__ServiceUri` | Env var | Blob storage endpoint URL |
 | `GlobalAdmin__Email` | Key Vault secret ref | Email of the global admin user |
 | `Redis__ConnectionString` | Key Vault secret ref | Azure Redis Cache connection string |
+| `OTEL_SERVICE_NAME` | Env var | OpenTelemetry service name (`codec-api`) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Env var | Application Insights connection string for OTel export |
 
 ### Web Container App
 
@@ -330,6 +341,18 @@ cd ../..
 
 ## Monitoring
 
+### Observability (OpenTelemetry + Application Insights)
+
+The API and SFU export traces, metrics, and logs to Application Insights (`appi-codec-prod`) via OpenTelemetry. This is powered by the `Codec.ServiceDefaults` project which configures:
+
+- **Traces:** ASP.NET Core request traces, HTTP client calls, EF Core queries
+- **Metrics:** ASP.NET Core, HTTP client, and .NET runtime metrics
+- **Logs:** Structured logs via OpenTelemetry log exporter (in addition to Serilog console output)
+
+The Application Insights connection string is passed as a plain environment variable (`APPLICATIONINSIGHTS_CONNECTION_STRING`), not via Key Vault, because the ingestion key is write-only and not security-sensitive.
+
+The SFU (`codec-sfu`) on the voice VM also exports telemetry to Application Insights when the connection string is set in its docker-compose template.
+
 ### Logs
 
 Container Apps logs stream to Log Analytics. Query logs in the Azure Portal:
@@ -343,12 +366,15 @@ ContainerAppConsoleLogs_CL
 
 The API outputs structured JSON logs via Serilog, which Log Analytics can parse for filtering and alerting.
 
+For distributed tracing across the API and SFU, use the Application Insights **Transaction search** and **Application map** views in the Azure Portal.
+
 ### Health Endpoints
 
 | Endpoint | Container App | Purpose |
 |----------|---------------|---------|
 | `/health/live` | API | Liveness probe — process is running |
-| `/health/ready` | API | Readiness probe — DB connectivity OK |
+| `/health/ready` | API | Readiness probe — DB and Redis connectivity OK |
+| `/alive` | API | Simple alive check |
 | `/health` | Web | Liveness probe — Node.js process running |
 
 ### Recommended Alerts
@@ -359,6 +385,7 @@ Configure in Azure Monitor:
 - HTTP 5xx error rate > 5% in 5 minutes
 - PostgreSQL CPU utilization > 80% sustained
 - Container App replica scaling events
+- Application Insights failure rate anomaly detection
 
 ## Troubleshooting
 
@@ -426,5 +453,6 @@ Container Apps supports WebSocket connections natively. If SignalR fails:
 | Container Registry | Basic, < 5 GB | ~$5 |
 | Key Vault | < 10 secrets | ~$0.03 |
 | Redis Cache | Basic C0, 250 MB | ~$16 |
+| Application Insights | Free tier (5 GB/month ingestion) | ~$0 |
 | Log Analytics | Free tier (5 GB/month) | ~$0 |
 | **Total** | | **~$53–74/month** |
