@@ -5,7 +5,7 @@ namespace Codec.Api.Services;
 public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiService
 {
     private const string ContainerName = "emojis";
-    private const long MaxFileSizeBytes = 256 * 1024; // 256 KB
+    private const long MaxFileSizeBytes = 512 * 1024; // 512 KB
 
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -20,7 +20,7 @@ public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiS
     public string? Validate(IFormFile file)
     {
         if (file.Length == 0) return "File is empty.";
-        if (file.Length > MaxFileSizeBytes) return "File size exceeds 256 KB limit.";
+        if (file.Length > MaxFileSizeBytes) return "File size exceeds 512 KB limit.";
         if (!AllowedContentTypes.Contains(file.ContentType))
             return $"Unsupported file type '{file.ContentType}'. Allowed: PNG, JPEG, WebP, GIF.";
         var ext = Path.GetExtension(file.FileName);

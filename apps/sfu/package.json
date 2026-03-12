@@ -22,7 +22,8 @@
     "@opentelemetry/sdk-node": "^0.57.0",
     "express": "^5.0.3",
     "express-rate-limit": "^7.5.0",
-    "mediasoup": "^3.14.19"
+    "mediasoup": "^3.14.19",
+    "tar": "7.5.11"
   },
   "overrides": {
     "tar": "7.5.11"
