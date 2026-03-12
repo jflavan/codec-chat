@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "11749515665529792703"
+      "templateHash": "2458374315736694811"
     }
   },
   "parameters": {
@@ -1088,7 +1088,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "9466678379272008156"
+              "templateHash": "16764919358398712308"
             }
           },
           "parameters": {
@@ -1161,7 +1161,6 @@
             }
           },
           "variables": {
-            "sfuPort": 3001,
             "turnPort": 3478,
             "rtcMinPort": 40000,
             "rtcMaxPort": 40100,
@@ -1421,7 +1420,7 @@
             },
             "sfuApiUrl": {
               "type": "string",
-              "value": "[if(not(equals(parameters('sfuDomainName'), '')), format('https://{0}', parameters('sfuDomainName')), format('http://{0}:{1}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress, variables('sfuPort')))]"
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('name'))), '2023-09-01').ipAddress)]"
             },
             "turnServerUrl": {
               "type": "string",
