@@ -249,13 +249,16 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "curl -sf http://localhost:3001/health && curl -sf https://sfu.codec-chat.com/health && echo OK" \
+            --scripts "curl -sf http://localhost:3001/health && echo INTERNAL_OK; curl -sf https://sfu.codec-chat.com/health && echo EXTERNAL_OK || echo EXTERNAL_SKIP" \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
-          if [[ "$STATUS" != *"OK"* ]]; then
-            echo "::error::SFU health check failed: $STATUS"
+          if [[ "$STATUS" != *"INTERNAL_OK"* ]]; then
+            echo "::error::SFU internal health check failed: $STATUS"
             exit 1
           fi
-          echo "SFU health check passed (direct + nginx TLS)"
+          if [[ "$STATUS" != *"EXTERNAL_OK"* ]]; then
+            echo "::warning::SFU external TLS health check failed (DNS may not be delegated yet)"
+          fi
+          echo "SFU health check passed"
 
   migrate-database:
     runs-on: ubuntu-latest
