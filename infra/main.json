@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "6813127065713115571"
+      "templateHash": "11749515665529792703"
     }
   },
   "parameters": {
@@ -1431,6 +1431,57 @@
         }
       }
     },
+    "sfuDnsZone": {
+      "condition": "[and(parameters('voiceVmEnabled'), not(equals(parameters('sfuDomainName'), '')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "sfu-dns-zone",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "zoneName": {
+            "value": "[variables('sfuDnsZoneName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "1765874125019946318"
+            }
+          },
+          "parameters": {
+            "zoneName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "global"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/dnsZones",
+              "apiVersion": "2018-05-01",
+              "name": "[parameters('zoneName')]",
+              "location": "[parameters('location')]"
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('zoneName')]"
+            }
+          }
+        }
+      }
+    },
     "sfuDnsRecord": {
       "condition": "[and(parameters('voiceVmEnabled'), not(equals(parameters('sfuDomainName'), '')))]",
       "type": "Microsoft.Resources/deployments",
@@ -1491,6 +1542,7 @@
         }
       },
       "dependsOn": [
+        "sfuDnsZone",
         "voiceVm"
       ]
     },

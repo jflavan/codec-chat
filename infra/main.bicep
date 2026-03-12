@@ -211,16 +211,22 @@ module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
   }
 }
 
-// ── DNS A record for the SFU TLS endpoint ─────────────────────────────────────
-// The parent DNS zone (e.g., codec-chat.com) must already exist in this resource
-// group with NS records delegated at the domain registrar.
+// ── DNS zone + A record for the SFU TLS endpoint ──────────────────────────────
 // Extract zone name (e.g., 'codec-chat.com') and record name (e.g., 'sfu') from the FQDN.
 var sfuDomainParts = split(sfuDomainName != '' ? sfuDomainName : 'placeholder.invalid', '.')
 var sfuDnsZoneName = '${sfuDomainParts[1]}.${sfuDomainParts[2]}'
 var sfuDnsRecordName = sfuDomainParts[0]
 
+module sfuDnsZone 'modules/dns-zone.bicep' = if (voiceVmEnabled && sfuDomainName != '') {
+  name: 'sfu-dns-zone'
+  params: {
+    zoneName: sfuDnsZoneName
+  }
+}
+
 module sfuDnsRecord 'modules/dns-record.bicep' = if (voiceVmEnabled && sfuDomainName != '') {
   name: 'sfu-dns-record'
+  dependsOn: [sfuDnsZone]
   params: {
     zoneName: sfuDnsZoneName
     recordName: sfuDnsRecordName
