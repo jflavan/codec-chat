@@ -44,7 +44,6 @@ param certbotEmail string = ''
 param vmSize string = 'Standard_D2als_v7'
 
 // ── Port constants ──────────────────────────────────────────────────────────────
-var sfuPort         = 3001
 var turnPort        = 3478
 var rtcMinPort      = 40000
 var rtcMaxPort      = 40100
@@ -340,5 +339,8 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // ── Outputs ─────────────────────────────────────────────────────────────────────
 output publicIpAddress string = publicIp.properties.ipAddress
 output fqdn string = publicIp.properties.dnsSettings.fqdn
-output sfuApiUrl string = sfuDomainName != '' ? 'https://${sfuDomainName}' : 'http://${publicIp.properties.ipAddress}:${sfuPort}'
+// Always use the public IP for API-to-SFU communication. The domain name
+// requires DNS delegation at the registrar, which may not be complete.
+// nginx on port 443 proxies to localhost:3001 regardless of hostname.
+output sfuApiUrl string = 'https://${publicIp.properties.ipAddress}'
 output turnServerUrl string = 'turn:${publicIp.properties.ipAddress}:${turnPort}'

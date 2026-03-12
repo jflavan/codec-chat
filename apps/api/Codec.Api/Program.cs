@@ -134,6 +134,9 @@ builder.Services.AddScoped<IUserService, UserService>();
 
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.
+// Accepts self-signed TLS certs because the SFU VM uses a snakeoil cert
+// until DNS delegation is complete and certbot provisions a real one.
+// Authentication is handled by the X-Internal-Key header, not the certificate.
 builder.Services.AddHttpClient("sfu", (sp, client) =>
 {
     client.Timeout = TimeSpan.FromSeconds(10);
@@ -143,6 +146,12 @@ builder.Services.AddHttpClient("sfu", (sp, client) =>
     else
         sp.GetRequiredService<ILogger<Program>>()
           .LogWarning("SFU security configuration incomplete: Voice:SfuInternalKey is not configured.");
+// TODO: Remove DangerousAcceptAnyServerCertificateValidator once DNS delegation
+// for sfu.codec-chat.com is complete and the Bicep sfuApiUrl output is switched
+// back to the domain name. Certbot will then have a valid cert.
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
 
 // Validate voice configuration at startup in non-development environments.
