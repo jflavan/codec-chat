@@ -117,6 +117,18 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Fetch App Insights connection string
+        id: appinsights
+        run: |
+          CONN_STR=$(az monitor app-insights component show \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --app appi-codec-prod \
+            --query connectionString -o tsv 2>/dev/null || echo "")
+          if [ -z "$CONN_STR" ]; then
+            echo "::warning::Could not fetch App Insights connection string — SFU telemetry will be disabled"
+          fi
+          echo "connection-string=$CONN_STR" >> "$GITHUB_OUTPUT"
+
       - name: Substitute variables in docker-compose template
         env:
           ACR_SERVER: ${{ env.ACR_NAME }}.azurecr.io
@@ -124,8 +136,9 @@ jobs:
           ANNOUNCED_IP: ${{ secrets.VOICE_VM_IP }}
           TURN_SECRET: ${{ secrets.VOICE_TURN_SECRET }}
           SFU_INTERNAL_KEY: ${{ secrets.VOICE_SFU_INTERNAL_KEY }}
+          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ steps.appinsights.outputs.connection-string }}
         run: |
-          envsubst '${ACR_SERVER} ${IMAGE_TAG} ${ANNOUNCED_IP} ${TURN_SECRET} ${SFU_INTERNAL_KEY}' \
+          envsubst '${ACR_SERVER} ${IMAGE_TAG} ${ANNOUNCED_IP} ${TURN_SECRET} ${SFU_INTERNAL_KEY} ${APPLICATIONINSIGHTS_CONNECTION_STRING}' \
             < infra/voice/docker-compose.yml \
             | base64 -w 0 > /tmp/compose-b64.txt
 
@@ -163,19 +176,86 @@ jobs:
               docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
             "
 
+      - name: Ensure nginx TLS proxy is configured
+        run: |
+          az vm run-command invoke \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VOICE_VM_NAME }} \
+            --command-id RunShellScript \
+            --scripts "
+              set -e
+              if command -v nginx &>/dev/null && [ -f /etc/letsencrypt/live/sfu.codec-chat.com/fullchain.pem ]; then
+                echo 'nginx + certbot already configured, reloading'
+                systemctl reload nginx
+                exit 0
+              fi
+
+              echo 'Installing nginx and certbot...'
+              apt-get update -qq
+              apt-get install -y -qq nginx certbot python3-certbot-nginx
+
+              cat > /etc/nginx/sites-available/sfu-proxy <<'NGINX'
+      server {
+          listen 80 default_server;
+          server_name _;
+          location /.well-known/acme-challenge/ {
+              root /var/www/html;
+          }
+          location / {
+              return 444;
+          }
+      }
+      server {
+          listen 443 ssl default_server;
+          server_name sfu.codec-chat.com;
+
+          ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+          ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_prefer_server_ciphers on;
+
+          location / {
+              proxy_pass http://127.0.0.1:3001;
+              proxy_set_header Host \$host;
+              proxy_set_header X-Real-IP \$remote_addr;
+              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$scheme;
+              proxy_read_timeout 30s;
+              proxy_connect_timeout 5s;
+          }
+
+          location /health {
+              proxy_pass http://127.0.0.1:3001/health;
+          }
+      }
+      NGINX
+              ln -sf /etc/nginx/sites-available/sfu-proxy /etc/nginx/sites-enabled/sfu-proxy
+              rm -f /etc/nginx/sites-enabled/default
+              systemctl enable nginx
+              systemctl restart nginx
+
+              certbot --nginx -d sfu.codec-chat.com \
+                --non-interactive --agree-tos \
+                --email '${{ secrets.CERTBOT_EMAIL }}' \
+                --redirect
+
+              systemctl reload nginx
+              echo 'nginx TLS proxy configured successfully'
+            "
+
       - name: Verify SFU health
         run: |
           STATUS=$(az vm run-command invoke \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "curl -sf http://localhost:3001/health && echo OK" \
+            --scripts "curl -sf http://localhost:3001/health && curl -sf https://sfu.codec-chat.com/health && echo OK" \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
           if [[ "$STATUS" != *"OK"* ]]; then
             echo "::error::SFU health check failed: $STATUS"
             exit 1
           fi
-          echo "SFU health check passed"
+          echo "SFU health check passed (direct + nginx TLS)"
 
   migrate-database:
     runs-on: ubuntu-latest

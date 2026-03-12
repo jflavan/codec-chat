@@ -14,7 +14,7 @@ param storageBlobEndpoint string
 param corsAllowedOrigins string
 param apiBaseUrl string
 
-@description('Internal URL of the mediasoup SFU (e.g., http://<voice-vm-ip>:3001).')
+@description('URL of the mediasoup SFU (e.g., https://sfu.codec-chat.com).')
 param sfuApiUrl string = ''
 
 @description('TURN server URL for WebRTC ICE (e.g., turn:<voice-vm-ip>:3478).')
@@ -31,6 +31,9 @@ param gitHubTokenKvUrl string = ''
 
 @description('Key Vault secret URL for the Redis connection string. Leave empty to disable Redis caching and SignalR backplane.')
 param redisConnectionStringKvUrl string = ''
+
+@description('Application Insights connection string for OpenTelemetry export. Leave empty to disable. Passed as a plain value (not Key Vault) because the ingestion key is write-only and not a security-sensitive credential.')
+param appInsightsConnectionString string = ''
 
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
@@ -173,6 +176,10 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'GlobalAdmin__Email'
               secretRef: 'global-admin-email'
             }
+            {
+              name: 'OTEL_SERVICE_NAME'
+              value: 'codec-api'
+            }
           ], sfuApiUrl != '' ? [
             {
               name: 'Voice__MediasoupApiUrl'
@@ -201,6 +208,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Redis__ConnectionString'
               secretRef: 'redis-connection-string'
+            }
+          ] : [], appInsightsConnectionString != '' ? [
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsightsConnectionString
             }
           ] : [])
           probes: [

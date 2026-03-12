@@ -8,13 +8,14 @@
 #   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
 #   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
 #   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
+#   APPLICATIONINSIGHTS_CONNECTION_STRING — App Insights connection string for OTel export
 
 services:
   sfu:
     image: ${ACR_SERVER}/codec-sfu:${IMAGE_TAG}
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
       - "40000-40100:40000-40100/udp"
     environment:
       ANNOUNCED_IP: "${ANNOUNCED_IP}"
@@ -22,6 +23,8 @@ services:
       RTC_MAX_PORT: "40100"
       SFU_PORT: "3001"
       SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
+      APPLICATIONINSIGHTS_CONNECTION_STRING: "${APPLICATIONINSIGHTS_CONNECTION_STRING}"
+      OTEL_SERVICE_NAME: "codec-sfu"
 
   coturn:
     # Pinned to a specific version tag (4.6.2). Note: this is a mutable tag, not a digest pin.

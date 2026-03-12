@@ -676,15 +676,27 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             sendTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "send");
             recvTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "recv");
         }
-        catch
+        catch (HttpRequestException ex)
         {
+            logger.LogError(ex, "Failed to reach SFU at {SfuApiUrl} for channel {ChannelId}", sfuApiUrl, channelId);
             try
             {
                 using var cleanupClient = httpClientFactory.CreateClient("sfu");
                 await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
             }
             catch { /* SFU cleanup is best-effort */ }
-            throw;
+            throw new HubException("Voice server is unavailable. Please try again later.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error setting up SFU transports for channel {ChannelId}", channelId);
+            try
+            {
+                using var cleanupClient = httpClientFactory.CreateClient("sfu");
+                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
+            }
+            catch { /* SFU cleanup is best-effort */ }
+            throw new HubException("Failed to set up voice connection. Please try again later.");
         }
 
         // SFU is ready — persist voice state and join the SignalR group.
