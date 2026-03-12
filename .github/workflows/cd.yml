@@ -231,6 +231,7 @@ jobs:
               }
           }
           NGINXCONF
+          )
           NGINX_B64=$(echo "$NGINX_CONF" | base64 -w 0)
 
           az vm run-command invoke \
