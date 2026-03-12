@@ -234,13 +234,19 @@ jobs:
               systemctl enable nginx
               systemctl restart nginx
 
-              certbot --nginx -d sfu.codec-chat.com \
+              # Attempt certbot — non-fatal if DNS delegation is not yet complete.
+              # nginx will continue to serve with the snakeoil cert until certbot succeeds.
+              if certbot --nginx -d sfu.codec-chat.com \
                 --non-interactive --agree-tos \
                 --email '${{ secrets.CERTBOT_EMAIL }}' \
-                --redirect
+                --redirect; then
+                echo 'certbot succeeded — real TLS cert provisioned'
+              else
+                echo '::warning::certbot failed (DNS may not be delegated yet) — using snakeoil cert'
+              fi
 
               systemctl reload nginx
-              echo 'nginx TLS proxy configured successfully'
+              echo 'nginx TLS proxy configured'
             "
 
       - name: Verify SFU health
@@ -249,16 +255,17 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "curl -sf http://localhost:3001/health && echo INTERNAL_OK; curl -sf https://sfu.codec-chat.com/health && echo EXTERNAL_OK || echo EXTERNAL_SKIP" \
+            --scripts "curl -sf http://localhost:3001/health && echo INTERNAL_OK; curl -skf https://localhost/health && echo NGINX_OK" \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
           if [[ "$STATUS" != *"INTERNAL_OK"* ]]; then
             echo "::error::SFU internal health check failed: $STATUS"
             exit 1
           fi
-          if [[ "$STATUS" != *"EXTERNAL_OK"* ]]; then
-            echo "::warning::SFU external TLS health check failed (DNS may not be delegated yet)"
+          if [[ "$STATUS" != *"NGINX_OK"* ]]; then
+            echo "::error::SFU nginx proxy health check failed: $STATUS"
+            exit 1
           fi
-          echo "SFU health check passed"
+          echo "SFU health check passed (direct + nginx proxy)"
 
   migrate-database:
     runs-on: ubuntu-latest
