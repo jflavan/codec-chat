@@ -55,6 +55,8 @@ public class FakeAuthHandler(
             if (payload.TryGetValue("name", out var name)) claims.Add(new Claim("name", name));
             if (payload.TryGetValue("email", out var email)) claims.Add(new Claim("email", email));
             if (payload.TryGetValue("picture", out var picture)) claims.Add(new Claim("picture", picture));
+            if (payload.TryGetValue("iss", out var iss)) claims.Add(new Claim("iss", iss));
+            else claims.Add(new Claim("iss", "accounts.google.com"));
 
             var identity = new ClaimsIdentity(claims, SchemeName);
             var principal = new ClaimsPrincipal(identity);
@@ -71,13 +73,13 @@ public class FakeAuthHandler(
     /// <summary>
     /// Creates a base64-encoded token from the given claims for use in test requests.
     /// </summary>
-    public static string CreateToken(string googleSubject, string name, string email = "test@test.com", string? picture = null)
+    public static string CreateToken(string googleSubject, string name, string? email = null, string? picture = null)
     {
         var payload = new Dictionary<string, string>
         {
             ["sub"] = googleSubject,
             ["name"] = name,
-            ["email"] = email
+            ["email"] = email ?? $"{googleSubject}@test.com"
         };
         if (picture is not null) payload["picture"] = picture;
 

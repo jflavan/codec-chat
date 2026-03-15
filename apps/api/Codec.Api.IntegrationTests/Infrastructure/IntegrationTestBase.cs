@@ -28,8 +28,8 @@ public abstract class IntegrationTestBase : IClassFixture<CodecWebFactory>
     /// Creates an authenticated HTTP client for a test user.
     /// Each unique googleSubject creates a new user on first API call.
     /// </summary>
-    protected HttpClient CreateClient(string googleSubject = "google-test-1", string name = "Test User", string email = "test@test.com")
-        => Factory.CreateAuthenticatedClient(googleSubject, name, email);
+    protected HttpClient CreateClient(string googleSubject = "google-test-1", string name = "Test User", string? email = null)
+        => Factory.CreateAuthenticatedClient(googleSubject, name, email ?? $"{googleSubject}@test.com");
 
     /// <summary>
     /// Creates a second authenticated user for multi-user test scenarios.

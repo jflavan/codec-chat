@@ -93,8 +93,47 @@ if (string.IsNullOrWhiteSpace(googleClientId))
     throw new InvalidOperationException("Google:ClientId is required for authentication.");
 }
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "";
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+{
+    if (builder.Environment.IsDevelopment())
+        jwtSecret = "dev-only-jwt-secret-that-is-at-least-32-chars-long!!";
+    else
+        throw new InvalidOperationException("Jwt:Secret must be at least 32 characters in non-development environments.");
+}
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "codec-api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "codec-api";
+
+builder.Services.AddAuthentication("Selector")
+    .AddPolicyScheme("Selector", "Google or Local", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+            var token = authHeader?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true
+                ? authHeader["Bearer ".Length..]
+                : context.Request.Query["access_token"].FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                // Peek at the issuer claim without validating
+                try
+                {
+                    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                    var jwt = handler.ReadJwtToken(token);
+                    var issuer = jwt.Issuer;
+                    if (issuer == "codec-api")
+                        return "Local";
+                }
+                catch
+                {
+                    // If we can't read it, fall through to Google
+                }
+            }
+            return "Google";
+        };
+    })
+    .AddJwtBearer("Google", options =>
     {
         options.Authority = "https://accounts.google.com";
         options.MapInboundClaims = false;
@@ -107,7 +146,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true
         };
 
-        // Allow SignalR to read the JWT from the query string for WebSocket connections.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
+    })
+    .AddJwtBearer("Local", options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(jwtSecret))
+        };
+
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -131,6 +197,7 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 });
 
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<TokenService>();
 
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.
@@ -179,6 +246,12 @@ builder.Services.AddRateLimiter(options =>
     options.AddFixedWindowLimiter("fixed", limiter =>
     {
         limiter.PermitLimit = 100;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = 10;
         limiter.Window = TimeSpan.FromMinutes(1);
         limiter.QueueLimit = 0;
     });

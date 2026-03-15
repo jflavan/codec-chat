@@ -1,14 +1,54 @@
 # Authentication
 
-This document explains how authentication works in Codec using Google ID tokens.
+This document explains how authentication works in Codec, which supports both Google Sign-In and email/password registration.
 
 ## Overview
 
-Codec uses a **stateless authentication** model powered by Google Identity Services. The web client obtains a JWT ID token from Google, and the API validates it on each request without maintaining server-side sessions.
+Codec supports **two authentication methods** with equivalent security guarantees:
 
-To provide a seamless user experience, the web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week**.
+1. **Google Sign-In** — Stateless authentication using Google-issued ID tokens validated on every API request.
+2. **Email/Password** — Registration and login with bcrypt password hashing; the API issues its own signed JWTs (access tokens + refresh tokens).
+
+Both methods use the same JWT-based authorization middleware in the API and produce access tokens with identical claims shapes. All authenticated API requests use `Authorization: Bearer <token>`, regardless of how the token was obtained.
+
+The web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week** (Google session limit or refresh-token lifetime).
 
 ## Authentication Flow
+
+Codec supports two parallel auth flows. Both result in a JWT access token stored in `localStorage` and sent with every API request.
+
+---
+
+### Email/Password Flow
+
+#### Registration (`POST /auth/register`)
+
+1. Client submits `{ email, password, nickname }`.
+2. API validates email uniqueness (409 Conflict if taken).
+3. Password is hashed with bcrypt (cost factor 12).
+4. A new `User` record is created with `PasswordHash` set and `GoogleSubject` = null.
+5. A 1-hour JWT access token and a 7-day refresh token are issued.
+6. The refresh token is stored hashed (SHA-256) in the `RefreshTokens` table.
+7. API returns 201 with `{ accessToken, refreshToken, user }`.
+
+#### Sign-In (`POST /auth/login`)
+
+1. Client submits `{ email, password }`.
+2. API looks up user by email; returns 401 if not found or if `PasswordHash` is null (Google-only account).
+3. bcrypt verify — 401 on mismatch.
+4. Issues new access + refresh token pair.
+5. Returns 200 with `{ accessToken, refreshToken, user }`.
+
+#### Token Refresh (`POST /auth/refresh`)
+
+1. Client sends `{ refreshToken }` when the access token is expired.
+2. API verifies the token against the stored SHA-256 hash; returns 401 if expired or revoked.
+3. Issues new access + refresh token pair, revokes the old refresh token (rotation on use).
+4. Refresh token lifetime: **7 days**.
+
+---
+
+### Google Sign-In Flow
 
 ### 1. Client-Side Sign-In
 
@@ -52,112 +92,150 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3. Token Validation (API)
 
-The ASP.NET Core API validates the token using Microsoft.AspNetCore.Authentication.JwtBearer:
+The API uses a **dual JWT Bearer scheme** with a policy-based selector. On each request, the selector peeks at the JWT `iss` claim (without validating) to route the token to the correct handler:
+
+- **`iss` = `codec-api`** → `"Local"` scheme (validates with the API's HMAC-SHA256 signing key)
+- **Any other issuer** → `"Google"` scheme (validates against Google's JWKS)
 
 ```csharp
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddAuthentication("Selector")
+    .AddPolicyScheme("Selector", "Google or Local", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            // Peek at the issuer claim without validating
+            var token = /* extract from Authorization header or access_token query */;
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            if (jwt.Issuer == "codec-api") return "Local";
+            return "Google";
+        };
+    })
+    .AddJwtBearer("Google", options =>
     {
         options.Authority = "https://accounts.google.com";
-        options.MapInboundClaims = false; // Preserve raw JWT claim names (sub, name, email, picture)
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuers = new[] { "https://accounts.google.com", "accounts.google.com" },
             ValidateAudience = true,
-            ValidAudience = googleClientId, // Your Google Client ID
+            ValidAudience = googleClientId,
             ValidateLifetime = true
         };
-
-        // Allow SignalR to read the JWT from the query string for WebSocket connections.
-        // WebSocket requests cannot set Authorization headers, so the token is passed
-        // via the access_token query parameter instead.
-        options.Events = new JwtBearerEvents
+        // SignalR WebSocket: read token from ?access_token query string
+    })
+    .AddJwtBearer("Local", options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
-                {
-                    context.Token = accessToken;
-                }
-                return Task.CompletedTask;
-            }
+            ValidateIssuer = true,
+            ValidIssuer = "codec-api",
+            ValidateAudience = true,
+            ValidAudience = "codec-api",
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
+        // SignalR WebSocket: read token from ?access_token query string
     });
 ```
 
-**Validation Steps:**
+**Validation Steps (Google):**
 1. Verify JWT signature using Google's public keys (JWKS)
 2. Check issuer is Google (`accounts.google.com`)
 3. Validate audience matches your Google Client ID
 4. Verify token has not expired
 5. Extract user claims (subject, email, name, picture)
 
-### 4. User Identity Mapping
+**Validation Steps (Local):**
+1. Verify HMAC-SHA256 signature using `Jwt:Secret`
+2. Check issuer and audience are `codec-api`
+3. Verify token has not expired
+4. Extract user claims (sub = user GUID, email, name, picture)
 
-After validation, the API extracts claims and maps to an internal User record:
+### 4. Nickname on First Sign-Up
+
+Both flows gate entry to the app on a nickname being set:
+
+- **Email/password users** — Nickname is collected during registration (`RegisterRequest.Nickname`) and written directly to `User.Nickname`.
+- **Google users** — After the first Google sign-in, `/me` returns `isNewUser: true`. The frontend shows a `NicknameModal` (pre-filled with the Google display name) before allowing navigation. On submit, the frontend calls `PATCH /me/nickname`.
+
+---
+
+### 5. Account Linking
+
+An email/password user can link their Google account by visiting Settings → My Account → Link Google Account.
+
+1. User signs in with Google on the link screen.
+2. Frontend sends `{ googleIdToken, password }` to `POST /auth/link-google`.
+3. API confirms the password (required — user must prove ownership of the email/password account).
+4. API stores the Google subject on the existing `User` record.
+5. From that point on, the user can sign in with either method.
+
+> **Deferred:** Reverse linking (Google-first users adding a password) and password reset via email are not yet implemented.
+
+---
+
+### 6. User Identity Mapping
+
+After validation, `UserService.GetOrCreateUserAsync` checks the JWT `iss` claim to determine the auth method and maps claims to an internal `User` record:
+
+- **Local tokens** (`iss` = `codec-api`): The `sub` claim is the user's GUID. The user is looked up directly by `Id`.
+- **Google tokens** (`iss` = `accounts.google.com`): The `sub` claim is the Google subject string. The user is looked up by `GoogleSubject`, and profile fields (display name, email, avatar) are synced from the Google token on each request.
 
 ```csharp
-app.MapGet("/me", async (ClaimsPrincipal user, CodecDbContext db) =>
+public async Task<(User, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal)
 {
-    var appUser = await GetOrCreateUserAsync(user, db);
-    return Results.Ok(appUser);
-}).RequireAuthorization();
+    var issuer = principal.FindFirst("iss")?.Value;
 
-// With MapInboundClaims = false, raw JWT claim names are preserved.
-static async Task<User> GetOrCreateUserAsync(ClaimsPrincipal user, CodecDbContext db)
-{
-    var subject = user.FindFirst("sub")?.Value;
-    var displayName = user.FindFirst("name")?.Value ?? user.Identity?.Name ?? "Unknown";
-    var email = user.FindFirst("email")?.Value;
-    var avatarUrl = user.FindFirst("picture")?.Value;
+    if (issuer == "codec-api")
+    {
+        // Local JWT — sub is the user's GUID
+        var userId = Guid.Parse(principal.FindFirst("sub")!.Value);
+        var user = await db.Users.FindAsync(userId);
+        return (user!, false);
+    }
 
-    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == subject);
+    // Google JWT — sub is the Google subject string
+    var googleSubject = principal.FindFirst("sub")?.Value;
+    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSubject);
 
     if (existing is not null)
     {
-        existing.DisplayName = displayName;
-        existing.Email = email;
-        existing.AvatarUrl = avatarUrl;
+        // Sync profile from Google token
+        existing.DisplayName = principal.FindFirst("name")?.Value ?? existing.DisplayName;
+        existing.Email = principal.FindFirst("email")?.Value;
+        existing.AvatarUrl = principal.FindFirst("picture")?.Value;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
-        return existing;
+        return (existing, false);
     }
 
-    var appUser = new User
-    {
-        GoogleSubject = subject,
-        DisplayName = displayName,
-        Email = email,
-        AvatarUrl = avatarUrl
-    };
-
-    db.Users.Add(appUser);
+    // New Google user
+    var newUser = new User { GoogleSubject = googleSubject, /* ... */ };
+    db.Users.Add(newUser);
     await db.SaveChangesAsync();
-    return appUser;
+    return (newUser, true);
 }
 ```
 
-> **Note:** `MapInboundClaims = false` is set on the JwtBearer configuration so that raw JWT claim names (`sub`, `name`, `email`, `picture`) pass through without being remapped to .NET `ClaimTypes` URIs. This simplifies claim access in application code.
+> **Note:** `MapInboundClaims = false` is set on both JWT Bearer schemes so that raw JWT claim names (`sub`, `name`, `email`, `picture`) pass through without being remapped to .NET `ClaimTypes` URIs.
 
 ## Token Claims
 
-Google ID tokens contain the following claims:
+Both token types produce an identical claims shape for application code:
 
-| Claim | Description | Example |
-|-------|-------------|----------|
-| `sub` | Unique Google user ID | `110169484474386276334` |
-| `email` | User's email address | `user@example.com` |
-| `name` | Full name | `John Doe` |
-| `picture` | Avatar URL | `https://lh3.googleusercontent.com/...` |
-| `iss` | Token issuer | `accounts.google.com` |
-| `aud` | Client ID | `123456789-abc.apps.googleusercontent.com` |
-| `exp` | Token expiry timestamp | `1707672600` |
-| `iat` | Token issued timestamp | `1707669000` |
+| Claim | Google Token | Local Token |
+|-------|-------------|-------------|
+| `sub` | Google user ID (`110169484474386276334`) | User GUID (`a1b2c3d4-...`) |
+| `email` | User's email | User's email |
+| `name` | Google display name | Effective display name |
+| `picture` | Google avatar URL | Custom avatar path (if set) |
+| `iss` | `accounts.google.com` | `codec-api` |
+| `aud` | Google Client ID | `codec-api` |
+| `exp` | 1 hour from issuance | 1 hour from issuance |
 
-> With `MapInboundClaims = false`, these claim names are used as-is in the `ClaimsPrincipal`. Without this setting, the JwtBearer middleware would remap them to `ClaimTypes` URIs (e.g., `sub` → `ClaimTypes.NameIdentifier`).
+> With `MapInboundClaims = false` on both schemes, these claim names are used as-is in the `ClaimsPrincipal`. The `iss` claim is used by `UserService` to determine which lookup strategy to use (`Id` for local, `GoogleSubject` for Google).
 
 ## Configuration
 
@@ -236,16 +314,28 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - `google.accounts.id.prompt()` triggers One Tap silent re-authentication
 - When a stored token expires (but session is still within 1 week), Google silently issues a fresh token
 
+### Security Comparison: Google vs. Email/Password
+
+| Property | Google Sign-In | Email/Password |
+|---|---|---|
+| Access token lifetime | 1 hour | 1 hour |
+| Session duration | 7 days (One Tap refresh) | 7 days (refresh token) |
+| Password storage | N/A (Google manages) | bcrypt cost factor 12 |
+| Token signing | Google RSA (JWKS) | API HMAC-SHA256 secret |
+| Rate limiting on auth endpoints | Standard (100 req/min) | Strict (10 req/min per IP) |
+| Refresh mechanism | Google One Tap silent re-auth | Rotating opaque refresh tokens (stored hashed) |
+
 ### Current Limitations
 
 ⚠️ **Token Revocation**
-- No real-time token invalidation
-- Compromised tokens valid until expiration
-- Future: Implement token blacklist or short TTL
+- Google tokens: no real-time invalidation; compromised tokens valid until expiration
+- Local tokens: access tokens cannot be individually revoked (short 1-hour TTL mitigates); refresh tokens are invalidated on use (rotation) and on sign-out
 
-⚠️ **Single Identity Provider**
-- Only Google authentication supported
-- Future: Add Microsoft, GitHub, email/password
+⚠️ **Password Reset**
+- Password reset via email is not yet implemented
+
+⚠️ **Reverse Account Linking**
+- Google-first users (no password set) cannot yet add an email/password credential; this is deferred
 
 ⚠️ **Sign-Out**
 - Sign-out button is available in the user panel (bottom of channel sidebar)

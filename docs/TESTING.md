@@ -6,11 +6,11 @@ Codec uses a multi-layer testing strategy combining unit tests and integration t
 
 | Suite | Framework | Tests | Coverage Target |
 |-------|-----------|-------|----------------|
-| API Unit Tests | xUnit + FluentAssertions + Moq | 205 | Services: 95%+ |
+| API Unit Tests | xUnit + FluentAssertions + Moq | 238 | Services: 95%+ |
 | API Integration Tests | xUnit + WebApplicationFactory + Testcontainers | 109 | Controllers + Hub: 72%+ |
-| Web Unit Tests | Vitest + jsdom | 134 | Utilities + API client: 98%+ |
+| Web Unit Tests | Vitest + jsdom | 154 | Utilities + API client: 98%+ |
 
-**Total: 448 tests**
+**Total: 501 tests**
 
 ## Running Tests
 
@@ -71,7 +71,7 @@ Pure unit tests using Vitest with jsdom environment. No browser or API server re
 **What's tested:**
 - `lib/utils/` — format, YouTube URL extraction, emoji regex, emoji frequency, theme management (100% coverage)
 - `lib/auth/session.ts` — JWT expiry checks, session persistence, token management (100% coverage)
-- `lib/api/client.ts` — All 50+ ApiClient methods, error handling, 401 retry logic (97%+ coverage)
+- `lib/api/client.ts` — All 50+ ApiClient methods, auth methods (register, login, refresh, link-google), error handling, 401 retry logic (97%+ coverage)
 
 **What's excluded from coverage** (requires browser APIs or framework integration):
 - `lib/state/app-state.svelte.ts` — Svelte 5 reactive state with context injection
@@ -84,7 +84,8 @@ Pure unit tests using Vitest with jsdom environment. No browser or API server re
 Tests services and controllers in isolation using mocked dependencies.
 
 **Services tested** (95%+ line coverage):
-- `UserService` — user creation/lookup, membership checks, role enforcement
+- `UserService` — user creation/lookup, dual-auth resolution (Google + local JWT), membership checks, role enforcement
+- `TokenService` — JWT generation, refresh token creation/validation/revocation, bulk revocation
 - `AvatarService` — file validation, upload paths, hash-based filenames
 - `ImageUploadService` — image validation and storage
 - `CustomEmojiService` — emoji validation, storage, deletion
@@ -93,6 +94,7 @@ Tests services and controllers in isolation using mocked dependencies.
 - `MessageCacheService` — Redis cache operations, graceful degradation
 
 **Controllers tested:**
+- `AuthController` — register (201, 409 conflict), login (200, 401), refresh (token rotation, expiry), email normalization
 - `HealthController`, `UsersController`, `AvatarsController`, `ImageUploadsController`
 - `IssuesController`, `PresenceController`, `FriendsController`
 - `ServersController` — server CRUD, channels, invites, emojis, member management

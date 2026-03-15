@@ -27,7 +27,7 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
             return BadRequest(new { error = validationError });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Remove the previous custom avatar file if one exists.
         if (!string.IsNullOrEmpty(appUser.CustomAvatarPath))
@@ -49,7 +49,7 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
     [HttpDelete("me/avatar")]
     public async Task<IActionResult> DeleteUserAvatar()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         if (string.IsNullOrEmpty(appUser.CustomAvatarPath))
         {
@@ -77,7 +77,7 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
             return BadRequest(new { error = validationError });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id);
 
         var membership = await db.ServerMembers
@@ -102,7 +102,7 @@ public class AvatarsController(CodecDbContext db, IUserService userService, IAva
     [HttpDelete("servers/{serverId:guid}/avatar")]
     public async Task<IActionResult> DeleteServerAvatar(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id);
 
         var membership = await db.ServerMembers

@@ -19,7 +19,7 @@ public class PresenceController(CodecDbContext db, IUserService userService, Pre
     [HttpGet("servers/{serverId}/presence")]
     public async Task<IActionResult> GetServerPresence(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Verify user is a member of this server
         var isMember = await db.ServerMembers
@@ -54,7 +54,7 @@ public class PresenceController(CodecDbContext db, IUserService userService, Pre
     [HttpGet("dm/presence")]
     public async Task<IActionResult> GetDmPresence()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Get distinct user IDs from all DM channels the user participates in
         var dmParticipantIds = await db.DmChannelMembers

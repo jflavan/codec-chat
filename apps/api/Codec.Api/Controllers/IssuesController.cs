@@ -28,7 +28,7 @@ public class IssuesController(IUserService userService) : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Length > MaxDescriptionLength)
             return BadRequest(new { error = $"Description is required and must be {MaxDescriptionLength} characters or fewer." });
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var body = $"""
             ## Description

@@ -7,6 +7,9 @@ This document tracks implemented and planned features for Codec.
 ### Authentication & Users
 - Google Sign-In with persistent sessions (1-week, `localStorage`)
 - Automatic silent token refresh via Google One Tap
+- Email/password registration and sign-in (bcrypt hashing, API-issued JWTs, rotating refresh tokens)
+- Nickname selection during sign-up for both email/password and Google flows
+- Account linking — email/password users can link a Google account after confirming their password
 - User profile display (name, email, avatar)
 - Nicknames — user-chosen display name overriding Google name across all surfaces
 - Custom avatar upload (JPG, PNG, WebP, GIF; 10 MB max; content-hash filenames)
@@ -122,6 +125,8 @@ This document tracks implemented and planned features for Codec.
 ## Planned
 
 ### Near-Term
+- ~~Email/password registration and sign-in~~ (implemented)
+- ~~Nickname selection during sign-up~~ (implemented)
 - ~~Presence indicators~~ (implemented)
 - Server settings/configuration
 - Channel categories/organization
@@ -137,7 +142,7 @@ This document tracks implemented and planned features for Codec.
 - Audit logs for admin actions
 - Custom roles and granular permissions
 - Status messages
-- Additional OAuth providers (GitHub, Discord)
+- Additional OAuth providers (GitHub, Discord) — same nickname-on-signup flow
 - SAML/SSO support
 - Webhooks
 

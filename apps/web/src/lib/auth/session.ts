@@ -1,6 +1,10 @@
 const TOKEN_KEY = 'codec_id_token';
 const LOGIN_TS_KEY = 'codec_login_ts';
+const AUTH_TYPE_KEY = 'codec_auth_type';
+const REFRESH_TOKEN_KEY = 'codec_refresh_token';
 const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+export type AuthType = 'google' | 'local';
 
 /** Decode a JWT payload without verifying the signature (client-side only). */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -39,4 +43,22 @@ export function loadStoredToken(): string | null {
 export function clearSession(): void {
 	localStorage.removeItem(TOKEN_KEY);
 	localStorage.removeItem(LOGIN_TS_KEY);
+	localStorage.removeItem(AUTH_TYPE_KEY);
+	localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export function getAuthType(): AuthType {
+	return (localStorage.getItem(AUTH_TYPE_KEY) as AuthType) ?? 'google';
+}
+
+export function setAuthType(type: AuthType): void {
+	localStorage.setItem(AUTH_TYPE_KEY, type);
+}
+
+export function persistRefreshToken(token: string): void {
+	localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
+export function loadStoredRefreshToken(): string | null {
+	return localStorage.getItem(REFRESH_TOKEN_KEY);
 }

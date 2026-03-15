@@ -23,7 +23,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
     [HttpGet]
     public async Task<IActionResult> GetFriends()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var friendships = await db.Friendships
             .AsNoTracking()
@@ -78,7 +78,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
     [HttpDelete("{friendshipId:guid}")]
     public async Task<IActionResult> RemoveFriend(Guid friendshipId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var friendship = await db.Friendships
             .FirstOrDefaultAsync(f => f.Id == friendshipId && f.Status == FriendshipStatus.Accepted);
@@ -112,7 +112,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
     [HttpPost("requests")]
     public async Task<IActionResult> SendRequest([FromBody] SendFriendRequestRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         if (request.RecipientUserId == appUser.Id)
         {
@@ -179,7 +179,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
     [HttpGet("requests")]
     public async Task<IActionResult> GetRequests([FromQuery] string? direction)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         IQueryable<Friendship> query = db.Friendships
             .AsNoTracking()
@@ -248,7 +248,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
             return BadRequest(new { error = "Action must be 'accept' or 'decline'." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var friendship = await db.Friendships
             .Include(f => f.Requester)
@@ -311,7 +311,7 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
     [HttpDelete("requests/{requestId:guid}")]
     public async Task<IActionResult> CancelRequest(Guid requestId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var friendship = await db.Friendships
             .FirstOrDefaultAsync(f => f.Id == requestId && f.Status == FriendshipStatus.Pending);
