@@ -3,7 +3,7 @@ namespace Codec.Api.Models;
 public class User
 {
     public Guid Id { get; set; }
-    public string GoogleSubject { get; set; } = string.Empty;
+    public string? GoogleSubject { get; set; }
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>
@@ -20,6 +20,11 @@ public class User
     /// priority over the Google-sourced <see cref="AvatarUrl"/>.
     /// </summary>
     public string? CustomAvatarPath { get; set; }
+
+    /// <summary>
+    /// BCrypt hash of the user's password. Null for Google-only accounts.
+    /// </summary>
+    public string? PasswordHash { get; set; }
 
     /// <summary>
     /// Indicates whether this user has global admin privileges, allowing them to

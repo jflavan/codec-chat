@@ -25,6 +25,7 @@ public class CodecDbContext : DbContext
     public DbSet<VoiceCall> VoiceCalls => Set<VoiceCall>();
     public DbSet<CustomEmoji> CustomEmojis => Set<CustomEmoji>();
     public DbSet<PresenceState> PresenceStates => Set<PresenceState>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,7 +41,13 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<User>()
             .HasIndex(user => user.GoogleSubject)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("\"GoogleSubject\" IS NOT NULL");
+
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.Email)
+            .IsUnique()
+            .HasFilter("\"Email\" IS NOT NULL");
 
         modelBuilder.Entity<User>()
             .Property(user => user.Nickname)
@@ -316,5 +323,15 @@ public class CodecDbContext : DbContext
             entity.HasIndex(ps => ps.UserId);
             entity.HasIndex(ps => ps.ConnectionId);
         });
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne(rt => rt.User)
+            .WithMany()
+            .HasForeignKey(rt => rt.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.TokenHash)
+            .IsUnique();
     }
 }
