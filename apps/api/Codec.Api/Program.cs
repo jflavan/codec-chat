@@ -94,6 +94,10 @@ if (string.IsNullOrWhiteSpace(googleClientId))
 }
 
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "";
+if (!builder.Environment.IsDevelopment() && (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32))
+{
+    throw new InvalidOperationException("Jwt:Secret must be at least 32 characters in non-development environments.");
+}
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "codec-api";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "codec-api";
 

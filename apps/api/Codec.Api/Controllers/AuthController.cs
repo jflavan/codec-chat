@@ -1,9 +1,13 @@
+using System.IdentityModel.Tokens.Jwt;
 using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 
 namespace Codec.Api.Controllers;
@@ -14,7 +18,8 @@ namespace Codec.Api.Controllers;
 public class AuthController(
     CodecDbContext db,
     TokenService tokenService,
-    IAvatarService avatarService) : ControllerBase
+    IAvatarService avatarService,
+    IConfiguration configuration) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -165,12 +170,29 @@ public class AuthController(
             return Unauthorized(new { error = "Invalid email or password." });
         }
 
-        // Validate the Google credential to extract the subject
-        var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+        // Validate the Google credential against Google's JWKS
+        var googleClientId = configuration["Google:ClientId"];
+        var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+            "https://accounts.google.com/.well-known/openid-configuration",
+            new OpenIdConnectConfigurationRetriever());
+
         try
         {
-            var googleToken = handler.ReadJwtToken(request.GoogleCredential);
-            var googleSubject = googleToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+            var openIdConfig = await configManager.GetConfigurationAsync();
+            var validationParams = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuers = new[] { "https://accounts.google.com", "accounts.google.com" },
+                ValidateAudience = true,
+                ValidAudience = googleClientId,
+                ValidateLifetime = true,
+                IssuerSigningKeys = openIdConfig.SigningKeys
+            };
+
+            var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+            var principal = handler.ValidateToken(request.GoogleCredential, validationParams, out _);
+
+            var googleSubject = principal.FindFirst("sub")?.Value;
             if (string.IsNullOrWhiteSpace(googleSubject))
             {
                 return BadRequest(new { error = "Invalid Google credential." });
@@ -186,17 +208,17 @@ public class AuthController(
             user.GoogleSubject = googleSubject;
 
             // Update Google-sourced profile fields
-            var googleName = googleToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
-            var googlePicture = googleToken.Claims.FirstOrDefault(c => c.Type == "picture")?.Value;
+            var googleName = principal.FindFirst("name")?.Value;
+            var googlePicture = principal.FindFirst("picture")?.Value;
             if (googleName is not null) user.DisplayName = googleName;
             if (googlePicture is not null) user.AvatarUrl = googlePicture;
 
             user.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
-        catch
+        catch (SecurityTokenException)
         {
-            return BadRequest(new { error = "Invalid Google credential." });
+            return BadRequest(new { error = "Invalid or expired Google credential." });
         }
 
         var accessToken = tokenService.GenerateAccessToken(user);

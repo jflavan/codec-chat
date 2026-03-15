@@ -16,6 +16,21 @@ public class UserService(CodecDbContext db) : IUserService
     /// <inheritdoc />
     public async Task<(User user, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal)
     {
+        var issuer = principal.FindFirst("iss")?.Value;
+
+        // Local JWT — sub claim is the user's GUID; user already exists (created during registration)
+        if (issuer == "codec-api")
+        {
+            var sub = principal.FindFirst("sub")?.Value;
+            if (sub is null || !Guid.TryParse(sub, out var userId))
+                throw new InvalidOperationException("Missing or invalid sub claim in local JWT.");
+
+            var localUser = await db.Users.FirstOrDefaultAsync(u => u.Id == userId)
+                ?? throw new InvalidOperationException($"Local user {userId} not found.");
+            return (localUser, false);
+        }
+
+        // Google JWT — sub claim is the Google subject
         var subject = principal.FindFirst("sub")?.Value;
         if (string.IsNullOrWhiteSpace(subject))
         {
