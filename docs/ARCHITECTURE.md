@@ -757,6 +757,8 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
                      │  CI ──► Infra (if infra/ changed) ──► CD            │
                      │    └──► CD (if no infra changes)                    │
                      │                                                     │
+                     │  CI: build, check, test (web + API unit +           │
+                     │      API integration), Docker image validation      │
                      │  Infra: zero-downtime Bicep deploy (preserves       │
                      │         running container images), then triggers CD  │
                      │  CD: build, push, migrate, blue-green deploy, smoke │

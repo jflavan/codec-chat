@@ -150,6 +150,18 @@ The following code is excluded from unit/integration test coverage targets becau
 - **Program.cs** — DI container setup, middleware pipeline configuration
 - **AzureBlobStorageService** — requires Azure Blob Storage (tests use `LocalFileStorageService`)
 
+## Continuous Integration
+
+All test suites run automatically on every push and pull request to `main` via GitHub Actions (`.github/workflows/ci.yml`). The CI pipeline includes three parallel test jobs:
+
+| Job | What it runs | Notes |
+|-----|-------------|-------|
+| `test-web` | `npm test` (Vitest) | Runs after web build succeeds |
+| `test-api` | `dotnet test` on `Codec.Api.Tests` | Runs after API build succeeds |
+| `test-api-integration` | `dotnet test` on `Codec.Api.IntegrationTests` | Uses Testcontainers (Docker available on GitHub-hosted runners) |
+
+Tests must pass before Docker image builds and deployment can proceed.
+
 ## Adding New Tests
 
 ### Web
