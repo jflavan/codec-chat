@@ -13,12 +13,14 @@ Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core W
 codec/
 ├── apps/
 │   ├── api/
-│   │   ├── Codec.Api/            # ASP.NET Core 10 Web API
-│   │   └── Codec.ServiceDefaults/ # Shared OpenTelemetry, health checks, resilience
+│   │   ├── Codec.Api/                 # ASP.NET Core 10 Web API
+│   │   ├── Codec.Api.Tests/           # xUnit unit tests (services, controllers)
+│   │   ├── Codec.Api.IntegrationTests/ # Integration tests (Testcontainers + WebApplicationFactory)
+│   │   └── Codec.ServiceDefaults/     # Shared OpenTelemetry, health checks, resilience
 │   ├── aspire/
-│   │   └── Codec.AppHost/        # .NET Aspire orchestrator (local dev)
-│   ├── sfu/                      # mediasoup SFU for voice channels
-│   └── web/                      # SvelteKit web front-end
+│   │   └── Codec.AppHost/            # .NET Aspire orchestrator (local dev)
+│   ├── sfu/                          # mediasoup SFU for voice channels
+│   └── web/                          # SvelteKit web front-end (includes Vitest specs)
 ├── docs/             # Project documentation
 ├── infra/            # Bicep IaC modules (Azure infrastructure)
 ├── .github/          # Copilot agent guidance, CI/CD workflows
@@ -85,6 +87,24 @@ For full setup details, see [Development Setup](docs/DEV_SETUP.md).
 
 For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and system design, see [Architecture](docs/ARCHITECTURE.md).
 
+## Testing
+
+Codec has 448 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
+
+```bash
+# Web tests (Vitest)
+cd apps/web && npm test
+
+# API unit + integration tests (requires Docker for integration tests)
+dotnet test Codec.sln
+```
+
+| Suite | Tests | Coverage |
+|-------|-------|----------|
+| Web (Vitest) | 134 | 98% line (unit-testable code) |
+| API Unit (xUnit) | 205 | 95% line (core services) |
+| API Integration (Testcontainers) | 109 | 72% line (full pipeline) |
+
 ## Self-Hosting
 
 Codec is designed to be easy to self-host. The repository includes a production-ready `docker-compose.yml` that starts the API, web frontend, PostgreSQL, Redis, and a local blob storage emulator.
@@ -121,6 +141,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - [Message Replies](docs/REPLIES.md) - Message replies feature specification
 - [Voice Channels](docs/VOICE.md) - Voice channels feature specification, SFU architecture, and infrastructure
 - [Data Layer](docs/DATA.md) - Database schema and migrations
+- [Testing](docs/TESTING.md) - Testing strategy, test suites, coverage, and how to add tests
 
 ## Community & Project Policies
 - [License](LICENSE) - MIT license
@@ -138,6 +159,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - **Authentication:** Google Identity Services (ID tokens)
 - **Observability:** OpenTelemetry (traces, metrics, logs) via `Codec.ServiceDefaults`; Azure Monitor / Application Insights in production; OTLP export to local Aspire dashboard in dev
 - **Local Dev:** .NET Aspire AppHost for single-command orchestration (Postgres, Redis, Azurite, API, Web) with developer dashboard
+- **Testing:** xUnit + FluentAssertions + Moq (API unit), Testcontainers + WebApplicationFactory (API integration), Vitest + jsdom (web)
 - **Infrastructure:** Azure Container Apps + dedicated VM (voice SFU), Bicep IaC, GitHub Actions CI/CD
 
 ## License & Quality Checks
