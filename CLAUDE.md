@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Codec is a Discord-like chat application — a monorepo with a SvelteKit frontend (`apps/web`) and an ASP.NET Core 10 Web API backend (`apps/api`). Authentication is Google Sign-In only (ID tokens validated by the API on every request). Real-time features run over SignalR WebSockets.
+Codec is a Discord-like chat application — a monorepo with a SvelteKit frontend (`apps/web`) and an ASP.NET Core 10 Web API backend (`apps/api`). Authentication supports both Google Sign-In (ID tokens validated by the API) and email/password registration (API-issued JWTs with bcrypt hashing and rotating refresh tokens). Real-time features run over SignalR WebSockets.
 
 ## Development Commands
 
@@ -115,10 +115,22 @@ Hub at `/hubs/chat`. Clients subscribe to:
 - `dm-{dmChannelId}` groups for DM events
 
 ### Authentication Flow
+
+Two methods are supported, both resulting in a JWT access token sent as `Authorization: Bearer <token>`:
+
+**Google Sign-In**
 1. Browser gets Google ID token via Google Identity Services SDK
-2. API requests use `Authorization: Bearer <token>`
-3. API validates token against Google JWKS (no server-side sessions)
-4. User identity mapped to internal `User` records via `GoogleSubject`
+2. API validates token against Google JWKS (no server-side sessions)
+3. User identity mapped to internal `User` records via `GoogleSubject`
+4. New Google users complete a nickname prompt before entering the app
+
+**Email/Password**
+1. User registers (`POST /auth/register`) or signs in (`POST /auth/login`) with email + password
+2. API issues a 1-hour access token and a 7-day rotating refresh token
+3. Passwords stored with bcrypt (cost factor 12); refresh tokens stored hashed (SHA-256)
+4. Frontend calls `POST /auth/refresh` when the access token expires
+
+Both methods use the same `[Authorize]` middleware and produce identical claims shapes (`sub`, `email`, `name`).
 
 ## Configuration
 

@@ -1,14 +1,54 @@
 # Authentication
 
-This document explains how authentication works in Codec using Google ID tokens.
+This document explains how authentication works in Codec, which supports both Google Sign-In and email/password registration.
 
 ## Overview
 
-Codec uses a **stateless authentication** model powered by Google Identity Services. The web client obtains a JWT ID token from Google, and the API validates it on each request without maintaining server-side sessions.
+Codec supports **two authentication methods** with equivalent security guarantees:
 
-To provide a seamless user experience, the web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week**.
+1. **Google Sign-In** — Stateless authentication using Google-issued ID tokens validated on every API request.
+2. **Email/Password** — Registration and login with bcrypt password hashing; the API issues its own signed JWTs (access tokens + refresh tokens).
+
+Both methods use the same JWT-based authorization middleware in the API and produce access tokens with identical claims shapes. All authenticated API requests use `Authorization: Bearer <token>`, regardless of how the token was obtained.
+
+The web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week** (Google session limit or refresh-token lifetime).
 
 ## Authentication Flow
+
+Codec supports two parallel auth flows. Both result in a JWT access token stored in `localStorage` and sent with every API request.
+
+---
+
+### Email/Password Flow
+
+#### Registration (`POST /auth/register`)
+
+1. Client submits `{ email, password, nickname }`.
+2. API validates email uniqueness (409 Conflict if taken).
+3. Password is hashed with bcrypt (cost factor 12).
+4. A new `User` record is created with `PasswordHash` set and `GoogleSubject` = null.
+5. A 1-hour JWT access token and a 7-day refresh token are issued.
+6. The refresh token is stored hashed (SHA-256) in the `RefreshTokens` table.
+7. API returns 201 with `{ accessToken, refreshToken, user }`.
+
+#### Sign-In (`POST /auth/login`)
+
+1. Client submits `{ email, password }`.
+2. API looks up user by email; returns 401 if not found or if `PasswordHash` is null (Google-only account).
+3. bcrypt verify — 401 on mismatch.
+4. Issues new access + refresh token pair.
+5. Returns 200 with `{ accessToken, refreshToken, user }`.
+
+#### Token Refresh (`POST /auth/refresh`)
+
+1. Client sends `{ refreshToken }` when the access token is expired.
+2. API verifies the token against the stored SHA-256 hash; returns 401 if expired or revoked.
+3. Issues new access + refresh token pair, revokes the old refresh token (rotation on use).
+4. Refresh token lifetime: **7 days**.
+
+---
+
+### Google Sign-In Flow
 
 ### 1. Client-Side Sign-In
 
@@ -95,7 +135,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 4. Verify token has not expired
 5. Extract user claims (subject, email, name, picture)
 
-### 4. User Identity Mapping
+### 4. Nickname on First Sign-Up
+
+Both flows gate entry to the app on a nickname being set:
+
+- **Email/password users** — Nickname is collected during registration (`RegisterRequest.Nickname`) and written directly to `User.Nickname`.
+- **Google users** — After the first Google sign-in, `/me` returns `isNewUser: true`. The frontend shows a `NicknameModal` (pre-filled with the Google display name) before allowing navigation. On submit, the frontend calls `PATCH /me/nickname`.
+
+---
+
+### 5. Account Linking
+
+An email/password user can link their Google account by visiting Settings → My Account → Link Google Account.
+
+1. User signs in with Google on the link screen.
+2. Frontend sends `{ googleIdToken, password }` to `POST /auth/link-google`.
+3. API confirms the password (required — user must prove ownership of the email/password account).
+4. API stores the Google subject on the existing `User` record.
+5. From that point on, the user can sign in with either method.
+
+> **Deferred:** Reverse linking (Google-first users adding a password) and password reset via email are not yet implemented.
+
+---
+
+### 6. User Identity Mapping
 
 After validation, the API extracts claims and maps to an internal User record:
 
@@ -236,17 +299,28 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - `google.accounts.id.prompt()` triggers One Tap silent re-authentication
 - When a stored token expires (but session is still within 1 week), Google silently issues a fresh token
 
+### Security Comparison: Google vs. Email/Password
+
+| Property | Google Sign-In | Email/Password |
+|---|---|---|
+| Access token lifetime | 1 hour | 1 hour |
+| Session duration | 7 days (One Tap refresh) | 7 days (refresh token) |
+| Password storage | N/A (Google manages) | bcrypt cost factor 12 |
+| Token signing | Google RSA (JWKS) | API HMAC-SHA256 secret |
+| Rate limiting on auth endpoints | Standard (100 req/min) | Strict (10 req/min per IP) |
+| Refresh mechanism | Google One Tap silent re-auth | Rotating opaque refresh tokens (stored hashed) |
+
 ### Current Limitations
 
 ⚠️ **Token Revocation**
-- No real-time token invalidation
-- Compromised tokens valid until expiration
-- Future: Implement token blacklist or short TTL
+- Google tokens: no real-time invalidation; compromised tokens valid until expiration
+- Local tokens: access tokens cannot be individually revoked (short 1-hour TTL mitigates); refresh tokens are invalidated on use (rotation) and on sign-out
 
-⚠️ **Single Identity Provider**
-- Only Google authentication supported currently
-- Planned: Email/password registration with bcrypt hashing, API-issued JWTs, and refresh tokens (see PLAN.md "Email/Password Sign-Up & Nickname" task breakdown)
-- Future: Add Microsoft, GitHub OAuth
+⚠️ **Password Reset**
+- Password reset via email is not yet implemented
+
+⚠️ **Reverse Account Linking**
+- Google-first users (no password set) cannot yet add an email/password credential; this is deferred
 
 ⚠️ **Sign-Out**
 - Sign-out button is available in the user panel (bottom of channel sidebar)
