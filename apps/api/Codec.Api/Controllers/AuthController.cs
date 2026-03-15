@@ -242,5 +242,3 @@ public class AuthController(
     }
 }
 
-public record RefreshRequest(string RefreshToken);
-public record LinkGoogleRequest(string Email, string Password, string GoogleCredential);

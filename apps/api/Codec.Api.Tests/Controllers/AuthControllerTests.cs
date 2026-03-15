@@ -191,7 +191,7 @@ public class AuthControllerTests : IDisposable
         var user = await CreateUserWithPassword("refresh@test.com");
         var (opaqueToken, _) = await _tokenService.GenerateRefreshTokenAsync(user);
 
-        var request = new RefreshRequest(opaqueToken);
+        var request = new RefreshRequest { RefreshToken = opaqueToken };
         var result = await _controller.Refresh(request);
 
         result.Should().BeOfType<OkObjectResult>();
@@ -200,7 +200,7 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Refresh_Returns401ForInvalidRefreshToken()
     {
-        var request = new RefreshRequest("totally-invalid-token");
+        var request = new RefreshRequest { RefreshToken = "totally-invalid-token" };
         var result = await _controller.Refresh(request);
 
         result.Should().BeOfType<UnauthorizedObjectResult>();
@@ -214,7 +214,7 @@ public class AuthControllerTests : IDisposable
         entity.ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1);
         await _db.SaveChangesAsync();
 
-        var request = new RefreshRequest(opaqueToken);
+        var request = new RefreshRequest { RefreshToken = opaqueToken };
         var result = await _controller.Refresh(request);
 
         result.Should().BeOfType<UnauthorizedObjectResult>();
@@ -226,7 +226,7 @@ public class AuthControllerTests : IDisposable
         var user = await CreateUserWithPassword("rotate@test.com");
         var (opaqueToken, entity) = await _tokenService.GenerateRefreshTokenAsync(user);
 
-        var request = new RefreshRequest(opaqueToken);
+        var request = new RefreshRequest { RefreshToken = opaqueToken };
         await _controller.Refresh(request);
 
         // Reload the entity to check revocation
@@ -241,11 +241,11 @@ public class AuthControllerTests : IDisposable
         var (opaqueToken, _) = await _tokenService.GenerateRefreshTokenAsync(user);
 
         // First refresh should succeed
-        var result1 = await _controller.Refresh(new RefreshRequest(opaqueToken));
+        var result1 = await _controller.Refresh(new RefreshRequest { RefreshToken = opaqueToken });
         result1.Should().BeOfType<OkObjectResult>();
 
         // Second use of the same token should fail (it was revoked during rotation)
-        var result2 = await _controller.Refresh(new RefreshRequest(opaqueToken));
+        var result2 = await _controller.Refresh(new RefreshRequest { RefreshToken = opaqueToken });
         result2.Should().BeOfType<UnauthorizedObjectResult>();
     }
 }
