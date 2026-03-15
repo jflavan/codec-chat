@@ -24,25 +24,27 @@ public class UserServiceTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private static ClaimsPrincipal CreatePrincipal(string sub, string name = "Test", string? email = "test@test.com", string? picture = null)
+    private static ClaimsPrincipal CreatePrincipal(string sub, string name = "Test", string? email = "test@test.com", string? picture = null, string? issuer = null)
     {
         var claims = new List<Claim> { new("sub", sub), new("name", name) };
         if (email is not null) claims.Add(new("email", email));
         if (picture is not null) claims.Add(new("picture", picture));
+        if (issuer is not null) claims.Add(new("iss", issuer));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
     }
 
-    // --- GetOrCreateUserAsync ---
+    // --- GetOrCreateUserAsync (Google JWT) ---
 
     [Fact]
     public async Task GetOrCreateUserAsync_CreatesNewUser()
     {
         var principal = CreatePrincipal("google-1", "Alice", "alice@test.com");
-        var user = await _svc.GetOrCreateUserAsync(principal);
+        var (user, isNew) = await _svc.GetOrCreateUserAsync(principal);
 
         user.GoogleSubject.Should().Be("google-1");
         user.DisplayName.Should().Be("Alice");
         user.Email.Should().Be("alice@test.com");
+        isNew.Should().BeTrue();
     }
 
     [Fact]
@@ -52,9 +54,10 @@ public class UserServiceTests : IDisposable
         await _db.SaveChangesAsync();
 
         var principal = CreatePrincipal("google-2", "Bob", "bob@test.com");
-        var user = await _svc.GetOrCreateUserAsync(principal);
+        var (user, isNew) = await _svc.GetOrCreateUserAsync(principal);
 
         user.DisplayName.Should().Be("Bob");
+        isNew.Should().BeFalse();
         _db.Users.Count(u => u.GoogleSubject == "google-2").Should().Be(1);
     }
 
@@ -65,7 +68,7 @@ public class UserServiceTests : IDisposable
         await _db.SaveChangesAsync();
 
         var principal = CreatePrincipal("google-3", "NewName", "new@test.com");
-        var user = await _svc.GetOrCreateUserAsync(principal);
+        var (user, _) = await _svc.GetOrCreateUserAsync(principal);
 
         user.DisplayName.Should().Be("NewName");
         user.Email.Should().Be("new@test.com");
@@ -88,11 +91,93 @@ public class UserServiceTests : IDisposable
         await _db.SaveChangesAsync();
 
         var principal = CreatePrincipal("google-4", "NewUser");
-        var user = await _svc.GetOrCreateUserAsync(principal);
+        var (user, _) = await _svc.GetOrCreateUserAsync(principal);
 
         var membership = await _db.ServerMembers.FirstOrDefaultAsync(m => m.UserId == user.Id && m.ServerId == Server.DefaultServerId);
         membership.Should().NotBeNull();
         membership!.Role.Should().Be(ServerRole.Member);
+    }
+
+    // --- GetOrCreateUserAsync (Local JWT — issuer "codec-api") ---
+
+    [Fact]
+    public async Task GetOrCreateUserAsync_LocalJwt_ReturnsExistingUserById()
+    {
+        var existingUser = new User { DisplayName = "Local User", Email = "local@test.com" };
+        _db.Users.Add(existingUser);
+        await _db.SaveChangesAsync();
+
+        var principal = CreatePrincipal(existingUser.Id.ToString(), "Local User", "local@test.com", issuer: "codec-api");
+        var (user, isNew) = await _svc.GetOrCreateUserAsync(principal);
+
+        user.Id.Should().Be(existingUser.Id);
+        isNew.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetOrCreateUserAsync_LocalJwt_ThrowsForNonExistentUser()
+    {
+        var nonExistentId = Guid.NewGuid();
+        var principal = CreatePrincipal(nonExistentId.ToString(), "Ghost", issuer: "codec-api");
+
+        await _svc.Invoking(s => s.GetOrCreateUserAsync(principal))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{nonExistentId}*");
+    }
+
+    [Fact]
+    public async Task GetOrCreateUserAsync_LocalJwt_InvalidGuid_Throws()
+    {
+        var principal = CreatePrincipal("not-a-guid", "Bad", issuer: "codec-api");
+
+        await _svc.Invoking(s => s.GetOrCreateUserAsync(principal))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*sub*");
+    }
+
+    // --- ResolveUserAsync ---
+
+    [Fact]
+    public async Task ResolveUserAsync_LocalJwt_ReturnsUserById()
+    {
+        var existingUser = new User { DisplayName = "Resolve Me", Email = "resolve@test.com" };
+        _db.Users.Add(existingUser);
+        await _db.SaveChangesAsync();
+
+        var principal = CreatePrincipal(existingUser.Id.ToString(), issuer: "codec-api");
+        var user = await _svc.ResolveUserAsync(principal);
+
+        user.Should().NotBeNull();
+        user!.Id.Should().Be(existingUser.Id);
+    }
+
+    [Fact]
+    public async Task ResolveUserAsync_GoogleJwt_ReturnsUserByGoogleSubject()
+    {
+        _db.Users.Add(new User { GoogleSubject = "google-resolve", DisplayName = "Google User" });
+        await _db.SaveChangesAsync();
+
+        var principal = CreatePrincipal("google-resolve", "Google User");
+        var user = await _svc.ResolveUserAsync(principal);
+
+        user.Should().NotBeNull();
+        user!.GoogleSubject.Should().Be("google-resolve");
+    }
+
+    [Fact]
+    public async Task ResolveUserAsync_ReturnsNullForUnknownUser()
+    {
+        var principal = CreatePrincipal(Guid.NewGuid().ToString(), issuer: "codec-api");
+        var user = await _svc.ResolveUserAsync(principal);
+        user.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveUserAsync_ReturnsNullForUnknownGoogleSubject()
+    {
+        var principal = CreatePrincipal("unknown-google-sub");
+        var user = await _svc.ResolveUserAsync(principal);
+        user.Should().BeNull();
     }
 
     // --- GetEffectiveDisplayName ---

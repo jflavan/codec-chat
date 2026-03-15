@@ -48,7 +48,7 @@ public class AvatarsControllerTests : IDisposable
         };
 
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync(_db.Users.First(u => u.Id == _testUser.Id));
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
     }
 
     public void Dispose() => _db.Dispose();

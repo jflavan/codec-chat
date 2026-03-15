@@ -28,7 +28,7 @@ public class IssuesControllerTests
             }
         };
 
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(_testUser);
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync((_testUser, false));
     }
 
     [Fact]

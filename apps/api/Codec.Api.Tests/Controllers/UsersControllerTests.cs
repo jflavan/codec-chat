@@ -48,7 +48,7 @@ public class UsersControllerTests : IDisposable
             }
         };
 
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(_testUser);
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync((_testUser, false));
         _userService.Setup(u => u.GetEffectiveDisplayName(_testUser)).Returns("Test User");
         _avatarService.Setup(a => a.ResolveUrl(It.IsAny<string?>())).Returns((string?)null);
     }
@@ -68,7 +68,7 @@ public class UsersControllerTests : IDisposable
         _db.Users.Add(_testUser);
         await _db.SaveChangesAsync();
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync(_db.Users.First(u => u.Id == _testUser.Id));
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
         _userService.Setup(u => u.GetEffectiveDisplayName(It.IsAny<User>())).Returns("Nicky");
 
         var result = await _controller.SetNickname(new SetNicknameRequest { Nickname = "Nicky" });
@@ -104,7 +104,7 @@ public class UsersControllerTests : IDisposable
         _db.Users.Add(_testUser);
         await _db.SaveChangesAsync();
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync(_db.Users.First(u => u.Id == _testUser.Id));
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
 
         var result = await _controller.RemoveNickname();
         result.Should().BeOfType<OkObjectResult>();

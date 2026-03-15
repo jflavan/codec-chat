@@ -31,7 +31,7 @@ public class ImageUploadsControllerTests
         };
 
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync(new User { Id = Guid.NewGuid(), GoogleSubject = "google-1", DisplayName = "Test" });
+            .ReturnsAsync((new User { Id = Guid.NewGuid(), GoogleSubject = "google-1", DisplayName = "Test" }, false));
     }
 
     [Fact]
