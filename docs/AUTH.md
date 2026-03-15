@@ -244,8 +244,9 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - Future: Implement token blacklist or short TTL
 
 ⚠️ **Single Identity Provider**
-- Only Google authentication supported
-- Future: Add Microsoft, GitHub, email/password
+- Only Google authentication supported currently
+- Planned: Email/password registration with bcrypt hashing, API-issued JWTs, and refresh tokens (see PLAN.md "Email/Password Sign-Up & Nickname" task breakdown)
+- Future: Add Microsoft, GitHub OAuth
 
 ⚠️ **Sign-Out**
 - Sign-out button is available in the user panel (bottom of channel sidebar)

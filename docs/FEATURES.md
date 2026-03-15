@@ -122,6 +122,8 @@ This document tracks implemented and planned features for Codec.
 ## Planned
 
 ### Near-Term
+- Email/password registration and sign-in (equivalent security to Google Sign-In)
+- Nickname selection during sign-up (both email/password and Google flows)
 - ~~Presence indicators~~ (implemented)
 - Server settings/configuration
 - Channel categories/organization
@@ -137,7 +139,7 @@ This document tracks implemented and planned features for Codec.
 - Audit logs for admin actions
 - Custom roles and granular permissions
 - Status messages
-- Additional OAuth providers (GitHub, Discord)
+- Additional OAuth providers (GitHub, Discord) — same nickname-on-signup flow
 - SAML/SSO support
 - Webhooks
 
