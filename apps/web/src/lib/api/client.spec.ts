@@ -834,6 +834,174 @@ describe('ApiClient', () => {
 		});
 	});
 
+	// --- Auth ---
+
+	describe('Auth', () => {
+		describe('register', () => {
+			it('sends POST to /auth/register with email, password, nickname', async () => {
+				const authResponse = { accessToken: 'at-1', refreshToken: 'rt-1', user: { id: 'u1', displayName: 'Alice' } };
+				mockFetch.mockResolvedValueOnce(jsonResponse(authResponse));
+
+				const result = await client.register('alice@example.com', 'secret123', 'Alice');
+				expect(result).toEqual(authResponse);
+
+				const call = mockFetch.mock.calls[0];
+				expect(call[0]).toBe(`${baseUrl}/auth/register`);
+				expect(call[1].method).toBe('POST');
+				expect(JSON.parse(call[1].body)).toEqual({ email: 'alice@example.com', password: 'secret123', nickname: 'Alice' });
+			});
+
+			it('does not send Authorization header', async () => {
+				mockFetch.mockResolvedValueOnce(jsonResponse({ accessToken: 'at', refreshToken: 'rt', user: {} }));
+				await client.register('alice@example.com', 'secret123', 'Alice');
+				const call = mockFetch.mock.calls[0];
+				const headers: Record<string, string> = call[1].headers ?? {};
+				expect(headers['Authorization']).toBeUndefined();
+			});
+
+			it('throws ApiError on 409 conflict', async () => {
+				mockFetch.mockResolvedValueOnce({
+					ok: false,
+					status: 409,
+					json: () => Promise.resolve({ error: 'Email already registered' })
+				});
+				await expect(client.register('alice@example.com', 'secret123', 'Alice')).rejects.toThrow(ApiError);
+			});
+
+			it('throws ApiError with correct status on 409', async () => {
+				mockFetch.mockResolvedValueOnce({
+					ok: false,
+					status: 409,
+					json: () => Promise.resolve({ error: 'Email already registered' })
+				});
+				const err = await client.register('a@b.com', 'pw', 'Nick').catch(e => e);
+				expect(err).toBeInstanceOf(ApiError);
+				expect((err as ApiError).status).toBe(409);
+				expect((err as ApiError).message).toBe('Email already registered');
+			});
+		});
+
+		describe('login', () => {
+			it('sends POST to /auth/login with email and password', async () => {
+				const authResponse = { accessToken: 'at-2', refreshToken: 'rt-2', user: { id: 'u2', displayName: 'Bob' } };
+				mockFetch.mockResolvedValueOnce(jsonResponse(authResponse));
+
+				const result = await client.login('bob@example.com', 'pass456');
+				expect(result).toEqual(authResponse);
+
+				const call = mockFetch.mock.calls[0];
+				expect(call[0]).toBe(`${baseUrl}/auth/login`);
+				expect(call[1].method).toBe('POST');
+				expect(JSON.parse(call[1].body)).toEqual({ email: 'bob@example.com', password: 'pass456' });
+			});
+
+			it('does not send Authorization header', async () => {
+				mockFetch.mockResolvedValueOnce(jsonResponse({ accessToken: 'at', refreshToken: 'rt', user: {} }));
+				await client.login('bob@example.com', 'pass456');
+				const call = mockFetch.mock.calls[0];
+				const headers: Record<string, string> = call[1].headers ?? {};
+				expect(headers['Authorization']).toBeUndefined();
+			});
+
+			it('throws ApiError on 401 invalid credentials', async () => {
+				mockFetch.mockResolvedValueOnce({
+					ok: false,
+					status: 401,
+					json: () => Promise.resolve({ error: 'Invalid credentials' })
+				});
+				const err = await client.login('bob@example.com', 'wrong').catch(e => e);
+				expect(err).toBeInstanceOf(ApiError);
+				expect((err as ApiError).status).toBe(401);
+				expect((err as ApiError).message).toBe('Invalid credentials');
+			});
+		});
+
+		describe('refreshToken', () => {
+			it('sends POST to /auth/refresh with refreshToken', async () => {
+				const refreshResponse = { accessToken: 'new-at', refreshToken: 'new-rt' };
+				mockFetch.mockResolvedValueOnce(jsonResponse(refreshResponse));
+
+				const result = await client.refreshToken('old-refresh-token');
+				expect(result).toEqual(refreshResponse);
+
+				const call = mockFetch.mock.calls[0];
+				expect(call[0]).toBe(`${baseUrl}/auth/refresh`);
+				expect(call[1].method).toBe('POST');
+				expect(JSON.parse(call[1].body)).toEqual({ refreshToken: 'old-refresh-token' });
+			});
+
+			it('does not send Authorization header', async () => {
+				mockFetch.mockResolvedValueOnce(jsonResponse({ accessToken: 'new-at', refreshToken: 'new-rt' }));
+				await client.refreshToken('old-refresh-token');
+				const call = mockFetch.mock.calls[0];
+				const headers: Record<string, string> = call[1].headers ?? {};
+				expect(headers['Authorization']).toBeUndefined();
+			});
+
+			it('throws ApiError on 401 expired token', async () => {
+				mockFetch.mockResolvedValueOnce({
+					ok: false,
+					status: 401,
+					json: () => Promise.resolve({ error: 'Refresh token expired' })
+				});
+				const err = await client.refreshToken('expired-token').catch(e => e);
+				expect(err).toBeInstanceOf(ApiError);
+				expect((err as ApiError).status).toBe(401);
+				expect((err as ApiError).message).toBe('Refresh token expired');
+			});
+		});
+
+		describe('linkGoogle', () => {
+			it('sends POST to /auth/link-google with email, password, googleCredential', async () => {
+				const authResponse = { accessToken: 'at-3', refreshToken: 'rt-3', user: { id: 'u3', displayName: 'Carol' } };
+				mockFetch.mockResolvedValueOnce(jsonResponse(authResponse));
+
+				const result = await client.linkGoogle('carol@example.com', 'mypassword', 'google-id-token-xyz');
+				expect(result).toEqual(authResponse);
+
+				const call = mockFetch.mock.calls[0];
+				expect(call[0]).toBe(`${baseUrl}/auth/link-google`);
+				expect(call[1].method).toBe('POST');
+				expect(JSON.parse(call[1].body)).toEqual({
+					email: 'carol@example.com',
+					password: 'mypassword',
+					googleCredential: 'google-id-token-xyz'
+				});
+			});
+
+			it('does not send Authorization header', async () => {
+				mockFetch.mockResolvedValueOnce(jsonResponse({ accessToken: 'at', refreshToken: 'rt', user: {} }));
+				await client.linkGoogle('carol@example.com', 'mypassword', 'google-id-token-xyz');
+				const call = mockFetch.mock.calls[0];
+				const headers: Record<string, string> = call[1].headers ?? {};
+				expect(headers['Authorization']).toBeUndefined();
+			});
+
+			it('throws ApiError on 401 when password does not match', async () => {
+				mockFetch.mockResolvedValueOnce({
+					ok: false,
+					status: 401,
+					json: () => Promise.resolve({ error: 'Invalid password' })
+				});
+				const err = await client.linkGoogle('carol@example.com', 'wrong', 'google-id-token-xyz').catch(e => e);
+				expect(err).toBeInstanceOf(ApiError);
+				expect((err as ApiError).status).toBe(401);
+				expect((err as ApiError).message).toBe('Invalid password');
+			});
+
+			it('throws ApiError on 404 when user not found', async () => {
+				mockFetch.mockResolvedValueOnce({
+					ok: false,
+					status: 404,
+					json: () => Promise.resolve({ error: 'User not found' })
+				});
+				const err = await client.linkGoogle('nobody@example.com', 'pw', 'google-token').catch(e => e);
+				expect(err).toBeInstanceOf(ApiError);
+				expect((err as ApiError).status).toBe(404);
+			});
+		});
+	});
+
 	// --- getActiveCall error ---
 
 	describe('getActiveCall error handling', () => {
