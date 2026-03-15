@@ -125,6 +125,30 @@ export type UserProfile = {
 		avatarUrl?: string;
 		isGlobalAdmin?: boolean;
 	};
+	isNewUser?: boolean;
+	needsLinking?: boolean;
+	email?: string;
+};
+
+/** Response from POST /auth/register and POST /auth/login. */
+export type AuthResponse = {
+	accessToken: string;
+	refreshToken: string;
+	user: {
+		id: string;
+		displayName: string;
+		nickname?: string | null;
+		effectiveDisplayName: string;
+		email?: string;
+		avatarUrl?: string;
+		isGlobalAdmin?: boolean;
+	};
+};
+
+/** Response from POST /auth/refresh. */
+export type TokenRefreshResponse = {
+	accessToken: string;
+	refreshToken: string;
 };
 
 /** Friendship status enum matching the API. */

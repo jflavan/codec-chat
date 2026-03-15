@@ -19,7 +19,9 @@ import type {
 	SearchFilters,
 	PaginatedSearchResults,
 	AroundMessages,
-	PresenceEntry
+	PresenceEntry,
+	AuthResponse,
+	TokenRefreshResponse
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -99,6 +101,40 @@ export class ApiClient {
 				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
 			throw new ApiError(response.status, message ?? undefined);
 		}
+	}
+
+	/* ───── Auth ───── */
+
+	async register(email: string, password: string, nickname: string): Promise<AuthResponse> {
+		return this.request(`${this.baseUrl}/auth/register`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password, nickname })
+		});
+	}
+
+	async login(email: string, password: string): Promise<AuthResponse> {
+		return this.request(`${this.baseUrl}/auth/login`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password })
+		});
+	}
+
+	async refreshToken(refreshToken: string): Promise<TokenRefreshResponse> {
+		return this.request(`${this.baseUrl}/auth/refresh`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refreshToken })
+		});
+	}
+
+	async linkGoogle(email: string, password: string, googleCredential: string): Promise<AuthResponse> {
+		return this.request(`${this.baseUrl}/auth/link-google`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password, googleCredential })
+		});
 	}
 
 	/* ───── User ───── */
