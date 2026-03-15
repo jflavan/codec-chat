@@ -2,6 +2,7 @@ using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -9,6 +10,7 @@ namespace Codec.Api.Controllers;
 
 [ApiController]
 [Route("auth")]
+[EnableRateLimiting("auth")]
 public class AuthController(
     CodecDbContext db,
     TokenService tokenService,
