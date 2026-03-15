@@ -1,7 +1,7 @@
 # Codec Plan
 
 ## Purpose
-Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP.NET Core Web API backend. Authentication uses Google Sign-In (ID tokens validated by the API).
+Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP.NET Core Web API backend. Authentication supports both email/password registration and Google Sign-In, with equivalent security for both methods. New users choose a nickname during sign-up.
 
 ## Milestones
 1. Baseline scaffolding
@@ -29,7 +29,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Decisions
 - Web: SvelteKit
 - API: .NET 10
-- Auth: Frontend obtains Google ID token; API validates per request
+- Auth: Two equivalent sign-in methods — (1) email/password with bcrypt hashing and API-issued JWTs, (2) Google Sign-In with Google-issued ID tokens validated by the API. Both flows require a nickname on first sign-up. Returning users sign in directly with either method.
 - Layout: apps/web + apps/api + docs + .github
 - Package manager: npm
 - Data: PostgreSQL + EF Core (Npgsql); Azure Database for PostgreSQL Flexible Server in production
@@ -994,6 +994,112 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update `README.md` with testing quick-start and coverage table
 - [x] Update `PLAN.md` with testing task breakdown and metrics
 - [x] Document test organization and naming conventions
+
+---
+
+## Task breakdown: Email/Password Sign-Up & Nickname
+
+### Overview
+Add email/password registration as a second auth method alongside Google Sign-In. Both flows require new users to choose a nickname during sign-up. Returning users can sign in directly with either method. Both methods must provide equivalent security guarantees.
+
+### Data model changes
+
+- [x] Add `PasswordHash` (nullable `string`) to `User` entity — stores bcrypt hash; null for Google-only users
+- [x] Make `GoogleSubject` nullable — email/password users won't have one
+- [x] Add unique index on `Email` (currently not unique) — prevents duplicate registrations
+- [x] Create EF Core migration `AddEmailPasswordAuth`
+
+### API — Email/password registration (`POST /auth/register`)
+
+- [x] Add `RegisterRequest` DTO: `Email` (required, valid email), `Password` (required, min 8 chars), `Nickname` (required, 2–32 chars)
+- [x] Validate email not already registered → 409 Conflict if taken
+- [x] Hash password with bcrypt (cost factor 12)
+- [x] Create `User` with `PasswordHash`, `Email`, `DisplayName` = nickname, `Nickname` = nickname, `GoogleSubject` = null
+- [x] Auto-join default server (same as Google flow)
+- [x] Issue a JWT access token (signed by the API, same claims shape as Google tokens: `sub` = user ID, `email`, `name`)
+- [x] Return 201 with token + user payload
+
+### API — Email/password sign-in (`POST /auth/login`)
+
+- [x] Add `LoginRequest` DTO: `Email` (required), `Password` (required)
+- [x] Look up user by email → 401 if not found or password hash is null (Google-only account)
+- [x] Verify password against bcrypt hash → 401 on mismatch
+- [x] Issue JWT access token (same format as registration)
+- [x] Return 200 with token + user payload
+
+### API — JWT issuance for email/password users
+
+- [x] Add `JwtSettings` config section: `Secret` (min 32 chars), `Issuer`, `Audience`, `ExpiryMinutes` (default 60)
+- [x] Create `TokenService` to generate signed JWTs with `sub`, `email`, `name`, `picture` claims
+- [x] Token lifetime: 1 hour (matching Google ID token expiry)
+- [x] Store `Jwt:Secret` in Key Vault (production) / `appsettings.Development.json` (dev)
+
+### API — Dual-scheme authentication
+
+- [x] Register a second authentication scheme (`"Local"`) for API-issued JWTs alongside the existing Google JWT Bearer scheme
+- [x] Configure policy selector: accept tokens from either issuer (Google `accounts.google.com` OR local API issuer)
+- [x] Update SignalR `OnMessageReceived` to accept tokens from both issuers via `?access_token=`
+- [x] `GetOrCreateUserAsync` — for Google sign-in, match on `GoogleSubject`; for local tokens, match on user ID claim (`sub`)
+
+### API — Token refresh (`POST /auth/refresh`)
+
+- [x] Issue a refresh token (opaque, stored hashed in DB) alongside access tokens on register/login
+- [x] Add `RefreshToken` entity: `Id`, `UserId`, `TokenHash`, `ExpiresAt`, `CreatedAt`, `RevokedAt`
+- [x] Refresh endpoint: validate refresh token → issue new access + refresh token pair → revoke old refresh token
+- [x] Refresh token lifetime: 7 days (matching current Google session duration)
+- [x] Revoke all refresh tokens on password change
+
+### API — Google Sign-In nickname prompt
+
+- [x] Modify `GetOrCreateUserAsync`: when creating a new user from Google sign-in, return a flag `isNewUser: true` in the `/me` response
+- [x] Add `PATCH /me/nickname` endpoint (or use existing nickname update) — called by frontend after Google sign-up to set initial nickname
+- [x] Frontend gates entry to the app on nickname being set for new Google users
+
+### Web — Sign-in / sign-up page
+
+- [x] Replace single Google Sign-In button with a two-option landing page:
+  - **"Sign in with Google"** — existing Google Identity Services flow
+  - **"Sign in" / "Create account"** toggle — email/password form
+- [x] Sign-up form: email, password, confirm password, nickname (2–32 chars with character counter)
+- [x] Sign-in form: email, password
+- [x] Client-side validation: email format, password min length, password match, nickname length
+- [x] Error display: email taken (409), invalid credentials (401), validation errors
+- [x] On successful registration or login, store API-issued JWT in `localStorage` (same persistence as Google tokens)
+
+### Web — Nickname prompt for Google sign-up
+
+- [x] After Google sign-in, if `/me` returns `isNewUser: true`, show a nickname modal/screen before entering the app
+- [x] Nickname input: 2–32 chars, character counter, submit calls `PATCH /me/nickname`
+- [x] Pre-fill with Google display name; user can change before confirming
+- [x] Block app navigation until nickname is confirmed
+
+### Web — Token refresh for email/password users
+
+- [x] Store refresh token in `localStorage` alongside access token
+- [x] When access token expires, call `POST /auth/refresh` to obtain a new one
+- [x] On refresh failure (expired/revoked), redirect to sign-in page
+- [x] Unify token lifecycle: same `isTokenExpired` / `clearSession` helpers for both auth methods
+
+### Security parity
+
+- [x] **Equivalent protections for both methods:**
+  - JWT signature verification (Google JWKS for Google tokens; HMAC-SHA256 or RSA for local tokens)
+  - Audience and issuer validation on both token types
+  - 1-hour access token expiry for both
+  - 7-day session duration cap for both (Google One Tap refresh / refresh tokens)
+  - Rate limiting on `/auth/login` and `/auth/register` (stricter: 10 req/min per IP) to prevent brute force
+  - Account lockout after 5 failed login attempts (15-minute cooldown)
+- [x] Bcrypt cost factor 12 for password hashing
+- [x] Passwords never logged or returned in API responses
+- [x] Refresh tokens stored hashed (SHA-256), not plaintext
+
+### Documentation
+
+- [x] Update `docs/AUTH.md` with dual-auth flow, email/password details, token refresh, and security comparison
+- [x] Update `docs/FEATURES.md` to list email/password auth and nickname-on-signup as implemented
+- [x] Update `docs/DATA.md` with `User.PasswordHash`, nullable `GoogleSubject`, `RefreshToken` entity
+- [x] Update `CLAUDE.md` auth description to reflect both sign-in methods
+- [x] Update `apps/web/.env.example` if any new env vars are needed
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin

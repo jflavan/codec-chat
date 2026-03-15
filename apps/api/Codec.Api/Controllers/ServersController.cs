@@ -26,7 +26,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpGet]
     public async Task<IActionResult> GetMyServers()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         if (appUser.IsGlobalAdmin)
         {
@@ -91,7 +91,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return BadRequest(new { error = "Duplicate server IDs are not allowed." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var memberships = await db.ServerMembers
             .Where(m => m.UserId == appUser.Id && request.ServerIds.Contains(m.ServerId))
@@ -118,7 +118,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateServerRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var server = new Server { Name = request.Name.Trim() };
         db.Servers.Add(server);
@@ -152,7 +152,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPatch("{serverId:guid}")]
     public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = (await db.Servers.FindAsync(serverId))!;
@@ -182,7 +182,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpGet("{serverId:guid}/members")]
     public async Task<IActionResult> GetMembers(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var members = await db.ServerMembers
@@ -230,7 +230,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpDelete("{serverId:guid}/members/{targetUserId:guid}")]
     public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         if (targetUserId == appUser.Id)
@@ -297,7 +297,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return BadRequest(new { error = "Role must be 'Admin' or 'Member'." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         if (targetUserId == appUser.Id)
@@ -361,7 +361,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpGet("{serverId:guid}/channels")]
     public async Task<IActionResult> GetChannels(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var channels = await db.Channels
@@ -379,7 +379,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPost("{serverId:guid}/channels")]
     public async Task<IActionResult> CreateChannel(Guid serverId, [FromBody] CreateChannelRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         ChannelType channelType;
@@ -421,7 +421,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPatch("{serverId:guid}/channels/{channelId:guid}")]
     public async Task<IActionResult> UpdateChannel(Guid serverId, Guid channelId, [FromBody] UpdateChannelRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var channel = await db.Channels
@@ -459,7 +459,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPost("{serverId:guid}/invites")]
     public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         DateTimeOffset? expiresAt = request.ExpiresInHours switch
@@ -504,7 +504,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpGet("{serverId:guid}/invites")]
     public async Task<IActionResult> GetInvites(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var now = DateTimeOffset.UtcNow;
@@ -535,7 +535,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpDelete("{serverId:guid}/invites/{inviteId:guid}")]
     public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var invite = await db.ServerInvites
@@ -559,7 +559,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPost("/invites/{code}")]
     public async Task<IActionResult> JoinViaInvite(string code)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         var now = DateTimeOffset.UtcNow;
 
         var invite = await db.ServerInvites
@@ -625,7 +625,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpDelete("{serverId:guid}")]
     public async Task<IActionResult> DeleteServer(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureOwnerAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         // Bulk-delete the server in a single SQL statement; PostgreSQL cascade
@@ -650,7 +650,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpDelete("{serverId:guid}/channels/{channelId:guid}")]
     public async Task<IActionResult> DeleteChannel(Guid serverId, Guid channelId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var channel = await db.Channels
@@ -742,7 +742,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return BadRequest(new { error = validationError });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = (await db.Servers.FindAsync(serverId))!;
@@ -773,7 +773,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpDelete("{serverId:guid}/icon")]
     public async Task<IActionResult> DeleteServerIcon(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = (await db.Servers.FindAsync(serverId))!;
@@ -801,7 +801,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpGet("{serverId:guid}/emojis")]
     public async Task<IActionResult> ListEmojis(Guid serverId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var emojis = await db.CustomEmojis
@@ -823,7 +823,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> UploadEmoji(
         Guid serverId, [FromForm] string name, IFormFile file)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         // Validate name format.
@@ -879,7 +879,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> RenameEmoji(
         Guid serverId, Guid emojiId, [FromBody] RenameEmojiRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var emoji = await db.CustomEmojis.FirstOrDefaultAsync(
@@ -905,7 +905,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpDelete("{serverId:guid}/emojis/{emojiId:guid}")]
     public async Task<IActionResult> DeleteEmoji(Guid serverId, Guid emojiId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var emoji = await db.CustomEmojis.FirstOrDefaultAsync(
@@ -946,7 +946,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         // Get all channel IDs in this server.

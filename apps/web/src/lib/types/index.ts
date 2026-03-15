@@ -29,5 +29,7 @@ export type {
 	AroundMessages,
 	SearchFilters,
 	PresenceStatus,
-	PresenceEntry
+	PresenceEntry,
+	AuthResponse,
+	TokenRefreshResponse
 } from './models.js';

@@ -19,7 +19,9 @@ import type {
 	SearchFilters,
 	PaginatedSearchResults,
 	AroundMessages,
-	PresenceEntry
+	PresenceEntry,
+	AuthResponse,
+	TokenRefreshResponse
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -99,6 +101,52 @@ export class ApiClient {
 				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
 			throw new ApiError(response.status, message ?? undefined);
 		}
+	}
+
+	/* ───── Auth (no 401 retry — these are unauthenticated endpoints) ───── */
+
+	private async requestNoRetry<T>(url: string, init: RequestInit): Promise<T> {
+		const response = await fetch(url, init);
+		if (!response.ok) {
+			const body = await response.json().catch(() => null);
+			const message = body?.error
+				?? body?.detail
+				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
+			throw new ApiError(response.status, message ?? undefined);
+		}
+		return response.json() as Promise<T>;
+	}
+
+	async register(email: string, password: string, nickname: string): Promise<AuthResponse> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/register`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password, nickname })
+		});
+	}
+
+	async login(email: string, password: string): Promise<AuthResponse> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/login`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password })
+		});
+	}
+
+	async refreshToken(refreshToken: string): Promise<TokenRefreshResponse> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/refresh`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refreshToken })
+		});
+	}
+
+	async linkGoogle(email: string, password: string, googleCredential: string): Promise<AuthResponse> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/link-google`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password, googleCredential })
+		});
 	}
 
 	/* ───── User ───── */

@@ -24,7 +24,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     [HttpGet("/channels/{channelId:guid}/voice-states")]
     public async Task<IActionResult> GetVoiceStates(Guid channelId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var channel = await db.Channels
             .AsNoTracking()
@@ -68,7 +68,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     [HttpPatch("state")]
     public async Task<IActionResult> UpdateVoiceState([FromBody] UpdateVoiceStateRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var voiceState = await db.VoiceStates
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
@@ -92,7 +92,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
     [HttpGet("active-call")]
     public async Task<IActionResult> GetActiveCall()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var call = await db.VoiceCalls
             .AsNoTracking()
@@ -144,7 +144,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
             throw new InvalidOperationException("Voice:TurnSecret is required.");
         var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Username encodes the expiry timestamp (Unix seconds) and a stable per-user identifier.
         // Using {expiry}:{userId} prevents credential sharing across users within the same

@@ -27,7 +27,7 @@ public class ImageUploadsController(IImageUploadService imageUploadService, IUse
             return BadRequest(new { error = validationError });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         var imageUrl = await imageUploadService.SaveImageAsync(appUser.Id, file);
 
         return Ok(new { imageUrl });

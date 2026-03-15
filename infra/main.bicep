@@ -51,6 +51,10 @@ param voiceSshAllowedSourcePrefix string = ''
 @secure()
 param gitHubToken string = ''
 
+@description('HMAC-SHA256 secret for signing locally-issued JWTs (email/password auth). Must be at least 32 characters.')
+@secure()
+param jwtSecret string
+
 @description('Deploy Azure Cache for Redis for distributed caching and SignalR backplane.')
 param redisEnabled bool = true
 
@@ -183,6 +187,17 @@ module redisCache 'modules/redis-cache.bicep' = if (redisEnabled) {
   }
 }
 
+// ── JWT signing secret for email/password auth ───────────────────────────────────
+
+module jwtSecretKv 'modules/key-vault-secret.bicep' = {
+  name: 'jwt-secret'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Jwt--Secret'
+    secretValue: jwtSecret
+  }
+}
+
 // ── GitHub PAT for in-app bug reporting ──────────────────────────────────────────
 
 module gitHubTokenSecret 'modules/key-vault-secret.bicep' = if (gitHubToken != '') {
@@ -305,6 +320,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     turnServerUrl: voiceVm.?outputs.turnServerUrl ?? ''
     voiceTurnKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--TurnSecret' : ''
     voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
+    jwtSecretKvUrl: '${keyVault.outputs.uri}secrets/Jwt--Secret'
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
     appInsightsConnectionString: appInsights.outputs.connectionString

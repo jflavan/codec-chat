@@ -24,7 +24,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpPost("channels")]
     public async Task<IActionResult> CreateOrResumeChannel([FromBody] CreateDmChannelRequest request)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         if (request.RecipientUserId == appUser.Id)
         {
@@ -127,7 +127,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpGet("channels")]
     public async Task<IActionResult> ListChannels()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Get DM channel IDs where the current user has IsOpen = true.
         var openChannelIds = await db.DmChannelMembers
@@ -206,7 +206,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     {
         limit = Math.Clamp(limit, 1, 100);
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
@@ -555,7 +555,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             return BadRequest(new { error = "Message body or image is required." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         var members = await db.DmChannelMembers
             .Where(m => m.DmChannelId == channelId)
@@ -752,7 +752,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             return BadRequest(new { error = "Message body is required." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
@@ -803,7 +803,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     {
         var emoji = request.Emoji.Trim();
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
         var messageExists = await db.DirectMessages.AnyAsync(m => m.Id == messageId && m.DmChannelId == channelId);
@@ -877,7 +877,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpDelete("channels/{channelId:guid}/messages/{messageId:guid}")]
     public async Task<IActionResult> DeleteMessage(Guid channelId, Guid messageId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
@@ -924,7 +924,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpDelete("channels/{channelId:guid}")]
     public async Task<IActionResult> CloseChannel(Guid channelId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureDmParticipantAsync(channelId, appUser.Id);
 
         var membership = await db.DmChannelMembers
@@ -956,7 +956,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Get all DM channel IDs where the current user is a member.
         var accessibleChannelIds = await db.DmChannelMembers

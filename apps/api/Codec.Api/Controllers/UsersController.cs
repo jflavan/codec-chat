@@ -21,7 +21,28 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     [HttpGet("me")]
     public async Task<IActionResult> Me()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var issuer = User.FindFirst("iss")?.Value;
+
+        // Check for account linking: Google sign-in where email matches an email/password account
+        if (issuer is "https://accounts.google.com" or "accounts.google.com")
+        {
+            var googleEmail = User.FindFirst("email")?.Value;
+            if (googleEmail is not null)
+            {
+                var existingByEmail = await db.Users.FirstOrDefaultAsync(
+                    u => u.Email == googleEmail.ToLowerInvariant() && u.GoogleSubject == null && u.PasswordHash != null);
+                if (existingByEmail is not null)
+                {
+                    return Ok(new
+                    {
+                        needsLinking = true,
+                        email = existingByEmail.Email
+                    });
+                }
+            }
+        }
+
+        var (appUser, isNewUser) = await userService.GetOrCreateUserAsync(User);
         var claims = User.Claims.Select(claim => new { claim.Type, claim.Value });
         var effectiveAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
         var effectiveDisplayName = userService.GetEffectiveDisplayName(appUser);
@@ -39,6 +60,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
                 appUser.GoogleSubject,
                 appUser.IsGlobalAdmin
             },
+            isNewUser,
             claims
         });
     }
@@ -56,7 +78,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         appUser.Nickname = trimmed;
         appUser.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
@@ -74,7 +96,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     [HttpDelete("me/nickname")]
     public async Task<IActionResult> RemoveNickname()
     {
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         if (appUser.Nickname is null)
         {
@@ -105,7 +127,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
         }
 
         var term = q.Trim();
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Use parameterized EF.Functions.Like to prevent injection.
         var pattern = $"%{term}%";

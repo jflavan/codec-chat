@@ -59,7 +59,7 @@ public class ServersControllerTests : IDisposable
         };
 
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync(_db.Users.First(u => u.Id == _testUser.Id));
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
         _userService.Setup(u => u.GetEffectiveDisplayName(It.IsAny<User>())).Returns("Test User");
         _avatarService.Setup(a => a.ResolveUrl(It.IsAny<string?>())).Returns((string?)null);
     }
@@ -86,7 +86,7 @@ public class ServersControllerTests : IDisposable
         _db.Servers.Add(new Server { Name = "Private" });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(adminUser);
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync((adminUser, false));
 
         var result = await _controller.GetMyServers();
         result.Should().BeOfType<OkObjectResult>();
@@ -432,7 +432,7 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(joiner);
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(joiner);
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync((joiner, false));
 
         var result = await _controller.JoinViaInvite("valid");
         result.Should().BeOfType<CreatedResult>();

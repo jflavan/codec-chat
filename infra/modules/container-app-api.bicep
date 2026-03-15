@@ -26,6 +26,10 @@ param voiceTurnKvUrl string = ''
 @description('Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled.')
 param voiceSfuInternalKeyKvUrl string = ''
 
+@description('Key Vault secret URL for the JWT signing secret (email/password auth).')
+@secure()
+param jwtSecretKvUrl string
+
 @description('Key Vault secret URL for the GitHub PAT. Leave empty to disable in-app bug reporting.')
 param gitHubTokenKvUrl string = ''
 
@@ -102,6 +106,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUri}secrets/GlobalAdmin--Email'
           identity: 'system'
         }
+        {
+          name: 'jwt-secret'
+          keyVaultUrl: jwtSecretKvUrl
+          identity: 'system'
+        }
       ], voiceTurnKvUrl != '' ? [
         {
           name: 'voice-turn-secret'
@@ -175,6 +184,10 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'GlobalAdmin__Email'
               secretRef: 'global-admin-email'
+            }
+            {
+              name: 'Jwt__Secret'
+              secretRef: 'jwt-secret'
             }
             {
               name: 'OTEL_SERVICE_NAME'

@@ -64,7 +64,7 @@ public class ChannelsControllerTests : IDisposable
         };
 
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync(_db.Users.First(u => u.Id == _testUser.Id));
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
         _userService.Setup(u => u.EnsureMemberAsync(_testServer.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id });
         _userService.Setup(u => u.GetEffectiveDisplayName(It.IsAny<User>())).Returns("Test User");

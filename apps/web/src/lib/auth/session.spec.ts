@@ -4,8 +4,31 @@ import {
 	isSessionExpired,
 	persistToken,
 	loadStoredToken,
-	clearSession
+	clearSession,
+	getAuthType,
+	setAuthType,
+	persistRefreshToken,
+	loadStoredRefreshToken
 } from './session';
+
+// Global localStorage mock setup
+const store: Record<string, string> = {};
+const mockStorage = {
+	getItem: (key: string) => store[key] ?? null,
+	setItem: (key: string, value: string) => {
+		store[key] = value;
+	},
+	removeItem: (key: string) => {
+		delete store[key];
+	},
+	clear: () => {
+		Object.keys(store).forEach((key) => delete store[key]);
+	},
+	length: 0,
+	key: () => null
+};
+
+vi.stubGlobal('localStorage', mockStorage);
 
 // Helper to create a fake JWT with a given exp
 function fakeJwt(payload: Record<string, unknown>): string {
@@ -97,13 +120,73 @@ describe('loadStoredToken', () => {
 });
 
 describe('clearSession', () => {
-	it('removes both keys', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('removes all keys', () => {
 		localStorage.setItem('codec_id_token', 'token');
 		localStorage.setItem('codec_login_ts', '12345');
+		localStorage.setItem('codec_auth_type', 'google');
+		localStorage.setItem('codec_refresh_token', 'refresh');
 
 		clearSession();
 
 		expect(localStorage.getItem('codec_id_token')).toBeNull();
 		expect(localStorage.getItem('codec_login_ts')).toBeNull();
+		expect(localStorage.getItem('codec_auth_type')).toBeNull();
+		expect(localStorage.getItem('codec_refresh_token')).toBeNull();
+	});
+});
+
+describe('getAuthType', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('returns google as default', () => {
+		expect(getAuthType()).toBe('google');
+	});
+
+	it('returns stored auth type', () => {
+		localStorage.setItem('codec_auth_type', 'local');
+		expect(getAuthType()).toBe('local');
+	});
+});
+
+describe('setAuthType', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('stores auth type', () => {
+		setAuthType('local');
+		expect(localStorage.getItem('codec_auth_type')).toBe('local');
+	});
+});
+
+describe('persistRefreshToken', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('stores refresh token', () => {
+		persistRefreshToken('my-refresh-token');
+		expect(localStorage.getItem('codec_refresh_token')).toBe('my-refresh-token');
+	});
+});
+
+describe('loadStoredRefreshToken', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('returns null when no refresh token stored', () => {
+		expect(loadStoredRefreshToken()).toBeNull();
+	});
+
+	it('returns stored refresh token', () => {
+		localStorage.setItem('codec_refresh_token', 'stored-refresh-token');
+		expect(loadStoredRefreshToken()).toBe('stored-refresh-token');
 	});
 });
