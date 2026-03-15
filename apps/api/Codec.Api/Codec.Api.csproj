@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Codec.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Codec.ServiceDefaults\Codec.ServiceDefaults.csproj" />
   </ItemGroup>
 

@@ -111,6 +111,14 @@ This document tracks implemented and planned features for Codec.
 - OpenTelemetry observability — distributed traces, metrics, and structured logs exported to Azure Monitor (Application Insights) in production and OTLP (Aspire dashboard) locally
 - SFU telemetry — custom spans on room/transport/producer/consumer operations with Azure Monitor export
 
+### Testing
+- 448 automated tests across 3 test suites (205 API unit, 109 API integration, 134 web)
+- API unit tests: xUnit + FluentAssertions + Moq; InMemory EF Core for database tests
+- API integration tests: WebApplicationFactory + Testcontainers (disposable PostgreSQL + Redis); full HTTP pipeline with real migrations; FakeAuthHandler bypasses Google JWT; SignalR hub tests via SignalR client
+- Web unit tests: Vitest + jsdom; localStorage polyfill; mocked fetch for API client
+- Coverage: core services 95%+, web utilities 98%+, combined API 72%+
+- See [TESTING.md](TESTING.md) for full details
+
 ## Planned
 
 ### Near-Term

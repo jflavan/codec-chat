@@ -1,8 +1,28 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+	test: {
+		include: ['src/**/*.{test,spec}.{js,ts}'],
+		environment: 'jsdom',
+		globals: true,
+		setupFiles: ['src/test-setup.ts'],
+		coverage: {
+			provider: 'v8',
+			include: ['src/lib/**/*.ts'],
+			exclude: [
+				'src/lib/types/**',
+				'src/lib/services/voice-service.ts',
+				'src/lib/services/chat-hub.ts',
+				'src/lib/state/**',
+				'src/lib/auth/google.ts',
+				'src/lib/data/**',
+				'src/lib/index.ts',
+				'src/lib/utils/dom.ts'
+			]
+		}
+	},
 	plugins: [
 		sveltekit(),
 		SvelteKitPWA({
