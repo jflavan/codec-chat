@@ -131,6 +131,7 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 });
 
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<TokenService>();
 
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.
