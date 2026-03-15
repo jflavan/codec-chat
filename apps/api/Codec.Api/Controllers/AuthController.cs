@@ -93,6 +93,9 @@ public class AuthController(
         });
     }
 
+    private const int MaxFailedAttempts = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -104,9 +107,30 @@ public class AuthController(
             return Unauthorized(new { error = "Invalid email or password." });
         }
 
+        // Check account lockout
+        if (user.LockoutEnd is not null && user.LockoutEnd > DateTimeOffset.UtcNow)
+        {
+            return Unauthorized(new { error = "Account temporarily locked. Try again later." });
+        }
+
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
+            // Increment failed attempts and lock if threshold exceeded
+            user.FailedLoginAttempts++;
+            if (user.FailedLoginAttempts >= MaxFailedAttempts)
+            {
+                user.LockoutEnd = DateTimeOffset.UtcNow.Add(LockoutDuration);
+            }
+            await db.SaveChangesAsync();
             return Unauthorized(new { error = "Invalid email or password." });
+        }
+
+        // Reset lockout state on successful login
+        if (user.FailedLoginAttempts > 0 || user.LockoutEnd is not null)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+            await db.SaveChangesAsync();
         }
 
         var accessToken = tokenService.GenerateAccessToken(user);
@@ -147,6 +171,19 @@ public class AuthController(
             accessToken,
             refreshToken = newRefreshToken
         });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+    {
+        var storedToken = await tokenService.ValidateRefreshTokenAsync(request.RefreshToken);
+        if (storedToken is not null)
+        {
+            await tokenService.RevokeRefreshTokenAsync(storedToken);
+        }
+
+        // Always return 204 to avoid leaking whether the token was valid
+        return NoContent();
     }
 
     [HttpPost("link-google")]
@@ -202,11 +239,13 @@ public class AuthController(
 
             user.GoogleSubject = googleSubject;
 
-            // Update Google-sourced profile fields
+            // Only update profile fields if the user hasn't set their own values
             var googleName = principal.FindFirst("name")?.Value;
             var googlePicture = principal.FindFirst("picture")?.Value;
-            if (googleName is not null) user.DisplayName = googleName;
-            if (googlePicture is not null) user.AvatarUrl = googlePicture;
+            if (googleName is not null && (string.IsNullOrWhiteSpace(user.DisplayName) || user.DisplayName == "Unknown"))
+                user.DisplayName = googleName;
+            if (googlePicture is not null && user.CustomAvatarPath is null && user.AvatarUrl is null)
+                user.AvatarUrl = googlePicture;
 
             user.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();

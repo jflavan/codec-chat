@@ -541,6 +541,13 @@ export class AppState {
 
 	async signOut(): Promise<void> {
 		await this.hub.stop();
+
+		// Revoke refresh token server-side before clearing local state
+		const refreshToken = loadStoredRefreshToken();
+		if (refreshToken) {
+			await this.api.logout(refreshToken);
+		}
+
 		clearStoredSession();
 
 		this.isInitialLoading = false;

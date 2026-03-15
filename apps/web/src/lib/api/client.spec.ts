@@ -1000,6 +1000,26 @@ describe('ApiClient', () => {
 				expect((err as ApiError).status).toBe(404);
 			});
 		});
+
+		describe('logout', () => {
+			it('sends POST to /auth/logout with refreshToken', async () => {
+				mockFetch.mockResolvedValueOnce(voidResponse(204));
+				await client.logout('my-refresh-token');
+				expect(mockFetch).toHaveBeenCalledWith(
+					'http://localhost:5050/auth/logout',
+					expect.objectContaining({
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ refreshToken: 'my-refresh-token' })
+					})
+				);
+			});
+
+			it('does not throw on network error', async () => {
+				mockFetch.mockRejectedValueOnce(new Error('network error'));
+				await expect(client.logout('any-token')).resolves.toBeUndefined();
+			});
+		});
 	});
 
 	// --- getActiveCall error ---

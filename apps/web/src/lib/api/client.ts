@@ -149,6 +149,14 @@ export class ApiClient {
 		});
 	}
 
+	async logout(refreshToken: string): Promise<void> {
+		await fetch(`${this.baseUrl}/auth/logout`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refreshToken })
+		}).catch(() => {});
+	}
+
 	/* ───── User ───── */
 
 	getMe(token: string): Promise<UserProfile> {

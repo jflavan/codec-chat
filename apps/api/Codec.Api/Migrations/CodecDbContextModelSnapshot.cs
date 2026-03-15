@@ -403,6 +403,11 @@ namespace Codec.Api.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid");
+
                     b.ToTable("RefreshTokens");
                 });
 
@@ -513,11 +518,17 @@ namespace Codec.Api.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("text");
 
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("GoogleSubject")
                         .HasColumnType("text");
 
                     b.Property<bool>("IsGlobalAdmin")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Nickname")
                         .HasMaxLength(32)

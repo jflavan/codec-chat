@@ -285,6 +285,8 @@ else
     builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsPath, $"{apiBaseUrl}/uploads"));
 }
 
+builder.Services.AddHostedService<RefreshTokenCleanupService>();
+
 builder.Services.AddSingleton<VoiceCallTimeoutService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutService>());
 
