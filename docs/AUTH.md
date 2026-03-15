@@ -92,48 +92,66 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3. Token Validation (API)
 
-The ASP.NET Core API validates the token using Microsoft.AspNetCore.Authentication.JwtBearer:
+The API uses a **dual JWT Bearer scheme** with a policy-based selector. On each request, the selector peeks at the JWT `iss` claim (without validating) to route the token to the correct handler:
+
+- **`iss` = `codec-api`** → `"Local"` scheme (validates with the API's HMAC-SHA256 signing key)
+- **Any other issuer** → `"Google"` scheme (validates against Google's JWKS)
 
 ```csharp
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddAuthentication("Selector")
+    .AddPolicyScheme("Selector", "Google or Local", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            // Peek at the issuer claim without validating
+            var token = /* extract from Authorization header or access_token query */;
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            if (jwt.Issuer == "codec-api") return "Local";
+            return "Google";
+        };
+    })
+    .AddJwtBearer("Google", options =>
     {
         options.Authority = "https://accounts.google.com";
-        options.MapInboundClaims = false; // Preserve raw JWT claim names (sub, name, email, picture)
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuers = new[] { "https://accounts.google.com", "accounts.google.com" },
             ValidateAudience = true,
-            ValidAudience = googleClientId, // Your Google Client ID
+            ValidAudience = googleClientId,
             ValidateLifetime = true
         };
-
-        // Allow SignalR to read the JWT from the query string for WebSocket connections.
-        // WebSocket requests cannot set Authorization headers, so the token is passed
-        // via the access_token query parameter instead.
-        options.Events = new JwtBearerEvents
+        // SignalR WebSocket: read token from ?access_token query string
+    })
+    .AddJwtBearer("Local", options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
-                {
-                    context.Token = accessToken;
-                }
-                return Task.CompletedTask;
-            }
+            ValidateIssuer = true,
+            ValidIssuer = "codec-api",
+            ValidateAudience = true,
+            ValidAudience = "codec-api",
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
+        // SignalR WebSocket: read token from ?access_token query string
     });
 ```
 
-**Validation Steps:**
+**Validation Steps (Google):**
 1. Verify JWT signature using Google's public keys (JWKS)
 2. Check issuer is Google (`accounts.google.com`)
 3. Validate audience matches your Google Client ID
 4. Verify token has not expired
 5. Extract user claims (subject, email, name, picture)
+
+**Validation Steps (Local):**
+1. Verify HMAC-SHA256 signature using `Jwt:Secret`
+2. Check issuer and audience are `codec-api`
+3. Verify token has not expired
+4. Extract user claims (sub = user GUID, email, name, picture)
 
 ### 4. Nickname on First Sign-Up
 
@@ -160,67 +178,64 @@ An email/password user can link their Google account by visiting Settings → My
 
 ### 6. User Identity Mapping
 
-After validation, the API extracts claims and maps to an internal User record:
+After validation, `UserService.GetOrCreateUserAsync` checks the JWT `iss` claim to determine the auth method and maps claims to an internal `User` record:
+
+- **Local tokens** (`iss` = `codec-api`): The `sub` claim is the user's GUID. The user is looked up directly by `Id`.
+- **Google tokens** (`iss` = `accounts.google.com`): The `sub` claim is the Google subject string. The user is looked up by `GoogleSubject`, and profile fields (display name, email, avatar) are synced from the Google token on each request.
 
 ```csharp
-app.MapGet("/me", async (ClaimsPrincipal user, CodecDbContext db) =>
+public async Task<(User, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal)
 {
-    var appUser = await GetOrCreateUserAsync(user, db);
-    return Results.Ok(appUser);
-}).RequireAuthorization();
+    var issuer = principal.FindFirst("iss")?.Value;
 
-// With MapInboundClaims = false, raw JWT claim names are preserved.
-static async Task<User> GetOrCreateUserAsync(ClaimsPrincipal user, CodecDbContext db)
-{
-    var subject = user.FindFirst("sub")?.Value;
-    var displayName = user.FindFirst("name")?.Value ?? user.Identity?.Name ?? "Unknown";
-    var email = user.FindFirst("email")?.Value;
-    var avatarUrl = user.FindFirst("picture")?.Value;
+    if (issuer == "codec-api")
+    {
+        // Local JWT — sub is the user's GUID
+        var userId = Guid.Parse(principal.FindFirst("sub")!.Value);
+        var user = await db.Users.FindAsync(userId);
+        return (user!, false);
+    }
 
-    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == subject);
+    // Google JWT — sub is the Google subject string
+    var googleSubject = principal.FindFirst("sub")?.Value;
+    var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSubject);
 
     if (existing is not null)
     {
-        existing.DisplayName = displayName;
-        existing.Email = email;
-        existing.AvatarUrl = avatarUrl;
+        // Sync profile from Google token
+        existing.DisplayName = principal.FindFirst("name")?.Value ?? existing.DisplayName;
+        existing.Email = principal.FindFirst("email")?.Value;
+        existing.AvatarUrl = principal.FindFirst("picture")?.Value;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
-        return existing;
+        return (existing, false);
     }
 
-    var appUser = new User
-    {
-        GoogleSubject = subject,
-        DisplayName = displayName,
-        Email = email,
-        AvatarUrl = avatarUrl
-    };
-
-    db.Users.Add(appUser);
+    // New Google user
+    var newUser = new User { GoogleSubject = googleSubject, /* ... */ };
+    db.Users.Add(newUser);
     await db.SaveChangesAsync();
-    return appUser;
+    return (newUser, true);
 }
 ```
 
-> **Note:** `MapInboundClaims = false` is set on the JwtBearer configuration so that raw JWT claim names (`sub`, `name`, `email`, `picture`) pass through without being remapped to .NET `ClaimTypes` URIs. This simplifies claim access in application code.
+> **Note:** `MapInboundClaims = false` is set on both JWT Bearer schemes so that raw JWT claim names (`sub`, `name`, `email`, `picture`) pass through without being remapped to .NET `ClaimTypes` URIs.
 
 ## Token Claims
 
-Google ID tokens contain the following claims:
+Both token types produce an identical claims shape for application code:
 
-| Claim | Description | Example |
-|-------|-------------|----------|
-| `sub` | Unique Google user ID | `110169484474386276334` |
-| `email` | User's email address | `user@example.com` |
-| `name` | Full name | `John Doe` |
-| `picture` | Avatar URL | `https://lh3.googleusercontent.com/...` |
-| `iss` | Token issuer | `accounts.google.com` |
-| `aud` | Client ID | `123456789-abc.apps.googleusercontent.com` |
-| `exp` | Token expiry timestamp | `1707672600` |
-| `iat` | Token issued timestamp | `1707669000` |
+| Claim | Google Token | Local Token |
+|-------|-------------|-------------|
+| `sub` | Google user ID (`110169484474386276334`) | User GUID (`a1b2c3d4-...`) |
+| `email` | User's email | User's email |
+| `name` | Google display name | Effective display name |
+| `picture` | Google avatar URL | Custom avatar path (if set) |
+| `iss` | `accounts.google.com` | `codec-api` |
+| `aud` | Google Client ID | `codec-api` |
+| `exp` | 1 hour from issuance | 1 hour from issuance |
 
-> With `MapInboundClaims = false`, these claim names are used as-is in the `ClaimsPrincipal`. Without this setting, the JwtBearer middleware would remap them to `ClaimTypes` URIs (e.g., `sub` → `ClaimTypes.NameIdentifier`).
+> With `MapInboundClaims = false` on both schemes, these claim names are used as-is in the `ClaimsPrincipal`. The `iss` claim is used by `UserService` to determine which lookup strategy to use (`Id` for local, `GoogleSubject` for Google).
 
 ## Configuration
 

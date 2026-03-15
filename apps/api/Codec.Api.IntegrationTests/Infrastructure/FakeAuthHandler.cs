@@ -55,6 +55,8 @@ public class FakeAuthHandler(
             if (payload.TryGetValue("name", out var name)) claims.Add(new Claim("name", name));
             if (payload.TryGetValue("email", out var email)) claims.Add(new Claim("email", email));
             if (payload.TryGetValue("picture", out var picture)) claims.Add(new Claim("picture", picture));
+            if (payload.TryGetValue("iss", out var iss)) claims.Add(new Claim("iss", iss));
+            else claims.Add(new Claim("iss", "accounts.google.com"));
 
             var identity = new ClaimsIdentity(claims, SchemeName);
             var principal = new ClaimsPrincipal(identity);

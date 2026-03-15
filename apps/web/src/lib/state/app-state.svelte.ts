@@ -471,6 +471,18 @@ export class AppState {
 		this.showAlphaNotification = true;
 	}
 
+	async register(email: string, password: string, nickname: string): Promise<AuthResponse> {
+		return this.api.register(email, password, nickname);
+	}
+
+	async login(email: string, password: string): Promise<AuthResponse> {
+		return this.api.login(email, password);
+	}
+
+	async linkGoogle(email: string, password: string, googleCredential: string): Promise<AuthResponse> {
+		return this.api.linkGoogle(email, password, googleCredential);
+	}
+
 	async handleLocalAuth(response: AuthResponse): Promise<void> {
 		this.idToken = response.accessToken;
 		this.status = 'Signed in';

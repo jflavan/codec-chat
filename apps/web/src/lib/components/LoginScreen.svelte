@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
-	import { env } from '$env/dynamic/public';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
-	import type { AuthResponse } from '$lib/types/models.js';
 
 	const app = getAppState();
-	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 
 	let mode = $state<'signin' | 'signup'>('signin');
 	let email = $state('');
@@ -43,32 +40,9 @@
 
 		isSubmitting = true;
 		try {
-			let response: AuthResponse;
-			if (mode === 'signup') {
-				const res = await fetch(`${apiBaseUrl}/auth/register`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ email: email.trim(), password, nickname: nickname.trim() })
-				});
-				if (!res.ok) {
-					if (res.status === 409) throw new Error('An account with this email already exists.');
-					const body = await res.text();
-					throw new Error(body || `Registration failed (${res.status})`);
-				}
-				response = await res.json();
-			} else {
-				const res = await fetch(`${apiBaseUrl}/auth/login`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ email: email.trim(), password })
-				});
-				if (!res.ok) {
-					if (res.status === 401) throw new Error('Invalid email or password.');
-					const body = await res.text();
-					throw new Error(body || `Sign in failed (${res.status})`);
-				}
-				response = await res.json();
-			}
+			const response = mode === 'signup'
+				? await app.register(email.trim(), password, nickname.trim())
+				: await app.login(email.trim(), password);
 			await app.handleLocalAuth(response);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';

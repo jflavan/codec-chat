@@ -1,10 +1,7 @@
 <script lang="ts">
-	import { env } from '$env/dynamic/public';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	const app = getAppState();
-
-	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 
 	let password = $state('');
 	let isSubmitting = $state(false);
@@ -16,24 +13,7 @@
 		error = '';
 		isSubmitting = true;
 		try {
-			const res = await fetch(`${apiBaseUrl}/auth/link-google`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					email: app.linkingEmail,
-					password,
-					googleCredential: app.pendingGoogleCredential
-				})
-			});
-			if (res.status === 401) {
-				error = 'Incorrect password. Please try again.';
-				return;
-			}
-			if (!res.ok) {
-				error = `Failed to link account (${res.status}).`;
-				return;
-			}
-			const data = await res.json();
+			const data = await app.linkGoogle(app.linkingEmail, password, app.pendingGoogleCredential);
 			await app.handleLocalAuth(data);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
