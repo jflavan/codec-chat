@@ -17,6 +17,7 @@
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
+import NicknameModal from '$lib/components/NicknameModal.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -143,6 +144,10 @@
 
 {#if !app.isSignedIn}
 	<LoginScreen />
+{/if}
+
+{#if app.needsNickname}
+	<NicknameModal />
 {/if}
 {/if}
 
