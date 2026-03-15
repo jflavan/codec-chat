@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "2458374315736694811"
+      "templateHash": "4768592185137789449"
     }
   },
   "parameters": {
@@ -103,6 +103,12 @@
       "defaultValue": "",
       "metadata": {
         "description": "GitHub fine-grained PAT with issues:write scope for in-app bug reporting. Leave empty to disable."
+      }
+    },
+    "jwtSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "HMAC-SHA256 secret for signing locally-issued JWTs (email/password auth). Must be at least 32 characters."
       }
     },
     "redisEnabled": {
@@ -976,6 +982,69 @@
             "connectionStringSecretUri": {
               "type": "string",
               "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'Redis--ConnectionString'), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "jwtSecretKv": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "jwt-secret",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "Jwt--Secret"
+          },
+          "secretValue": {
+            "value": "[parameters('jwtSecret')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
             }
           }
         }
@@ -1873,6 +1942,9 @@
           },
           "voiceTurnKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--TurnSecret', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
           "voiceSfuInternalKeyKvUrl": "[if(parameters('voiceVmEnabled'), createObject('value', format('{0}secrets/Voice--SfuInternalKey', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
+          "jwtSecretKvUrl": {
+            "value": "[format('{0}secrets/Jwt--Secret', reference('keyVault').outputs.uri.value)]"
+          },
           "gitHubTokenKvUrl": "[if(not(equals(parameters('gitHubToken'), '')), createObject('value', format('{0}secrets/GitHub--Token', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
           "redisConnectionStringKvUrl": "[if(parameters('redisEnabled'), createObject('value', reference('redisCache').outputs.connectionStringSecretUri.value), createObject('value', ''))]",
           "appInsightsConnectionString": {
@@ -1886,7 +1958,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "7879231019898027263"
+              "templateHash": "18201857809434566220"
             }
           },
           "parameters": {
@@ -1953,6 +2025,12 @@
               "defaultValue": "",
               "metadata": {
                 "description": "Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled."
+              }
+            },
+            "jwtSecretKvUrl": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Key Vault secret URL for the JWT signing secret (email/password auth)."
               }
             },
             "gitHubTokenKvUrl": {
@@ -2027,7 +2105,7 @@
                       "allowCredentials": true
                     }
                   },
-                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()))]",
+                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'jwt-secret', 'keyVaultUrl', parameters('jwtSecretKvUrl'), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()))]",
                   "registries": [
                     {
                       "server": "[parameters('containerRegistryLoginServer')]",
@@ -2044,7 +2122,7 @@
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"
                       },
-                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()))]",
+                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'Jwt__Secret', 'secretRef', 'jwt-secret'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()))]",
                       "probes": [
                         {
                           "type": "Liveness",

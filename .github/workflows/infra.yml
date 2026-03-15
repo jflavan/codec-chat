@@ -130,6 +130,7 @@ jobs:
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              jwtSecret='${{ secrets.JWT_SECRET }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
@@ -157,6 +158,7 @@ jobs:
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              jwtSecret='${{ secrets.JWT_SECRET }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
@@ -183,6 +185,7 @@ jobs:
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
               voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
               voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              jwtSecret='${{ secrets.JWT_SECRET }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
