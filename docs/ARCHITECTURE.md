@@ -169,6 +169,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - **Framework:** ASP.NET Core 10 with Controller-based APIs
 - **Language:** C# 14 (.NET 10)
 - **Database:** PostgreSQL via Entity Framework Core (Npgsql)
+- **Testing:** `Codec.Api.Tests/` (xUnit unit tests) + `Codec.Api.IntegrationTests/` (Testcontainers integration tests) — see [TESTING.md](TESTING.md)
 - **Key Features:**
   - Stateless JWT validation
   - RESTful controller-based API design (`[ApiController]`)

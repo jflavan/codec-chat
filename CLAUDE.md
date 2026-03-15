@@ -37,6 +37,23 @@ npm run build       # Production build
 npm run check       # svelte-check + TypeScript + deprecated-events lint
 ```
 
+### Tests
+```bash
+# Web tests (Vitest)
+cd apps/web
+npm test                # Run all tests
+npm run test:coverage   # Run with coverage
+
+# API unit tests (xUnit)
+dotnet test apps/api/Codec.Api.Tests/Codec.Api.Tests.csproj
+
+# API integration tests (requires Docker for Testcontainers)
+dotnet test apps/api/Codec.Api.IntegrationTests/Codec.Api.IntegrationTests.csproj
+
+# All API tests
+dotnet test Codec.sln
+```
+
 ### Database migrations (EF Core)
 ```bash
 # Requires: dotnet tool install --global dotnet-ef

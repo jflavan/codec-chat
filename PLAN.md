@@ -43,6 +43,9 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Logging: Serilog with structured JSON → Log Analytics
 - Observability: OpenTelemetry (traces, metrics, logs) via Codec.ServiceDefaults; Azure Monitor / Application Insights in production
 - Local dev: .NET Aspire AppHost for single-command orchestration
+- Testing (API): xUnit + FluentAssertions + Moq for unit tests; WebApplicationFactory + Testcontainers (PostgreSQL, Redis) for integration tests; coverlet for coverage
+- Testing (Web): Vitest + jsdom for unit tests; @vitest/coverage-v8 for coverage
+- Test auth: FakeAuthHandler bypasses Google JWT validation in integration tests (base64-encoded claims as Bearer token)
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
@@ -76,6 +79,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **DM reactions** — Reaction entity extended with nullable DirectMessageId (mutual exclusivity constraint with MessageId) to support emoji reactions on direct messages
 - **.NET Aspire AppHost** — single-command local dev orchestration (Postgres, Redis, Azurite, API, Web) with dashboard at `https://localhost:17222`
 - **OpenTelemetry observability** — `Codec.ServiceDefaults` shared project with distributed traces, metrics, and structured logs; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard; SFU instrumented with custom spans on room/transport/producer/consumer operations; Application Insights Bicep module wired to API container app; CD pipeline passes connection string to voice VM
+- **Testing** — 448 automated tests (205 API unit, 109 API integration, 134 web); API core services at 95%+ coverage; web unit-testable code at 98%+ coverage; integration tests use Testcontainers for disposable Postgres/Redis; see [TESTING.md](docs/TESTING.md)
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
@@ -935,6 +939,61 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] `az bicep build --file main.bicep` passes (0 errors)
 
 ---
+
+## Task breakdown: Testing
+
+### API Unit Tests (`apps/api/Codec.Api.Tests/`)
+- [x] Create xUnit test project with test directory structure
+- [x] Configure Moq for interface mocking
+- [x] Configure FluentAssertions for readable test assertions
+- [x] Configure coverlet for code coverage reporting
+- [x] Write service unit tests (UserService, AvatarService, ImageUploadService, CustomEmojiService, LinkPreviewService, PresenceTracker, MessageCacheService) — 95%+ coverage
+- [x] Write controller unit tests (HealthController, UsersController, AvatarsController, ImageUploadsController, IssuesController, PresenceController, FriendsController, ServersController, ChannelsController, DmController) — targeting all happy paths and error cases
+- [x] Use InMemory EF Core for database operations in unit tests
+- [x] Use ClaimsPrincipal setup for authenticated controller context
+- [x] Verify 205 tests pass successfully
+
+### API Integration Tests (`apps/api/Codec.Api.IntegrationTests/`)
+- [x] Create xUnit integration test project
+- [x] Configure Testcontainers for PostgreSQL and Redis
+- [x] Create `CodecWebFactory` to boot complete API pipeline against disposable containers
+- [x] Create `FakeAuthHandler` to bypass Google JWT validation (accepts base64-encoded claim payloads)
+- [x] Create `IntegrationTestBase` with shared test helpers
+- [x] Write integration tests for full HTTP request pipeline (routing, model binding, middleware, auth, exception handling)
+- [x] Test `ExecuteDeleteAsync` code paths (server/channel/message deletion with cascade)
+- [x] Test SignalR hub connections, channel groups, typing indicators, presence heartbeat
+- [x] Test voice call lifecycle via hub (start → decline/answer → end)
+- [x] Test server lifecycle (create → update → add channels → invite → join → delete)
+- [x] Test message flow (post → edit → react → delete → purge)
+- [x] Test DM conversation flow (friend request → accept → DM → send → close)
+- [x] Test invite flow (create → join → already-member → expired → max-uses)
+- [x] Test member management (kick, role promotion/demotion)
+- [x] Test file uploads (avatars, images, server icons, custom emojis)
+- [x] Test search (server messages, DM messages, with filters)
+- [x] Test voice state (TURN credentials, voice channel states)
+- [x] Test EF Core migrations against real PostgreSQL
+- [x] Verify 109 tests pass successfully
+
+### Web Unit Tests (`apps/web/src/**/*.spec.ts`)
+- [x] Configure Vitest with jsdom environment
+- [x] Configure @vitest/coverage-v8 for code coverage reporting
+- [x] Add localStorage polyfill in test-setup.ts
+- [x] Write util tests (format, YouTube URL extraction, emoji regex, emoji frequency, theme management) — 100% coverage
+- [x] Write auth tests (session persistence, JWT expiry checks, token management) — 100% coverage
+- [x] Write API client tests (all 50+ ApiClient methods, error handling, 401 retry logic) — 97.7% coverage
+- [x] Verify 134 tests pass successfully
+
+### Coverage Reporting
+- [x] Generate and merge API unit + integration coverage reports (72.52% line coverage)
+- [x] Generate web coverage report (98.59% line coverage)
+- [x] Document coverage metrics in TESTING.md
+- [x] Document untestable code sections (voice signaling, background services, Program.cs, external storage)
+
+### Documentation
+- [x] Create comprehensive `docs/TESTING.md` with test suites, running instructions, coverage details, architecture, and adding new tests guide
+- [x] Update `README.md` with testing quick-start and coverage table
+- [x] Update `PLAN.md` with testing task breakdown and metrics
+- [x] Document test organization and naming conventions
 
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
