@@ -17,7 +17,9 @@ import type {
 	CustomEmoji,
 	SearchFilters,
 	PaginatedSearchResults,
-	PresenceStatus
+	PresenceStatus,
+	AuthResponse,
+	TokenRefreshResponse
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -28,7 +30,12 @@ import {
 	loadStoredToken,
 	clearSession as clearStoredSession,
 	isTokenExpired,
-	isSessionExpired
+	isSessionExpired,
+	type AuthType,
+	setAuthType,
+	getAuthType,
+	persistRefreshToken,
+	loadStoredRefreshToken
 } from '$lib/auth/session.js';
 import {
 	initGoogleIdentity,
@@ -99,6 +106,11 @@ export class AppState {
 	me = $state<UserProfile | null>(null);
 	status = $state('Signed out');
 	error = $state<string | null>(null);
+	authType: AuthType = $state<AuthType>('google');
+	needsNickname = $state(false);
+	needsLinking = $state(false);
+	linkingEmail = $state('');
+	pendingGoogleCredential = $state('');
 
 	/* ───── loading flags ───── */
 	isInitialLoading = $state(true);
@@ -382,6 +394,7 @@ export class AppState {
 		applyTheme(this.theme);
 		this._loadUserVolumes();
 		this._loadVoicePreferences();
+		this.authType = getAuthType();
 
 		// Check for credential from Google redirect flow (Android PWA)
 		const redirectCredential = consumeRedirectCredential();
@@ -394,6 +407,18 @@ export class AppState {
 			const stored = loadStoredToken();
 			if (stored && !isTokenExpired(stored)) {
 				this.handleCredential(stored);
+				return;
+			}
+			// For local auth, try refresh token
+			if (this.authType === 'local') {
+				this.refreshAccessToken().then((success) => {
+					if (success && this.idToken) {
+						this.handleCredential(this.idToken);
+					} else {
+						this.isInitialLoading = false;
+						this.renderSignIn();
+					}
+				});
 				return;
 			}
 		}
@@ -414,10 +439,26 @@ export class AppState {
 		this.status = 'Signed in';
 		this.isInitialLoading = true;
 		persistToken(token);
-		
+
 		// Load user profile first to ensure user is created and auto-joined to default server
 		await this.loadMe();
-		
+
+		// Check if this Google sign-in needs account linking
+		if (this.me?.needsLinking) {
+			this.needsLinking = true;
+			this.linkingEmail = this.me.email ?? '';
+			this.pendingGoogleCredential = token;
+			this.isInitialLoading = false;
+			return;
+		}
+
+		// Check if this is a new Google user who needs to set a nickname
+		if (this.me?.isNewUser) {
+			this.needsNickname = true;
+			this.isInitialLoading = false;
+			return;
+		}
+
 		// Then load all other data in parallel
 		await Promise.all([
 			this.loadServers(),
@@ -428,6 +469,62 @@ export class AppState {
 		]);
 		this.isInitialLoading = false;
 		this.showAlphaNotification = true;
+	}
+
+	async handleLocalAuth(response: AuthResponse): Promise<void> {
+		this.idToken = response.accessToken;
+		this.status = 'Signed in';
+		this.isInitialLoading = true;
+		persistToken(response.accessToken);
+		persistRefreshToken(response.refreshToken);
+		setAuthType('local');
+		this.authType = 'local';
+
+		await this.loadMe();
+
+		await Promise.all([
+			this.loadServers(),
+			this.loadFriends(),
+			this.loadFriendRequests(),
+			this.loadDmConversations(),
+			this.startSignalR()
+		]);
+		this.isInitialLoading = false;
+		this.showAlphaNotification = true;
+	}
+
+	async confirmNickname(nickname: string): Promise<void> {
+		if (!this.idToken) return;
+		await this.api.setNickname(this.idToken, nickname);
+		this.needsNickname = false;
+		this.isInitialLoading = true;
+
+		await Promise.all([
+			this.loadMe(),
+			this.loadServers(),
+			this.loadFriends(),
+			this.loadFriendRequests(),
+			this.loadDmConversations(),
+			this.startSignalR()
+		]);
+		this.isInitialLoading = false;
+		this.showAlphaNotification = true;
+	}
+
+	async refreshAccessToken(): Promise<boolean> {
+		const refreshToken = loadStoredRefreshToken();
+		if (!refreshToken) return false;
+
+		try {
+			const response = await this.api.refreshToken(refreshToken);
+			this.idToken = response.accessToken;
+			persistToken(response.accessToken);
+			persistRefreshToken(response.refreshToken);
+			return true;
+		} catch {
+			clearStoredSession();
+			return false;
+		}
 	}
 
 	async signOut(): Promise<void> {
