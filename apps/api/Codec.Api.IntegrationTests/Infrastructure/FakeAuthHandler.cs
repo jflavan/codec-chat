@@ -71,13 +71,13 @@ public class FakeAuthHandler(
     /// <summary>
     /// Creates a base64-encoded token from the given claims for use in test requests.
     /// </summary>
-    public static string CreateToken(string googleSubject, string name, string email = "test@test.com", string? picture = null)
+    public static string CreateToken(string googleSubject, string name, string? email = null, string? picture = null)
     {
         var payload = new Dictionary<string, string>
         {
             ["sub"] = googleSubject,
             ["name"] = name,
-            ["email"] = email
+            ["email"] = email ?? $"{googleSubject}@test.com"
         };
         if (picture is not null) payload["picture"] = picture;
 
