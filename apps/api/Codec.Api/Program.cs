@@ -93,8 +93,40 @@ if (string.IsNullOrWhiteSpace(googleClientId))
     throw new InvalidOperationException("Google:ClientId is required for authentication.");
 }
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "codec-api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "codec-api";
+
+builder.Services.AddAuthentication("Selector")
+    .AddPolicyScheme("Selector", "Google or Local", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+            var token = authHeader?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true
+                ? authHeader["Bearer ".Length..]
+                : context.Request.Query["access_token"].FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                // Peek at the issuer claim without validating
+                try
+                {
+                    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                    var jwt = handler.ReadJwtToken(token);
+                    var issuer = jwt.Issuer;
+                    if (issuer == "codec-api")
+                        return "Local";
+                }
+                catch
+                {
+                    // If we can't read it, fall through to Google
+                }
+            }
+            return "Google";
+        };
+    })
+    .AddJwtBearer("Google", options =>
     {
         options.Authority = "https://accounts.google.com";
         options.MapInboundClaims = false;
@@ -107,7 +139,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true
         };
 
-        // Allow SignalR to read the JWT from the query string for WebSocket connections.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
+    })
+    .AddJwtBearer("Local", options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(jwtSecret))
+        };
+
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
