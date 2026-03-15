@@ -18,6 +18,7 @@
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
 import NicknameModal from '$lib/components/NicknameModal.svelte';
+import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -148,6 +149,10 @@ import NicknameModal from '$lib/components/NicknameModal.svelte';
 
 {#if app.needsNickname}
 	<NicknameModal />
+{/if}
+
+{#if app.needsLinking}
+	<LinkAccountModal />
 {/if}
 {/if}
 
