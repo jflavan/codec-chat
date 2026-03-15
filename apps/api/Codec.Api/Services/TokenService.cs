@@ -78,6 +78,30 @@ public class TokenService(IConfiguration configuration, CodecDbContext db)
         return refreshToken;
     }
 
+    public async Task<(User user, string accessToken, string refreshToken)?> RotateRefreshTokenAsync(string opaqueToken)
+    {
+        var storedToken = await ValidateRefreshTokenAsync(opaqueToken);
+        if (storedToken is null) return null;
+
+        // Revoke the old token
+        storedToken.RevokedAt = DateTimeOffset.UtcNow;
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request already revoked this token
+            return null;
+        }
+
+        var user = storedToken.User;
+        var accessToken = GenerateAccessToken(user);
+        var (newRefreshToken, _) = await GenerateRefreshTokenAsync(user);
+
+        return (user, accessToken, newRefreshToken);
+    }
+
     public async Task RevokeRefreshTokenAsync(RefreshToken token)
     {
         token.RevokedAt = DateTimeOffset.UtcNow;

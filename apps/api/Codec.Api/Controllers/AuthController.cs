@@ -134,18 +134,13 @@ public class AuthController(
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        var storedToken = await tokenService.ValidateRefreshTokenAsync(request.RefreshToken);
-        if (storedToken is null)
+        var result = await tokenService.RotateRefreshTokenAsync(request.RefreshToken);
+        if (result is null)
         {
             return Unauthorized(new { error = "Invalid or expired refresh token." });
         }
 
-        // Revoke old token (rotation)
-        await tokenService.RevokeRefreshTokenAsync(storedToken);
-
-        var user = storedToken.User;
-        var accessToken = tokenService.GenerateAccessToken(user);
-        var (newRefreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
+        var (user, accessToken, newRefreshToken) = result.Value;
 
         return Ok(new
         {

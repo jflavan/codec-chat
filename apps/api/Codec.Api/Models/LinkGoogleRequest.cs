@@ -7,7 +7,7 @@ public class LinkGoogleRequest
     [Required, EmailAddress]
     public string Email { get; set; } = string.Empty;
 
-    [Required]
+    [Required, MaxLength(128)]
     public string Password { get; set; } = string.Empty;
 
     [Required]
