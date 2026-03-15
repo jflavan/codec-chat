@@ -14,7 +14,7 @@ namespace Codec.Api.Services;
 public class UserService(CodecDbContext db) : IUserService
 {
     /// <inheritdoc />
-    public async Task<User> GetOrCreateUserAsync(ClaimsPrincipal principal)
+    public async Task<(User user, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal)
     {
         var subject = principal.FindFirst("sub")?.Value;
         if (string.IsNullOrWhiteSpace(subject))
@@ -45,7 +45,7 @@ public class UserService(CodecDbContext db) : IUserService
                 await db.SaveChangesAsync();
             }
 
-            return existing;
+            return (existing, false);
         }
 
         var appUser = new User
@@ -82,11 +82,31 @@ public class UserService(CodecDbContext db) : IUserService
         {
             // Another concurrent request already created this user. Detach and re-fetch.
             db.Entry(appUser).State = EntityState.Detached;
-            return await db.Users.FirstAsync(u => u.GoogleSubject == subject);
+            var raceUser = await db.Users.FirstAsync(u => u.GoogleSubject == subject);
+            return (raceUser, false);
         }
 
 
-        return appUser;
+        return (appUser, true);
+    }
+
+    /// <inheritdoc />
+    public async Task<User?> ResolveUserAsync(ClaimsPrincipal principal)
+    {
+        var issuer = principal.FindFirst("iss")?.Value;
+
+        // Local JWT — sub claim is the user's GUID
+        if (issuer == "codec-api")
+        {
+            var sub = principal.FindFirst("sub")?.Value;
+            if (sub is null || !Guid.TryParse(sub, out var userId)) return null;
+            return await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        }
+
+        // Google JWT — sub claim is the Google subject
+        var googleSubject = principal.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(googleSubject)) return null;
+        return await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSubject);
     }
 
     /// <inheritdoc />

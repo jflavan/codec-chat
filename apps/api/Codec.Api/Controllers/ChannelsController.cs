@@ -41,7 +41,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Channel not found." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         // Cache-first path for paginated history (not around-mode, not latest page).
@@ -467,7 +467,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Channel not found." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var authorName = userService.GetEffectiveDisplayName(appUser);
@@ -688,7 +688,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Channel not found." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
@@ -728,7 +728,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Channel not found." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         if (!appUser.IsGlobalAdmin)
         {
             throw new Codec.Api.Services.Exceptions.ForbiddenException();
@@ -768,7 +768,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Channel not found." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
@@ -813,7 +813,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             return NotFound(new { error = "Channel not found." });
         }
 
-        var appUser = await userService.GetOrCreateUserAsync(User);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
 
         var messageExists = await db.Messages.AnyAsync(m => m.Id == messageId && m.ChannelId == channelId);

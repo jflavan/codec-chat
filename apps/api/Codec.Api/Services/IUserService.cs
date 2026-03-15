@@ -11,8 +11,15 @@ public interface IUserService
     /// <summary>
     /// Resolves an application user from the authenticated claims principal,
     /// creating a new user record on first sign-in.
+    /// Returns the user and a flag indicating whether the user was newly created.
     /// </summary>
-    Task<User> GetOrCreateUserAsync(ClaimsPrincipal principal);
+    Task<(User user, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal);
+
+    /// <summary>
+    /// Resolves a user from authentication claims. For Google tokens, matches on GoogleSubject.
+    /// For local tokens, matches on user ID (sub claim).
+    /// </summary>
+    Task<User?> ResolveUserAsync(ClaimsPrincipal principal);
 
     /// <summary>
     /// Checks whether a user is a member of the specified server.

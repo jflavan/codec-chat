@@ -24,7 +24,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public override async Task OnConnectedAsync()
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{appUser.Id}");
 
         List<Guid> serverIds;
@@ -177,7 +177,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task<object> StartCall(string dmChannelId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
         if (!Guid.TryParse(dmChannelId, out var dmChannelGuid))
             throw new HubException("Invalid DM channel ID.");
@@ -273,7 +273,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task<object> AcceptCall(string callId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
         if (!Guid.TryParse(callId, out var callGuid))
             throw new HubException("Invalid call ID.");
@@ -374,7 +374,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task<object> SetupCallTransports(string callId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
         if (!Guid.TryParse(callId, out var callGuid))
             throw new HubException("Invalid call ID.");
@@ -471,7 +471,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task DeclineCall(string callId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
         if (!Guid.TryParse(callId, out var callGuid))
             throw new HubException("Invalid call ID.");
@@ -531,7 +531,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task EndCall()
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
         var call = await db.VoiceCalls
             .FirstOrDefaultAsync(c => (c.CallerUserId == appUser.Id || c.RecipientUserId == appUser.Id)
@@ -642,7 +642,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task<object> JoinVoiceChannel(string channelId)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
         if (!Guid.TryParse(channelId, out var channelGuid))
             throw new HubException("Invalid channel ID.");
@@ -799,7 +799,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task ConnectTransport(string transportId, JsonElement dtlsParameters)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         var voiceState = await db.VoiceStates
             .AsNoTracking()
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
@@ -823,7 +823,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task<object> Produce(string transportId, JsonElement rtpParameters)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         var voiceState = await db.VoiceStates
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
 
@@ -862,7 +862,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task<object> Consume(string producerId, string recvTransportId, JsonElement rtpCapabilities)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         var voiceState = await db.VoiceStates
             .AsNoTracking()
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
@@ -887,7 +887,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task UpdateVoiceState(bool isMuted, bool isDeafened)
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         var voiceState = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
 
         if (voiceState is null) return; // Not in voice; ignore silently.
@@ -933,7 +933,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task LeaveVoiceChannel()
     {
-        var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         var voiceState = await db.VoiceStates
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
 
@@ -948,7 +948,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     {
         try
         {
-            var appUser = await userService.GetOrCreateUserAsync(Context.User!);
+            var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
 
             // Update presence on disconnect
             var (previousPresence, currentPresence, remainingConnections) = presenceTracker.Disconnect(Context.ConnectionId);
