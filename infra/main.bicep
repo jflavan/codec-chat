@@ -72,6 +72,9 @@ param sfuDomainName string = ''
 @description('Email for Let\'s Encrypt certificate notifications. Required when voiceVmEnabled is true.')
 param certbotEmail string = ''
 
+@description('Deploy Azure Communication Services for transactional email. Requires the Microsoft.Communication resource provider to be registered on the subscription.')
+param emailEnabled bool = false
+
 @description('Sender email address for transactional emails (e.g., noreply@codec.app). Requires a verified Azure Communication Services Email domain.')
 param emailSenderAddress string = 'DoNotReply@codec.app'
 
@@ -215,7 +218,7 @@ module gitHubTokenSecret 'modules/key-vault-secret.bicep' = if (gitHubToken != '
 
 // ── Azure Communication Services (transactional email) ────────────────────────
 
-module communicationServices 'modules/communication-services.bicep' = {
+module communicationServices 'modules/communication-services.bicep' = if (emailEnabled) {
   name: 'communication-services'
   params: {
     name: communicationServicesName
@@ -338,7 +341,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
     appInsightsConnectionString: appInsights.outputs.connectionString
-    emailConnectionStringKvUrl: communicationServices.outputs.connectionStringSecretUri
+    emailConnectionStringKvUrl: emailEnabled ? communicationServices.outputs.connectionStringSecretUri : ''
     emailSenderAddress: emailSenderAddress
     frontendBaseUrl: effectiveWebUrl
   }
