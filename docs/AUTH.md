@@ -367,10 +367,10 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 
 Email verification is required for all email/password registrations (hard gate):
 
-- On registration, a verification email is sent with a 24-hour token link
+- On registration, a verification email is sent with a 24-hour token link. If email sending fails, registration still succeeds (the response includes `emailSent: false` so the frontend can prompt the user to resend)
 - Users cannot access the app until they click the verification link
 - The `POST /auth/verify-email` endpoint validates the token (anonymous)
-- The `POST /auth/resend-verification` endpoint allows resending (authenticated, 2-minute cooldown)
+- The `POST /auth/resend-verification` endpoint allows resending (authenticated, 2-minute cooldown). Returns 502 if email sending fails
 - Google Sign-In users are auto-verified (Google already verified the email)
 - Verification tokens are SHA-256 hashed in the database (same pattern as refresh tokens)
 - A `[RequireEmailVerified]` action filter gates data-loading endpoints, returning 403 with `{ code: "email_not_verified" }` for unverified users
