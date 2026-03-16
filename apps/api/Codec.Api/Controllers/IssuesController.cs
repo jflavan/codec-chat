@@ -1,3 +1,4 @@
+using Codec.Api.Filters;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -7,6 +8,7 @@ namespace Codec.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 [Route("issues")]
 public class IssuesController(IUserService userService) : ControllerBase
 {

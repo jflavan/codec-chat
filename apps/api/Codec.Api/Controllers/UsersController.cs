@@ -58,7 +58,8 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
                 appUser.Email,
                 AvatarUrl = effectiveAvatarUrl,
                 appUser.GoogleSubject,
-                appUser.IsGlobalAdmin
+                appUser.IsGlobalAdmin,
+                appUser.EmailVerified
             },
             isNewUser,
             claims
