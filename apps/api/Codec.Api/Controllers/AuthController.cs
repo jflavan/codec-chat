@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,8 @@ public class AuthController(
     CodecDbContext db,
     TokenService tokenService,
     IAvatarService avatarService,
-    IConfiguration configuration) : ControllerBase
+    IConfiguration configuration,
+    EmailVerificationService emailVerificationService) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -71,6 +73,8 @@ public class AuthController(
             return Conflict(new { error = "An account with this email already exists." });
         }
 
+        await emailVerificationService.GenerateAndSendVerificationAsync(user);
+
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
 
@@ -88,7 +92,8 @@ public class AuthController(
                 EffectiveDisplayName = user.EffectiveDisplayName,
                 user.Email,
                 AvatarUrl = effectiveAvatarUrl,
-                user.IsGlobalAdmin
+                user.IsGlobalAdmin,
+                user.EmailVerified
             }
         });
     }
@@ -157,7 +162,8 @@ public class AuthController(
                 EffectiveDisplayName = user.EffectiveDisplayName,
                 user.Email,
                 AvatarUrl = effectiveAvatarUrl,
-                user.IsGlobalAdmin
+                user.IsGlobalAdmin,
+                user.EmailVerified
             }
         });
     }
@@ -191,6 +197,39 @@ public class AuthController(
 
         // Always return 204 to avoid leaking whether the token was valid
         return NoContent();
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        var user = await emailVerificationService.VerifyTokenAsync(request.Token);
+        if (user is null)
+        {
+            return BadRequest(new { error = "Invalid or expired verification token." });
+        }
+
+        return Ok(new { message = "Email verified successfully." });
+    }
+
+    [HttpPost("resend-verification")]
+    [Authorize]
+    public async Task<IActionResult> ResendVerification()
+    {
+        var sub = User.FindFirst("sub")?.Value;
+        if (sub is null || !Guid.TryParse(sub, out var userId))
+            return Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user is null) return Unauthorized();
+
+        if (user.EmailVerified)
+            return BadRequest(new { error = "Email is already verified." });
+
+        if (!emailVerificationService.CanResend(user))
+            return StatusCode(429, new { error = "Please wait before requesting another verification email." });
+
+        await emailVerificationService.GenerateAndSendVerificationAsync(user);
+        return Ok(new { message = "Verification email sent." });
     }
 
     [HttpPost("link-google")]
@@ -301,4 +340,3 @@ public class AuthController(
         });
     }
 }
-
