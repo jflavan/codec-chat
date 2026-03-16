@@ -50,6 +50,11 @@ public class CodecDbContext : DbContext
             .HasFilter("\"Email\" IS NOT NULL");
 
         modelBuilder.Entity<User>()
+            .HasIndex(user => user.EmailVerificationToken)
+            .IsUnique()
+            .HasFilter("\"EmailVerificationToken\" IS NOT NULL");
+
+        modelBuilder.Entity<User>()
             .Property(user => user.Nickname)
             .HasMaxLength(32);
 

@@ -68,7 +68,8 @@ public class UserService(CodecDbContext db) : IUserService
             GoogleSubject = subject,
             DisplayName = displayName,
             Email = email,
-            AvatarUrl = avatarUrl
+            AvatarUrl = avatarUrl,
+            EmailVerified = true
         };
 
         db.Users.Add(appUser);
