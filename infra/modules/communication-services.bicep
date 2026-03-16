@@ -3,9 +3,6 @@ param name string
 param location string = 'global'
 param keyVaultName string
 
-@description('Sender address for outbound email (e.g., DoNotReply@<acs-domain> or a custom verified domain).')
-param senderAddress string = ''
-
 resource acs 'Microsoft.Communication/communicationServices@2023-04-01' = {
   name: name
   location: location
