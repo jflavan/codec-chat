@@ -38,7 +38,7 @@ jobs:
             # Compare HEAD against its first parent to detect changed files.
             # For merge commits, diff-tree's default combined diff produces empty
             # output when the merge is clean, so we compare explicitly against HEAD~1.
-            if git diff --name-only HEAD~1 HEAD -- 'infra/' | grep -q .; then
+            if git diff --name-only HEAD~1 HEAD -- 'infra/' '.github/workflows/infra.yml' | grep -q .; then
               echo "has-changes=true" >> "$GITHUB_OUTPUT"
               echo "Infrastructure changes detected"
             else
@@ -67,8 +67,6 @@ jobs:
         run: |
           az provider register --namespace Microsoft.Cache --wait || \
             echo "::warning::Could not register Microsoft.Cache — ensure it is registered at the subscription level"
-          az provider register --namespace Microsoft.Communication --wait || \
-            echo "::warning::Could not register Microsoft.Communication — ensure it is registered at the subscription level"
 
       - name: Resolve current container images
         id: images
@@ -136,7 +134,8 @@ jobs:
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
-              certbotEmail='${{ secrets.CERTBOT_EMAIL }}'
+              certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
+              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }}
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         if: steps.certs.outputs.certs-exist != 'true'
@@ -164,7 +163,8 @@ jobs:
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
-              certbotEmail='${{ secrets.CERTBOT_EMAIL }}'
+              certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
+              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }}
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -191,7 +191,8 @@ jobs:
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
-              certbotEmail='${{ secrets.CERTBOT_EMAIL }}'
+              certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
+              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }}
 
       - name: Show deployment outputs
         run: |
