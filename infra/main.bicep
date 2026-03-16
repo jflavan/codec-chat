@@ -220,7 +220,6 @@ module communicationServices 'modules/communication-services.bicep' = {
   params: {
     name: communicationServicesName
     keyVaultName: keyVault.outputs.name
-    senderAddress: emailSenderAddress
   }
 }
 
