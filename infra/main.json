@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "4768592185137789449"
+      "templateHash": "4271958382575238088"
     }
   },
   "parameters": {
@@ -145,6 +145,20 @@
       "metadata": {
         "description": "Email for Let's Encrypt certificate notifications. Required when voiceVmEnabled is true."
       }
+    },
+    "emailEnabled": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy Azure Communication Services for transactional email. Requires the Microsoft.Communication resource provider to be registered on the subscription."
+      }
+    },
+    "emailSenderAddress": {
+      "type": "string",
+      "defaultValue": "DoNotReply@codec.app",
+      "metadata": {
+        "description": "Sender email address for transactional emails (e.g., noreply@codec.app). Requires a verified Azure Communication Services Email domain."
+      }
     }
   },
   "variables": {
@@ -160,6 +174,7 @@
     "redisCacheName": "[format('redis-{0}', variables('baseName'))]",
     "voiceVmName": "[format('vm-{0}-voice', variables('baseName'))]",
     "appInsightsName": "[format('appi-{0}', variables('baseName'))]",
+    "communicationServicesName": "[format('acs-{0}', variables('baseName'))]",
     "sfuDomainParts": "[split(if(not(equals(parameters('sfuDomainName'), '')), parameters('sfuDomainName'), 'placeholder.invalid'), '.')]",
     "sfuDnsZoneName": "[format('{0}.{1}', variables('sfuDomainParts')[1], variables('sfuDomainParts')[2])]",
     "sfuDnsRecordName": "[variables('sfuDomainParts')[0]]"
@@ -1117,6 +1132,171 @@
         "keyVault"
       ]
     },
+    "communicationServices": {
+      "condition": "[parameters('emailEnabled')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "communication-services",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('communicationServicesName')]"
+          },
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "14298815089425670301"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "global"
+            },
+            "keyVaultName": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Communication/communicationServices",
+              "apiVersion": "2023-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "dataLocation": "United States",
+                "linkedDomains": [
+                  "[resourceId('Microsoft.Communication/emailServices/domains', format('{0}-email', parameters('name')), 'AzureManagedDomain')]"
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Communication/emailServices/domains', format('{0}-email', parameters('name')), 'AzureManagedDomain')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Communication/emailServices",
+              "apiVersion": "2023-04-01",
+              "name": "[format('{0}-email', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "dataLocation": "United States"
+              }
+            },
+            {
+              "type": "Microsoft.Communication/emailServices/domains",
+              "apiVersion": "2023-04-01",
+              "name": "[format('{0}/{1}', format('{0}-email', parameters('name')), 'AzureManagedDomain')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "domainManagement": "AzureManaged"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Communication/emailServices', format('{0}-email', parameters('name')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "[format('{0}-conn-str-secret', parameters('name'))]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "keyVaultName": {
+                    "value": "[parameters('keyVaultName')]"
+                  },
+                  "secretName": {
+                    "value": "Email--ConnectionString"
+                  },
+                  "secretValue": {
+                    "value": "[listKeys(resourceId('Microsoft.Communication/communicationServices', parameters('name')), '2023-04-01').primaryConnectionString]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.40.2.10011",
+                      "templateHash": "17427752039621998580"
+                    }
+                  },
+                  "parameters": {
+                    "keyVaultName": {
+                      "type": "string"
+                    },
+                    "secretName": {
+                      "type": "string"
+                    },
+                    "secretValue": {
+                      "type": "securestring"
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.KeyVault/vaults/secrets",
+                      "apiVersion": "2023-07-01",
+                      "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+                      "properties": {
+                        "value": "[parameters('secretValue')]"
+                      }
+                    }
+                  ],
+                  "outputs": {
+                    "secretUri": {
+                      "type": "string",
+                      "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Communication/communicationServices', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Communication/communicationServices', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "connectionStringSecretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Resources/deployments', format('{0}-conn-str-secret', parameters('name'))), '2025-04-01').outputs.secretUri.value]"
+            },
+            "senderAddress": {
+              "type": "string",
+              "value": "[format('DoNotReply@{0}', reference(resourceId('Microsoft.Communication/emailServices/domains', format('{0}-email', parameters('name')), 'AzureManagedDomain'), '2023-04-01').fromSenderDomain)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
     "voiceVm": {
       "condition": "[parameters('voiceVmEnabled')]",
       "type": "Microsoft.Resources/deployments",
@@ -1949,7 +2129,10 @@
           "redisConnectionStringKvUrl": "[if(parameters('redisEnabled'), createObject('value', reference('redisCache').outputs.connectionStringSecretUri.value), createObject('value', ''))]",
           "appInsightsConnectionString": {
             "value": "[listOutputsWithSecureValues('appInsights', '2025-04-01').connectionString]"
-          }
+          },
+          "emailConnectionStringKvUrl": "[if(parameters('emailEnabled'), createObject('value', coalesce(tryGet(if(parameters('emailEnabled'), reference('communicationServices'), null()), 'outputs', 'connectionStringSecretUri', 'value'), '')), createObject('value', ''))]",
+          "emailSenderAddress": "[if(parameters('emailEnabled'), createObject('value', coalesce(tryGet(if(parameters('emailEnabled'), reference('communicationServices'), null()), 'outputs', 'senderAddress', 'value'), parameters('emailSenderAddress'))), createObject('value', parameters('emailSenderAddress')))]",
+          "frontendBaseUrl": "[if(not(equals(parameters('webCustomDomain'), '')), createObject('value', format('https://{0}', parameters('webCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('webAppName'), reference('containerAppsEnv').outputs.defaultDomain.value)))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -1958,7 +2141,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "18201857809434566220"
+              "templateHash": "1781565495030484288"
             }
           },
           "parameters": {
@@ -2054,6 +2237,27 @@
                 "description": "Application Insights connection string for OpenTelemetry export. Leave empty to disable. Passed as a plain value (not Key Vault) because the ingestion key is write-only and not a security-sensitive credential."
               }
             },
+            "emailConnectionStringKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the Azure Communication Services connection string (email sending)."
+              }
+            },
+            "emailSenderAddress": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Sender email address for transactional emails."
+              }
+            },
+            "frontendBaseUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Frontend base URL for email verification links."
+              }
+            },
             "customDomainName": {
               "type": "string",
               "defaultValue": "",
@@ -2105,7 +2309,7 @@
                       "allowCredentials": true
                     }
                   },
-                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'jwt-secret', 'keyVaultUrl', parameters('jwtSecretKvUrl'), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()))]",
+                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'jwt-secret', 'keyVaultUrl', parameters('jwtSecretKvUrl'), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('emailConnectionStringKvUrl'), '')), createArray(createObject('name', 'email-connection-string', 'keyVaultUrl', parameters('emailConnectionStringKvUrl'), 'identity', 'system')), createArray()))]",
                   "registries": [
                     {
                       "server": "[parameters('containerRegistryLoginServer')]",
@@ -2122,7 +2326,7 @@
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"
                       },
-                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'Jwt__Secret', 'secretRef', 'jwt-secret'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()))]",
+                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'Jwt__Secret', 'secretRef', 'jwt-secret'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()), if(not(equals(parameters('emailConnectionStringKvUrl'), '')), createArray(createObject('name', 'Email__ConnectionString', 'secretRef', 'email-connection-string')), createArray()), if(not(equals(parameters('emailSenderAddress'), '')), createArray(createObject('name', 'Email__SenderAddress', 'value', parameters('emailSenderAddress'))), createArray()), if(not(equals(parameters('frontendBaseUrl'), '')), createArray(createObject('name', 'Frontend__BaseUrl', 'value', parameters('frontendBaseUrl'))), createArray()))]",
                       "probes": [
                         {
                           "type": "Liveness",
@@ -2218,6 +2422,7 @@
       },
       "dependsOn": [
         "appInsights",
+        "communicationServices",
         "containerAppsEnv",
         "containerRegistry",
         "keyVault",

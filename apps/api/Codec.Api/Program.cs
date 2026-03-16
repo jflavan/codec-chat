@@ -199,10 +199,10 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<TokenService>();
 
-if (builder.Environment.IsDevelopment())
-    builder.Services.AddSingleton<IEmailSender, ConsoleEmailSender>();
-else
+if (!builder.Environment.IsDevelopment() && !string.IsNullOrEmpty(builder.Configuration["Email:ConnectionString"]))
     builder.Services.AddSingleton<IEmailSender, AzureEmailSender>();
+else
+    builder.Services.AddSingleton<IEmailSender, ConsoleEmailSender>();
 
 builder.Services.AddScoped<EmailVerificationService>();
 
