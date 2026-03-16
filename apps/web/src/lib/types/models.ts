@@ -124,6 +124,7 @@ export type UserProfile = {
 		email?: string;
 		avatarUrl?: string;
 		isGlobalAdmin?: boolean;
+		emailVerified?: boolean;
 	};
 	isNewUser?: boolean;
 	needsLinking?: boolean;
@@ -142,6 +143,7 @@ export type AuthResponse = {
 		email?: string;
 		avatarUrl?: string;
 		isGlobalAdmin?: boolean;
+		emailVerified?: boolean;
 	};
 };
 

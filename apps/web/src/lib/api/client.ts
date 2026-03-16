@@ -157,6 +157,21 @@ export class ApiClient {
 		}).catch(() => {});
 	}
 
+	async verifyEmail(token: string): Promise<{ message: string }> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/verify-email`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ token })
+		});
+	}
+
+	async resendVerification(accessToken: string): Promise<{ message: string }> {
+		return this.request(`${this.baseUrl}/auth/resend-verification`, {
+			method: 'POST',
+			headers: this.headers(accessToken)
+		});
+	}
+
 	/* ───── User ───── */
 
 	getMe(token: string): Promise<UserProfile> {

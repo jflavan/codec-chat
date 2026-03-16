@@ -5,6 +5,7 @@ using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Codec.Api.Filters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Controllers;
@@ -14,6 +15,7 @@ namespace Codec.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 [Route("friends")]
 public class FriendsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService) : ControllerBase
 {

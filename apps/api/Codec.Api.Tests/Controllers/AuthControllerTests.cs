@@ -15,7 +15,9 @@ public class AuthControllerTests : IDisposable
     private readonly CodecDbContext _db;
     private readonly TokenService _tokenService;
     private readonly Mock<IAvatarService> _avatarService = new();
+    private readonly Mock<IEmailSender> _emailSender = new();
     private readonly IConfiguration _config;
+    private readonly EmailVerificationService _emailVerificationService;
     private readonly AuthController _controller;
 
     public AuthControllerTests()
@@ -31,14 +33,16 @@ public class AuthControllerTests : IDisposable
                 ["Jwt:Secret"] = "super-secret-key-that-is-at-least-32-chars-long!!",
                 ["Jwt:Issuer"] = "codec-api",
                 ["Jwt:Audience"] = "codec-api",
-                ["Jwt:ExpiryMinutes"] = "60"
+                ["Jwt:ExpiryMinutes"] = "60",
+                ["Frontend:BaseUrl"] = "http://localhost:5174"
             })
             .Build();
 
         _tokenService = new TokenService(_config, _db);
         _avatarService.Setup(a => a.ResolveUrl(It.IsAny<string?>())).Returns((string?)null);
+        _emailVerificationService = new EmailVerificationService(_db, _emailSender.Object, _config);
 
-        _controller = new AuthController(_db, _tokenService, _avatarService.Object, _config);
+        _controller = new AuthController(_db, _tokenService, _avatarService.Object, _config, _emailVerificationService);
     }
 
     public void Dispose() => _db.Dispose();
@@ -347,5 +351,46 @@ public class AuthControllerTests : IDisposable
 
         var result = await _controller.Login(new LoginRequest { Email = "expired-lock@test.com", Password = "Correct123!" });
         result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // --- Email Verification ---
+
+    [Fact]
+    public async Task Register_SendsVerificationEmail_UserNotVerified()
+    {
+        var request = new RegisterRequest
+        {
+            Email = "verify@test.com",
+            Password = "StrongPass1!",
+            Nickname = "VerifyUser"
+        };
+
+        await _controller.Register(request);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == "verify@test.com");
+        user.Should().NotBeNull();
+        user!.EmailVerified.Should().BeFalse();
+        user.EmailVerificationToken.Should().NotBeNullOrEmpty();
+        _emailSender.Verify(e => e.SendEmailAsync("verify@test.com", It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_ValidToken_Returns200()
+    {
+        var user = await CreateUserWithPassword("v@test.com");
+        var rawToken = await _emailVerificationService.GenerateAndSendVerificationAsync(user);
+
+        var result = await _controller.VerifyEmail(new VerifyEmailRequest { Token = rawToken });
+
+        result.Should().BeOfType<OkObjectResult>();
+        var updated = await _db.Users.FirstAsync(u => u.Id == user.Id);
+        updated.EmailVerified.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task VerifyEmail_InvalidToken_Returns400()
+    {
+        var result = await _controller.VerifyEmail(new VerifyEmailRequest { Token = "bad-token" });
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 }

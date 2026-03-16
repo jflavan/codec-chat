@@ -199,6 +199,13 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<TokenService>();
 
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddSingleton<IEmailSender, ConsoleEmailSender>();
+else
+    builder.Services.AddSingleton<IEmailSender, AzureEmailSender>();
+
+builder.Services.AddScoped<EmailVerificationService>();
+
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.
 // Accepts self-signed TLS certs because the SFU VM uses a snakeoil cert

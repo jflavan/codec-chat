@@ -19,6 +19,7 @@
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
 import NicknameModal from '$lib/components/NicknameModal.svelte';
 import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
+import VerificationGate from '$lib/components/VerificationGate.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -145,6 +146,10 @@ import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
 
 {#if !app.isSignedIn}
 	<LoginScreen />
+{/if}
+
+{#if app.isSignedIn && !app.emailVerified}
+	<VerificationGate />
 {/if}
 
 {#if app.needsNickname}

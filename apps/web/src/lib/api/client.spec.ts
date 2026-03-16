@@ -1051,4 +1051,44 @@ describe('ApiClient', () => {
 			expect(mockFetch).toHaveBeenCalledTimes(2);
 		});
 	});
+
+	// --- Email Verification ---
+
+	describe('verifyEmail', () => {
+		it('sends POST with token', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ message: 'Email verified successfully.' }));
+
+			const result = await client.verifyEmail('my-token');
+			expect(result.message).toBe('Email verified successfully.');
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/auth/verify-email`,
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ token: 'my-token' })
+				})
+			);
+		});
+
+		it('throws on invalid token', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ error: 'Invalid or expired verification token.' }, 400));
+
+			await expect(client.verifyEmail('bad-token')).rejects.toThrow();
+		});
+	});
+
+	describe('resendVerification', () => {
+		it('sends POST with auth header', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ message: 'Verification email sent.' }));
+
+			const result = await client.resendVerification(token);
+			expect(result.message).toBe('Verification email sent.');
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/auth/resend-verification`,
+				expect.objectContaining({
+					method: 'POST',
+					headers: expect.objectContaining({ Authorization: `Bearer ${token}` })
+				})
+			);
+		});
+	});
 });
