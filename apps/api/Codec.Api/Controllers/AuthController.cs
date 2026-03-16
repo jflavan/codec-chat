@@ -113,6 +113,13 @@ public class AuthController(
             return Unauthorized(new { error = "Account temporarily locked. Try again later." });
         }
 
+        // Reset failed attempts if a previous lockout has expired
+        if (user.LockoutEnd is not null && user.LockoutEnd <= DateTimeOffset.UtcNow)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+        }
+
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             // Increment failed attempts and lock if threshold exceeded
@@ -197,8 +204,27 @@ public class AuthController(
             return Unauthorized(new { error = "Invalid email or password." });
         }
 
+        // Check account lockout
+        if (user.LockoutEnd is not null && user.LockoutEnd > DateTimeOffset.UtcNow)
+        {
+            return Unauthorized(new { error = "Account temporarily locked. Try again later." });
+        }
+
+        // Reset failed attempts if a previous lockout has expired
+        if (user.LockoutEnd is not null && user.LockoutEnd <= DateTimeOffset.UtcNow)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+        }
+
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
+            user.FailedLoginAttempts++;
+            if (user.FailedLoginAttempts >= MaxFailedAttempts)
+            {
+                user.LockoutEnd = DateTimeOffset.UtcNow.Add(LockoutDuration);
+            }
+            await db.SaveChangesAsync();
             return Unauthorized(new { error = "Invalid email or password." });
         }
 
