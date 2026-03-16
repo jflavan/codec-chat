@@ -32,6 +32,16 @@ public class User
     /// </summary>
     public bool IsGlobalAdmin { get; set; }
 
+    /// <summary>
+    /// Number of consecutive failed login attempts. Reset to 0 on successful login.
+    /// </summary>
+    public int FailedLoginAttempts { get; set; }
+
+    /// <summary>
+    /// When set, login is blocked until this time passes (account lockout).
+    /// </summary>
+    public DateTimeOffset? LockoutEnd { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
