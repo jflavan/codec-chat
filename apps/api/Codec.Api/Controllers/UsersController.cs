@@ -1,4 +1,5 @@
 using Codec.Api.Data;
+using Codec.Api.Filters;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -70,6 +71,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     /// Sets or updates the current user's nickname.
     /// </summary>
     [HttpPut("me/nickname")]
+    [RequireEmailVerified]
     public async Task<IActionResult> SetNickname([FromBody] SetNicknameRequest request)
     {
         var trimmed = request.Nickname?.Trim() ?? "";
@@ -95,6 +97,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     /// Removes the current user's nickname, reverting to the Google display name.
     /// </summary>
     [HttpDelete("me/nickname")]
+    [RequireEmailVerified]
     public async Task<IActionResult> RemoveNickname()
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
@@ -120,6 +123,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     /// Excludes the current user from results.
     /// </summary>
     [HttpGet("users/search")]
+    [RequireEmailVerified]
     public async Task<IActionResult> SearchUsers([FromQuery] string? q)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
