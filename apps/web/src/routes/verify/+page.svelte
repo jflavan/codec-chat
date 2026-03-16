@@ -11,7 +11,7 @@
 	let errorMessage = $state('');
 
 	onMount(async () => {
-		const token = $page.url.searchParams.get('token');
+		const token = page.url.searchParams.get('token');
 		if (!token) {
 			status = 'error';
 			errorMessage = 'No verification token provided.';
