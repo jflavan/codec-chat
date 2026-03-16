@@ -363,8 +363,20 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 ⚠️ **Refresh Token in localStorage**
 - Refresh tokens are stored in `localStorage`, which is accessible to any JavaScript on the page (XSS risk). HttpOnly cookies would be more secure but require API-side cookie management, CORS/SameSite changes, and CSRF protection rework. Documented as a future improvement.
 
-⚠️ **No Email Verification**
-- Users can register with any email address without verifying ownership. This enables email squatting (registering someone else's email before they do). Email verification is planned as future work.
+### Email Verification
+
+Email verification is required for all email/password registrations (hard gate):
+
+- On registration, a verification email is sent with a 24-hour token link
+- Users cannot access the app until they click the verification link
+- The `POST /auth/verify-email` endpoint validates the token (anonymous)
+- The `POST /auth/resend-verification` endpoint allows resending (authenticated, 2-minute cooldown)
+- Google Sign-In users are auto-verified (Google already verified the email)
+- Verification tokens are SHA-256 hashed in the database (same pattern as refresh tokens)
+- A `[RequireEmailVerified]` action filter gates data-loading endpoints, returning 403 with `{ code: "email_not_verified" }` for unverified users
+- Exempt endpoints: `/auth/*`, `/me`, `/auth/refresh`, `/auth/logout`
+- In development, verification emails are logged to the console via `ConsoleEmailSender`
+- In production, emails are sent via Azure Communication Services (`AzureEmailSender`)
 
 ## Production Recommendations
 

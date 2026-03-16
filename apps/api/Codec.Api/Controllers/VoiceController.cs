@@ -5,6 +5,7 @@ using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Codec.Api.Filters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Controllers;
@@ -14,6 +15,7 @@ namespace Codec.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 [Route("voice")]
 public class VoiceController(CodecDbContext db, IUserService userService, IConfiguration config) : ControllerBase
 {

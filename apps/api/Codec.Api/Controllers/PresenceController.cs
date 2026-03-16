@@ -1,4 +1,5 @@
 using Codec.Api.Data;
+using Codec.Api.Filters;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,7 @@ namespace Codec.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 public class PresenceController(CodecDbContext db, IUserService userService, PresenceTracker tracker) : ControllerBase
 {
     /// <summary>

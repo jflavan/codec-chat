@@ -6,6 +6,7 @@ using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Codec.Api.Filters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Controllers;
@@ -15,6 +16,7 @@ namespace Codec.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 [Route("channels")]
 public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache) : ControllerBase
 {

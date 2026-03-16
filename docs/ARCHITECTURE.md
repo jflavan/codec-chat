@@ -281,6 +281,14 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - Optimistic concurrency via PostgreSQL `xmin` column prevents concurrent token rotation
 - Background cleanup service (`RefreshTokenCleanupService`) runs every 6 hours to purge expired tokens and tokens revoked more than 24 hours ago
 
+**Email Verification:**
+- Email/password registrations require email verification before app access
+- On registration, a 24-hour verification token is generated and emailed to the user
+- Tokens are SHA-256 hashed in the database (same security pattern as refresh tokens)
+- `[RequireEmailVerified]` action filter gates all data-loading controllers, returning 403 for unverified users
+- Google Sign-In users are auto-verified (bypassed by the filter via issuer check)
+- `ConsoleEmailSender` logs verification links in development; `AzureEmailSender` sends via Azure Communication Services in production
+
 ## API Endpoints
 
 ### Public Endpoints

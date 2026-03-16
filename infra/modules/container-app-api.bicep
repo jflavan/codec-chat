@@ -39,6 +39,15 @@ param redisConnectionStringKvUrl string = ''
 @description('Application Insights connection string for OpenTelemetry export. Leave empty to disable. Passed as a plain value (not Key Vault) because the ingestion key is write-only and not a security-sensitive credential.')
 param appInsightsConnectionString string = ''
 
+@description('Key Vault secret URL for the Azure Communication Services connection string (email sending).')
+param emailConnectionStringKvUrl string = ''
+
+@description('Sender email address for transactional emails.')
+param emailSenderAddress string = ''
+
+@description('Frontend base URL for email verification links.')
+param frontendBaseUrl string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -135,6 +144,12 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: redisConnectionStringKvUrl
           identity: 'system'
         }
+      ] : [], emailConnectionStringKvUrl != '' ? [
+        {
+          name: 'email-connection-string'
+          keyVaultUrl: emailConnectionStringKvUrl
+          identity: 'system'
+        }
       ] : [])
       registries: [
         {
@@ -226,6 +241,21 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
               value: appInsightsConnectionString
+            }
+          ] : [], emailConnectionStringKvUrl != '' ? [
+            {
+              name: 'Email__ConnectionString'
+              secretRef: 'email-connection-string'
+            }
+          ] : [], emailSenderAddress != '' ? [
+            {
+              name: 'Email__SenderAddress'
+              value: emailSenderAddress
+            }
+          ] : [], frontendBaseUrl != '' ? [
+            {
+              name: 'Frontend__BaseUrl'
+              value: frontendBaseUrl
             }
           ] : [])
           probes: [

@@ -1,3 +1,4 @@
+using Codec.Api.Filters;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,7 @@ namespace Codec.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 [Route("uploads")]
 public class ImageUploadsController(IImageUploadService imageUploadService, IUserService userService) : ControllerBase
 {

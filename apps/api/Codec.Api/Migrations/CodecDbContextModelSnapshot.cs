@@ -518,6 +518,18 @@ namespace Codec.Api.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("text");
 
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("EmailVerificationToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("EmailVerificationTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EmailVerificationTokenSentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("FailedLoginAttempts")
                         .HasColumnType("integer");
 
@@ -545,6 +557,10 @@ namespace Codec.Api.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasFilter("\"Email\" IS NOT NULL");
+
+                    b.HasIndex("EmailVerificationToken")
+                        .IsUnique()
+                        .HasFilter("\"EmailVerificationToken\" IS NOT NULL");
 
                     b.HasIndex("GoogleSubject")
                         .IsUnique()

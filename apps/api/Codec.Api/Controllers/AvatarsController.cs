@@ -1,4 +1,5 @@
 using Codec.Api.Data;
+using Codec.Api.Filters;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,7 @@ namespace Codec.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
+[RequireEmailVerified]
 [Route("")]
 public class AvatarsController(CodecDbContext db, IUserService userService, IAvatarService avatarService) : ControllerBase
 {

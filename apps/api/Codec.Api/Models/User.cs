@@ -42,6 +42,26 @@ public class User
     /// </summary>
     public DateTimeOffset? LockoutEnd { get; set; }
 
+    /// <summary>
+    /// Whether the user has verified their email address.
+    /// </summary>
+    public bool EmailVerified { get; set; }
+
+    /// <summary>
+    /// SHA-256 hash of the email verification token. Null when no pending verification.
+    /// </summary>
+    public string? EmailVerificationToken { get; set; }
+
+    /// <summary>
+    /// When the email verification token expires.
+    /// </summary>
+    public DateTimeOffset? EmailVerificationTokenExpiresAt { get; set; }
+
+    /// <summary>
+    /// When the last verification email was sent (for rate limiting resends).
+    /// </summary>
+    public DateTimeOffset? EmailVerificationTokenSentAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
