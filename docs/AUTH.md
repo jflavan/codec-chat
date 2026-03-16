@@ -35,16 +35,26 @@ Codec supports two parallel auth flows. Both result in a JWT access token stored
 
 1. Client submits `{ email, password }`.
 2. API looks up user by email; returns 401 if not found or if `PasswordHash` is null (Google-only account).
-3. bcrypt verify — 401 on mismatch.
-4. Issues new access + refresh token pair.
-5. Returns 200 with `{ accessToken, refreshToken, user }`.
+3. If account is locked (`LockoutEnd` > now), returns 401 with "Account temporarily locked."
+4. bcrypt verify — on mismatch, increments `FailedLoginAttempts`. After 5 consecutive failures, sets `LockoutEnd` to 15 minutes from now.
+5. On success, resets `FailedLoginAttempts` to 0 and clears `LockoutEnd`.
+6. Issues new access + refresh token pair.
+7. Returns 200 with `{ accessToken, refreshToken, user }`.
 
 #### Token Refresh (`POST /auth/refresh`)
 
 1. Client sends `{ refreshToken }` when the access token is expired.
 2. API verifies the token against the stored SHA-256 hash; returns 401 if expired or revoked.
-3. Issues new access + refresh token pair, revokes the old refresh token (rotation on use).
-4. Refresh token lifetime: **7 days**.
+3. Revokes the old refresh token atomically using PostgreSQL's `xmin` optimistic concurrency token — concurrent refresh requests on the same token will fail (second request gets 401).
+4. Issues new access + refresh token pair.
+5. Refresh token lifetime: **7 days**.
+
+#### Logout (`POST /auth/logout`)
+
+1. Client sends `{ refreshToken }`.
+2. API revokes the token (sets `RevokedAt`). Returns 204 regardless of whether the token was found (no information leakage).
+3. Frontend calls this before clearing `localStorage` on sign-out.
+4. Unauthenticated endpoint — the refresh token itself is the credential.
 
 ---
 
@@ -323,13 +333,15 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 | Password storage | N/A (Google manages) | bcrypt cost factor 12 |
 | Token signing | Google RSA (JWKS) | API HMAC-SHA256 secret |
 | Rate limiting on auth endpoints | Standard (100 req/min) | Strict (10 req/min per IP) |
+| Account lockout | N/A (Google manages) | 5 failed attempts → 15-min lockout |
 | Refresh mechanism | Google One Tap silent re-auth | Rotating opaque refresh tokens (stored hashed) |
+| Logout | Client-side only | Server-side revocation via `POST /auth/logout` |
 
 ### Current Limitations
 
 ⚠️ **Token Revocation**
 - Google tokens: no real-time invalidation; compromised tokens valid until expiration
-- Local tokens: access tokens cannot be individually revoked (short 1-hour TTL mitigates); refresh tokens are invalidated on use (rotation) and on sign-out
+- Local tokens: access tokens cannot be individually revoked (short 1-hour TTL mitigates); refresh tokens are invalidated on use (rotation) and on sign-out via the logout endpoint
 
 ⚠️ **Password Reset**
 - Password reset via email is not yet implemented
@@ -339,8 +351,20 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 
 ⚠️ **Sign-Out**
 - Sign-out button is available in the user panel (bottom of channel sidebar)
-- Calls `clearSession()` from `$lib/auth/session.ts` and `google.accounts.id.disableAutoSelect()`
+- For email/password users, sign-out calls `POST /auth/logout` to revoke the refresh token server-side before clearing local state
+- For Google users, calls `google.accounts.id.disableAutoSelect()` and clears `localStorage`
 - Resets application state and returns user to the sign-in screen
+
+### Accepted Tradeoffs
+
+⚠️ **Registration Email Enumeration**
+- The `POST /auth/register` endpoint returns 409 when an email is already taken, revealing whether an email is registered. Without email verification, we cannot return a generic "check your email" response. Accepted risk; mitigated by rate limiting (10 req/min).
+
+⚠️ **Refresh Token in localStorage**
+- Refresh tokens are stored in `localStorage`, which is accessible to any JavaScript on the page (XSS risk). HttpOnly cookies would be more secure but require API-side cookie management, CORS/SameSite changes, and CSRF protection rework. Documented as a future improvement.
+
+⚠️ **No Email Verification**
+- Users can register with any email address without verifying ownership. This enables email squatting (registering someone else's email before they do). Email verification is planned as future work.
 
 ## Production Recommendations
 

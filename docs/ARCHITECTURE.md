@@ -267,6 +267,20 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - Automatic silent token refresh via Google One Tap (`auto_select: true`)
 - SignalR WebSocket connections authenticate via `access_token` query parameter (standard pattern for WebSocket auth since `Authorization` headers aren't supported)
 
+**Account Lockout:**
+- After 5 consecutive failed login attempts, the account is locked for 15 minutes
+- Failed attempt counter resets on successful login or when the lockout period expires
+- Lockout applies to both the `/auth/login` and `/auth/link-google` endpoints
+
+**Server-Side Logout:**
+- `POST /auth/logout` accepts a refresh token and immediately revokes it
+- Always returns 204 to avoid leaking token validity
+- Frontend calls this before clearing local auth state
+
+**Refresh Token Security:**
+- Optimistic concurrency via PostgreSQL `xmin` column prevents concurrent token rotation
+- Background cleanup service (`RefreshTokenCleanupService`) runs every 6 hours to purge expired tokens and tokens revoked more than 24 hours ago
+
 ## API Endpoints
 
 ### Public Endpoints
@@ -691,6 +705,10 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 - ✅ SSRF protection on link preview fetching (private IP blocking, DNS rebinding prevention)
 - ✅ Secrets management via Azure Key Vault (production)
 - ✅ Managed Identity for all Azure service-to-service auth (no connection strings for blob/ACR)
+- ✅ Account lockout after 5 failed login attempts (15-minute window)
+- ✅ Server-side refresh token revocation on logout
+- ✅ Optimistic concurrency on refresh token rotation (PostgreSQL `xmin`)
+- ✅ Background cleanup of expired/revoked refresh tokens
 
 ### Production Requirements
 - 🔒 HTTPS enforcement (via Azure Container Apps)

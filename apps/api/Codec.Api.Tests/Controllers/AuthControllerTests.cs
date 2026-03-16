@@ -248,4 +248,104 @@ public class AuthControllerTests : IDisposable
         var result2 = await _controller.Refresh(new RefreshRequest { RefreshToken = opaqueToken });
         result2.Should().BeOfType<UnauthorizedObjectResult>();
     }
+
+    // --- Logout ---
+
+    [Fact]
+    public async Task Logout_Returns204ForValidToken()
+    {
+        var user = await CreateUserWithPassword("logout@test.com");
+        var (opaqueToken, _) = await _tokenService.GenerateRefreshTokenAsync(user);
+
+        var result = await _controller.Logout(new LogoutRequest { RefreshToken = opaqueToken });
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task Logout_Returns204ForInvalidToken()
+    {
+        // Should not leak whether the token was valid
+        var result = await _controller.Logout(new LogoutRequest { RefreshToken = "bogus-token" });
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task Logout_RevokesTheRefreshToken()
+    {
+        var user = await CreateUserWithPassword("logout-revoke@test.com");
+        var (opaqueToken, entity) = await _tokenService.GenerateRefreshTokenAsync(user);
+
+        await _controller.Logout(new LogoutRequest { RefreshToken = opaqueToken });
+
+        var dbToken = await _db.RefreshTokens.FindAsync(entity.Id);
+        dbToken!.RevokedAt.Should().NotBeNull();
+
+        // Token can no longer be used for refresh
+        var refreshResult = await _controller.Refresh(new RefreshRequest { RefreshToken = opaqueToken });
+        refreshResult.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    // --- Account Lockout ---
+
+    [Fact]
+    public async Task Login_IncrementsFailedAttemptsOnWrongPassword()
+    {
+        var user = await CreateUserWithPassword("lockout@test.com", "Correct123!");
+
+        await _controller.Login(new LoginRequest { Email = "lockout@test.com", Password = "Wrong!" });
+
+        var dbUser = await _db.Users.FindAsync(user.Id);
+        dbUser!.FailedLoginAttempts.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Login_LocksAccountAfter5FailedAttempts()
+    {
+        await CreateUserWithPassword("lock5@test.com", "Correct123!");
+
+        for (int i = 0; i < 5; i++)
+        {
+            await _controller.Login(new LoginRequest { Email = "lock5@test.com", Password = "Wrong!" });
+        }
+
+        // Account should now be locked — even correct password returns 401
+        var result = await _controller.Login(new LoginRequest { Email = "lock5@test.com", Password = "Correct123!" });
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Login_ResetsFailedAttemptsOnSuccess()
+    {
+        var user = await CreateUserWithPassword("reset@test.com", "Correct123!");
+
+        // Fail twice
+        await _controller.Login(new LoginRequest { Email = "reset@test.com", Password = "Wrong!" });
+        await _controller.Login(new LoginRequest { Email = "reset@test.com", Password = "Wrong!" });
+
+        var dbUser = await _db.Users.FindAsync(user.Id);
+        dbUser!.FailedLoginAttempts.Should().Be(2);
+
+        // Succeed — counter should reset
+        await _controller.Login(new LoginRequest { Email = "reset@test.com", Password = "Correct123!" });
+
+        await _db.Entry(dbUser).ReloadAsync();
+        dbUser.FailedLoginAttempts.Should().Be(0);
+        dbUser.LockoutEnd.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Login_AllowsLoginAfterLockoutExpires()
+    {
+        var user = await CreateUserWithPassword("expired-lock@test.com", "Correct123!");
+
+        // Simulate expired lockout
+        user.FailedLoginAttempts = 5;
+        user.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(-1); // expired
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.Login(new LoginRequest { Email = "expired-lock@test.com", Password = "Correct123!" });
+        result.Should().BeOfType<OkObjectResult>();
+    }
 }

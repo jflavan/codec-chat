@@ -10,6 +10,10 @@ This document tracks implemented and planned features for Codec.
 - Email/password registration and sign-in (bcrypt hashing, API-issued JWTs, rotating refresh tokens)
 - Nickname selection during sign-up for both email/password and Google flows
 - Account linking — email/password users can link a Google account after confirming their password
+- Account lockout — 15-minute lockout after 5 consecutive failed login attempts (brute-force protection)
+- Server-side logout — `POST /auth/logout` revokes refresh tokens on sign-out
+- Refresh token cleanup — background service purges expired and stale revoked tokens every 6 hours
+- Optimistic concurrency on refresh token rotation (PostgreSQL `xmin` concurrency token)
 - User profile display (name, email, avatar)
 - Nicknames — user-chosen display name overriding Google name across all surfaces
 - Custom avatar upload (JPG, PNG, WebP, GIF; 10 MB max; content-hash filenames)

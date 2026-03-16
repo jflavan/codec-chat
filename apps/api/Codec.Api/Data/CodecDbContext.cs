@@ -324,14 +324,22 @@ public class CodecDbContext : DbContext
             entity.HasIndex(ps => ps.ConnectionId);
         });
 
-        modelBuilder.Entity<RefreshToken>()
-            .HasOne(rt => rt.User)
-            .WithMany()
-            .HasForeignKey(rt => rt.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasOne(rt => rt.User)
+                .WithMany()
+                .HasForeignKey(rt => rt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<RefreshToken>()
-            .HasIndex(rt => rt.TokenHash)
-            .IsUnique();
+            entity.HasIndex(rt => rt.TokenHash)
+                .IsUnique();
+
+            // Use PostgreSQL's xmin system column for optimistic concurrency.
+            // This ensures RotateRefreshTokenAsync detects concurrent revocations.
+            entity.Property<uint>("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
+        });
     }
 }
