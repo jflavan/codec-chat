@@ -21,7 +21,8 @@ public class AuthController(
     TokenService tokenService,
     IAvatarService avatarService,
     IConfiguration configuration,
-    EmailVerificationService emailVerificationService) : ControllerBase
+    EmailVerificationService emailVerificationService,
+    ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -73,7 +74,16 @@ public class AuthController(
             return Conflict(new { error = "An account with this email already exists." });
         }
 
-        await emailVerificationService.GenerateAndSendVerificationAsync(user);
+        var emailSent = true;
+        try
+        {
+            await emailVerificationService.GenerateAndSendVerificationAsync(user);
+        }
+        catch (Exception ex)
+        {
+            emailSent = false;
+            logger.LogError(ex, "Failed to send verification email during registration for user {UserId}", user.Id);
+        }
 
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
@@ -84,6 +94,7 @@ public class AuthController(
         {
             accessToken,
             refreshToken,
+            emailSent,
             user = new
             {
                 user.Id,
@@ -228,7 +239,16 @@ public class AuthController(
         if (!emailVerificationService.CanResend(user))
             return StatusCode(429, new { error = "Please wait before requesting another verification email." });
 
-        await emailVerificationService.GenerateAndSendVerificationAsync(user);
+        try
+        {
+            await emailVerificationService.GenerateAndSendVerificationAsync(user);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to send verification email to user {UserId}", user.Id);
+            return StatusCode(502, new { error = "Failed to send verification email. Please try again later." });
+        }
+
         return Ok(new { message = "Verification email sent." });
     }
 

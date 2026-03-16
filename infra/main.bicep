@@ -73,7 +73,7 @@ param sfuDomainName string = ''
 param certbotEmail string = ''
 
 @description('Deploy Azure Communication Services for transactional email. Requires the Microsoft.Communication resource provider to be registered on the subscription.')
-param emailEnabled bool = false
+param emailEnabled bool = true
 
 @description('Sender email address for transactional emails (e.g., noreply@codec.app). Requires a verified Azure Communication Services Email domain.')
 param emailSenderAddress string = 'DoNotReply@codec.app'
@@ -341,8 +341,8 @@ module apiApp 'modules/container-app-api.bicep' = {
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
     appInsightsConnectionString: appInsights.outputs.connectionString
-    emailConnectionStringKvUrl: emailEnabled ? communicationServices.outputs.connectionStringSecretUri : ''
-    emailSenderAddress: emailSenderAddress
+    emailConnectionStringKvUrl: emailEnabled ? communicationServices.?outputs.connectionStringSecretUri ?? '' : ''
+    emailSenderAddress: emailEnabled ? communicationServices.?outputs.senderAddress ?? emailSenderAddress : emailSenderAddress
     frontendBaseUrl: effectiveWebUrl
   }
 }
