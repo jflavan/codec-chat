@@ -111,6 +111,7 @@ export class AppState {
 	needsLinking = $state(false);
 	linkingEmail = $state('');
 	pendingGoogleCredential = $state('');
+	emailVerified = $state(true);
 
 	/* ───── loading flags ───── */
 	isInitialLoading = $state(true);
@@ -443,6 +444,13 @@ export class AppState {
 		// Load user profile first to ensure user is created and auto-joined to default server
 		await this.loadMe();
 
+		// Check if local auth user needs email verification
+		if (this.authType === 'local' && this.me && !this.me.user.emailVerified) {
+			this.emailVerified = false;
+			this.isInitialLoading = false;
+			return;
+		}
+
 		// Check if this Google sign-in needs account linking
 		if (this.me?.needsLinking) {
 			this.needsLinking = true;
@@ -486,12 +494,18 @@ export class AppState {
 	async handleLocalAuth(response: AuthResponse): Promise<void> {
 		this.idToken = response.accessToken;
 		this.status = 'Signed in';
-		this.isInitialLoading = true;
 		persistToken(response.accessToken);
 		persistRefreshToken(response.refreshToken);
 		setAuthType('local');
 		this.authType = 'local';
+		this.emailVerified = response.user.emailVerified ?? false;
 
+		if (!this.emailVerified) {
+			this.isInitialLoading = false;
+			return;
+		}
+
+		this.isInitialLoading = true;
 		await this.loadMe();
 
 		await Promise.all([
@@ -503,6 +517,36 @@ export class AppState {
 		]);
 		this.isInitialLoading = false;
 		this.showAlphaNotification = true;
+	}
+
+	async resendVerification(): Promise<void> {
+		if (!this.idToken) return;
+		await this.api.resendVerification(this.idToken);
+	}
+
+	async checkEmailVerified(): Promise<boolean> {
+		if (!this.idToken) return false;
+		try {
+			const profile = await this.api.getMe(this.idToken);
+			if (profile.user.emailVerified) {
+				this.emailVerified = true;
+				this.me = profile;
+				this.isInitialLoading = true;
+				await Promise.all([
+					this.loadServers(),
+					this.loadFriends(),
+					this.loadFriendRequests(),
+					this.loadDmConversations(),
+					this.startSignalR()
+				]);
+				this.isInitialLoading = false;
+				this.showAlphaNotification = true;
+				return true;
+			}
+		} catch {
+			// ignore
+		}
+		return false;
 	}
 
 	async confirmNickname(nickname: string): Promise<void> {
