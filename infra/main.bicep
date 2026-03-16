@@ -72,6 +72,9 @@ param sfuDomainName string = ''
 @description('Email for Let\'s Encrypt certificate notifications. Required when voiceVmEnabled is true.')
 param certbotEmail string = ''
 
+@description('Sender email address for transactional emails (e.g., noreply@codec.app). Requires a verified Azure Communication Services Email domain.')
+param emailSenderAddress string = 'DoNotReply@codec.app'
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -88,6 +91,7 @@ var webAppName = 'ca-${baseName}-web'
 var redisCacheName = 'redis-${baseName}'
 var voiceVmName = 'vm-${baseName}-voice'
 var appInsightsName = 'appi-${baseName}'
+var communicationServicesName = 'acs-${baseName}'
 
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
 var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
@@ -209,6 +213,17 @@ module gitHubTokenSecret 'modules/key-vault-secret.bicep' = if (gitHubToken != '
   }
 }
 
+// ── Azure Communication Services (transactional email) ────────────────────────
+
+module communicationServices 'modules/communication-services.bicep' = {
+  name: 'communication-services'
+  params: {
+    name: communicationServicesName
+    keyVaultName: keyVault.outputs.name
+    senderAddress: emailSenderAddress
+  }
+}
+
 // ── Voice VM (mediasoup SFU + coturn) ────────────────────────────────────────────
 // Deployed only when voiceVmEnabled = true. Both services require UDP port exposure
 // that Azure Container Apps cannot provide, so they run on a dedicated VM instead.
@@ -324,6 +339,9 @@ module apiApp 'modules/container-app-api.bicep' = {
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
     appInsightsConnectionString: appInsights.outputs.connectionString
+    emailConnectionStringKvUrl: communicationServices.outputs.connectionStringSecretUri
+    emailSenderAddress: emailSenderAddress
+    frontendBaseUrl: effectiveWebUrl
   }
 }
 
