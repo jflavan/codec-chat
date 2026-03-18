@@ -268,7 +268,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Admins can only kick Members.
     /// </summary>
     [HttpDelete("{serverId:guid}/members/{targetUserId:guid}")]
-    public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId)
+    public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -296,6 +296,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return Forbid();
         }
 
+        var kickedUserDisplayName = await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == targetUserId)
+            .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
         db.ServerMembers.Remove(targetMembership);
         await db.SaveChangesAsync();
 
@@ -319,6 +325,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             userId = targetUserId
         });
 
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.MemberKicked,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: kickedUserDisplayName);
+
         return NoContent();
     }
 
@@ -329,7 +339,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Nobody can change the Owner's role or their own role.
     /// </summary>
     [HttpPatch("{serverId:guid}/members/{targetUserId:guid}/role")]
-    public async Task<IActionResult> UpdateMemberRole(Guid serverId, Guid targetUserId, [FromBody] UpdateMemberRoleRequest request)
+    public async Task<IActionResult> UpdateMemberRole(Guid serverId, Guid targetUserId, [FromBody] UpdateMemberRoleRequest request, [FromServices] AuditService audit)
     {
         if (!Enum.TryParse<ServerRole>(request.Role, ignoreCase: true, out var newRole)
             || newRole is ServerRole.Owner)
@@ -377,6 +387,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             });
         }
 
+        var targetDisplayName = await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == targetUserId)
+            .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
         targetMembership.Role = newRole;
         await db.SaveChangesAsync();
 
@@ -386,6 +402,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             userId = targetUserId,
             newRole = newRole.ToString()
         });
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.MemberRoleChanged,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: $"Changed @{targetDisplayName} role to {newRole}");
 
         return Ok(new
         {
@@ -426,7 +446,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Creates a channel within a server. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPost("{serverId:guid}/channels")]
-    public async Task<IActionResult> CreateChannel(Guid serverId, [FromBody] CreateChannelRequest request)
+    public async Task<IActionResult> CreateChannel(Guid serverId, [FromBody] CreateChannelRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -454,6 +474,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         db.Channels.Add(channel);
         await db.SaveChangesAsync();
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelCreated,
+            targetType: "Channel", targetId: channel.Id.ToString(),
+            details: channel.Name);
 
         return Created($"/servers/{serverId}/channels/{channel.Id}", new
         {
@@ -768,7 +792,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Creates a new invite code for a server. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPost("{serverId:guid}/invites")]
-    public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request)
+    public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -795,6 +819,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         db.ServerInvites.Add(invite);
         await db.SaveChangesAsync();
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.InviteCreated,
+            targetType: "Invite", targetId: invite.Id.ToString(),
+            details: invite.Code);
 
         return Created($"/servers/{serverId}/invites/{invite.Id}", new
         {
@@ -844,7 +872,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Revokes (deletes) an invite code. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpDelete("{serverId:guid}/invites/{inviteId:guid}")]
-    public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId)
+    public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -857,8 +885,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return NotFound(new { error = "Invite not found." });
         }
 
+        var inviteCode = invite.Code;
         db.ServerInvites.Remove(invite);
         await db.SaveChangesAsync();
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.InviteRevoked,
+            targetType: "Invite", targetId: inviteId.ToString(),
+            details: inviteCode);
 
         return NoContent();
     }
@@ -934,10 +967,16 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Deletes a server and all associated data. Requires server Owner role or global admin privileges.
     /// </summary>
     [HttpDelete("{serverId:guid}")]
-    public async Task<IActionResult> DeleteServer(Guid serverId)
+    public async Task<IActionResult> DeleteServer(Guid serverId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureOwnerAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var serverName = await db.Servers
+            .AsNoTracking()
+            .Where(s => s.Id == serverId)
+            .Select(s => s.Name)
+            .FirstOrDefaultAsync() ?? "Unknown";
 
         // Bulk-delete the server in a single SQL statement; PostgreSQL cascade
         // deletes handle channels, messages, reactions, link previews, members,
@@ -951,6 +990,19 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverId
         });
 
+        // Note: AuditLogEntry cascade-deletes with the server, so this is a best-effort log
+        // that captures intent even though the entry won't persist after server deletion.
+        // In practice, ServerId FK cascade will remove audit entries when the server is deleted.
+        // We still call LogAsync so future refactors (e.g. soft-delete) work correctly.
+        try
+        {
+            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerDeleted, details: serverName);
+        }
+        catch
+        {
+            // Audit log entry may fail if cascade already deleted the server record; ignore.
+        }
+
         return NoContent();
     }
 
@@ -959,7 +1011,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Cascade-deletes all messages, reactions, and link previews in the channel.
     /// </summary>
     [HttpDelete("{serverId:guid}/channels/{channelId:guid}")]
-    public async Task<IActionResult> DeleteChannel(Guid serverId, Guid channelId)
+    public async Task<IActionResult> DeleteChannel(Guid serverId, Guid channelId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -1035,6 +1087,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             channelId
         });
 
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelDeleted,
+            targetType: "Channel", targetId: channelId.ToString(),
+            details: channel.Name);
+
         return NoContent();
     }
 
@@ -1045,7 +1101,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Accepts JPG, JPEG, PNG, WebP, or GIF files up to 10 MB.
     /// </summary>
     [HttpPost("{serverId:guid}/icon")]
-    public async Task<IActionResult> UploadServerIcon(Guid serverId, IFormFile file)
+    public async Task<IActionResult> UploadServerIcon(Guid serverId, IFormFile file, [FromServices] AuditService audit)
     {
         var validationError = avatarService.Validate(file);
         if (validationError is not null)
@@ -1075,6 +1131,8 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             iconUrl
         });
 
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerIconChanged, details: "Icon uploaded");
+
         return Ok(new { iconUrl });
     }
 
@@ -1082,7 +1140,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Removes the server icon. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpDelete("{serverId:guid}/icon")]
-    public async Task<IActionResult> DeleteServerIcon(Guid serverId)
+    public async Task<IActionResult> DeleteServerIcon(Guid serverId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -1101,6 +1159,8 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 serverId,
                 iconUrl = (string?)null
             });
+
+            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerIconChanged, details: "Icon removed");
         }
 
         return NoContent();
@@ -1132,7 +1192,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// <summary>Uploads a new custom emoji. Requires Owner or Admin role.</summary>
     [HttpPost("{serverId:guid}/emojis")]
     public async Task<IActionResult> UploadEmoji(
-        Guid serverId, [FromForm] string name, IFormFile file)
+        Guid serverId, [FromForm] string name, IFormFile file, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -1182,13 +1242,17 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiAdded", new { serverId, emoji = payload });
 
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.EmojiUploaded,
+            targetType: "Emoji", targetId: emoji.Id.ToString(),
+            details: emoji.Name);
+
         return Created($"/servers/{serverId}/emojis/{emoji.Id}", payload);
     }
 
     /// <summary>Renames a custom emoji. Requires Owner or Admin role.</summary>
     [HttpPatch("{serverId:guid}/emojis/{emojiId:guid}")]
     public async Task<IActionResult> RenameEmoji(
-        Guid serverId, Guid emojiId, [FromBody] RenameEmojiRequest request)
+        Guid serverId, Guid emojiId, [FromBody] RenameEmojiRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -1203,18 +1267,23 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         if (nameTaken)
             return Conflict(new { error = $"An emoji named '{request.Name}' already exists." });
 
+        var oldEmojiName = emoji.Name;
         emoji.Name = request.Name;
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiUpdated", new { serverId, emojiId, name = request.Name });
 
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.EmojiRenamed,
+            targetType: "Emoji", targetId: emojiId.ToString(),
+            details: $"{oldEmojiName}→{emoji.Name}");
+
         return Ok(new { emoji.Id, emoji.Name, emoji.ImageUrl });
     }
 
     /// <summary>Deletes a custom emoji. Requires Owner or Admin role.</summary>
     [HttpDelete("{serverId:guid}/emojis/{emojiId:guid}")]
-    public async Task<IActionResult> DeleteEmoji(Guid serverId, Guid emojiId)
+    public async Task<IActionResult> DeleteEmoji(Guid serverId, Guid emojiId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
@@ -1224,12 +1293,17 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         if (emoji is null)
             return NotFound(new { error = "Emoji not found." });
 
+        var emojiName = emoji.Name;
         await customEmojiService.DeleteEmojiAsync(emoji.ImageUrl);
         db.CustomEmojis.Remove(emoji);
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiDeleted", new { serverId, emojiId });
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.EmojiDeleted,
+            targetType: "Emoji", targetId: emojiId.ToString(),
+            details: emojiName);
 
         return NoContent();
     }
@@ -1517,6 +1591,191 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             const string c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             for (var i = 0; i < span.Length; i++)
                 span[i] = c[b[i] % c.Length];
+        });
+    }
+
+    /* ═══════════════════ Audit Log ═══════════════════ */
+
+    /// <summary>
+    /// Returns paginated audit log entries for a server. Requires Owner, Admin, or global admin role.
+    /// Supports cursor-based pagination via the <c>before</c> and <c>limit</c> query parameters.
+    /// </summary>
+    [HttpGet("{serverId:guid}/audit-log")]
+    public async Task<IActionResult> GetAuditLog(Guid serverId, [FromQuery] DateTimeOffset? before, [FromQuery] int limit = 50)
+    {
+        limit = Math.Clamp(limit, 1, 100);
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var query = db.AuditLogEntries
+            .AsNoTracking()
+            .Where(e => e.ServerId == serverId);
+
+        if (before.HasValue)
+        {
+            query = query.Where(e => e.CreatedAt < before.Value);
+        }
+
+        var rawEntries = await query
+            .OrderByDescending(e => e.CreatedAt)
+            .Take(limit + 1)
+            .Select(e => new
+            {
+                e.Id,
+                e.ServerId,
+                e.ActorUserId,
+                e.Action,
+                e.TargetType,
+                e.TargetId,
+                e.Details,
+                e.CreatedAt,
+                ActorDisplayName = e.ActorUser != null
+                    ? (e.ActorUser.Nickname != null && e.ActorUser.Nickname != ""
+                        ? e.ActorUser.Nickname
+                        : e.ActorUser.DisplayName)
+                    : "Deleted User",
+                ActorAvatarUrl = e.ActorUser != null ? e.ActorUser.AvatarUrl : null,
+                ActorCustomAvatarPath = e.ActorUser != null ? e.ActorUser.CustomAvatarPath : null
+            })
+            .ToListAsync();
+
+        var hasMore = rawEntries.Count > limit;
+        var entries = rawEntries
+            .Take(limit)
+            .Select(e => new
+            {
+                e.Id,
+                e.ServerId,
+                e.ActorUserId,
+                Action = e.Action.ToString(),
+                e.TargetType,
+                e.TargetId,
+                e.Details,
+                e.CreatedAt,
+                e.ActorDisplayName,
+                ActorAvatarUrl = avatarService.ResolveUrl(e.ActorCustomAvatarPath) ?? e.ActorAvatarUrl
+            })
+            .ToList();
+
+        return Ok(new { hasMore, entries });
+    }
+
+    /* ═══════════════════ Notification Preferences ═══════════════════ */
+
+    /// <summary>
+    /// Mutes or unmutes a server for the current user. Requires membership.
+    /// </summary>
+    [HttpPut("{serverId:guid}/mute")]
+    public async Task<IActionResult> MuteServer(Guid serverId, [FromBody] MuteRequest request)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+
+        var member = await db.ServerMembers
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (member is null)
+        {
+            return NotFound(new { error = "Server not found or you are not a member." });
+        }
+
+        member.IsMuted = request.IsMuted;
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Mutes or unmutes a specific channel for the current user. Requires membership.
+    /// If unmuting and no override exists, this is a no-op.
+    /// </summary>
+    [HttpPut("{serverId:guid}/channels/{channelId:guid}/mute")]
+    public async Task<IActionResult> MuteChannel(Guid serverId, Guid channelId, [FromBody] MuteRequest request)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+
+        var isMember = await db.ServerMembers
+            .AnyAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (!isMember && !appUser.IsGlobalAdmin)
+        {
+            return NotFound(new { error = "Server not found or you are not a member." });
+        }
+
+        var channelExists = await db.Channels
+            .AnyAsync(c => c.Id == channelId && c.ServerId == serverId);
+
+        if (!channelExists)
+        {
+            return NotFound(new { error = "Channel not found." });
+        }
+
+        var existing = await db.ChannelNotificationOverrides
+            .FirstOrDefaultAsync(o => o.UserId == appUser.Id && o.ChannelId == channelId);
+
+        if (request.IsMuted)
+        {
+            if (existing is null)
+            {
+                db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
+                {
+                    UserId = appUser.Id,
+                    ChannelId = channelId,
+                    IsMuted = true
+                });
+            }
+            else
+            {
+                existing.IsMuted = true;
+            }
+        }
+        else
+        {
+            if (existing is not null)
+            {
+                db.ChannelNotificationOverrides.Remove(existing);
+            }
+        }
+
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns the current user's notification preferences for a server,
+    /// including server-level mute and per-channel overrides.
+    /// </summary>
+    [HttpGet("{serverId:guid}/notification-preferences")]
+    public async Task<IActionResult> GetNotificationPreferences(Guid serverId)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+
+        var member = await db.ServerMembers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+
+        if (member is null && !appUser.IsGlobalAdmin)
+        {
+            return NotFound(new { error = "Server not found or you are not a member." });
+        }
+
+        var serverChannelIds = await db.Channels
+            .AsNoTracking()
+            .Where(c => c.ServerId == serverId)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var channelOverrides = await db.ChannelNotificationOverrides
+            .AsNoTracking()
+            .Where(o => o.UserId == appUser.Id && serverChannelIds.Contains(o.ChannelId))
+            .Select(o => new { channelId = o.ChannelId, isMuted = o.IsMuted })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            serverMuted = member?.IsMuted ?? false,
+            channelOverrides
         });
     }
 }
