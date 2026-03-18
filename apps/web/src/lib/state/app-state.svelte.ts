@@ -924,7 +924,7 @@ export class AppState {
 
 		this.isUpdatingServerName = true;
 		try {
-			await this.api.updateServer(this.idToken, this.selectedServerId, name.trim());
+			await this.api.updateServer(this.idToken, this.selectedServerId, { name: name.trim() });
 			// Update will be reflected via SignalR event
 		} catch (e) {
 			this.setError(e);
@@ -1003,7 +1003,7 @@ export class AppState {
 
 		this.isUpdatingChannelName = true;
 		try {
-			await this.api.updateChannel(this.idToken, this.selectedServerId, channelId, name.trim());
+			await this.api.updateChannel(this.idToken, this.selectedServerId, channelId, { name: name.trim() });
 			// Update will be reflected via SignalR event
 		} catch (e) {
 			this.setError(e);

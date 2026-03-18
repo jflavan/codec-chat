@@ -21,7 +21,10 @@ import type {
 	AroundMessages,
 	PresenceEntry,
 	AuthResponse,
-	TokenRefreshResponse
+	TokenRefreshResponse,
+	ChannelCategory,
+	PaginatedAuditLog,
+	NotificationPreferences
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -324,12 +327,12 @@ export class ApiClient {
 	updateServer(
 		token: string,
 		serverId: string,
-		name: string
+		data: { name?: string; description?: string }
 	): Promise<{ id: string; name: string; iconUrl?: string | null }> {
 		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}`, {
 			method: 'PATCH',
 			headers: this.headers(token, true),
-			body: JSON.stringify({ name })
+			body: JSON.stringify(data)
 		});
 	}
 
@@ -363,13 +366,139 @@ export class ApiClient {
 		token: string,
 		serverId: string,
 		channelId: string,
-		name: string
+		data: { name?: string; description?: string }
 	): Promise<{ id: string; name: string; serverId: string }> {
 		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/channels/${encodeURIComponent(channelId)}`, {
 			method: 'PATCH',
 			headers: this.headers(token, true),
-			body: JSON.stringify({ name })
+			body: JSON.stringify(data)
 		});
+	}
+
+	/* ───── Categories ───── */
+
+	/** List all channel categories for a server. */
+	getCategories(token: string, serverId: string): Promise<ChannelCategory[]> {
+		return this.request<ChannelCategory[]>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/categories`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Create a new channel category in a server. */
+	createCategory(token: string, serverId: string, name: string): Promise<ChannelCategory> {
+		return this.request<ChannelCategory>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/categories`,
+			{
+				method: 'POST',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ name })
+			}
+		);
+	}
+
+	/** Rename a channel category. */
+	renameCategory(token: string, serverId: string, categoryId: string, name: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/categories/${encodeURIComponent(categoryId)}`,
+			{
+				method: 'PATCH',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ name })
+			}
+		);
+	}
+
+	/** Delete a channel category. */
+	deleteCategory(token: string, serverId: string, categoryId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/categories/${encodeURIComponent(categoryId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/** Update channel positions and category assignments in a server. */
+	updateChannelOrder(
+		token: string,
+		serverId: string,
+		channels: { channelId: string; categoryId?: string; position: number }[]
+	): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/channel-order`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ channels })
+			}
+		);
+	}
+
+	/** Update category positions in a server. */
+	updateCategoryOrder(
+		token: string,
+		serverId: string,
+		categories: { categoryId: string; position: number }[]
+	): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/category-order`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ categories })
+			}
+		);
+	}
+
+	/* ───── Audit Log ───── */
+
+	/** Get paginated audit log entries for a server. */
+	getAuditLog(
+		token: string,
+		serverId: string,
+		options?: { before?: string; limit?: number }
+	): Promise<PaginatedAuditLog> {
+		const params = new URLSearchParams();
+		if (options?.before) params.set('before', options.before);
+		if (options?.limit) params.set('limit', options.limit.toString());
+		const query = params.toString();
+		return this.request<PaginatedAuditLog>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/audit-log${query ? `?${query}` : ''}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Notification Preferences ───── */
+
+	/** Mute or unmute an entire server for the current user. */
+	muteServer(token: string, serverId: string, isMuted: boolean): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/mute`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ isMuted })
+			}
+		);
+	}
+
+	/** Mute or unmute a specific channel for the current user. */
+	muteChannel(token: string, serverId: string, channelId: string, isMuted: boolean): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/channels/${encodeURIComponent(channelId)}/mute`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ isMuted })
+			}
+		);
+	}
+
+	/** Get notification preferences for a server. */
+	getNotificationPreferences(token: string, serverId: string): Promise<NotificationPreferences> {
+		return this.request<NotificationPreferences>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/notification-preferences`,
+			{ headers: this.headers(token) }
+		);
 	}
 
 	/* ───── Messages ───── */

@@ -456,7 +456,7 @@ describe('ApiClient', () => {
 	describe('updateServer', () => {
 		it('sends PATCH with name', async () => {
 			mockFetch.mockResolvedValueOnce(jsonResponse({ id: 's1', name: 'Renamed' }));
-			await client.updateServer(token, 's1', 'Renamed');
+			await client.updateServer(token, 's1', { name: 'Renamed' });
 			const call = mockFetch.mock.calls[0];
 			expect(call[1].method).toBe('PATCH');
 		});
@@ -507,7 +507,7 @@ describe('ApiClient', () => {
 	describe('updateChannel', () => {
 		it('sends PATCH', async () => {
 			mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'ch1', name: 'renamed' }));
-			await client.updateChannel(token, 's1', 'ch1', 'renamed');
+			await client.updateChannel(token, 's1', 'ch1', { name: 'renamed' });
 			expect(mockFetch.mock.calls[0][1].method).toBe('PATCH');
 		});
 	});
