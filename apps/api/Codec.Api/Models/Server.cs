@@ -16,10 +16,10 @@ public class Server
     public string? IconUrl { get; set; }
 
     public string? Description { get; set; }
-    public List<Channel> Channels { get; set; } = new();
-    public List<ServerMember> Members { get; set; } = new();
-    public List<ServerInvite> Invites { get; set; } = new();
-    public List<CustomEmoji> CustomEmojis { get; set; } = new();
+    public List<Channel> Channels { get; set; } = [];
+    public List<ServerMember> Members { get; set; } = [];
+    public List<ServerInvite> Invites { get; set; } = [];
+    public List<CustomEmoji> CustomEmojis { get; set; } = [];
     public List<ChannelCategory> Categories { get; set; } = [];
     public List<AuditLogEntry> AuditLogEntries { get; set; } = [];
 }
