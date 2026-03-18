@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import UserPanel from './UserPanel.svelte';
-	import InvitePanel from './InvitePanel.svelte';
+
 	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
 	import UserActionSheet from '$lib/components/voice/UserActionSheet.svelte';
 
@@ -35,7 +35,7 @@
 					class="header-btn"
 					aria-label="Manage invites"
 					title="Manage invites"
-					onclick={() => { app.showInvitePanel = !app.showInvitePanel; }}
+					onclick={() => { app.serverSettingsOpen = true; app.serverSettingsCategory = 'invites'; }}
 				>
 					<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 						<path d="M8 1a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 4a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm-2.5 8a3.5 3.5 0 0 1 3.163-3.487A.5.5 0 0 0 7 8H5.5A3.5 3.5 0 0 0 2 11.5v.5h4.05a.5.5 0 0 0 .45-.72A3.48 3.48 0 0 1 3.5 12zM12 8.5a.5.5 0 0 1 .5.5v1.5H14a.5.5 0 0 1 0 1h-1.5V13a.5.5 0 0 1-1 0v-1.5H10a.5.5 0 0 1 0-1h1.5V9a.5.5 0 0 1 .5-.5z"/>
@@ -201,9 +201,6 @@
 		{/if}
 	</div>
 
-	{#if app.canManageInvites && app.showInvitePanel}
-		<InvitePanel />
-	{/if}
 
 	{#if app.activeVoiceChannelId || app.activeCall}
 		<VoiceConnectedBar />

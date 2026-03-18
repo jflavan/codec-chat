@@ -19,7 +19,10 @@ import type {
 	PaginatedSearchResults,
 	PresenceStatus,
 	AuthResponse,
-	TokenRefreshResponse
+	TokenRefreshResponse,
+	ChannelCategory,
+	AuditLogEntry,
+	NotificationPreferences
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -97,6 +100,17 @@ export class AppState {
 	/* ───── invite data ───── */
 	serverInvites = $state<ServerInvite[]>([]);
 
+	/* ───── categories ───── */
+	categories = $state<ChannelCategory[]>([]);
+
+	/* ───── audit log ───── */
+	auditLogEntries = $state<AuditLogEntry[]>([]);
+	hasMoreAuditLog = $state(false);
+	isLoadingAuditLog = $state(false);
+
+	/* ───── notification preferences ───── */
+	notificationPreferences = $state<NotificationPreferences | null>(null);
+
 	/* ───── selection ───── */
 	selectedServerId = $state<string | null>(null);
 	selectedChannelId = $state<string | null>(null);
@@ -138,7 +152,6 @@ export class AppState {
 	/* ───── UI toggles ───── */
 	showCreateServer = $state(false);
 	showCreateChannel = $state(false);
-	showInvitePanel = $state(false);
 	showFriendsPanel = $state(false);
 	showAlphaNotification = $state(false);
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
@@ -148,7 +161,7 @@ export class AppState {
 	theme = $state<ThemeId>(getTheme());
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'emojis' | 'members'>('general');
+	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'emojis' | 'members' | 'audit-log'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
@@ -620,7 +633,10 @@ export class AppState {
 		this.selectedChannelId = null;
 		this.serverInvites = [];
 		this.customEmojis = [];
-		this.showInvitePanel = false;
+		this.categories = [];
+		this.auditLogEntries = [];
+		this.hasMoreAuditLog = false;
+		this.notificationPreferences = null;
 		this.typingUsers = [];
 		this.ignoredReactionUpdates = new Map();
 		this.pendingReactionKeys = new Set();
@@ -1117,6 +1133,183 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Categories ═══════════════════ */
+
+	async loadCategories(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			this.categories = await this.api.getCategories(this.idToken, this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async createCategory(name: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			const created = await this.api.createCategory(this.idToken, this.selectedServerId, name);
+			this.categories = [...this.categories, created];
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async renameCategory(categoryId: string, name: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.renameCategory(this.idToken, this.selectedServerId, categoryId, name);
+			this.categories = this.categories.map((c) =>
+				c.id === categoryId ? { ...c, name } : c
+			);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async deleteCategory(categoryId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.deleteCategory(this.idToken, this.selectedServerId, categoryId);
+			this.categories = this.categories.filter((c) => c.id !== categoryId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async saveChannelOrder(channels: { channelId: string; categoryId?: string; position: number }[]): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.updateChannelOrder(this.idToken, this.selectedServerId, channels);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async saveCategoryOrder(categories: { categoryId: string; position: number }[]): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.updateCategoryOrder(this.idToken, this.selectedServerId, categories);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/* ═══════════════════ Descriptions ═══════════════════ */
+
+	async updateServerDescription(description: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.updateServer(this.idToken, this.selectedServerId, { description });
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async updateChannelDescription(channelId: string, description: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.updateChannel(this.idToken, this.selectedServerId, channelId, { description });
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/* ═══════════════════ Audit Log ═══════════════════ */
+
+	async loadAuditLog(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isLoadingAuditLog = true;
+		this.auditLogEntries = [];
+		try {
+			const result = await this.api.getAuditLog(this.idToken, this.selectedServerId, { limit: 50 });
+			this.auditLogEntries = result.entries;
+			this.hasMoreAuditLog = result.hasMore;
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingAuditLog = false;
+		}
+	}
+
+	async loadOlderAuditLog(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId || !this.hasMoreAuditLog || this.isLoadingAuditLog) return;
+		const last = this.auditLogEntries[this.auditLogEntries.length - 1];
+		if (!last) return;
+
+		this.isLoadingAuditLog = true;
+		try {
+			const result = await this.api.getAuditLog(this.idToken, this.selectedServerId, {
+				before: last.createdAt,
+				limit: 50
+			});
+			this.auditLogEntries = [...this.auditLogEntries, ...result.entries];
+			this.hasMoreAuditLog = result.hasMore;
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingAuditLog = false;
+		}
+	}
+
+	/* ═══════════════════ Notification Preferences ═══════════════════ */
+
+	async loadNotificationPreferences(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			this.notificationPreferences = await this.api.getNotificationPreferences(this.idToken, this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async toggleServerMute(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		const current = this.notificationPreferences?.serverMuted ?? false;
+		const next = !current;
+		if (this.notificationPreferences) {
+			this.notificationPreferences = { ...this.notificationPreferences, serverMuted: next };
+		}
+		try {
+			await this.api.muteServer(this.idToken, this.selectedServerId, next);
+		} catch (e) {
+			// Revert on failure
+			if (this.notificationPreferences) {
+				this.notificationPreferences = { ...this.notificationPreferences, serverMuted: current };
+			}
+			this.setError(e);
+		}
+	}
+
+	async toggleChannelMute(channelId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId || !this.notificationPreferences) return;
+		const override = this.notificationPreferences.channelOverrides.find((o) => o.channelId === channelId);
+		const current = override?.isMuted ?? false;
+		const next = !current;
+
+		// Optimistic update
+		const overrides = this.notificationPreferences.channelOverrides.filter((o) => o.channelId !== channelId);
+		this.notificationPreferences = {
+			...this.notificationPreferences,
+			channelOverrides: [...overrides, { channelId, isMuted: next }]
+		};
+
+		try {
+			await this.api.muteChannel(this.idToken, this.selectedServerId, channelId, next);
+		} catch (e) {
+			// Revert on failure
+			await this.loadNotificationPreferences();
+			this.setError(e);
+		}
+	}
+
+	get isServerMuted(): boolean {
+		return this.notificationPreferences?.serverMuted ?? false;
+	}
+
+	isChannelMuted(channelId: string): boolean {
+		return this.notificationPreferences?.channelOverrides.find((o) => o.channelId === channelId)?.isMuted ?? false;
+	}
+
 	/** Join a server via invite code. */
 	async joinViaInvite(code: string): Promise<void> {
 		if (!this.idToken) return;
@@ -1572,7 +1765,6 @@ export class AppState {
 	/** Navigate back to a server view. */
 	async selectServer(serverId: string): Promise<void> {
 		this.showFriendsPanel = false;
-		this.showInvitePanel = false;
 		this.selectedServerId = serverId;
 		this.mobileNavOpen = false;
 
@@ -1588,6 +1780,8 @@ export class AppState {
 		await this.loadMembers(serverId);
 		await this.loadCustomEmojis(serverId);
 		this.loadServerPresence(serverId);
+		this.loadCategories();
+		this.loadNotificationPreferences();
 	}
 
 	async loadFriends(): Promise<void> {
@@ -2772,6 +2966,53 @@ export class AppState {
 			},
 			onCustomEmojiDeleted: (event) => {
 				this.customEmojis = this.customEmojis.filter(e => e.id !== event.emojiId);
+			},
+			onServerDescriptionChanged: (event) => {
+				this.servers = this.servers.map((s) =>
+					s.serverId === event.serverId ? { ...s, description: event.description } : s
+				);
+			},
+			onChannelDescriptionChanged: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.channels = this.channels.map((c) =>
+						c.id === event.channelId ? { ...c, description: event.description } : c
+					);
+				}
+			},
+			onCategoryCreated: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					if (!this.categories.some((c) => c.id === event.categoryId)) {
+						this.categories = [...this.categories, {
+							id: event.categoryId,
+							serverId: event.serverId,
+							name: event.name,
+							position: event.position
+						}];
+					}
+				}
+			},
+			onCategoryRenamed: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.categories = this.categories.map((c) =>
+						c.id === event.categoryId ? { ...c, name: event.name } : c
+					);
+				}
+			},
+			onCategoryDeleted: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.categories = this.categories.filter((c) => c.id !== event.categoryId);
+				}
+			},
+			onChannelOrderChanged: async (event) => {
+				if (event.serverId === this.selectedServerId) {
+					await this.loadChannels(event.serverId).catch(() => {});
+					await this.loadCategories().catch(() => {});
+				}
+			},
+			onCategoryOrderChanged: async (event) => {
+				if (event.serverId === this.selectedServerId) {
+					await this.loadCategories().catch(() => {});
+				}
 			},
 		});
 
