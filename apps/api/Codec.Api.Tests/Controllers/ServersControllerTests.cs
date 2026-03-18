@@ -25,6 +25,7 @@ public class ServersControllerTests : IDisposable
     private readonly Mock<IHttpClientFactory> _httpFactory = new();
     private readonly Mock<IConfiguration> _config = new();
     private readonly MessageCacheService _messageCache;
+    private readonly AuditService _auditService;
     private readonly ServersController _controller;
     private readonly User _testUser;
 
@@ -40,6 +41,7 @@ public class ServersControllerTests : IDisposable
         _db.SaveChanges();
 
         _messageCache = new MessageCacheService(new Mock<ILogger<MessageCacheService>>().Object);
+        _auditService = new AuditService(_db);
 
         var clients = new Mock<IHubClients>();
         var clientProxy = new Mock<IClientProxy>();
@@ -139,7 +141,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New", null));
+        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New", null), _auditService);
         result.Should().BeOfType<OkObjectResult>();
     }
 
@@ -183,7 +185,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.CreateChannel(server.Id, new CreateChannelRequest("new-channel"));
+        var result = await _controller.CreateChannel(server.Id, new CreateChannelRequest("new-channel"), _auditService);
         result.Should().BeOfType<CreatedResult>();
     }
 
@@ -197,7 +199,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.CreateInvite(server.Id, new CreateInviteRequest());
+        var result = await _controller.CreateInvite(server.Id, new CreateInviteRequest(), _auditService);
         result.Should().BeOfType<CreatedResult>();
         _db.ServerInvites.Should().ContainSingle();
     }
@@ -249,7 +251,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.RevokeInvite(server.Id, invite.Id);
+        var result = await _controller.RevokeInvite(server.Id, invite.Id, _auditService);
         result.Should().BeOfType<NoContentResult>();
     }
 
@@ -263,7 +265,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.RevokeInvite(server.Id, Guid.NewGuid());
+        var result = await _controller.RevokeInvite(server.Id, Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -280,7 +282,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, _testUser.Id);
+        var result = await _controller.KickMember(server.Id, _testUser.Id, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -294,7 +296,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, Guid.NewGuid());
+        var result = await _controller.KickMember(server.Id, Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -312,7 +314,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, owner.Id);
+        var result = await _controller.KickMember(server.Id, owner.Id, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -330,7 +332,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, target.Id);
+        var result = await _controller.KickMember(server.Id, target.Id, _auditService);
         result.Should().BeOfType<NoContentResult>();
     }
 
@@ -339,14 +341,14 @@ public class ServersControllerTests : IDisposable
     [Fact]
     public async Task UpdateMemberRole_InvalidRole_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "Owner" });
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "Owner" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
     public async Task UpdateMemberRole_InvalidRoleName_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "SuperAdmin" });
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "SuperAdmin" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -364,7 +366,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest("new-name", null));
+        var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest("new-name", null), _auditService);
         result.Should().BeOfType<OkObjectResult>();
     }
 
@@ -378,7 +380,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(), new UpdateChannelRequest("renamed", null));
+        var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(), new UpdateChannelRequest("renamed", null), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
