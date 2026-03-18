@@ -5,7 +5,12 @@ namespace Codec.Api.Services;
 
 public class AuditService(CodecDbContext db)
 {
-    public async Task LogAsync(
+    /// <summary>
+    /// Stages an audit log entry in the current DbContext without saving.
+    /// Callers are responsible for calling <c>db.SaveChangesAsync()</c> to persist the entry,
+    /// allowing the audit write to be batched with the caller's own SaveChanges call.
+    /// </summary>
+    public void Log(
         Guid serverId,
         Guid actorUserId,
         AuditAction action,
@@ -24,6 +29,5 @@ public class AuditService(CodecDbContext db)
             Details = details,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await db.SaveChangesAsync();
     }
 }

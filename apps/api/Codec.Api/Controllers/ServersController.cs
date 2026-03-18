@@ -193,7 +193,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 serverId,
                 name = server.Name
             });
-            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerRenamed,
+            audit.Log(serverId, appUser.Id, AuditAction.ServerRenamed,
                 details: $"Renamed from \"{oldName}\" to \"{server.Name}\"");
         }
 
@@ -204,7 +204,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 serverId,
                 description = server.Description
             });
-            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
+            audit.Log(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
+        }
+
+        if (nameChanged || descriptionChanged)
+        {
+            await db.SaveChangesAsync();
         }
 
         return Ok(new
@@ -303,6 +308,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .FirstOrDefaultAsync() ?? "Unknown";
 
         db.ServerMembers.Remove(targetMembership);
+        audit.Log(serverId, appUser.Id, AuditAction.MemberKicked,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: kickedUserDisplayName);
         await db.SaveChangesAsync();
 
         // Notify the kicked user in real-time so their client can update.
@@ -324,10 +332,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverId,
             userId = targetUserId
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.MemberKicked,
-            targetType: "User", targetId: targetUserId.ToString(),
-            details: kickedUserDisplayName);
 
         return NoContent();
     }
@@ -394,6 +398,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .FirstOrDefaultAsync() ?? "Unknown";
 
         targetMembership.Role = newRole;
+        audit.Log(serverId, appUser.Id, AuditAction.MemberRoleChanged,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: $"Changed @{targetDisplayName} role to {newRole}");
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRoleChanged", new
@@ -402,10 +409,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             userId = targetUserId,
             newRole = newRole.ToString()
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.MemberRoleChanged,
-            targetType: "User", targetId: targetUserId.ToString(),
-            details: $"Changed @{targetDisplayName} role to {newRole}");
 
         return Ok(new
         {
@@ -475,9 +478,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         db.Channels.Add(channel);
         await db.SaveChangesAsync();
 
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelCreated,
+        audit.Log(serverId, appUser.Id, AuditAction.ChannelCreated,
             targetType: "Channel", targetId: channel.Id.ToString(),
             details: channel.Name);
+        await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/channels/{channel.Id}", new
         {
@@ -538,7 +542,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 channelId,
                 name = channel.Name
             });
-            await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelRenamed,
+            audit.Log(serverId, appUser.Id, AuditAction.ChannelRenamed,
                 targetType: "Channel", targetId: channelId.ToString(),
                 details: $"Renamed from \"{oldName}\" to \"{channel.Name}\"");
         }
@@ -551,8 +555,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 channelId,
                 description = channel.Description
             });
-            await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelDescriptionChanged,
+            audit.Log(serverId, appUser.Id, AuditAction.ChannelDescriptionChanged,
                 targetType: "Channel", targetId: channelId.ToString());
+        }
+
+        if (nameChanged || descriptionChanged)
+        {
+            await db.SaveChangesAsync();
         }
 
         return Ok(new
@@ -619,9 +628,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             position = category.Position
         });
 
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.CategoryCreated,
+        audit.Log(serverId, appUser.Id, AuditAction.CategoryCreated,
             targetType: "Category", targetId: category.Id.ToString(),
             details: $"Created category \"{category.Name}\"");
+        await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/categories/{category.Id}", new
         {
@@ -651,6 +661,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         var oldName = category.Name;
         category.Name = request.Name.Trim();
+        audit.Log(serverId, appUser.Id, AuditAction.CategoryRenamed,
+            targetType: "Category", targetId: categoryId.ToString(),
+            details: $"Renamed from \"{oldName}\" to \"{category.Name}\"");
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryRenamed", new
@@ -659,10 +672,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             categoryId,
             name = category.Name
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.CategoryRenamed,
-            targetType: "Category", targetId: categoryId.ToString(),
-            details: $"Renamed from \"{oldName}\" to \"{category.Name}\"");
 
         return Ok(new { category.Id, category.Name, category.Position });
     }
@@ -685,6 +694,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         db.ChannelCategories.Remove(category);
+        audit.Log(serverId, appUser.Id, AuditAction.CategoryDeleted,
+            targetType: "Category", targetId: categoryId.ToString(),
+            details: $"Deleted category \"{category.Name}\"");
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryDeleted", new
@@ -692,10 +704,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverId,
             categoryId
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.CategoryDeleted,
-            targetType: "Category", targetId: categoryId.ToString(),
-            details: $"Deleted category \"{category.Name}\"");
 
         return NoContent();
     }
@@ -743,14 +751,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             channel.Position = item.Position;
         }
 
+        audit.Log(serverId, appUser.Id, AuditAction.ChannelMoved);
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelOrderChanged", new
         {
             serverId
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelMoved);
 
         return NoContent();
     }
@@ -821,9 +828,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         db.ServerInvites.Add(invite);
         await db.SaveChangesAsync();
 
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.InviteCreated,
+        audit.Log(serverId, appUser.Id, AuditAction.InviteCreated,
             targetType: "Invite", targetId: invite.Id.ToString(),
             details: invite.Code);
+        await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/invites/{invite.Id}", new
         {
@@ -888,11 +896,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         var inviteCode = invite.Code;
         db.ServerInvites.Remove(invite);
-        await db.SaveChangesAsync();
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.InviteRevoked,
+        audit.Log(serverId, appUser.Id, AuditAction.InviteRevoked,
             targetType: "Invite", targetId: inviteId.ToString(),
             details: inviteCode);
+        await db.SaveChangesAsync();
 
         return NoContent();
     }
@@ -994,10 +1001,11 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         // Note: AuditLogEntry cascade-deletes with the server, so this is a best-effort log
         // that captures intent even though the entry won't persist after server deletion.
         // In practice, ServerId FK cascade will remove audit entries when the server is deleted.
-        // We still call LogAsync so future refactors (e.g. soft-delete) work correctly.
+        // We still call Log so future refactors (e.g. soft-delete) work correctly.
         try
         {
-            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerDeleted, details: serverName);
+            audit.Log(serverId, appUser.Id, AuditAction.ServerDeleted, details: serverName);
+            await db.SaveChangesAsync();
         }
         catch
         {
@@ -1076,6 +1084,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         db.Messages.RemoveRange(messages);
 
         db.Channels.Remove(channel);
+        audit.Log(serverId, appUser.Id, AuditAction.ChannelDeleted,
+            targetType: "Channel", targetId: channelId.ToString(),
+            details: channel.Name);
         await db.SaveChangesAsync();
 
         // Clean up any cached message pages for this channel.
@@ -1087,10 +1098,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverId,
             channelId
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelDeleted,
-            targetType: "Channel", targetId: channelId.ToString(),
-            details: channel.Name);
 
         return NoContent();
     }
@@ -1123,6 +1130,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         var iconUrl = await avatarService.SaveServerIconAsync(serverId, file);
         server.IconUrl = iconUrl;
+        audit.Log(serverId, appUser.Id, AuditAction.ServerIconChanged, details: "Icon uploaded");
         await db.SaveChangesAsync();
 
         // Notify all server members of the icon change via SignalR.
@@ -1131,8 +1139,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverId,
             iconUrl
         });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerIconChanged, details: "Icon uploaded");
 
         return Ok(new { iconUrl });
     }
@@ -1152,6 +1158,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             await avatarService.DeleteServerIconAsync(serverId);
             server.IconUrl = null;
+            audit.Log(serverId, appUser.Id, AuditAction.ServerIconChanged, details: "Icon removed");
             await db.SaveChangesAsync();
 
             // Notify all server members of the icon removal via SignalR.
@@ -1160,8 +1167,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 serverId,
                 iconUrl = (string?)null
             });
-
-            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerIconChanged, details: "Icon removed");
         }
 
         return NoContent();
@@ -1243,9 +1248,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiAdded", new { serverId, emoji = payload });
 
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.EmojiUploaded,
+        audit.Log(serverId, appUser.Id, AuditAction.EmojiUploaded,
             targetType: "Emoji", targetId: emoji.Id.ToString(),
             details: emoji.Name);
+        await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/emojis/{emoji.Id}", payload);
     }
@@ -1270,14 +1276,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         var oldEmojiName = emoji.Name;
         emoji.Name = request.Name;
+        audit.Log(serverId, appUser.Id, AuditAction.EmojiRenamed,
+            targetType: "Emoji", targetId: emojiId.ToString(),
+            details: $"{oldEmojiName}→{emoji.Name}");
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiUpdated", new { serverId, emojiId, name = request.Name });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.EmojiRenamed,
-            targetType: "Emoji", targetId: emojiId.ToString(),
-            details: $"{oldEmojiName}→{emoji.Name}");
 
         return Ok(new { emoji.Id, emoji.Name, emoji.ImageUrl });
     }
@@ -1297,14 +1302,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var emojiName = emoji.Name;
         await customEmojiService.DeleteEmojiAsync(emoji.ImageUrl);
         db.CustomEmojis.Remove(emoji);
+        audit.Log(serverId, appUser.Id, AuditAction.EmojiDeleted,
+            targetType: "Emoji", targetId: emojiId.ToString(),
+            details: emojiName);
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiDeleted", new { serverId, emojiId });
-
-        await audit.LogAsync(serverId, appUser.Id, AuditAction.EmojiDeleted,
-            targetType: "Emoji", targetId: emojiId.ToString(),
-            details: emojiName);
 
         return NoContent();
     }

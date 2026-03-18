@@ -21,13 +21,19 @@ public class AuditServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task LogAsync_CreatesEntry()
+    public async Task Log_StagesEntryWithoutSaving()
     {
         var serverId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
 
-        await _service.LogAsync(serverId, actorId, AuditAction.ServerRenamed,
+        _service.Log(serverId, actorId, AuditAction.ServerRenamed,
             "Server", serverId.ToString(), "Renamed to New Name");
+
+        // Entry is staged but not yet persisted — caller must SaveChangesAsync.
+        var entriesBeforeSave = await _db.AuditLogEntries.ToListAsync();
+        entriesBeforeSave.Should().BeEmpty();
+
+        await _db.SaveChangesAsync();
 
         var entries = await _db.AuditLogEntries.ToListAsync();
         entries.Should().HaveCount(1);

@@ -713,6 +713,12 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             .FirstOrDefaultAsync() ?? "Unknown";
 
         db.Messages.Remove(message);
+        if (isAdminDelete)
+        {
+            audit.Log(channel.ServerId, appUser.Id, AuditAction.MessageDeletedByAdmin,
+                targetType: "Message", targetId: messageId.ToString(),
+                details: $"Message by {authorName} in #{channelName}");
+        }
         await db.SaveChangesAsync();
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("MessageDeleted", new
@@ -721,13 +727,6 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             ChannelId = channelId
         });
         await messageCache.InvalidateChannelAsync(channelId);
-
-        if (isAdminDelete)
-        {
-            await audit.LogAsync(channel.ServerId, appUser.Id, AuditAction.MessageDeletedByAdmin,
-                targetType: "Message", targetId: messageId.ToString(),
-                details: $"Message by {authorName} in #{channelName}");
-        }
 
         return NoContent();
     }
@@ -769,9 +768,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         });
         await messageCache.InvalidateChannelAsync(channelId);
 
-        await audit.LogAsync(channel.ServerId, appUser.Id, AuditAction.ChannelPurged,
+        audit.Log(channel.ServerId, appUser.Id, AuditAction.ChannelPurged,
             targetType: "Channel", targetId: channelId.ToString(),
             details: channel.Name);
+        await db.SaveChangesAsync();
 
         return NoContent();
     }
