@@ -460,6 +460,13 @@ describe('ApiClient', () => {
 			const call = mockFetch.mock.calls[0];
 			expect(call[1].method).toBe('PATCH');
 		});
+
+		it('sends name and description in body', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ id: 's1', name: 'Renamed' }));
+			await client.updateServer(token, 's1', { name: 'Renamed', description: 'A server' });
+			const call = mockFetch.mock.calls[0];
+			expect(JSON.parse(call[1].body)).toEqual({ name: 'Renamed', description: 'A server' });
+		});
 	});
 
 	describe('uploadServerIcon', () => {
@@ -509,6 +516,13 @@ describe('ApiClient', () => {
 			mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'ch1', name: 'renamed' }));
 			await client.updateChannel(token, 's1', 'ch1', { name: 'renamed' });
 			expect(mockFetch.mock.calls[0][1].method).toBe('PATCH');
+		});
+
+		it('sends name and description in body', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'ch1', name: 'renamed', serverId: 's1' }));
+			await client.updateChannel(token, 's1', 'ch1', { name: 'renamed', description: 'new desc' });
+			const call = mockFetch.mock.calls[0];
+			expect(JSON.parse(call[1].body)).toEqual({ name: 'renamed', description: 'new desc' });
 		});
 	});
 
@@ -1086,6 +1100,164 @@ describe('ApiClient', () => {
 				`${baseUrl}/auth/resend-verification`,
 				expect.objectContaining({
 					method: 'POST',
+					headers: expect.objectContaining({ Authorization: `Bearer ${token}` })
+				})
+			);
+		});
+	});
+
+	// --- Categories ---
+
+	describe('getCategories', () => {
+		it('sends GET to server categories endpoint', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse([]));
+			await client.getCategories(token, 's1');
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/servers/s1/categories`,
+				expect.objectContaining({
+					headers: expect.objectContaining({ Authorization: `Bearer ${token}` })
+				})
+			);
+		});
+	});
+
+	describe('createCategory', () => {
+		it('sends POST with name', async () => {
+			const category = { id: 'cat-1', name: 'General', serverId: 's1', position: 0 };
+			mockFetch.mockResolvedValueOnce(jsonResponse(category));
+			const result = await client.createCategory(token, 's1', 'General');
+			expect(result).toEqual(category);
+			const call = mockFetch.mock.calls[0];
+			expect(call[0]).toBe(`${baseUrl}/servers/s1/categories`);
+			expect(call[1].method).toBe('POST');
+			expect(JSON.parse(call[1].body)).toEqual({ name: 'General' });
+		});
+	});
+
+	describe('renameCategory', () => {
+		it('sends PATCH with name to category endpoint', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			await client.renameCategory(token, 's1', 'cat-1', 'Renamed');
+			const call = mockFetch.mock.calls[0];
+			expect(call[0]).toBe(`${baseUrl}/servers/s1/categories/cat-1`);
+			expect(call[1].method).toBe('PATCH');
+			expect(JSON.parse(call[1].body)).toEqual({ name: 'Renamed' });
+		});
+	});
+
+	describe('deleteCategory', () => {
+		it('sends DELETE to category endpoint', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			await client.deleteCategory(token, 's1', 'cat-1');
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/servers/s1/categories/cat-1`,
+				expect.objectContaining({ method: 'DELETE' })
+			);
+		});
+	});
+
+	describe('updateChannelOrder', () => {
+		it('sends PUT with channels array', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			const channels = [
+				{ channelId: 'ch-1', position: 0 },
+				{ channelId: 'ch-2', categoryId: 'cat-1', position: 1 }
+			];
+			await client.updateChannelOrder(token, 's1', channels);
+			const call = mockFetch.mock.calls[0];
+			expect(call[0]).toBe(`${baseUrl}/servers/s1/channel-order`);
+			expect(call[1].method).toBe('PUT');
+			expect(JSON.parse(call[1].body)).toEqual({ channels });
+		});
+	});
+
+	describe('updateCategoryOrder', () => {
+		it('sends PUT with categories array', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			const categories = [
+				{ categoryId: 'cat-1', position: 0 },
+				{ categoryId: 'cat-2', position: 1 }
+			];
+			await client.updateCategoryOrder(token, 's1', categories);
+			const call = mockFetch.mock.calls[0];
+			expect(call[0]).toBe(`${baseUrl}/servers/s1/category-order`);
+			expect(call[1].method).toBe('PUT');
+			expect(JSON.parse(call[1].body)).toEqual({ categories });
+		});
+	});
+
+	// --- Audit Log ---
+
+	describe('getAuditLog', () => {
+		it('sends GET to audit-log endpoint without params', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ entries: [], hasMore: false }));
+			await client.getAuditLog(token, 's1');
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/servers/s1/audit-log`,
+				expect.objectContaining({
+					headers: expect.objectContaining({ Authorization: `Bearer ${token}` })
+				})
+			);
+		});
+
+		it('sends GET with before query param', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ entries: [], hasMore: false }));
+			await client.getAuditLog(token, 's1', { before: '2024-01-01' });
+			expect(mockFetch).toHaveBeenCalledWith(
+				expect.stringContaining('before=2024-01-01'),
+				expect.anything()
+			);
+		});
+
+		it('sends GET with limit query param', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ entries: [], hasMore: false }));
+			await client.getAuditLog(token, 's1', { limit: 25 });
+			expect(mockFetch).toHaveBeenCalledWith(
+				expect.stringContaining('limit=25'),
+				expect.anything()
+			);
+		});
+	});
+
+	// --- Notification Preferences ---
+
+	describe('muteServer', () => {
+		it('sends PUT with isMuted true', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			await client.muteServer(token, 's1', true);
+			const call = mockFetch.mock.calls[0];
+			expect(call[0]).toBe(`${baseUrl}/servers/s1/mute`);
+			expect(call[1].method).toBe('PUT');
+			expect(JSON.parse(call[1].body)).toEqual({ isMuted: true });
+		});
+
+		it('sends PUT with isMuted false', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			await client.muteServer(token, 's1', false);
+			expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ isMuted: false });
+		});
+	});
+
+	describe('muteChannel', () => {
+		it('sends PUT with isMuted to channel mute endpoint', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			await client.muteChannel(token, 's1', 'ch-1', true);
+			const call = mockFetch.mock.calls[0];
+			expect(call[0]).toBe(`${baseUrl}/servers/s1/channels/ch-1/mute`);
+			expect(call[1].method).toBe('PUT');
+			expect(JSON.parse(call[1].body)).toEqual({ isMuted: true });
+		});
+	});
+
+	describe('getNotificationPreferences', () => {
+		it('sends GET to notification-preferences endpoint', async () => {
+			const prefs = { serverId: 's1', isMuted: false, channelOverrides: [] };
+			mockFetch.mockResolvedValueOnce(jsonResponse(prefs));
+			const result = await client.getNotificationPreferences(token, 's1');
+			expect(result).toEqual(prefs);
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/servers/s1/notification-preferences`,
+				expect.objectContaining({
 					headers: expect.objectContaining({ Authorization: `Bearer ${token}` })
 				})
 			);
