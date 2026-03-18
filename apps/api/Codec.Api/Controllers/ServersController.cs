@@ -476,8 +476,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         };
 
         db.Channels.Add(channel);
-        await db.SaveChangesAsync();
-
         audit.Log(serverId, appUser.Id, AuditAction.ChannelCreated,
             targetType: "Channel", targetId: channel.Id.ToString(),
             details: channel.Name);
@@ -618,6 +616,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         };
 
         db.ChannelCategories.Add(category);
+        audit.Log(serverId, appUser.Id, AuditAction.CategoryCreated,
+            targetType: "Category", targetId: category.Id.ToString(),
+            details: $"Created category \"{category.Name}\"");
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryCreated", new
@@ -627,11 +628,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             name = category.Name,
             position = category.Position
         });
-
-        audit.Log(serverId, appUser.Id, AuditAction.CategoryCreated,
-            targetType: "Category", targetId: category.Id.ToString(),
-            details: $"Created category \"{category.Name}\"");
-        await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/categories/{category.Id}", new
         {
@@ -776,12 +772,18 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .Where(c => c.ServerId == serverId)
             .ToDictionaryAsync(c => c.Id);
 
+        if (request.Categories.Count != categories.Count)
+        {
+            return BadRequest(new { error = "Request must include all categories in the server." });
+        }
+
         foreach (var item in request.Categories)
         {
-            if (categories.TryGetValue(item.CategoryId, out var category))
+            if (!categories.TryGetValue(item.CategoryId, out var category))
             {
-                category.Position = item.Position;
+                return BadRequest(new { error = $"Category {item.CategoryId} not found in this server." });
             }
+            category.Position = item.Position;
         }
 
         await db.SaveChangesAsync();
@@ -826,8 +828,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         };
 
         db.ServerInvites.Add(invite);
-        await db.SaveChangesAsync();
-
         audit.Log(serverId, appUser.Id, AuditAction.InviteCreated,
             targetType: "Invite", targetId: invite.Id.ToString(),
             details: invite.Code);
@@ -1237,6 +1237,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         };
 
         db.CustomEmojis.Add(emoji);
+        audit.Log(serverId, appUser.Id, AuditAction.EmojiUploaded,
+            targetType: "Emoji", targetId: emoji.Id.ToString(),
+            details: emoji.Name);
         await db.SaveChangesAsync();
 
         var payload = new
@@ -1247,11 +1250,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         await hub.Clients.Group($"server-{serverId}")
             .SendAsync("CustomEmojiAdded", new { serverId, emoji = payload });
-
-        audit.Log(serverId, appUser.Id, AuditAction.EmojiUploaded,
-            targetType: "Emoji", targetId: emoji.Id.ToString(),
-            details: emoji.Name);
-        await db.SaveChangesAsync();
 
         return Created($"/servers/{serverId}/emojis/{emoji.Id}", payload);
     }

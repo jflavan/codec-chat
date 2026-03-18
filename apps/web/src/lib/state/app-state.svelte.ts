@@ -602,7 +602,11 @@ export class AppState {
 		// Revoke refresh token server-side before clearing local state
 		const refreshToken = loadStoredRefreshToken();
 		if (refreshToken) {
-			await this.api.logout(refreshToken);
+			try {
+				await this.api.logout(refreshToken);
+			} catch {
+				// Best-effort: proceed with local cleanup even if server revocation fails
+			}
 		}
 
 		clearStoredSession();
@@ -1171,6 +1175,9 @@ export class AppState {
 		try {
 			await this.api.deleteCategory(this.idToken, this.selectedServerId, categoryId);
 			this.categories = this.categories.filter((c) => c.id !== categoryId);
+			this.channels = this.channels.map((ch) =>
+				ch.categoryId === categoryId ? { ...ch, categoryId: undefined } : ch
+			);
 		} catch (e) {
 			this.setError(e);
 		}
@@ -3001,6 +3008,9 @@ export class AppState {
 			onCategoryDeleted: (event) => {
 				if (event.serverId === this.selectedServerId) {
 					this.categories = this.categories.filter((c) => c.id !== event.categoryId);
+					this.channels = this.channels.map((ch) =>
+						ch.categoryId === event.categoryId ? { ...ch, categoryId: undefined } : ch
+					);
 				}
 			},
 			onChannelOrderChanged: async (event) => {

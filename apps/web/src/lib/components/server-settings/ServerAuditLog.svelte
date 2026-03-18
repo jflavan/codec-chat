@@ -78,14 +78,14 @@
 			{#each app.auditLogEntries as entry (entry.id)}
 				<div class="log-entry">
 					<div class="actor-avatar">
-						{#if entry.actor.avatarUrl}
-							<img src={entry.actor.avatarUrl} alt="" class="avatar-img" />
+						{#if entry.actorAvatarUrl}
+							<img src={entry.actorAvatarUrl} alt="" class="avatar-img" />
 						{:else}
-							<span class="avatar-placeholder">{(entry.actor.displayName || '?').slice(0, 1).toUpperCase()}</span>
+							<span class="avatar-placeholder">{(entry.actorDisplayName || '?').slice(0, 1).toUpperCase()}</span>
 						{/if}
 					</div>
 					<div class="entry-body">
-						<span class="actor-name">{entry.actor.displayName || 'Deleted User'}</span>
+						<span class="actor-name">{entry.actorDisplayName || 'Deleted User'}</span>
 						<span class="action-description">{formatAction(entry)}</span>
 					</div>
 					<span class="entry-time" title={new Date(entry.createdAt).toLocaleString()}>

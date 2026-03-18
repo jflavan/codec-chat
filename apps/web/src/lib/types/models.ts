@@ -312,7 +312,9 @@ export interface AuditLogEntry {
 	targetId?: string;
 	details?: string;
 	createdAt: string;
-	actor: { userId?: string; displayName: string; avatarUrl?: string };
+	actorUserId?: string;
+	actorDisplayName: string;
+	actorAvatarUrl?: string;
 }
 
 /** Paginated audit log response from the API. */
