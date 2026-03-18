@@ -139,7 +139,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New"));
+        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New", null));
         result.Should().BeOfType<OkObjectResult>();
     }
 
@@ -364,7 +364,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest("new-name"));
+        var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest("new-name", null));
         result.Should().BeOfType<OkObjectResult>();
     }
 
@@ -378,7 +378,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(), new UpdateChannelRequest("renamed"));
+        var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(), new UpdateChannelRequest("renamed", null));
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
