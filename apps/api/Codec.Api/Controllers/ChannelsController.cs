@@ -682,7 +682,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     /// will have their <c>ReplyToMessageId</c> set to <c>null</c> automatically.
     /// </summary>
     [HttpDelete("{channelId:guid}/messages/{messageId:guid}")]
-    public async Task<IActionResult> DeleteMessage(Guid channelId, Guid messageId)
+    public async Task<IActionResult> DeleteMessage(Guid channelId, Guid messageId, [FromServices] AuditService audit)
     {
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
         if (channel is null)
@@ -704,7 +704,21 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             throw new Codec.Api.Services.Exceptions.ForbiddenException("You can only delete your own messages.");
         }
 
+        var isAdminDelete = message.AuthorUserId != appUser.Id;
+        var authorName = message.AuthorName;
+        var channelName = await db.Channels
+            .AsNoTracking()
+            .Where(c => c.Id == channelId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
         db.Messages.Remove(message);
+        if (isAdminDelete)
+        {
+            audit.Log(channel.ServerId, appUser.Id, AuditAction.MessageDeletedByAdmin,
+                targetType: "Message", targetId: messageId.ToString(),
+                details: $"Message by {authorName} in #{channelName}");
+        }
         await db.SaveChangesAsync();
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("MessageDeleted", new
@@ -722,7 +736,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     /// Cascade-deletes associated reactions and link previews.
     /// </summary>
     [HttpDelete("{channelId:guid}/messages")]
-    public async Task<IActionResult> PurgeChannelMessages(Guid channelId)
+    public async Task<IActionResult> PurgeChannelMessages(Guid channelId, [FromServices] AuditService audit)
     {
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null)
@@ -753,6 +767,11 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             ChannelId = channelId
         });
         await messageCache.InvalidateChannelAsync(channelId);
+
+        audit.Log(channel.ServerId, appUser.Id, AuditAction.ChannelPurged,
+            targetType: "Channel", targetId: channelId.ToString(),
+            details: channel.Name);
+        await db.SaveChangesAsync();
 
         return NoContent();
     }

@@ -25,6 +25,7 @@ public class ServersControllerTests : IDisposable
     private readonly Mock<IHttpClientFactory> _httpFactory = new();
     private readonly Mock<IConfiguration> _config = new();
     private readonly MessageCacheService _messageCache;
+    private readonly AuditService _auditService;
     private readonly ServersController _controller;
     private readonly User _testUser;
 
@@ -40,6 +41,7 @@ public class ServersControllerTests : IDisposable
         _db.SaveChanges();
 
         _messageCache = new MessageCacheService(new Mock<ILogger<MessageCacheService>>().Object);
+        _auditService = new AuditService(_db);
 
         var clients = new Mock<IHubClients>();
         var clientProxy = new Mock<IClientProxy>();
@@ -139,7 +141,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New"));
+        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New", null), _auditService);
         result.Should().BeOfType<OkObjectResult>();
     }
 
@@ -183,7 +185,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.CreateChannel(server.Id, new CreateChannelRequest("new-channel"));
+        var result = await _controller.CreateChannel(server.Id, new CreateChannelRequest("new-channel"), _auditService);
         result.Should().BeOfType<CreatedResult>();
     }
 
@@ -197,7 +199,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.CreateInvite(server.Id, new CreateInviteRequest());
+        var result = await _controller.CreateInvite(server.Id, new CreateInviteRequest(), _auditService);
         result.Should().BeOfType<CreatedResult>();
         _db.ServerInvites.Should().ContainSingle();
     }
@@ -249,7 +251,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.RevokeInvite(server.Id, invite.Id);
+        var result = await _controller.RevokeInvite(server.Id, invite.Id, _auditService);
         result.Should().BeOfType<NoContentResult>();
     }
 
@@ -263,7 +265,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.RevokeInvite(server.Id, Guid.NewGuid());
+        var result = await _controller.RevokeInvite(server.Id, Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -280,7 +282,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, _testUser.Id);
+        var result = await _controller.KickMember(server.Id, _testUser.Id, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -294,7 +296,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, Guid.NewGuid());
+        var result = await _controller.KickMember(server.Id, Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -312,7 +314,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, owner.Id);
+        var result = await _controller.KickMember(server.Id, owner.Id, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -330,7 +332,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
 
-        var result = await _controller.KickMember(server.Id, target.Id);
+        var result = await _controller.KickMember(server.Id, target.Id, _auditService);
         result.Should().BeOfType<NoContentResult>();
     }
 
@@ -339,14 +341,14 @@ public class ServersControllerTests : IDisposable
     [Fact]
     public async Task UpdateMemberRole_InvalidRole_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "Owner" });
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "Owner" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
     public async Task UpdateMemberRole_InvalidRoleName_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "SuperAdmin" });
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "SuperAdmin" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -364,7 +366,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest("new-name"));
+        var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest("new-name", null), _auditService);
         result.Should().BeOfType<OkObjectResult>();
     }
 
@@ -378,7 +380,7 @@ public class ServersControllerTests : IDisposable
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember());
 
-        var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(), new UpdateChannelRequest("renamed"));
+        var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(), new UpdateChannelRequest("renamed", null), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -449,5 +451,350 @@ public class ServersControllerTests : IDisposable
 
         var result = await _controller.JoinViaInvite("rejoiner");
         result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // --- Category CRUD ---
+
+    [Fact]
+    public async Task CreateCategory_ReturnsCreated()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var result = await _controller.CreateCategory(server.Id, new CreateCategoryRequest("General"), _auditService);
+
+        result.Should().BeOfType<CreatedResult>();
+        var created = (CreatedResult)result;
+        created.Value.Should().NotBeNull();
+        _db.ChannelCategories.Should().ContainSingle(c => c.Name == "General" && c.ServerId == server.Id);
+    }
+
+    [Fact]
+    public async Task CreateCategory_AutoIncrementsPosition()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        await _controller.CreateCategory(server.Id, new CreateCategoryRequest("First"), _auditService);
+        await _controller.CreateCategory(server.Id, new CreateCategoryRequest("Second"), _auditService);
+
+        var categories = _db.ChannelCategories.OrderBy(c => c.Position).ToList();
+        categories.Should().HaveCount(2);
+        categories[0].Position.Should().Be(0);
+        categories[1].Position.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetCategories_ReturnsOrderedList()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        _db.ChannelCategories.AddRange(
+            new ChannelCategory { Server = server, Name = "C", Position = 2 },
+            new ChannelCategory { Server = server, Name = "A", Position = 0 },
+            new ChannelCategory { Server = server, Name = "B", Position = 1 }
+        );
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+
+        var result = await _controller.GetCategories(server.Id);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var ok = (OkObjectResult)result;
+        var list = ok.Value as IEnumerable<dynamic>;
+        list.Should().NotBeNull();
+        // Verify the result is ordered by Position by checking the raw DB state
+        var dbCategories = _db.ChannelCategories
+            .Where(c => c.ServerId == server.Id)
+            .OrderBy(c => c.Position)
+            .ToList();
+        dbCategories[0].Name.Should().Be("A");
+        dbCategories[1].Name.Should().Be("B");
+        dbCategories[2].Name.Should().Be("C");
+    }
+
+    [Fact]
+    public async Task RenameCategory_UpdatesName()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var category = new ChannelCategory { Server = server, Name = "Old Name", Position = 0 };
+        _db.ChannelCategories.Add(category);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var result = await _controller.RenameCategory(server.Id, category.Id, new RenameCategoryRequest("New Name"), _auditService);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var updated = await _db.ChannelCategories.FindAsync(category.Id);
+        updated!.Name.Should().Be("New Name");
+    }
+
+    [Fact]
+    public async Task RenameCategory_NotFound_Returns404()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var result = await _controller.RenameCategory(server.Id, Guid.NewGuid(), new RenameCategoryRequest("New Name"), _auditService);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task DeleteCategory_ReturnsNoContent()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var category = new ChannelCategory { Server = server, Name = "To Delete", Position = 0 };
+        _db.ChannelCategories.Add(category);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var result = await _controller.DeleteCategory(server.Id, category.Id, _auditService);
+
+        result.Should().BeOfType<NoContentResult>();
+        _db.ChannelCategories.Any(c => c.Id == category.Id).Should().BeFalse();
+    }
+
+    // --- Channel Ordering ---
+
+    [Fact]
+    public async Task UpdateChannelOrder_UpdatesPositions()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var ch1 = new Channel { Server = server, Name = "ch1", Position = 0 };
+        var ch2 = new Channel { Server = server, Name = "ch2", Position = 1 };
+        _db.Channels.AddRange(ch1, ch2);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var request = new UpdateChannelOrderRequest(
+        [
+            new ChannelOrderItem(ch2.Id, null, 0),
+            new ChannelOrderItem(ch1.Id, null, 1)
+        ]);
+
+        var result = await _controller.UpdateChannelOrder(server.Id, request, _auditService);
+
+        result.Should().BeOfType<NoContentResult>();
+        var updated1 = await _db.Channels.FindAsync(ch1.Id);
+        var updated2 = await _db.Channels.FindAsync(ch2.Id);
+        updated1!.Position.Should().Be(1);
+        updated2!.Position.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task UpdateChannelOrder_MissingChannel_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var ch1 = new Channel { Server = server, Name = "ch1", Position = 0 };
+        var ch2 = new Channel { Server = server, Name = "ch2", Position = 1 };
+        _db.Channels.AddRange(ch1, ch2);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        // Only send one channel when there are two
+        var request = new UpdateChannelOrderRequest(
+        [
+            new ChannelOrderItem(ch1.Id, null, 0)
+        ]);
+
+        var result = await _controller.UpdateChannelOrder(server.Id, request, _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task UpdateChannelOrder_InvalidCategory_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        var otherServer = new Server { Name = "Other" };
+        _db.Servers.AddRange(server, otherServer);
+        var ch1 = new Channel { Server = server, Name = "ch1", Position = 0 };
+        _db.Channels.Add(ch1);
+        // Category belonging to a different server
+        var otherCategory = new ChannelCategory { Server = otherServer, Name = "Other Cat", Position = 0 };
+        _db.ChannelCategories.Add(otherCategory);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var request = new UpdateChannelOrderRequest(
+        [
+            new ChannelOrderItem(ch1.Id, otherCategory.Id, 0)
+        ]);
+
+        var result = await _controller.UpdateChannelOrder(server.Id, request, _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // --- Audit Log ---
+
+    [Fact]
+    public async Task GetAuditLog_ReturnsPaginatedEntries()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, Role = ServerRole.Owner });
+        await _db.SaveChangesAsync();
+
+        _db.AuditLogEntries.AddRange(
+            new AuditLogEntry { ServerId = server.Id, ActorUserId = _testUser.Id, Action = AuditAction.ChannelCreated, CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2) },
+            new AuditLogEntry { ServerId = server.Id, ActorUserId = _testUser.Id, Action = AuditAction.ServerRenamed, CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1) }
+        );
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Owner });
+
+        var result = await _controller.GetAuditLog(server.Id, null, 50);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var ok = (OkObjectResult)result;
+        ok.Value.Should().NotBeNull();
+        // Verify entries exist in DB for this server
+        _db.AuditLogEntries.Count(e => e.ServerId == server.Id).Should().Be(2);
+    }
+
+    // --- Mute Tests ---
+
+    [Fact]
+    public async Task MuteServer_SetsIsMuted()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var member = new ServerMember { Server = server, UserId = _testUser.Id, Role = ServerRole.Member, IsMuted = false };
+        _db.ServerMembers.Add(member);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.MuteServer(server.Id, new MuteRequest(true));
+
+        result.Should().BeOfType<NoContentResult>();
+        var updated = await _db.ServerMembers.FindAsync(server.Id, _testUser.Id);
+        updated!.IsMuted.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MuteChannel_CreatesOverride()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, Role = ServerRole.Member });
+        var channel = new Channel { Server = server, Name = "general" };
+        _db.Channels.Add(channel);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.MuteChannel(server.Id, channel.Id, new MuteRequest(true));
+
+        result.Should().BeOfType<NoContentResult>();
+        var overrideEntry = _db.ChannelNotificationOverrides
+            .FirstOrDefault(o => o.UserId == _testUser.Id && o.ChannelId == channel.Id);
+        overrideEntry.Should().NotBeNull();
+        overrideEntry!.IsMuted.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MuteChannel_Unmute_RemovesOverride()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, Role = ServerRole.Member });
+        var channel = new Channel { Server = server, Name = "general" };
+        _db.Channels.Add(channel);
+        _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
+        {
+            UserId = _testUser.Id,
+            ChannelId = channel.Id,
+            IsMuted = true
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.MuteChannel(server.Id, channel.Id, new MuteRequest(false));
+
+        result.Should().BeOfType<NoContentResult>();
+        var overrideEntry = _db.ChannelNotificationOverrides
+            .FirstOrDefault(o => o.UserId == _testUser.Id && o.ChannelId == channel.Id);
+        overrideEntry.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetNotificationPreferences_ReturnsCorrectState()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, Role = ServerRole.Member, IsMuted = true });
+        var channel = new Channel { Server = server, Name = "general" };
+        _db.Channels.Add(channel);
+        _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
+        {
+            UserId = _testUser.Id,
+            ChannelId = channel.Id,
+            IsMuted = true
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetNotificationPreferences(server.Id);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var ok = (OkObjectResult)result;
+        ok.Value.Should().NotBeNull();
+        // Verify DB state reflects muted server + channel override
+        var memberInDb = _db.ServerMembers.First(m => m.ServerId == server.Id && m.UserId == _testUser.Id);
+        memberInDb.IsMuted.Should().BeTrue();
+        _db.ChannelNotificationOverrides.Any(o => o.UserId == _testUser.Id && o.ChannelId == channel.Id && o.IsMuted).Should().BeTrue();
+    }
+
+    // --- Description Tests ---
+
+    [Fact]
+    public async Task UpdateServer_Description_Updates()
+    {
+        var server = new Server { Name = "S", Description = null };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+
+        var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest(null, "A new description"), _auditService);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var updated = await _db.Servers.FindAsync(server.Id);
+        updated!.Description.Should().Be("A new description");
+    }
+
+    [Fact]
+    public async Task UpdateServer_BothNull_ReturnsBadRequest()
+    {
+        var result = await _controller.UpdateServer(Guid.NewGuid(), new UpdateServerRequest(null, null), _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 }

@@ -293,6 +293,8 @@ else
 }
 
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
+builder.Services.AddScoped<AuditService>();
+builder.Services.AddHostedService<AuditLogCleanupService>();
 
 builder.Services.AddSingleton<VoiceCallTimeoutService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutService>());

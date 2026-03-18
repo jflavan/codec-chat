@@ -103,10 +103,13 @@ src/
 │   │   │   └── AppearanceSettings.svelte  # Theme picker (4 presets with preview cards)
 │   │   ├── server-settings/
 │   │   │   ├── ServerSettingsModal.svelte  # Modal shell with sidebar + content area
-│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Emojis, Members)
-│   │   │   ├── ServerSettings.svelte      # Server management + global admin danger zone
-│   │   │   ├── ServerEmojis.svelte        # Custom emoji upload, rename, delete (Owner/Admin)
-│   │   │   └── ServerMembers.svelte       # Member role management (promote/demote, Owner/Admin)
+│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Channels, Invites, Emojis, Members, Audit Log)
+│   │   │   ├── ServerSettings.svelte      # General tab — server name, description, icon, danger zone
+│   │   │   ├── ServerChannels.svelte      # Channels tab — category and channel management with drag-and-drop reordering
+│   │   │   ├── ServerInvites.svelte       # Invites tab — invite CRUD (create, list, revoke)
+│   │   │   ├── ServerAuditLog.svelte      # Audit Log tab — paginated action history
+│   │   │   ├── ServerEmojis.svelte        # Emojis tab — custom emoji upload, rename, delete (Owner/Admin)
+│   │   │   └── ServerMembers.svelte       # Members tab — member role management (promote/demote, Owner/Admin)
 │   │   ├── shared/
 │   │   │   └── PresenceDot.svelte        # Online/idle/offline indicator dot
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
@@ -305,19 +308,35 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `DELETE /me/avatar` - Remove custom avatar, revert to Google profile picture
 
 #### Server Management
-- `GET /servers` - List servers user is a member of (global admin sees all servers; `role` is `null` for non-member servers)
+- `GET /servers` - List servers user is a member of (global admin sees all servers; `role` is `null` for non-member servers; includes `description`)
 - `POST /servers` - Create a new server (authenticated user becomes Owner)
-- `PATCH /servers/{serverId}` - Update server name (requires Owner, Admin, or Global Admin role; broadcasts `ServerNameChanged` via SignalR)
+- `PATCH /servers/{serverId}` - Update server name and/or description (requires Owner, Admin, or Global Admin role; broadcasts `ServerNameChanged` and/or `ServerDescriptionChanged` via SignalR)
 - `GET /servers/{serverId}/members` - List server members (requires membership or Global Admin)
-- `GET /servers/{serverId}/channels` - List channels in a server (requires membership or Global Admin)
+- `GET /servers/{serverId}/channels` - List channels in a server (requires membership or Global Admin; includes `description`, `categoryId`, `position`)
 - `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner, Admin, or Global Admin role)
-- `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name (requires Owner, Admin, or Global Admin role; broadcasts `ChannelNameChanged` via SignalR)
+- `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name and/or description (requires Owner, Admin, or Global Admin role; broadcasts `ChannelNameChanged` and/or `ChannelDescriptionChanged` via SignalR)
 - `POST /servers/{serverId}/avatar` - Upload a server-specific avatar (multipart/form-data, overrides global avatar in this server)
 - `DELETE /servers/{serverId}/avatar` - Remove server-specific avatar, fall back to global avatar
 - `PATCH /servers/{serverId}/members/{userId}/role` - Change a member's role (requires Owner, Admin, or Global Admin; Owner can promote/demote freely; Admin can promote Members but not demote other Admins; broadcasts `MemberRoleChanged` via SignalR)
 - `DELETE /servers/{serverId}/members/{userId}` - Kick a member from the server (requires Owner, Admin, or Global Admin role; broadcasts `KickedFromServer` via SignalR)
 - `DELETE /servers/{serverId}` - Delete a server and all associated data (requires Owner or Global Admin; cascade-deletes channels, messages, reactions, link previews, members, invites; broadcasts `ServerDeleted` via SignalR)
 - `DELETE /servers/{serverId}/channels/{channelId}` - Delete a channel and all associated data (requires Owner, Admin, or Global Admin; cascade-deletes messages, reactions, link previews; broadcasts `ChannelDeleted` via SignalR)
+
+#### Channel Categories
+- `GET /servers/{serverId}/categories` - List all categories for a server ordered by position (requires membership or Global Admin)
+- `POST /servers/{serverId}/categories` - Create a new category (requires Owner, Admin, or Global Admin; broadcasts `CategoryCreated` via SignalR)
+- `PATCH /servers/{serverId}/categories/{categoryId}` - Rename a category (requires Owner, Admin, or Global Admin; broadcasts `CategoryRenamed` via SignalR)
+- `DELETE /servers/{serverId}/categories/{categoryId}` - Delete a category; channels become uncategorized (requires Owner, Admin, or Global Admin; broadcasts `CategoryDeleted` via SignalR)
+- `PUT /servers/{serverId}/channel-order` - Bulk update channel positions and category assignments (requires Owner, Admin, or Global Admin; broadcasts `ChannelOrderChanged` via SignalR)
+- `PUT /servers/{serverId}/category-order` - Bulk update category positions (requires Owner, Admin, or Global Admin; broadcasts `CategoryOrderChanged` via SignalR)
+
+#### Audit Log
+- `GET /servers/{serverId}/audit-log?page={n}&pageSize={n}` - Paginated audit log (newest first; requires Owner, Admin, or Global Admin; returns `{ totalCount, entries }`)
+
+#### Notification Preferences
+- `GET /servers/{serverId}/notification-preferences` - Get current user's mute settings for the server and its channels
+- `PUT /servers/{serverId}/mute` - Toggle server-level mute for the current user (`{ isMuted: bool }`)
+- `PUT /servers/{serverId}/channels/{channelId}/mute` - Toggle channel-level mute for the current user (`{ isMuted: bool }`)
 
 #### Custom Emojis
 - `GET /servers/{serverId}/emojis` - List all custom emojis for a server (requires membership; returns name, imageUrl, contentType, isAnimated, uploadedByUserId, createdAt)
@@ -430,6 +449,13 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `CustomEmojiAdded` | `{ serverId, emoji: { id, name, imageUrl, contentType, isAnimated, uploadedByUserId, createdAt } }` | A custom emoji was uploaded to a server (sent to server group) |
 | `CustomEmojiUpdated` | `{ serverId, emojiId, name }` | A custom emoji was renamed (sent to server group) |
 | `CustomEmojiDeleted` | `{ serverId, emojiId }` | A custom emoji was deleted (sent to server group) |
+| `ServerDescriptionChanged` | `{ serverId, description }` | Server description was updated (sent to server group) |
+| `ChannelDescriptionChanged` | `{ serverId, channelId, description }` | Channel description/topic was updated (sent to server group) |
+| `CategoryCreated` | `{ serverId, category: { id, name, position } }` | A new channel category was created (sent to server group) |
+| `CategoryRenamed` | `{ serverId, categoryId, name }` | A category was renamed (sent to server group) |
+| `CategoryDeleted` | `{ serverId, categoryId }` | A category was deleted; affected channels become uncategorized (sent to server group) |
+| `ChannelOrderChanged` | `{ serverId, channels: [{ channelId, position, categoryId }] }` | Channel positions and/or category assignments were bulk-updated (sent to server group) |
+| `CategoryOrderChanged` | `{ serverId, categories: [{ categoryId, position }] }` | Category positions were bulk-updated (sent to server group) |
 | `IncomingCall` | `{ callId, dmChannelId, callerUserId, callerDisplayName, callerAvatarUrl }` | Incoming voice call from a DM partner (sent to recipient's user group) |
 | `CallAccepted` | `{ callId, sendTransportOptions, recvTransportOptions }` | Call was accepted; includes SFU transport options for the caller to connect |
 | `CallDeclined` | `{ callId }` | Call was declined by the recipient (sent to caller's user group) |
@@ -540,11 +566,11 @@ Content-Type: application/json
 
 ### Entity Relationships
 ```
-User ────┬──── ServerMember ──── Server
-         │                         │
-         │                    CustomEmoji
-         │                         │
-         ├──── Message ──────── Channel
+User ────┬──── ServerMember ──── Server ──── ChannelCategory
+         │                         │              │
+         │                    CustomEmoji     Channel ──────┐
+         │                                        │         │
+         ├──── Message ──────── Channel           │    AuditLogEntry
          │        │
          ├──── Reaction ────────┘
          │        └──── DirectMessage
@@ -561,6 +587,8 @@ User ────┬──── ServerMember ──── Server
          │
          ├──── VoiceState ──── Channel (nullable)
          │                     DmChannel (nullable)
+         │
+         ├──── ChannelNotificationOverride ──── Channel
          │
          └──── PresenceState (transient; one per connection)
 
@@ -580,17 +608,34 @@ DirectMessage ─┘
 
 #### Server
 - Top-level organizational unit (like Discord servers)
-- Contains channels, members, and custom emojis
-- Fields: Id, Name
+- Contains channels, members, categories, and custom emojis
+- Fields: Id, Name, Description (nullable, max 256 chars)
 
 #### ServerMember
 - Join table linking users to servers
-- Tracks role and join date
-- Fields: ServerId, UserId, Role (Owner/Admin/Member), JoinedAt, CustomAvatarPath
+- Tracks role, join date, and notification preferences
+- Fields: ServerId, UserId, Role (Owner/Admin/Member), JoinedAt, CustomAvatarPath, IsMuted
 
 #### Channel
 - Text communication channel within a server
-- Fields: Id, Name, ServerId
+- Fields: Id, Name, ServerId, Description (nullable, max 256 chars), CategoryId (nullable FK → ChannelCategory), Position
+
+#### ChannelCategory
+- Ordered group of channels within a server
+- Fields: Id, ServerId, Name, Position
+- Cascade delete with Server; deleting a category sets `CategoryId` to null on its channels
+
+#### AuditLogEntry
+- Record of an administrative action performed in a server
+- Fields: Id, ServerId, ActorUserId (nullable FK → User), Action (enum, 21 values), TargetType (nullable string), TargetId (nullable string), Details (nullable string), CreatedAt
+- Entries older than 90 days are purged automatically by `AuditLogCleanupService` (background service)
+- Action types: ServerCreated, ServerRenamed, ServerDescriptionChanged, ServerDeleted, ChannelCreated, ChannelRenamed, ChannelDescriptionChanged, ChannelDeleted, ChannelPurged, MemberJoined, MemberLeft, MemberKicked, MemberRoleChanged, InviteCreated, InviteRevoked, EmojiUploaded, EmojiRenamed, EmojiDeleted, MessageDeleted, CategoryCreated, CategoryDeleted
+
+#### ChannelNotificationOverride
+- Per-user, per-channel mute preference
+- Composite primary key: (UserId, ChannelId)
+- Fields: UserId (FK → User), ChannelId (FK → Channel), IsMuted
+- Created on first mute; deleted when user leaves the server
 
 #### Message
 - Individual chat message in a channel

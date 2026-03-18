@@ -5,11 +5,8 @@
 
 	let serverNameEdit = $state('');
 	let isEditingServerName = $state(false);
-	let channelEditId = $state<string | null>(null);
-	let channelEditName = $state('');
+	let serverDescriptionEdit = $state('');
 	let confirmDeleteServer = $state(false);
-	let confirmDeleteChannelId = $state<string | null>(null);
-	let confirmPurgeChannelId = $state<string | null>(null);
 	let iconFileInput = $state<HTMLInputElement>();
 
 	function startEditingServerName() {
@@ -29,37 +26,10 @@
 		serverNameEdit = '';
 	}
 
-	function startEditingChannel(channelId: string, currentName: string) {
-		channelEditId = channelId;
-		channelEditName = currentName;
-	}
-
-	function cancelEditingChannel() {
-		channelEditId = null;
-		channelEditName = '';
-	}
-
-	async function saveChannelName(channelId: string) {
-		if (!channelEditName.trim()) return;
-		await app.updateChannelName(channelId, channelEditName);
-		channelEditId = null;
-		channelEditName = '';
-	}
-
 	async function handleDeleteServer() {
 		if (!app.selectedServerId) return;
 		await app.deleteServer(app.selectedServerId);
 		confirmDeleteServer = false;
-	}
-
-	async function handleDeleteChannel(channelId: string) {
-		await app.deleteChannel(channelId);
-		confirmDeleteChannelId = null;
-	}
-
-	async function handlePurgeChannel(channelId: string) {
-		await app.purgeChannel(channelId);
-		confirmPurgeChannelId = null;
 	}
 
 	function triggerIconUpload() {
@@ -77,17 +47,17 @@
 	async function handleRemoveIcon() {
 		await app.removeServerIcon();
 	}
+
+	$effect(() => {
+		const server = app.servers.find((s) => s.serverId === app.selectedServerId);
+		serverDescriptionEdit = server?.description ?? '';
+	});
+
+	async function saveDescription() {
+		await app.updateServerDescription(serverDescriptionEdit);
+	}
 </script>
 
-{#snippet channelTypeIcon(type: string | undefined)}
-	{#if type === 'voice'}
-		<svg class="channel-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-			<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-		</svg>
-	{:else}
-		<span class="channel-hash">#</span>
-	{/if}
-{/snippet}
 
 <div class="server-settings">
 	<h1 class="settings-title">Server Settings</h1>
@@ -195,6 +165,26 @@
 			{/if}
 		</div>
 
+		{#if app.canManageChannels}
+			<div class="form-group">
+				<label for="server-description" class="label">Server Description</label>
+				<textarea
+					id="server-description"
+					class="input textarea"
+					maxlength="256"
+					rows="3"
+					placeholder="Describe your server…"
+					bind:value={serverDescriptionEdit}
+					onblur={saveDescription}
+				></textarea>
+				<div class="form-meta">
+					<span class="char-counter" class:warn={serverDescriptionEdit.length >= 256}>
+						{serverDescriptionEdit.length}/256
+					</span>
+				</div>
+			</div>
+		{/if}
+
 		{#if app.canDeleteServer}
 			<div class="danger-zone">
 				{#if confirmDeleteServer}
@@ -212,125 +202,6 @@
 		{/if}
 	</section>
 
-	<!-- Channel Management Section -->
-	<section class="settings-section">
-		<h2 class="section-title">Channels</h2>
-		<div class="channel-list">
-			{#each app.channels as channel (channel.id)}
-				<div class="channel-item">
-					{#if channelEditId === channel.id}
-						<div class="inline-edit">
-							<div class="inline-edit-row">
-								{@render channelTypeIcon(channel.type)}
-								<input
-									type="text"
-									class="input"
-									bind:value={channelEditName}
-									maxlength="100"
-									disabled={app.isUpdatingChannelName}
-									onkeydown={(e) => {
-										if (e.key === 'Enter') saveChannelName(channel.id);
-										if (e.key === 'Escape') cancelEditingChannel();
-									}}
-								/>
-							</div>
-							<div class="form-meta">
-								<span class="char-counter" class:warn={channelEditName.length >= 100}>
-									{channelEditName.length}/100
-								</span>
-							</div>
-							<div class="inline-actions">
-								<button
-									type="button"
-									class="btn-primary"
-									disabled={app.isUpdatingChannelName || !channelEditName.trim()}
-									onclick={() => saveChannelName(channel.id)}
-								>
-									{app.isUpdatingChannelName ? '…' : 'Save'}
-								</button>
-								<button
-									type="button"
-									class="btn-secondary"
-									disabled={app.isUpdatingChannelName}
-									onclick={cancelEditingChannel}
-								>
-									Cancel
-								</button>
-							</div>
-						</div>
-					{:else}
-						<div class="channel-display">
-							{@render channelTypeIcon(channel.type)}
-							<span class="channel-name">{channel.name}</span>
-							{#if app.canManageChannels}
-								<button
-									type="button"
-									class="btn-edit"
-									onclick={() => startEditingChannel(channel.id, channel.name)}
-								>
-									Edit
-								</button>
-							{/if}
-							{#if app.isGlobalAdmin && channel.type !== 'voice'}
-								{#if confirmPurgeChannelId === channel.id}
-									<span class="danger-warning-inline">Delete all messages?</span>
-									<button
-										type="button"
-										class="btn-danger-sm"
-										disabled={app.isPurgingChannel}
-										onclick={() => handlePurgeChannel(channel.id)}
-									>
-										{app.isPurgingChannel ? 'Purging...' : 'Confirm'}
-									</button>
-									<button
-										type="button"
-										class="btn-secondary-sm"
-										disabled={app.isPurgingChannel}
-										onclick={() => (confirmPurgeChannelId = null)}
-									>
-										Cancel
-									</button>
-								{:else}
-									<button
-										type="button"
-										class="btn-danger-sm"
-										onclick={() => {
-											confirmPurgeChannelId = channel.id;
-											confirmDeleteChannelId = null;
-										}}
-									>
-										Purge
-									</button>
-								{/if}
-							{/if}
-							{#if app.canDeleteChannel}
-								{#if confirmDeleteChannelId === channel.id}
-									<button type="button" class="btn-danger-sm" onclick={() => handleDeleteChannel(channel.id)}>Confirm</button>
-									<button type="button" class="btn-secondary-sm" onclick={() => (confirmDeleteChannelId = null)}>Cancel</button>
-								{:else}
-									<button type="button" class="btn-danger-sm" onclick={() => (confirmDeleteChannelId = channel.id)}>Delete</button>
-								{/if}
-							{/if}
-						</div>
-					{/if}
-				</div>
-			{/each}
-		</div>
-	</section>
-
-	<!-- Member Management Section -->
-	<section class="settings-section">
-		<h2 class="section-title">Members</h2>
-		<p class="section-description">
-			Server members are managed from the Members sidebar. 
-			{#if app.canKickMembers}
-				You can kick members by clicking on them in the member list.
-			{/if}
-		</p>
-		<div class="member-count">
-			<strong>{app.members.length}</strong> member{app.members.length === 1 ? '' : 's'}
-		</div>
-	</section>
 </div>
 
 <style>
@@ -364,14 +235,7 @@
 		letter-spacing: 0.5px;
 	}
 
-	.section-description {
-		color: var(--text-muted);
-		font-size: 14px;
-		margin-bottom: 12px;
-		line-height: 1.5;
-	}
-
-	.icon-upload-area {
+.icon-upload-area {
 		display: flex;
 		align-items: center;
 		gap: 16px;
@@ -458,23 +322,34 @@
 		cursor: not-allowed;
 	}
 
+	.textarea {
+		resize: vertical;
+		min-height: 72px;
+		line-height: 1.5;
+	}
+
+	.form-meta {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 4px;
+	}
+
+	.char-counter {
+		font-size: 11px;
+		color: var(--text-muted);
+	}
+
+	.char-counter.warn {
+		color: var(--danger);
+	}
+
 	.inline-edit {
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 	}
 
-	.inline-edit-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.inline-edit-row .input {
-		flex: 1;
-	}
-
-	.inline-actions {
+.inline-actions {
 		display: flex;
 		gap: 8px;
 	}
@@ -538,48 +413,6 @@
 		color: var(--bg-tertiary);
 	}
 
-	.channel-list {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.channel-item {
-		padding: 8px 0;
-	}
-
-	.channel-display {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.channel-hash {
-		color: var(--text-muted);
-		font-weight: 600;
-		flex-shrink: 0;
-	}
-
-	.channel-icon {
-		color: var(--text-muted);
-		flex-shrink: 0;
-		opacity: 0.7;
-	}
-
-	.channel-name {
-		font-size: 15px;
-		color: var(--text-normal);
-		flex: 1;
-	}
-
-	.member-count {
-		padding: 12px 16px;
-		background: var(--bg-secondary);
-		border-radius: 4px;
-		color: var(--text-normal);
-		font-size: 14px;
-	}
-
 	.danger-zone {
 		margin-top: 20px;
 		padding-top: 16px;
@@ -612,49 +445,6 @@
 	.btn-danger:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
-	}
-
-	.btn-danger-sm {
-		padding: 6px 12px;
-		background: var(--danger);
-		color: #fff;
-		border: none;
-		border-radius: 3px;
-		font-size: 13px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: opacity 150ms ease;
-	}
-
-	.btn-danger-sm:hover:not(:disabled) {
-		opacity: 0.9;
-	}
-
-	.btn-danger-sm:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.btn-secondary-sm {
-		padding: 6px 12px;
-		background: transparent;
-		color: var(--text-normal);
-		border: none;
-		border-radius: 3px;
-		font-size: 13px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: color 150ms ease;
-	}
-
-	.btn-secondary-sm:hover:not(:disabled) {
-		color: var(--text-header);
-	}
-
-	.danger-warning-inline {
-		color: var(--danger);
-		font-size: 12px;
-		white-space: nowrap;
 	}
 
 	@media (max-width: 899px) {

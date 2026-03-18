@@ -89,6 +89,7 @@ apps/
       styles/        # CSS design tokens (tokens.css) + global.css
       utils/         # Pure helpers (format.ts)
       components/    # Svelte 5 components grouped by feature area
+        server-settings/  # ServerSettings, ServerChannels, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerSettingsSidebar, ServerSettingsModal
     routes/
       +layout.svelte  # Root layout
       +page.svelte    # Thin shell (~75 lines); creates AppState, sets context
@@ -166,6 +167,7 @@ PUBLIC_GOOGLE_CLIENT_ID=<your google oauth client id>
 - Use `<script lang="ts">` with `$props()` for component props
 - Components organized by feature area under `lib/components/`
 - Avoid adding new dependencies without a clear reason
+- `svelte-dnd-action` is used for drag-and-drop reordering (channel and category ordering in server settings)
 
 ## Required Updates When Changing Code
 

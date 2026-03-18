@@ -26,18 +26,31 @@ public class CodecDbContext : DbContext
     public DbSet<CustomEmoji> CustomEmojis => Set<CustomEmoji>();
     public DbSet<PresenceState> PresenceStates => Set<PresenceState>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ChannelCategory> ChannelCategories => Set<ChannelCategory>();
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+    public DbSet<ChannelNotificationOverride> ChannelNotificationOverrides => Set<ChannelNotificationOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Server>()
-            .HasMany(server => server.Channels)
-            .WithOne(channel => channel.Server)
-            .HasForeignKey(channel => channel.ServerId);
+        modelBuilder.Entity<Server>(e =>
+        {
+            e.HasMany(server => server.Channels)
+                .WithOne(channel => channel.Server)
+                .HasForeignKey(channel => channel.ServerId);
+            e.Property(s => s.Description).HasMaxLength(256);
+        });
 
-        modelBuilder.Entity<Channel>()
-            .HasMany(channel => channel.Messages)
-            .WithOne(message => message.Channel)
-            .HasForeignKey(message => message.ChannelId);
+        modelBuilder.Entity<Channel>(e =>
+        {
+            e.HasMany(channel => channel.Messages)
+                .WithOne(message => message.Channel)
+                .HasForeignKey(message => message.ChannelId);
+            e.HasOne(c => c.Category)
+                .WithMany(cat => cat.Channels)
+                .HasForeignKey(c => c.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.Property(c => c.Description).HasMaxLength(256);
+        });
 
         modelBuilder.Entity<User>()
             .HasIndex(user => user.GoogleSubject)
@@ -345,6 +358,43 @@ public class CodecDbContext : DbContext
                 .HasColumnType("xid")
                 .ValueGeneratedOnAddOrUpdate()
                 .IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<ChannelCategory>(e =>
+        {
+            e.HasOne(c => c.Server)
+                .WithMany(s => s.Categories)
+                .HasForeignKey(c => c.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Property(c => c.Name).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<AuditLogEntry>(e =>
+        {
+            e.HasOne(a => a.Server)
+                .WithMany(s => s.AuditLogEntries)
+                .HasForeignKey(a => a.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(a => a.ActorUser)
+                .WithMany()
+                .HasForeignKey(a => a.ActorUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(a => new { a.ServerId, a.CreatedAt })
+                .IsDescending(false, true);
+            e.Property(a => a.Action).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<ChannelNotificationOverride>(e =>
+        {
+            e.HasKey(o => new { o.UserId, o.ChannelId });
+            e.HasOne(o => o.User)
+                .WithMany()
+                .HasForeignKey(o => o.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(o => o.Channel)
+                .WithMany()
+                .HasForeignKey(o => o.ChannelId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

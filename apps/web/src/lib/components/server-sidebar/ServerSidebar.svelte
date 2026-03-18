@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import ContextMenu from '$lib/components/channel-sidebar/ContextMenu.svelte';
+	import type { MemberServer } from '$lib/types/index.js';
 
 	const app = getAppState();
+
+	let serverContextMenu = $state<{ server: MemberServer; x: number; y: number } | null>(null);
+
+	function openServerContextMenu(e: MouseEvent, server: MemberServer) {
+		e.preventDefault();
+		serverContextMenu = { server, x: e.clientX, y: e.clientY };
+	}
 
 	let showJoinByCode = $state(false);
 	let inviteCode = $state('');
@@ -126,8 +135,10 @@
 						class="server-icon"
 						class:active={server.serverId === app.selectedServerId}
 						class:has-icon={Boolean(server.iconUrl)}
+						class:muted-server={server.serverId === app.selectedServerId && app.isServerMuted}
 						onclick={() => app.selectServer(server.serverId)}
-						aria-label="Server: {server.name}"
+					oncontextmenu={(e) => openServerContextMenu(e, server)}
+						aria-label="Server: {server.name}{server.serverId === app.selectedServerId && app.isServerMuted ? ' (muted)' : ''}"
 						title={server.name}
 					>
 						{#if server.iconUrl}
@@ -223,6 +234,21 @@
 	{/if}
 </nav>
 
+{#if serverContextMenu}
+	{@const sv = serverContextMenu.server}
+	<ContextMenu
+		x={serverContextMenu.x}
+		y={serverContextMenu.y}
+		items={[
+			{
+				label: app.isServerMuted ? 'Unmute Server' : 'Mute Server',
+				onClick: () => app.toggleServerMute()
+			}
+		]}
+		onClose={() => { serverContextMenu = null; }}
+	/>
+{/if}
+
 <style>
 	.server-sidebar {
 		background: var(--bg-tertiary);
@@ -315,6 +341,10 @@
 		border-radius: 16px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
+	}
+
+	.server-icon.muted-server {
+		opacity: 0.5;
 	}
 
 	.server-icon.has-icon {
