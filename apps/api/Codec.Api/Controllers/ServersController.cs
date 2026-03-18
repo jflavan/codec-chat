@@ -542,6 +542,226 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         });
     }
 
+    /* ═══════════════════ Channel Categories ═══════════════════ */
+
+    /// <summary>
+    /// Lists categories for a server. Requires membership or global admin.
+    /// </summary>
+    [HttpGet("{serverId:guid}/categories")]
+    public async Task<IActionResult> GetCategories(Guid serverId)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var categories = await db.ChannelCategories
+            .AsNoTracking()
+            .Where(c => c.ServerId == serverId)
+            .OrderBy(c => c.Position)
+            .Select(c => new { c.Id, c.Name, c.Position })
+            .ToListAsync();
+
+        return Ok(categories);
+    }
+
+    /// <summary>
+    /// Creates a category in a server. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPost("{serverId:guid}/categories")]
+    public async Task<IActionResult> CreateCategory(Guid serverId, [FromBody] CreateCategoryRequest request, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var maxPosition = await db.ChannelCategories
+            .Where(c => c.ServerId == serverId)
+            .Select(c => (int?)c.Position)
+            .MaxAsync() ?? -1;
+
+        var category = new ChannelCategory
+        {
+            ServerId = serverId,
+            Name = request.Name.Trim(),
+            Position = maxPosition + 1
+        };
+
+        db.ChannelCategories.Add(category);
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryCreated", new
+        {
+            serverId,
+            categoryId = category.Id,
+            name = category.Name,
+            position = category.Position
+        });
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.CategoryCreated,
+            targetType: "Category", targetId: category.Id.ToString(),
+            details: $"Created category \"{category.Name}\"");
+
+        return Created($"/servers/{serverId}/categories/{category.Id}", new
+        {
+            category.Id,
+            category.Name,
+            category.Position
+        });
+    }
+
+    /// <summary>
+    /// Renames a category. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPatch("{serverId:guid}/categories/{categoryId:guid}")]
+    public async Task<IActionResult> RenameCategory(Guid serverId, Guid categoryId, [FromBody] RenameCategoryRequest request, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var category = await db.ChannelCategories
+            .FirstOrDefaultAsync(c => c.Id == categoryId && c.ServerId == serverId);
+
+        if (category is null)
+        {
+            return NotFound(new { error = "Category not found." });
+        }
+
+        var oldName = category.Name;
+        category.Name = request.Name.Trim();
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryRenamed", new
+        {
+            serverId,
+            categoryId,
+            name = category.Name
+        });
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.CategoryRenamed,
+            targetType: "Category", targetId: categoryId.ToString(),
+            details: $"Renamed from \"{oldName}\" to \"{category.Name}\"");
+
+        return Ok(new { category.Id, category.Name, category.Position });
+    }
+
+    /// <summary>
+    /// Deletes a category. Channels become uncategorized. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/categories/{categoryId:guid}")]
+    public async Task<IActionResult> DeleteCategory(Guid serverId, Guid categoryId, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var category = await db.ChannelCategories
+            .FirstOrDefaultAsync(c => c.Id == categoryId && c.ServerId == serverId);
+
+        if (category is null)
+        {
+            return NotFound(new { error = "Category not found." });
+        }
+
+        db.ChannelCategories.Remove(category);
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryDeleted", new
+        {
+            serverId,
+            categoryId
+        });
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.CategoryDeleted,
+            targetType: "Category", targetId: categoryId.ToString(),
+            details: $"Deleted category \"{category.Name}\"");
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates the position and category assignment of all channels in a server.
+    /// Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPut("{serverId:guid}/channel-order")]
+    public async Task<IActionResult> UpdateChannelOrder(Guid serverId, [FromBody] UpdateChannelOrderRequest request, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var channels = await db.Channels
+            .Where(c => c.ServerId == serverId)
+            .ToListAsync();
+
+        if (request.Channels.Count != channels.Count)
+        {
+            return BadRequest(new { error = "Request must include all channels in the server." });
+        }
+
+        var validCategoryIds = await db.ChannelCategories
+            .Where(c => c.ServerId == serverId)
+            .Select(c => c.Id)
+            .ToHashSetAsync();
+
+        foreach (var item in request.Channels)
+        {
+            if (item.CategoryId is not null && !validCategoryIds.Contains(item.CategoryId.Value))
+            {
+                return BadRequest(new { error = $"CategoryId {item.CategoryId} does not belong to this server." });
+            }
+        }
+
+        var channelLookup = channels.ToDictionary(c => c.Id);
+        foreach (var item in request.Channels)
+        {
+            if (!channelLookup.TryGetValue(item.ChannelId, out var channel))
+            {
+                return BadRequest(new { error = $"Channel {item.ChannelId} not found in this server." });
+            }
+            channel.CategoryId = item.CategoryId;
+            channel.Position = item.Position;
+        }
+
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelOrderChanged", new
+        {
+            serverId
+        });
+
+        await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelMoved);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates the display order of categories in a server.
+    /// Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPut("{serverId:guid}/category-order")]
+    public async Task<IActionResult> UpdateCategoryOrder(Guid serverId, [FromBody] UpdateCategoryOrderRequest request, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var categories = await db.ChannelCategories
+            .Where(c => c.ServerId == serverId)
+            .ToDictionaryAsync(c => c.Id);
+
+        foreach (var item in request.Categories)
+        {
+            if (categories.TryGetValue(item.CategoryId, out var category))
+            {
+                category.Position = item.Position;
+            }
+        }
+
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("CategoryOrderChanged", new
+        {
+            serverId
+        });
+
+        return NoContent();
+    }
+
     /* ═══════════════════ Server Invites ═══════════════════ */
 
     /// <summary>
