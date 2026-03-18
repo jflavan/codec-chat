@@ -94,6 +94,13 @@
 		.category-list {
 			flex-direction: row;
 			gap: 0;
+			overflow-x: auto;
+			-webkit-overflow-scrolling: touch;
+			scrollbar-width: none;
+		}
+
+		.category-list::-webkit-scrollbar {
+			display: none;
 		}
 
 		.category-item {
@@ -103,6 +110,7 @@
 			padding: 12px 16px;
 			min-height: 44px;
 			justify-content: center;
+			flex-shrink: 0;
 		}
 
 		.category-item.active {
