@@ -13,7 +13,7 @@ Enhance the server settings experience with six features: invite management tab,
 | Field | Type | Constraints |
 |-------|------|-------------|
 | Id | Guid | PK |
-| ServerId | Guid | FK → Server |
+| ServerId | Guid | FK → Server, ON DELETE CASCADE |
 | Name | string | max 50 chars |
 | Position | int | sort order within server |
 
@@ -22,28 +22,27 @@ Enhance the server settings experience with six features: invite management tab,
 | Field | Type | Constraints |
 |-------|------|-------------|
 | Id | Guid | PK |
-| ServerId | Guid | FK → Server |
-| ActorUserId | Guid | FK → User |
+| ServerId | Guid | FK → Server, ON DELETE CASCADE |
+| ActorUserId | Guid? | FK → User, nullable, ON DELETE SET NULL |
 | Action | enum | see Action enum below |
 | TargetType | string? | e.g. "Channel", "User", "Invite", "Emoji", "Message" |
 | TargetId | string? | ID of the affected entity |
 | Details | string? | human-readable context, e.g. "Renamed #general to #lobby" |
 | CreatedAt | DateTimeOffset | |
 
-Index on `(ServerId, CreatedAt DESC)`.
+Index on `(ServerId, CreatedAt DESC)`. When `ActorUserId` is null (user deleted), UI displays "Deleted User".
 
-**Action enum values:** `ServerRenamed`, `ServerIconChanged`, `ServerDeleted`, `ChannelCreated`, `ChannelRenamed`, `ChannelDeleted`, `ChannelPurged`, `MemberKicked`, `MemberRoleChanged`, `InviteCreated`, `InviteRevoked`, `EmojiUploaded`, `EmojiRenamed`, `EmojiDeleted`, `MessageDeletedByAdmin`.
+**Action enum values:** `ServerRenamed`, `ServerDescriptionChanged`, `ServerIconChanged`, `ServerDeleted`, `ChannelCreated`, `ChannelRenamed`, `ChannelDescriptionChanged`, `ChannelDeleted`, `ChannelPurged`, `ChannelMoved`, `CategoryCreated`, `CategoryRenamed`, `CategoryDeleted`, `MemberKicked`, `MemberRoleChanged`, `InviteCreated`, `InviteRevoked`, `EmojiUploaded`, `EmojiRenamed`, `EmojiDeleted`, `MessageDeletedByAdmin`.
 
 **ChannelNotificationOverride**
 
 | Field | Type | Constraints |
 |-------|------|-------------|
-| Id | Guid | PK |
-| UserId | Guid | FK → User |
-| ChannelId | Guid | FK → Channel |
+| UserId | Guid | Composite PK, FK → User, ON DELETE CASCADE |
+| ChannelId | Guid | Composite PK, FK → Channel, ON DELETE CASCADE |
 | IsMuted | bool | |
 
-Unique index on `(UserId, ChannelId)`.
+Composite PK on `(UserId, ChannelId)`. No surrogate Id — matches the `ServerMember` pattern.
 
 ### Modified Entities
 
@@ -73,7 +72,14 @@ Single migration covering all schema changes:
 - `ChannelCategory` table
 - `AuditLogEntry` table with `(ServerId, CreatedAt DESC)` index
 - `ServerMember.IsMuted` (bool, default false)
-- `ChannelNotificationOverride` table with `(UserId, ChannelId)` unique index
+- `ChannelNotificationOverride` table with `(UserId, ChannelId)` composite PK
+
+### Cascade delete behaviors
+
+- `ChannelCategory` → ON DELETE CASCADE from Server (server deleted = categories deleted)
+- `AuditLogEntry` → ON DELETE CASCADE from Server; ON DELETE SET NULL from User (preserve history when user deleted)
+- `ChannelNotificationOverride` → ON DELETE CASCADE from both User and Channel
+- `Channel.CategoryId` → ON DELETE SET NULL from ChannelCategory (category deleted = channels become uncategorized)
 
 ## API Endpoints
 
@@ -105,7 +111,7 @@ Existing endpoints, no changes needed:
 ### Notification preferences
 
 - `PUT /servers/{serverId}/mute` — toggle server-level mute. Body: `{ isMuted: bool }`. Any member.
-- `PUT /channels/{channelId}/mute` — toggle channel-level mute. Body: `{ isMuted: bool }`. Any member.
+- `PUT /servers/{serverId}/channels/{channelId}/mute` — toggle channel-level mute. Body: `{ isMuted: bool }`. Any member. Routed under `ServersController` to keep server-scoped operations together.
 - `GET /servers/{serverId}/notification-preferences` — returns `{ serverMuted, channelOverrides: [{ channelId, isMuted }] }`. Any member.
 
 ### New SignalR Events
@@ -119,6 +125,58 @@ Existing endpoints, no changes needed:
 - `ChannelDescriptionChanged { serverId, channelId, description }`
 
 Audit log entries are written inline in each controller action to keep the action and its context together.
+
+## Request & Response DTOs
+
+### Request DTOs (C#)
+
+- `UpdateServerRequest` — extend existing: `{ Name?: string, Description?: string }` (at least one required)
+- `UpdateChannelRequest` — extend existing: `{ Name?: string, Description?: string }` (at least one required)
+- `CreateCategoryRequest` — `{ Name: string }` (required, max 50 chars)
+- `RenameCategoryRequest` — `{ Name: string }` (required, max 50 chars)
+- `UpdateChannelOrderRequest` — `{ Channels: [{ ChannelId: Guid, CategoryId?: Guid, Position: int }] }` (must include ALL channels in server; omitted channels are rejected with 400)
+- `UpdateCategoryOrderRequest` — `{ Categories: [{ CategoryId: Guid, Position: int }] }`
+- `MuteRequest` — `{ IsMuted: bool }`
+
+### Response DTOs (C#)
+
+- `AuditLogEntryResponse` — `{ Id, Action, TargetType?, TargetId?, Details?, CreatedAt, Actor: { UserId?, DisplayName, AvatarUrl? } }` (Actor.DisplayName = "Deleted User" when ActorUserId is null)
+- `PaginatedAuditLog` — `{ HasMore: bool, Entries: AuditLogEntryResponse[] }`
+- `NotificationPreferencesResponse` — `{ ServerMuted: bool, ChannelOverrides: [{ ChannelId, IsMuted }] }`
+
+### Frontend Types (TypeScript in `models.ts`)
+
+```typescript
+interface ChannelCategory {
+  id: string;
+  serverId: string;
+  name: string;
+  position: number;
+}
+
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  details?: string;
+  createdAt: string;
+  actor: { userId?: string; displayName: string; avatarUrl?: string };
+}
+
+interface NotificationPreferences {
+  serverMuted: boolean;
+  channelOverrides: { channelId: string; isMuted: boolean }[];
+}
+```
+
+Existing types to extend:
+- `MemberServer` — add `description?: string`
+- `Channel` (in channel list responses) — add `description?: string`, `categoryId?: string`, `position: number`
+
+### Frontend State (`AppState`)
+
+- `serverSettingsCategory` type: extend from `'general' | 'emojis' | 'members'` to `'general' | 'channels' | 'invites' | 'emojis' | 'members' | 'audit-log'`
 
 ## Frontend — Settings Modal
 
@@ -168,7 +226,7 @@ Unchanged — existing promote/demote/kick functionality stays as-is.
 - Channels grouped by category with collapsible headers (click category name to collapse/expand)
 - Uncategorized channels appear at the top, above any categories
 - Within each category, channels sorted by `position`, then text before voice
-- Collapse state stored in `localStorage` per server (local UI preference, not persisted to DB)
+- Collapse state stored in `localStorage` per server using key `codec:category-collapse:{serverId}` (JSON array of collapsed category IDs)
 
 ### Chat area header
 
