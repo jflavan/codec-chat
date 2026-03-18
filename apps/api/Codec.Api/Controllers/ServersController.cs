@@ -34,7 +34,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             var allServers = await db.Servers
                 .AsNoTracking()
-                .Select(s => new { s.Id, s.Name, s.IconUrl })
+                .Select(s => new { s.Id, s.Name, s.IconUrl, s.Description })
                 .ToListAsync();
 
             var myMemberships = await db.ServerMembers
@@ -47,6 +47,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 ServerId = s.Id,
                 s.Name,
                 s.IconUrl,
+                s.Description,
                 Role = myMemberships.TryGetValue(s.Id, out var info) ? info.Role : (string?)null,
                 SortOrder = myMemberships.TryGetValue(s.Id, out var sortInfo) ? sortInfo.SortOrder : int.MaxValue
             }).OrderBy(s => s.SortOrder);
@@ -63,6 +64,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 member.ServerId,
                 Name = member.Server!.Name,
                 IconUrl = member.Server!.IconUrl,
+                Description = member.Server!.Description,
                 Role = member.Role.ToString(),
                 member.SortOrder
             })
@@ -152,29 +154,65 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Updates a server's name. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPatch("{serverId:guid}")]
-    public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerRequest request)
+    public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerRequest request, [FromServices] AuditService audit)
     {
+        if (request.Name is null && request.Description is null)
+        {
+            return BadRequest(new { error = "At least one of Name or Description must be provided." });
+        }
+
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
         var server = (await db.Servers.FindAsync(serverId))!;
 
-        var oldName = server.Name;
-        server.Name = request.Name.Trim();
+        bool nameChanged = false;
+        bool descriptionChanged = false;
+        string? oldName = null;
+
+        if (request.Name is not null && request.Name.Trim() != server.Name)
+        {
+            oldName = server.Name;
+            server.Name = request.Name.Trim();
+            nameChanged = true;
+        }
+
+        if (request.Description is not null)
+        {
+            server.Description = request.Description;
+            descriptionChanged = true;
+        }
+
         await db.SaveChangesAsync();
 
-        // Notify all server members of the name change via SignalR.
-        await hub.Clients.Group($"server-{serverId}").SendAsync("ServerNameChanged", new
+        if (nameChanged)
         {
-            serverId,
-            name = server.Name
-        });
+            // Notify all server members of the name change via SignalR.
+            await hub.Clients.Group($"server-{serverId}").SendAsync("ServerNameChanged", new
+            {
+                serverId,
+                name = server.Name
+            });
+            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerRenamed,
+                details: $"Renamed from \"{oldName}\" to \"{server.Name}\"");
+        }
+
+        if (descriptionChanged)
+        {
+            await hub.Clients.Group($"server-{serverId}").SendAsync("ServerDescriptionChanged", new
+            {
+                serverId,
+                description = server.Description
+            });
+            await audit.LogAsync(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
+        }
 
         return Ok(new
         {
             server.Id,
             server.Name,
-            server.IconUrl
+            server.IconUrl,
+            server.Description
         });
     }
 
@@ -369,7 +407,16 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var channels = await db.Channels
             .AsNoTracking()
             .Where(channel => channel.ServerId == serverId)
-            .Select(channel => new { channel.Id, channel.Name, channel.ServerId, Type = channel.Type.ToString().ToLowerInvariant() })
+            .Select(channel => new
+            {
+                channel.Id,
+                channel.Name,
+                channel.ServerId,
+                Type = channel.Type.ToString().ToLowerInvariant(),
+                channel.Description,
+                channel.CategoryId,
+                channel.Position
+            })
             .ToListAsync();
 
         return Ok(channels);
@@ -421,8 +468,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Updates a channel's name. Requires Owner, Admin, or global admin role.
     /// </summary>
     [HttpPatch("{serverId:guid}/channels/{channelId:guid}")]
-    public async Task<IActionResult> UpdateChannel(Guid serverId, Guid channelId, [FromBody] UpdateChannelRequest request)
+    public async Task<IActionResult> UpdateChannel(Guid serverId, Guid channelId, [FromBody] UpdateChannelRequest request, [FromServices] AuditService audit)
     {
+        if (request.Name is null && request.Description is null)
+        {
+            return BadRequest(new { error = "At least one of Name or Description must be provided." });
+        }
+
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
@@ -434,22 +486,59 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return NotFound(new { error = "Channel not found." });
         }
 
-        channel.Name = request.Name.Trim();
+        bool nameChanged = false;
+        bool descriptionChanged = false;
+        string? oldName = null;
+
+        if (request.Name is not null && request.Name.Trim() != channel.Name)
+        {
+            oldName = channel.Name;
+            channel.Name = request.Name.Trim();
+            nameChanged = true;
+        }
+
+        if (request.Description is not null)
+        {
+            channel.Description = request.Description;
+            descriptionChanged = true;
+        }
+
         await db.SaveChangesAsync();
 
-        // Notify all server members of the channel name change via SignalR.
-        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelNameChanged", new
+        if (nameChanged)
         {
-            serverId,
-            channelId,
-            name = channel.Name
-        });
+            // Notify all server members of the channel name change via SignalR.
+            await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelNameChanged", new
+            {
+                serverId,
+                channelId,
+                name = channel.Name
+            });
+            await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelRenamed,
+                targetType: "Channel", targetId: channelId.ToString(),
+                details: $"Renamed from \"{oldName}\" to \"{channel.Name}\"");
+        }
+
+        if (descriptionChanged)
+        {
+            await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDescriptionChanged", new
+            {
+                serverId,
+                channelId,
+                description = channel.Description
+            });
+            await audit.LogAsync(serverId, appUser.Id, AuditAction.ChannelDescriptionChanged,
+                targetType: "Channel", targetId: channelId.ToString());
+        }
 
         return Ok(new
         {
             channel.Id,
             channel.Name,
-            channel.ServerId
+            channel.ServerId,
+            channel.Description,
+            channel.CategoryId,
+            channel.Position
         });
     }
 
