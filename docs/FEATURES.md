@@ -31,6 +31,14 @@ This document tracks implemented and planned features for Codec.
 - Server invite codes with configurable expiry and max uses
 - Kick members with real-time notification and auto-redirect
 
+### Server Settings
+- **Invite management tab** — invite CRUD (create, list, revoke) moved into server settings as a dedicated Invites tab; no longer embedded in the channel sidebar
+- **Server descriptions** — optional description field (256 char max) editable in the General tab; displayed in the chat area header; broadcast to all members via `ServerDescriptionChanged` SignalR event
+- **Channel descriptions/topics** — optional per-channel description (256 char max) editable in the Channels settings tab and inline in the chat area header; broadcast via `ChannelDescriptionChanged` SignalR event
+- **Channel categories** — `ChannelCategory` entity groups channels into collapsible sidebar sections; full CRUD (create, rename, delete) with drag-and-drop reordering; channels can be assigned to categories with drag-and-drop ordering within categories; bulk position update endpoints keep order consistent across clients
+- **Audit log** — `AuditLogEntry` entity tracks 21 action types (server/channel/member/invite/emoji/message events); paginated `GET /servers/{id}/audit-log` endpoint with actor name, target, and detail fields; 90-day automatic cleanup via background service; dedicated Audit Log tab in server settings
+- **Notification preferences** — per-server mute (`ServerMember.IsMuted`) and per-channel mute (`ChannelNotificationOverride` entity); right-click context menus on server icons and channel list items to toggle mute; `GET /servers/{id}/notification-preferences` endpoint returns current mute state
+
 ### Messaging
 - Real-time message delivery via SignalR WebSockets
 - Typing indicators
@@ -133,8 +141,8 @@ This document tracks implemented and planned features for Codec.
 - ~~Email/password registration and sign-in~~ (implemented)
 - ~~Nickname selection during sign-up~~ (implemented)
 - ~~Presence indicators~~ (implemented)
-- Server settings/configuration
-- Channel categories/organization
+- ~~Server settings/configuration~~ (implemented)
+- ~~Channel categories/organization~~ (implemented)
 - Link preview caching and image proxying
 - Video embeds for Vimeo
 - File uploads (documents, other media)
@@ -144,7 +152,6 @@ This document tracks implemented and planned features for Codec.
 - Message pinning
 - Push notifications
 - User banning and message moderation
-- Audit logs for admin actions
 - Custom roles and granular permissions
 - Status messages
 - Additional OAuth providers (GitHub, Discord) — same nickname-on-signup flow
