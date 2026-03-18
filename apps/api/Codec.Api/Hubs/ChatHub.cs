@@ -73,6 +73,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
 
         // Also broadcast to friends/DM contacts
         var friendUserIds = await db.Friendships
+            .Where(f => f.Status == FriendshipStatus.Accepted)
             .Where(f => f.RequesterId == appUser.Id || f.RecipientId == appUser.Id)
             .Select(f => f.RequesterId == appUser.Id ? f.RecipientId : f.RequesterId)
             .Distinct()
@@ -1089,6 +1090,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         }
 
         var friendUserIds = await db.Friendships
+            .Where(f => f.Status == FriendshipStatus.Accepted)
             .Where(f => f.RequesterId == userId || f.RecipientId == userId)
             .Select(f => f.RequesterId == userId ? f.RecipientId : f.RequesterId)
             .Distinct()

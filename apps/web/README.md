@@ -23,7 +23,8 @@ src/
 │   │   ├── dm/               # DM sidebar, DM chat area
 │   │   ├── friends/          # Friends panel, friends list, pending requests, add friend
 │   │   ├── members/          # Members sidebar grouped by role
-│   │   └── settings/         # User settings modal, profile & account management
+│   │   ├── settings/         # User settings modal, profile & account management
+│   │   └── server-settings/  # Server settings modal (General, Channels, Invites, Emojis, Members, Audit Log)
 │   └── index.ts         # Public barrel exports
 └── routes/
     ├── +layout.svelte   # Root layout (global CSS, font preconnect)

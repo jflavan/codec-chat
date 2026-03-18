@@ -31,5 +31,9 @@ export type {
 	PresenceStatus,
 	PresenceEntry,
 	AuthResponse,
-	TokenRefreshResponse
+	TokenRefreshResponse,
+	ChannelCategory,
+	AuditLogEntry,
+	PaginatedAuditLog,
+	NotificationPreferences
 } from './models.js';

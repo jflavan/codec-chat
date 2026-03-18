@@ -10,6 +10,39 @@
 	let isDragOver = $state(false);
 	let dragCounter = 0;
 
+	// ── server description inline edit ────────────────────────────────────────
+	let editingServerDescription = $state(false);
+	let serverDescriptionDraft = $state('');
+
+	const selectedServer = $derived(app.servers.find((s) => s.serverId === app.selectedServerId) ?? null);
+
+	function startEditServerDescription() {
+		serverDescriptionDraft = selectedServer?.description ?? '';
+		editingServerDescription = true;
+	}
+
+	async function saveServerDescription() {
+		editingServerDescription = false;
+		await app.updateServerDescription(serverDescriptionDraft.trim());
+	}
+
+	// ── channel description inline edit ───────────────────────────────────────
+	let editingChannelDescription = $state(false);
+	let channelDescriptionDraft = $state('');
+
+	const selectedChannel = $derived(app.channels.find((c) => c.id === app.selectedChannelId) ?? null);
+
+	function startEditChannelDescription() {
+		channelDescriptionDraft = selectedChannel?.description ?? '';
+		editingChannelDescription = true;
+	}
+
+	async function saveChannelDescription() {
+		if (!app.selectedChannelId) return;
+		editingChannelDescription = false;
+		await app.updateChannelDescription(app.selectedChannelId, channelDescriptionDraft.trim());
+	}
+
 	function handleDragEnter(e: DragEvent): void {
 		if (!e.dataTransfer?.types.includes('Files')) return;
 		e.preventDefault();
@@ -66,6 +99,35 @@
 			<h1 class="chat-channel-name">
 				{app.selectedChannelName ?? 'Select a channel'}
 			</h1>
+			{#if selectedChannel?.description || (app.canManageChannels && app.selectedChannelId)}
+				{#if !editingChannelDescription}
+					<span class="header-divider" aria-hidden="true">|</span>
+					<span
+						class="channel-description"
+						title={selectedChannel?.description ?? ''}
+					>
+						{selectedChannel?.description ? selectedChannel.description.slice(0, 80) + (selectedChannel.description.length > 80 ? '…' : '') : ''}
+						{#if app.canManageChannels}
+							<button class="edit-pencil" aria-label="Edit channel description" onclick={startEditChannelDescription}>
+								<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+								</svg>
+							</button>
+						{/if}
+					</span>
+				{:else}
+					<span class="header-divider" aria-hidden="true">|</span>
+					<input
+						class="description-input"
+						type="text"
+						bind:value={channelDescriptionDraft}
+						placeholder="Channel topic…"
+						maxlength="256"
+						onblur={saveChannelDescription}
+						onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveChannelDescription(); } if (e.key === 'Escape') { editingChannelDescription = false; } }}
+					/>
+				{/if}
+			{/if}
 		</div>
 		<button
 			class="search-btn"
@@ -158,6 +220,67 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		flex-shrink: 0;
+	}
+
+	.header-divider {
+		color: var(--border);
+		font-size: 18px;
+		flex-shrink: 0;
+		margin: 0 4px;
+	}
+
+	.channel-description {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 13px;
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 240px;
+		flex-shrink: 1;
+		min-width: 0;
+	}
+
+	.channel-description:hover .edit-pencil {
+		opacity: 1;
+	}
+
+	.edit-pencil {
+		background: none;
+		border: none;
+		padding: 2px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: inline-grid;
+		place-items: center;
+		border-radius: 3px;
+		opacity: 0;
+		flex-shrink: 0;
+		transition: opacity 150ms ease, color 150ms ease;
+	}
+
+	.edit-pencil:hover {
+		color: var(--text-header);
+	}
+
+	.description-input {
+		border: none;
+		background: var(--input-bg);
+		color: var(--text-normal);
+		font-size: 13px;
+		font-family: inherit;
+		border-radius: 4px;
+		padding: 2px 6px;
+		outline: none;
+		max-width: 240px;
+		flex-shrink: 1;
+	}
+
+	.description-input:focus {
+		box-shadow: 0 0 0 2px var(--accent);
 	}
 
 	.channel-hash {

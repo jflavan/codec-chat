@@ -49,6 +49,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 
 ## Current status
 - **All features implemented** — see [FEATURES.md](docs/FEATURES.md) for full list
+- **Server settings enhancements** — server/channel descriptions, channel categories with drag-and-drop ordering, invite management tab, audit log (21 action types, 90-day retention), notification mute preferences (per-server and per-channel via right-click context menus)
 - **Global admin role** — configurable global admin with full access to all servers (see all servers, read/post/react in any channel, manage channels/invites, rename servers, delete any server/channel/message, kick any member); seeded from `GlobalAdmin:Email` config; Key Vault integration for production
 - Real-time member list updates via SignalR server-scoped groups
 - Alpha notification banner with in-app bug report modal shown on every login
@@ -1102,6 +1103,109 @@ Add email/password registration as a second auth method alongside Google Sign-In
 - [x] Update `CLAUDE.md` auth description to reflect both sign-in methods
 - [x] Update `apps/web/.env.example` if any new env vars are needed
 
+## Task breakdown: Server Settings Enhancements
+
+### Backend — Entities and migration
+- [x] Add `Description` (nullable string, max 256) to `Server` entity
+- [x] Add `Description` (nullable string, max 256), `CategoryId` (nullable FK), `Position` (int) to `Channel` entity
+- [x] Add `IsMuted` (bool, default false) to `ServerMember` entity
+- [x] Create `ChannelCategory` entity (Id, ServerId, Name, Position)
+- [x] Create `AuditLogEntry` entity (Id, ServerId, ActorUserId?, Action enum, TargetType?, TargetId?, Details?, CreatedAt)
+- [x] Create `ChannelNotificationOverride` entity (composite PK: UserId + ChannelId, IsMuted)
+- [x] Add DbSets and configure relationships in `CodecDbContext`
+- [x] Create and apply EF Core migration
+
+### Backend — Request DTOs
+- [x] Extend `UpdateServerRequest` with optional `Description`
+- [x] Extend `UpdateChannelRequest` with optional `Description`
+- [x] Create `CreateCategoryRequest`, `UpdateCategoryRequest`
+- [x] Create `ChannelOrderUpdate`, `CategoryOrderUpdate` list DTOs
+- [x] Create `MuteRequest` DTO
+
+### Backend — AuditService and cleanup
+- [x] Create `AuditService` with `LogAsync(serverId, actorUserId, action, targetType, targetId, details)` method
+- [x] Create `AuditLogCleanupService` background service — deletes entries older than 90 days on a timer
+
+### Backend — Server description endpoint
+- [x] Extend `PATCH /servers/{id}` to accept optional `description`; broadcast `ServerDescriptionChanged` via SignalR if changed
+
+### Backend — Channel description endpoint
+- [x] Extend `PATCH /servers/{id}/channels/{id}` to accept optional `description`; broadcast `ChannelDescriptionChanged` via SignalR if changed
+
+### Backend — Category CRUD and channel ordering
+- [x] Implement `GET /servers/{id}/categories`
+- [x] Implement `POST /servers/{id}/categories` — create category; broadcast `CategoryCreated`
+- [x] Implement `PATCH /servers/{id}/categories/{id}` — rename; broadcast `CategoryRenamed`
+- [x] Implement `DELETE /servers/{id}/categories/{id}` — delete; nullify channel CategoryIds; broadcast `CategoryDeleted`
+- [x] Implement `PUT /servers/{id}/channel-order` — bulk update position + categoryId; broadcast `ChannelOrderChanged`
+- [x] Implement `PUT /servers/{id}/category-order` — bulk update position; broadcast `CategoryOrderChanged`
+
+### Backend — Audit log and notification preference endpoints
+- [x] Implement `GET /servers/{id}/audit-log?page&pageSize` — paginated entries newest-first
+- [x] Implement `GET /servers/{id}/notification-preferences` — return server IsMuted + channel overrides
+- [x] Implement `PUT /servers/{id}/mute` — update `ServerMember.IsMuted`
+- [x] Implement `PUT /servers/{id}/channels/{id}/mute` — upsert `ChannelNotificationOverride`
+
+### Backend — Audit logging for existing actions
+- [x] Wire `AuditService.LogAsync` into all relevant controller actions (ServerRenamed, ServerDescriptionChanged, ChannelCreated, ChannelRenamed, ChannelDescriptionChanged, ChannelDeleted, ChannelPurged, MemberJoined, MemberLeft, MemberKicked, MemberRoleChanged, InviteCreated, InviteRevoked, EmojiUploaded, EmojiRenamed, EmojiDeleted, MessageDeleted, CategoryCreated, CategoryDeleted)
+
+### Frontend — Types and API client
+- [x] Add `description` to `Server` and `Channel` types in `models.ts`
+- [x] Add `categoryId`, `position` to `Channel` type
+- [x] Add `isMuted` to `ServerMember` type
+- [x] Add `ChannelCategory`, `AuditLogEntry`, `NotificationPreferences`, `ChannelNotificationOverride` types
+- [x] Add all new API methods to `ApiClient` (category CRUD, channel order, category order, audit log, notification preferences)
+
+### Frontend — SignalR event handlers
+- [x] Add event types and callbacks for `ServerDescriptionChanged`, `ChannelDescriptionChanged`, `CategoryCreated`, `CategoryRenamed`, `CategoryDeleted`, `ChannelOrderChanged`, `CategoryOrderChanged`
+- [x] Register all new handlers in `ChatHubService.start()`
+- [x] Wire all callbacks in `AppState.startSignalR()`
+
+### Frontend — AppState
+- [x] Add `categories`, `notificationPreferences`, `serverSettingsTab` state
+- [x] Add description update, category CRUD, channel/category order, and mute action methods
+- [x] Update SignalR callbacks to keep categories and channel order in sync
+
+### Frontend — Settings modal General tab
+- [x] Add server description inline editor to `ServerSettings.svelte`
+- [x] Tab structure updated to: General, Channels, Invites, Emojis, Members, Audit Log
+
+### Frontend — Settings modal Channels tab (`ServerChannels.svelte`)
+- [x] Draggable channel list grouped by category
+- [x] Inline channel description/topic editor
+- [x] Create/rename/delete category controls
+- [x] Bulk position updates sent on drag drop
+
+### Frontend — Settings modal Invites tab (`ServerInvites.svelte`)
+- [x] Invite list with create (configurable expiry/max uses), revoke, and copy-link
+- [x] Removed `InvitePanel` from channel sidebar
+
+### Frontend — Settings modal Audit Log tab (`ServerAuditLog.svelte`)
+- [x] Paginated audit log table with actor, action, target, details, timestamp
+- [x] Pagination controls (previous/next page)
+
+### Frontend — Channel sidebar category grouping
+- [x] Channels grouped into collapsible `ChannelCategory` sections in `ChannelSidebar.svelte`
+- [x] Uncategorized channels shown first
+- [x] Collapse/expand state persisted per category
+
+### Frontend — Chat area header descriptions
+- [x] Server description shown in `ChatArea.svelte` header below server/channel name
+- [x] Channel topic shown inline in chat area header with inline edit capability
+
+### Frontend — Notification mute context menus
+- [x] Create reusable `ContextMenu.svelte` component
+- [x] Right-click on server icon → Mute/Unmute Server
+- [x] Right-click on channel in sidebar → Mute/Unmute Channel
+
+### Documentation
+- [x] Update `docs/FEATURES.md` — move server settings/channel categories to Implemented; add Server Settings section
+- [x] Update `docs/SERVER_SETTINGS.md` — document new tabs, categories, descriptions, notification preferences, new endpoints and SignalR events
+- [x] Update `docs/ARCHITECTURE.md` — new endpoints, new entities, new SignalR events
+- [x] Update `PLAN.md` — task breakdown, current status, next steps
+
+---
+
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
@@ -1120,6 +1224,7 @@ Add email/password registration as a second auth method alongside Google Sign-In
   - WebRTC transport setup via mediasoup SFU with call-specific room IDs
   - Incoming call overlay with ring tone, DM call header with elapsed time
   - System messages for voice call events (missed calls, call duration)
+- ~~Server settings/configuration~~ (implemented: descriptions, channel categories, invite management tab, audit log, notification preferences)
 - Message search (completed)
   - PostgreSQL trigram indexes (`pg_trgm` extension) on `Messages.Body` and `DirectMessages.Body` for fast ILIKE search
   - Server search endpoint (`GET /servers/{serverId}/search`) and DM search endpoint (`GET /dm/search`) with filters (channel, author, date range, content type)

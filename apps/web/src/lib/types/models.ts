@@ -11,6 +11,7 @@ export interface PresenceEntry {
 export type MemberServer = {
 	serverId: string;
 	name: string;
+	description?: string;
 	iconUrl?: string | null;
 	role: string | null;
 	sortOrder: number;
@@ -25,6 +26,9 @@ export type Channel = {
 	name: string;
 	serverId: string;
 	type?: ChannelType;
+	description?: string;
+	categoryId?: string;
+	position: number;
 };
 
 /** A user currently connected to a voice channel. */
@@ -291,3 +295,36 @@ export type SearchFilters = {
 	page?: number;
 	pageSize?: number;
 };
+
+/** A named category that groups channels within a server. */
+export interface ChannelCategory {
+	id: string;
+	serverId: string;
+	name: string;
+	position: number;
+}
+
+/** A single entry in a server's audit log. */
+export interface AuditLogEntry {
+	id: string;
+	action: string;
+	targetType?: string;
+	targetId?: string;
+	details?: string;
+	createdAt: string;
+	actorUserId?: string;
+	actorDisplayName: string;
+	actorAvatarUrl?: string;
+}
+
+/** Paginated audit log response from the API. */
+export interface PaginatedAuditLog {
+	hasMore: boolean;
+	entries: AuditLogEntry[];
+}
+
+/** Notification preferences for a server and its channels. */
+export interface NotificationPreferences {
+	serverMuted: boolean;
+	channelOverrides: { channelId: string; isMuted: boolean }[];
+}

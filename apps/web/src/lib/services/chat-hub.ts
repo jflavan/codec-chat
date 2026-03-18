@@ -90,6 +90,14 @@ export type MentionReceivedEvent = {
 	body: string;
 };
 
+export type ChannelOrderChangedEvent = { serverId: string };
+export type CategoryOrderChangedEvent = { serverId: string };
+export type CategoryCreatedEvent = { serverId: string; categoryId: string; name: string; position: number };
+export type CategoryRenamedEvent = { serverId: string; categoryId: string; name: string };
+export type CategoryDeletedEvent = { serverId: string; categoryId: string };
+export type ServerDescriptionChangedEvent = { serverId: string; description: string };
+export type ChannelDescriptionChangedEvent = { serverId: string; channelId: string; description: string };
+
 export type MemberJoinedEvent = {
 	serverId: string;
 };
@@ -265,6 +273,13 @@ export type SignalRCallbacks = {
 	onCustomEmojiUpdated?: (event: CustomEmojiUpdatedEvent) => void;
 	onCustomEmojiDeleted?: (event: CustomEmojiDeletedEvent) => void;
 	onUserPresenceChanged?: (event: UserPresenceChangedEvent) => void;
+	onChannelOrderChanged?: (event: ChannelOrderChangedEvent) => void;
+	onCategoryOrderChanged?: (event: CategoryOrderChangedEvent) => void;
+	onCategoryCreated?: (event: CategoryCreatedEvent) => void;
+	onCategoryRenamed?: (event: CategoryRenamedEvent) => void;
+	onCategoryDeleted?: (event: CategoryDeletedEvent) => void;
+	onServerDescriptionChanged?: (event: ServerDescriptionChangedEvent) => void;
+	onChannelDescriptionChanged?: (event: ChannelDescriptionChangedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -416,6 +431,27 @@ export class ChatHubService {
 		}
 		if (callbacks.onUserPresenceChanged) {
 			connection.on('UserPresenceChanged', callbacks.onUserPresenceChanged);
+		}
+		if (callbacks.onChannelOrderChanged) {
+			connection.on('ChannelOrderChanged', callbacks.onChannelOrderChanged);
+		}
+		if (callbacks.onCategoryOrderChanged) {
+			connection.on('CategoryOrderChanged', callbacks.onCategoryOrderChanged);
+		}
+		if (callbacks.onCategoryCreated) {
+			connection.on('CategoryCreated', callbacks.onCategoryCreated);
+		}
+		if (callbacks.onCategoryRenamed) {
+			connection.on('CategoryRenamed', callbacks.onCategoryRenamed);
+		}
+		if (callbacks.onCategoryDeleted) {
+			connection.on('CategoryDeleted', callbacks.onCategoryDeleted);
+		}
+		if (callbacks.onServerDescriptionChanged) {
+			connection.on('ServerDescriptionChanged', callbacks.onServerDescriptionChanged);
+		}
+		if (callbacks.onChannelDescriptionChanged) {
+			connection.on('ChannelDescriptionChanged', callbacks.onChannelDescriptionChanged);
 		}
 
 		if (callbacks.onReconnecting) {

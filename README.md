@@ -87,7 +87,7 @@ For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and
 
 ## Testing
 
-Codec has 501 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
+Codec has 561 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
 
 ```bash
 # Web tests (Vitest)
@@ -99,8 +99,8 @@ dotnet test Codec.sln
 
 | Suite | Tests | Coverage |
 |-------|-------|----------|
-| Web (Vitest) | 154 | 98% line (unit-testable code) |
-| API Unit (xUnit) | 238 | 95% line (core services) |
+| Web (Vitest) | 174 | 98% line (unit-testable code) |
+| API Unit (xUnit) | 278 | 95% line (core services) |
 | API Integration (Testcontainers) | 109 | 72% line (full pipeline) |
 
 ## Self-Hosting

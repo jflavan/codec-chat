@@ -23,6 +23,7 @@ public class ChannelsControllerTests : IDisposable
     private readonly Mock<IAvatarService> _avatarService = new();
     private readonly Mock<IServiceScopeFactory> _scopeFactory = new();
     private readonly MessageCacheService _messageCache;
+    private readonly AuditService _auditService;
     private readonly ChannelsController _controller;
     private readonly User _testUser;
     private readonly Server _testServer;
@@ -46,6 +47,7 @@ public class ChannelsControllerTests : IDisposable
         _db.SaveChanges();
 
         _messageCache = new MessageCacheService(new Mock<ILogger<MessageCacheService>>().Object);
+        _auditService = new AuditService(_db);
 
         var clients = new Mock<IHubClients>();
         var clientProxy = new Mock<IClientProxy>();
@@ -162,14 +164,14 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task DeleteMessage_ChannelNotFound_Returns404()
     {
-        var result = await _controller.DeleteMessage(Guid.NewGuid(), Guid.NewGuid());
+        var result = await _controller.DeleteMessage(Guid.NewGuid(), Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
     public async Task DeleteMessage_MessageNotFound_Returns404()
     {
-        var result = await _controller.DeleteMessage(_testChannel.Id, Guid.NewGuid());
+        var result = await _controller.DeleteMessage(_testChannel.Id, Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -180,7 +182,7 @@ public class ChannelsControllerTests : IDisposable
         _db.Messages.Add(msg);
         await _db.SaveChangesAsync();
 
-        var result = await _controller.DeleteMessage(_testChannel.Id, msg.Id);
+        var result = await _controller.DeleteMessage(_testChannel.Id, msg.Id, _auditService);
         result.Should().BeOfType<NoContentResult>();
     }
 
@@ -193,7 +195,7 @@ public class ChannelsControllerTests : IDisposable
         _db.Messages.Add(msg);
         await _db.SaveChangesAsync();
 
-        await _controller.Invoking(c => c.DeleteMessage(_testChannel.Id, msg.Id))
+        await _controller.Invoking(c => c.DeleteMessage(_testChannel.Id, msg.Id, _auditService))
             .Should().ThrowAsync<Codec.Api.Services.Exceptions.ForbiddenException>();
     }
 
@@ -287,14 +289,14 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task PurgeChannelMessages_ChannelNotFound_Returns404()
     {
-        var result = await _controller.PurgeChannelMessages(Guid.NewGuid());
+        var result = await _controller.PurgeChannelMessages(Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
     public async Task PurgeChannelMessages_NotGlobalAdmin_ThrowsForbidden()
     {
-        await _controller.Invoking(c => c.PurgeChannelMessages(_testChannel.Id))
+        await _controller.Invoking(c => c.PurgeChannelMessages(_testChannel.Id, _auditService))
             .Should().ThrowAsync<Codec.Api.Services.Exceptions.ForbiddenException>();
     }
 

@@ -4,6 +4,9 @@
 	import ServerSettings from './ServerSettings.svelte';
 	import ServerEmojis from './ServerEmojis.svelte';
 	import ServerMembers from './ServerMembers.svelte';
+	import ServerChannels from './ServerChannels.svelte';
+	import ServerInvites from './ServerInvites.svelte';
+	import ServerAuditLog from './ServerAuditLog.svelte';
 
 	const app = getAppState();
 
@@ -56,10 +59,16 @@
 					<path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
 				</svg>
 			</button>
-			{#if app.serverSettingsCategory === 'emojis'}
+			{#if app.serverSettingsCategory === 'channels'}
+				<ServerChannels />
+			{:else if app.serverSettingsCategory === 'invites'}
+				<ServerInvites />
+			{:else if app.serverSettingsCategory === 'emojis'}
 				<ServerEmojis />
 			{:else if app.serverSettingsCategory === 'members'}
 				<ServerMembers />
+			{:else if app.serverSettingsCategory === 'audit-log'}
+				<ServerAuditLog />
 			{:else}
 				<ServerSettings />
 			{/if}
