@@ -22,6 +22,8 @@ public class ServerMember
     /// </summary>
     public string? CustomAvatarPath { get; set; }
 
+    public bool IsMuted { get; set; }
+
     public Server? Server { get; set; }
     public User? User { get; set; }
 }
