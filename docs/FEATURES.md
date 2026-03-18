@@ -128,7 +128,7 @@ This document tracks implemented and planned features for Codec.
 - SFU telemetry — custom spans on room/transport/producer/consumer operations with Azure Monitor export
 
 ### Testing
-- 448 automated tests across 3 test suites (205 API unit, 109 API integration, 134 web)
+- 561 automated tests across 3 test suites (278 API unit, 109 API integration, 174 web)
 - API unit tests: xUnit + FluentAssertions + Moq; InMemory EF Core for database tests
 - API integration tests: WebApplicationFactory + Testcontainers (disposable PostgreSQL + Redis); full HTTP pipeline with real migrations; FakeAuthHandler bypasses Google JWT; SignalR hub tests via SignalR client
 - Web unit tests: Vitest + jsdom; localStorage polyfill; mocked fetch for API client

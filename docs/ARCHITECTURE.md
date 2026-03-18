@@ -103,10 +103,13 @@ src/
 │   │   │   └── AppearanceSettings.svelte  # Theme picker (4 presets with preview cards)
 │   │   ├── server-settings/
 │   │   │   ├── ServerSettingsModal.svelte  # Modal shell with sidebar + content area
-│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Emojis, Members)
-│   │   │   ├── ServerSettings.svelte      # Server management + global admin danger zone
-│   │   │   ├── ServerEmojis.svelte        # Custom emoji upload, rename, delete (Owner/Admin)
-│   │   │   └── ServerMembers.svelte       # Member role management (promote/demote, Owner/Admin)
+│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Channels, Invites, Emojis, Members, Audit Log)
+│   │   │   ├── ServerSettings.svelte      # General tab — server name, description, icon, danger zone
+│   │   │   ├── ServerChannels.svelte      # Channels tab — category and channel management with drag-and-drop reordering
+│   │   │   ├── ServerInvites.svelte       # Invites tab — invite CRUD (create, list, revoke)
+│   │   │   ├── ServerAuditLog.svelte      # Audit Log tab — paginated action history
+│   │   │   ├── ServerEmojis.svelte        # Emojis tab — custom emoji upload, rename, delete (Owner/Admin)
+│   │   │   └── ServerMembers.svelte       # Members tab — member role management (promote/demote, Owner/Admin)
 │   │   ├── shared/
 │   │   │   └── PresenceDot.svelte        # Online/idle/offline indicator dot
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
