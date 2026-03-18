@@ -163,7 +163,7 @@
 				type="text"
 				class="input"
 				placeholder="Category name"
-				maxlength="100"
+				maxlength="50"
 				bind:value={newCategoryName}
 				onkeydown={(e) => { if (e.key === 'Enter') addCategory(); }}
 			/>
@@ -203,7 +203,7 @@
 							type="text"
 							class="input input-sm"
 							bind:value={categoryEditName}
-							maxlength="100"
+							maxlength="50"
 							onkeydown={(e) => {
 								if (e.key === 'Enter') saveCategoryName(group.categoryId);
 								if (e.key === 'Escape') { categoryEditId = null; categoryEditName = ''; }

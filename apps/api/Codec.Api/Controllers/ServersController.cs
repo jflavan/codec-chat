@@ -627,6 +627,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             category.Id,
             category.Name,
+            category.ServerId,
             category.Position
         });
     }

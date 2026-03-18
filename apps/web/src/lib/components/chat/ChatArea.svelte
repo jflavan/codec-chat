@@ -122,7 +122,7 @@
 						type="text"
 						bind:value={channelDescriptionDraft}
 						placeholder="Channel topic…"
-						maxlength="200"
+						maxlength="256"
 						onblur={saveChannelDescription}
 						onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveChannelDescription(); } if (e.key === 'Escape') { editingChannelDescription = false; } }}
 					/>

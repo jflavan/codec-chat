@@ -135,9 +135,10 @@
 						class="server-icon"
 						class:active={server.serverId === app.selectedServerId}
 						class:has-icon={Boolean(server.iconUrl)}
+						class:muted-server={server.serverId === app.selectedServerId && app.isServerMuted}
 						onclick={() => app.selectServer(server.serverId)}
 					oncontextmenu={(e) => openServerContextMenu(e, server)}
-						aria-label="Server: {server.name}"
+						aria-label="Server: {server.name}{server.serverId === app.selectedServerId && app.isServerMuted ? ' (muted)' : ''}"
 						title={server.name}
 					>
 						{#if server.iconUrl}
@@ -340,6 +341,10 @@
 		border-radius: 16px;
 		background: var(--accent);
 		color: var(--bg-tertiary);
+	}
+
+	.server-icon.muted-server {
+		opacity: 0.5;
 	}
 
 	.server-icon.has-icon {
