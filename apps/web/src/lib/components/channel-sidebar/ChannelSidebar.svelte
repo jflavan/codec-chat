@@ -1,16 +1,76 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 	import UserPanel from './UserPanel.svelte';
-
 	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
 	import UserActionSheet from '$lib/components/voice/UserActionSheet.svelte';
+	import ContextMenu from './ContextMenu.svelte';
+	import type { Channel } from '$lib/types/index.js';
 
 	const app = getAppState();
 
 	let contextMenu = $state<{ userId: string; displayName: string; x: number; y: number } | null>(null);
+	let channelContextMenu = $state<{ channel: Channel; x: number; y: number } | null>(null);
 
-	const textChannels = $derived(app.channels.filter((c) => c.type !== 'voice'));
-	const voiceChannels = $derived(app.channels.filter((c) => c.type === 'voice'));
+	// ── category grouping ──────────────────────────────────────────────────────
+
+	const uncategorizedChannels = $derived(
+		app.channels
+			.filter((c) => !c.categoryId)
+			.sort((a, b) => {
+				// text before voice as secondary sort
+				const typeOrder = (c: Channel) => (c.type === 'voice' ? 1 : 0);
+				return a.position - b.position || typeOrder(a) - typeOrder(b);
+			})
+	);
+
+	const categorizedGroups = $derived(
+		app.categories
+			.sort((a, b) => a.position - b.position)
+			.map((cat) => ({
+				...cat,
+				channels: app.channels
+					.filter((c) => c.categoryId === cat.id)
+					.sort((a, b) => {
+						const typeOrder = (c: Channel) => (c.type === 'voice' ? 1 : 0);
+						return a.position - b.position || typeOrder(a) - typeOrder(b);
+					})
+			}))
+	);
+
+	// ── collapse state ─────────────────────────────────────────────────────────
+
+	let collapsedCategories = $state<Set<string>>(new Set());
+
+	function loadCollapsedState() {
+		if (!app.selectedServerId) return;
+		const key = `codec:category-collapse:${app.selectedServerId}`;
+		const stored = localStorage.getItem(key);
+		collapsedCategories = stored ? new Set(JSON.parse(stored)) : new Set();
+	}
+
+	function toggleCollapse(categoryId: string) {
+		const next = new Set(collapsedCategories);
+		if (next.has(categoryId)) next.delete(categoryId);
+		else next.add(categoryId);
+		collapsedCategories = next;
+		if (app.selectedServerId) {
+			localStorage.setItem(`codec:category-collapse:${app.selectedServerId}`, JSON.stringify([...next]));
+		}
+	}
+
+	$effect(() => {
+		// Re-load collapse state whenever the selected server changes
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		app.selectedServerId;
+		loadCollapsedState();
+	});
+
+	// ── channel context menu ───────────────────────────────────────────────────
+
+	function openChannelContextMenu(e: MouseEvent, channel: Channel) {
+		e.preventDefault();
+		channelContextMenu = { channel, x: e.clientX, y: e.clientY };
+	}
 </script>
 
 <aside class="channel-sidebar" aria-label="Channels">
@@ -46,127 +106,216 @@
 	</div>
 
 	<div class="channel-list-scroll">
-		<!-- Text Channels -->
-		<div class="channel-category">
-			<span class="category-label">Text Channels</span>
-			{#if app.canManageChannels && app.selectedServerId && !app.showCreateChannel}
-				<button class="category-action" aria-label="Create channel" onclick={() => { app.showCreateChannel = true; app.newChannelType = 'text'; }}>
-					<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-						<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
-					</svg>
-				</button>
-			{/if}
-		</div>
+		{#if app.isLoadingChannels}
+			<p class="muted channel-item">Loading…</p>
+		{:else if app.channels.length === 0}
+			<p class="muted channel-item">No channels yet.</p>
+		{:else}
 
-		<ul class="channel-list" role="list">
-			{#if app.isLoadingChannels}
-				<li class="muted channel-item">Loading…</li>
-			{:else if textChannels.length === 0 && voiceChannels.length === 0}
-				<li class="muted channel-item">No channels yet.</li>
-			{:else}
-				{#each textChannels as channel}
-					{@const mentions = app.channelMentionCount(channel.id)}
-					<li>
-						<button
-							class="channel-item"
-							class:active={channel.id === app.selectedChannelId}
-							onclick={() => app.selectChannel(channel.id)}
-						>
-							<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-								<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
-							</svg>
-							<span>{channel.name}</span>
-							{#if mentions > 0}
-								<span class="mention-badge" aria-label="{mentions} mentions">{mentions}</span>
+			<!-- Uncategorized channels -->
+			{#if uncategorizedChannels.length > 0}
+				<ul class="channel-list" role="list">
+					{#each uncategorizedChannels as channel}
+						{@const isMuted = app.isChannelMuted(channel.id)}
+						<li>
+							{#if channel.type === 'voice'}
+								{@const members = app.voiceChannelMembers.get(channel.id) ?? []}
+								{@const isActive = channel.id === app.activeVoiceChannelId}
+								<button
+									class="channel-item voice-channel-item"
+									class:active={isActive}
+									class:muted-channel={isMuted}
+									onclick={() => app.joinVoiceChannel(channel.id)}
+									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+									disabled={app.isJoiningVoice}
+									aria-label="Join {channel.name}"
+								>
+									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+										<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+									</svg>
+									<span>{channel.name}</span>
+									{#if members.length > 0}
+										<span class="voice-count" aria-label="{members.length} connected">{members.length}</span>
+									{/if}
+								</button>
+								{#if members.length > 0}
+									<ul class="voice-members" aria-label="Connected members">
+										{#each members as member}
+											<li
+												class="voice-member"
+												class:voice-member--interactive={member.userId !== app.me?.user.id}
+												role={member.userId !== app.me?.user.id ? 'button' : undefined}
+												tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
+												aria-label={member.userId !== app.me?.user.id ? `${member.displayName} volume controls` : undefined}
+												onclick={(e) => {
+													if (member.userId !== app.me?.user.id) {
+														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+													}
+												}}
+												oncontextmenu={(e) => {
+													if (member.userId !== app.me?.user.id) {
+														e.preventDefault();
+														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+													}
+												}}
+												onkeydown={(e) => {
+													if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+														e.preventDefault();
+														const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+														contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
+													}
+												}}
+											>
+												{#if member.avatarUrl}
+													<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
+												{:else}
+													<span class="voice-avatar-placeholder"></span>
+												{/if}
+												<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
+												{#if member.isMuted}
+													<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
+														<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+													</svg>
+												{/if}
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							{:else}
+								{@const mentions = app.channelMentionCount(channel.id)}
+								<button
+									class="channel-item"
+									class:active={channel.id === app.selectedChannelId}
+									class:muted-channel={isMuted}
+									onclick={() => app.selectChannel(channel.id)}
+									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+								>
+									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+										<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
+									</svg>
+									<span>{channel.name}</span>
+									{#if mentions > 0}
+										<span class="mention-badge" aria-label="{mentions} mentions">{mentions}</span>
+									{/if}
+								</button>
 							{/if}
-						</button>
-					</li>
-				{/each}
+						</li>
+					{/each}
+				</ul>
 			{/if}
-		</ul>
 
-		<!-- Voice Channels -->
-		{#if voiceChannels.length > 0 || (app.canManageChannels && app.selectedServerId)}
-			<div class="channel-category">
-				<span class="category-label">Voice Channels</span>
-				{#if app.canManageChannels && app.selectedServerId && !app.showCreateChannel}
-					<button class="category-action" aria-label="Create voice channel" onclick={() => { app.showCreateChannel = true; app.newChannelType = 'voice'; }}>
-						<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-							<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
-						</svg>
+			<!-- Categorized groups -->
+			{#each categorizedGroups as group}
+				{@const isCollapsed = collapsedCategories.has(group.id)}
+				<div class="channel-category">
+					<button class="category-collapse-btn" onclick={() => toggleCollapse(group.id)} aria-expanded={!isCollapsed}>
+						<span class="category-arrow" class:collapsed={isCollapsed}>▾</span>
+						<span class="category-label">{group.name}</span>
 					</button>
-				{/if}
-			</div>
-
-			<ul class="channel-list" role="list">
-				{#each voiceChannels as channel}
-					{@const members = app.voiceChannelMembers.get(channel.id) ?? []}
-					{@const isActive = channel.id === app.activeVoiceChannelId}
-					<li>
-						<button
-							class="channel-item voice-channel-item"
-							class:active={isActive}
-							onclick={() => app.joinVoiceChannel(channel.id)}
-							disabled={app.isJoiningVoice}
-							aria-label="Join {channel.name}"
-						>
-							<!-- Speaker icon -->
-							<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-								<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+					{#if app.canManageChannels && app.selectedServerId && !app.showCreateChannel}
+						<button class="category-action" aria-label="Create channel in {group.name}" onclick={() => { app.showCreateChannel = true; app.newChannelType = 'text'; }}>
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+								<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
 							</svg>
-							<span>{channel.name}</span>
-							{#if members.length > 0}
-								<span class="voice-count" aria-label="{members.length} connected">{members.length}</span>
-							{/if}
 						</button>
-						{#if members.length > 0}
-							<ul class="voice-members" aria-label="Connected members">
-								{#each members as member}
-									<li
-										class="voice-member"
-										class:voice-member--interactive={member.userId !== app.me?.user.id}
-										role={member.userId !== app.me?.user.id ? 'button' : undefined}
-										tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
-										aria-label={member.userId !== app.me?.user.id ? `${member.displayName} volume controls` : undefined}
-										onclick={(e) => {
-											if (member.userId !== app.me?.user.id) {
-												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
-											}
-										}}
-										oncontextmenu={(e) => {
-											if (member.userId !== app.me?.user.id) {
-												e.preventDefault();
-												contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
-											}
-										}}
-										onkeydown={(e) => {
-											if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
-												e.preventDefault();
-												const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-												contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
-											}
-										}}
+					{/if}
+				</div>
+
+				{#if !isCollapsed}
+					<ul class="channel-list" role="list">
+						{#each group.channels as channel}
+							{@const isMuted = app.isChannelMuted(channel.id)}
+							<li>
+								{#if channel.type === 'voice'}
+									{@const members = app.voiceChannelMembers.get(channel.id) ?? []}
+									{@const isActive = channel.id === app.activeVoiceChannelId}
+									<button
+										class="channel-item voice-channel-item"
+										class:active={isActive}
+										class:muted-channel={isMuted}
+										onclick={() => app.joinVoiceChannel(channel.id)}
+										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+										disabled={app.isJoiningVoice}
+										aria-label="Join {channel.name}"
 									>
-										{#if member.avatarUrl}
-											<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
-										{:else}
-											<span class="voice-avatar-placeholder"></span>
+										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+											<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+										</svg>
+										<span>{channel.name}</span>
+										{#if members.length > 0}
+											<span class="voice-count" aria-label="{members.length} connected">{members.length}</span>
 										{/if}
-										<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
-										{#if member.isMuted}
-											<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
-												<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
-											</svg>
+									</button>
+									{#if members.length > 0}
+										<ul class="voice-members" aria-label="Connected members">
+											{#each members as member}
+												<li
+													class="voice-member"
+													class:voice-member--interactive={member.userId !== app.me?.user.id}
+													role={member.userId !== app.me?.user.id ? 'button' : undefined}
+													tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
+													aria-label={member.userId !== app.me?.user.id ? `${member.displayName} volume controls` : undefined}
+													onclick={(e) => {
+														if (member.userId !== app.me?.user.id) {
+															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+														}
+													}}
+													oncontextmenu={(e) => {
+														if (member.userId !== app.me?.user.id) {
+															e.preventDefault();
+															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+														}
+													}}
+													onkeydown={(e) => {
+														if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+															e.preventDefault();
+															const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+															contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
+														}
+													}}
+												>
+													{#if member.avatarUrl}
+														<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
+													{:else}
+														<span class="voice-avatar-placeholder"></span>
+													{/if}
+													<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
+													{#if member.isMuted}
+														<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
+															<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+														</svg>
+													{/if}
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								{:else}
+									{@const mentions = app.channelMentionCount(channel.id)}
+									<button
+										class="channel-item"
+										class:active={channel.id === app.selectedChannelId}
+										class:muted-channel={isMuted}
+										onclick={() => app.selectChannel(channel.id)}
+										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+									>
+										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+											<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
+										</svg>
+										<span>{channel.name}</span>
+										{#if mentions > 0}
+											<span class="mention-badge" aria-label="{mentions} mentions">{mentions}</span>
 										{/if}
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</li>
-				{/each}
-			</ul>
+									</button>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			{/each}
+
 		{/if}
 
+		<!-- Create channel inline form -->
 		{#if app.canManageChannels && app.selectedServerId && app.showCreateChannel}
 			<form class="inline-form channel-create-form" onsubmit={(e) => { e.preventDefault(); app.createChannel(); }}>
 				<div class="type-toggle">
@@ -216,6 +365,21 @@
 		x={contextMenu.x}
 		y={contextMenu.y}
 		onclose={() => { contextMenu = null; }}
+	/>
+{/if}
+
+{#if channelContextMenu}
+	{@const ch = channelContextMenu.channel}
+	<ContextMenu
+		x={channelContextMenu.x}
+		y={channelContextMenu.y}
+		items={[
+			{
+				label: app.isChannelMuted(ch.id) ? 'Unmute Channel' : 'Mute Channel',
+				onClick: () => app.toggleChannelMute(ch.id)
+			}
+		]}
+		onClose={() => { channelContextMenu = null; }}
 	/>
 {/if}
 
@@ -287,7 +451,32 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 16px 8px 4px;
+		padding: 16px 4px 4px;
+	}
+
+	.category-collapse-btn {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex: 1;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-align: left;
+		min-width: 0;
+	}
+
+	.category-arrow {
+		font-size: 12px;
+		color: var(--text-muted);
+		flex-shrink: 0;
+		transition: transform 150ms ease;
+		display: inline-block;
+	}
+
+	.category-arrow.collapsed {
+		transform: rotate(-90deg);
 	}
 
 	.category-label {
@@ -296,6 +485,14 @@
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.category-collapse-btn:hover .category-label,
+	.category-collapse-btn:hover .category-arrow {
+		color: var(--text-header);
 	}
 
 	.category-action {
@@ -309,6 +506,7 @@
 		border-radius: 3px;
 		width: 18px;
 		height: 18px;
+		flex-shrink: 0;
 	}
 
 	.category-action:hover {
@@ -352,6 +550,10 @@
 		background: var(--bg-message-hover);
 		color: var(--text-header);
 		font-weight: 600;
+	}
+
+	.channel-item.muted-channel {
+		opacity: 0.5;
 	}
 
 	.channel-hash {
@@ -572,4 +774,17 @@
 		color: var(--text-header);
 	}
 
+	.form-meta {
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	.char-counter {
+		font-size: 11px;
+		color: var(--text-muted);
+	}
+
+	.char-counter.warn {
+		color: var(--danger);
+	}
 </style>

@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import ContextMenu from '$lib/components/channel-sidebar/ContextMenu.svelte';
+	import type { MemberServer } from '$lib/types/index.js';
 
 	const app = getAppState();
+
+	let serverContextMenu = $state<{ server: MemberServer; x: number; y: number } | null>(null);
+
+	function openServerContextMenu(e: MouseEvent, server: MemberServer) {
+		e.preventDefault();
+		serverContextMenu = { server, x: e.clientX, y: e.clientY };
+	}
 
 	let showJoinByCode = $state(false);
 	let inviteCode = $state('');
@@ -127,6 +136,7 @@
 						class:active={server.serverId === app.selectedServerId}
 						class:has-icon={Boolean(server.iconUrl)}
 						onclick={() => app.selectServer(server.serverId)}
+					oncontextmenu={(e) => openServerContextMenu(e, server)}
 						aria-label="Server: {server.name}"
 						title={server.name}
 					>
@@ -222,6 +232,21 @@
 		</div>
 	{/if}
 </nav>
+
+{#if serverContextMenu}
+	{@const sv = serverContextMenu.server}
+	<ContextMenu
+		x={serverContextMenu.x}
+		y={serverContextMenu.y}
+		items={[
+			{
+				label: app.isServerMuted ? 'Unmute Server' : 'Mute Server',
+				onClick: () => app.toggleServerMute()
+			}
+		]}
+		onClose={() => { serverContextMenu = null; }}
+	/>
+{/if}
 
 <style>
 	.server-sidebar {
