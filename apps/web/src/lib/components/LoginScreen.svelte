@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
-	import { PUBLIC_RECAPTCHA_SITE_KEY } from '$env/static/public';
+	import { env } from '$env/dynamic/public';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	const app = getAppState();
-	const siteKey = PUBLIC_RECAPTCHA_SITE_KEY;
+	const siteKey = env.PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 
 	let mode = $state<'signin' | 'signup'>('signin');
 	let email = $state('');
