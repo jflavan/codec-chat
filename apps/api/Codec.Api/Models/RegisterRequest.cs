@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Codec.Api.Models;
 
-public class RegisterRequest
+public class RegisterRequest : IRecaptchaRequest
 {
     [Required, EmailAddress]
     public string Email { get; set; } = string.Empty;
@@ -12,4 +12,6 @@ public class RegisterRequest
 
     [Required, StringLength(32, MinimumLength = 2)]
     public string Nickname { get; set; } = string.Empty;
+
+    public string? RecaptchaToken { get; set; }
 }

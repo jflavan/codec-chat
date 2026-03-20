@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using Codec.Api.Data;
+using Codec.Api.Filters;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -25,6 +26,7 @@ public class AuthController(
     ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("register")]
+    [ValidateRecaptcha(Action = "register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
@@ -113,6 +115,7 @@ public class AuthController(
     private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
     [HttpPost("login")]
+    [ValidateRecaptcha(Action = "login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
