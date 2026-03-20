@@ -74,7 +74,8 @@ apps/
       Models/        # EF Core entities + request DTOs
       Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
       Hubs/          # ChatHub (SignalR)
-      Services/      # UserService, AvatarService, ImageUploadService, LinkPreviewService, file storage
+      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, LinkPreviewService, file storage
+      Filters/       # ValidateRecaptchaAttribute (action filter)
       Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
   aspire/
@@ -133,12 +134,15 @@ Two methods are supported, both resulting in a JWT access token sent as `Authori
 
 Both methods use the same `[Authorize]` middleware and produce identical claims shapes (`sub`, `email`, `name`).
 
+**reCAPTCHA Enterprise** protects `POST /auth/login` and `POST /auth/register` with invisible score-based bot detection via a `[ValidateRecaptcha]` action filter. Disabled by default in local dev (`Recaptcha:Enabled = false` in `appsettings.json`). Google Sign-In is unaffected.
+
 ## Configuration
 
 ### Web (`.env` — copy from `.env.example`)
 ```
 PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=<your google oauth client id>
+PUBLIC_RECAPTCHA_SITE_KEY=<your recaptcha enterprise site key, optional for local dev>
 ```
 
 ### API (`appsettings.Development.json`)
