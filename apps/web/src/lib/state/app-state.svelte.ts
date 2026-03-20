@@ -492,12 +492,12 @@ export class AppState {
 		this.showAlphaNotification = true;
 	}
 
-	async register(email: string, password: string, nickname: string): Promise<AuthResponse> {
-		return this.api.register(email, password, nickname);
+	async register(email: string, password: string, nickname: string, recaptchaToken?: string): Promise<AuthResponse> {
+		return this.api.register(email, password, nickname, recaptchaToken);
 	}
 
-	async login(email: string, password: string): Promise<AuthResponse> {
-		return this.api.login(email, password);
+	async login(email: string, password: string, recaptchaToken?: string): Promise<AuthResponse> {
+		return this.api.login(email, password, recaptchaToken);
 	}
 
 	async linkGoogle(email: string, password: string, googleCredential: string): Promise<AuthResponse> {
