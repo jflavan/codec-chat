@@ -74,6 +74,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Infrastructure pipeline: Bicep what-if → deploy on push to `infra/` or manual dispatch
 - OIDC federated credentials for GitHub Actions → Azure (no long-lived secrets)
 - **Auth security hardening** — account lockout (5 failed attempts → 15-minute lock), server-side logout with refresh token revocation, optimistic concurrency on token rotation (PostgreSQL `xmin`), background refresh token cleanup service (every 6 hours)
+- **reCAPTCHA v3 bot protection** — Google reCAPTCHA Enterprise on login/register endpoints; `[ValidateRecaptcha]` action filter with `RecaptchaService`; frontend token acquisition via `grecaptcha.enterprise.execute()`; fail-closed; configurable score threshold; Bicep/Key Vault integration for secrets; disabled in local dev and integration tests
 - Content Security Policy with SvelteKit nonce-based inline script support
 - Progressive Web App (PWA) — installable via `@vite-pwa/sveltekit`, Workbox service worker with precached assets, user-prompted update toast, branded icons from favicon.ico
 - **Custom server emojis** — CRUD endpoints for custom emoji management (upload, list, rename, delete); 256 KB max, 50 per server; content-addressed storage; real-time SignalR sync

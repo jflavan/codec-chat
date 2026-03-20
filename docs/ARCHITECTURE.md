@@ -270,6 +270,14 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - Automatic silent token refresh via Google One Tap (`auto_select: true`)
 - SignalR WebSocket connections authenticate via `access_token` query parameter (standard pattern for WebSocket auth since `Authorization` headers aren't supported)
 
+**reCAPTCHA v3 Bot Protection:**
+- `POST /auth/register` and `POST /auth/login` are decorated with `[ValidateRecaptcha]` action filter
+- Frontend loads Google reCAPTCHA Enterprise script and calls `grecaptcha.enterprise.execute()` to obtain a token on each auth request
+- `RecaptchaService` sends the token to Google's reCAPTCHA Enterprise Assessment API and validates the score against a configurable threshold (default 0.5)
+- Fail-closed: if the Google API is unreachable or returns an error, the request is rejected (403)
+- Disabled by default in local development (`Recaptcha:Enabled = false` in `appsettings.json`); enabled in production when `Recaptcha:SiteKey` is configured (derived in Bicep)
+- Google Sign-In flow is unaffected (does not go through `AuthController`)
+
 **Account Lockout:**
 - After 5 consecutive failed login attempts, the account is locked for 15 minutes
 - Failed attempt counter resets on successful login or when the lockout period expires
