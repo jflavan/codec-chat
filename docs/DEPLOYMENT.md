@@ -90,6 +90,9 @@ Configure these secrets in the repository's Settings > Secrets and variables > A
 | `PUBLIC_GOOGLE_CLIENT_ID` | Google client ID baked into SvelteKit build |
 | `GLOBAL_ADMIN_EMAIL` | Email address of the platform-wide global admin |
 | `CERTBOT_EMAIL` | Email for Let's Encrypt certificate notifications (voice VM TLS) |
+| `RECAPTCHA_SECRET_KEY` | Google Cloud API key for reCAPTCHA Enterprise Assessment API |
+| `PUBLIC_RECAPTCHA_SITE_KEY` | reCAPTCHA Enterprise site key (public, baked into SvelteKit build) |
+| `RECAPTCHA_PROJECT_ID` | Google Cloud project ID for reCAPTCHA Enterprise |
 
 ### GitHub Environment
 
