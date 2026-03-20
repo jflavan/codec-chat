@@ -16,6 +16,7 @@ Add invisible reCAPTCHA v3 verification to the login and register endpoints to p
 **Out of scope:**
 - Google Sign-In (already validated via Google JWKS)
 - Token refresh, logout, email verification endpoints (lower risk, require existing tokens)
+- `link-google` endpoint — requires a valid Google ID token in addition to credentials, so bot abuse risk is negligible
 - reCAPTCHA Enterprise (paid tier)
 
 ## 1. Google Cloud Setup
@@ -43,7 +44,7 @@ Follows the existing secret management pattern (identical to `Google:ClientId` a
 5. SvelteKit reads it as a public env var
 
 ### Local Development
-- `appsettings.Development.json`: `Recaptcha:SecretKey`, `Recaptcha:SiteKey`
+- `appsettings.Development.json`: `Recaptcha:SecretKey`
 - `apps/web/.env.example`: `PUBLIC_RECAPTCHA_SITE_KEY`
 - `Recaptcha:Enabled` defaults to `true`; set to `false` if no keys configured
 
@@ -56,7 +57,7 @@ Follows the existing secret management pattern (identical to `Google:ClientId` a
 
 ### LoginScreen.svelte
 - Load reCAPTCHA v3 script on mount: `google.com/recaptcha/api.js?render=<siteKey>`
-- Before calling `login()` or `register()`, execute `grecaptcha.execute(siteKey, { action: 'login' | 'register' })` to obtain a token
+- **At submit time** (not on page load — tokens expire after 2 minutes), execute `grecaptcha.execute(siteKey, { action: 'login' | 'register' })` to obtain a token
 - Pass the token as `recaptchaToken` in the request body
 
 ### ApiClient
@@ -69,7 +70,11 @@ Follows the existing secret management pattern (identical to `Google:ClientId` a
 
 ### UI
 - No visible changes — v3 is invisible
-- Google's reCAPTCHA badge appears in the bottom-right corner (required by Google ToS, or alternatively add branding text to the form)
+- Hide the default reCAPTCHA badge (CSS: `.grecaptcha-badge { visibility: hidden; }`) and add the required branding text below the form: "This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply." with links to Google's policies. This is the cleaner approach per Google's FAQ.
+
+### Error Handling
+- If reCAPTCHA verification fails (403), show: "Verification failed. Please try again."
+- If the reCAPTCHA script fails to load or `grecaptcha.execute()` errors, still attempt the request without a token — the backend's `Enabled` flag or fail-open behavior handles it
 
 ## 4. Backend Integration
 
@@ -78,32 +83,34 @@ Follows the existing secret management pattern (identical to `Google:ClientId` a
 public class RecaptchaSettings
 {
     public string SecretKey { get; set; } = "";
-    public string SiteKey { get; set; } = "";
     public double ScoreThreshold { get; set; } = 0.5;
     public bool Enabled { get; set; } = true;
 }
 ```
+Note: `SiteKey` is not needed on the API — it's only used by the frontend.
 Bound from `Recaptcha` config section in `Program.cs`.
 
 ### RecaptchaService
-- Injected as a scoped service
+- Registered as a typed HttpClient via `builder.Services.AddHttpClient<RecaptchaService>()` (standard ASP.NET Core pattern, avoids socket exhaustion)
 - `VerifyAsync(string token, string expectedAction)` → calls `https://www.google.com/recaptcha/api/siteverify` with secret key and token
 - Returns `(bool success, double score, string? errorMessage)`
 - Validates: success flag, score ≥ threshold, action matches expected action
-- Handles timeouts and HTTP errors gracefully (log and reject)
+- **Fail-closed by default**: if Google's siteverify is unreachable or times out, verification fails (rejects the request). This is the safer default — a temporary Google outage blocks email/password auth but prevents bot bypass. Google Sign-In remains unaffected as a fallback auth method.
 
 ### ValidateRecaptchaAttribute (Action Filter)
 - Custom `IAsyncActionFilter` registered as a service filter
-- Reads `recaptchaToken` from the request body (deserializes to extract the field)
+- Reads `recaptchaToken` from `context.ActionArguments` (runs after model binding, avoids double-reading the request body stream)
+- Extracts the `RecaptchaToken` property from the bound request DTO
 - Calls `RecaptchaService.VerifyAsync()`
-- Returns `400 Bad Request` if token is missing
-- Returns `403 Forbidden` if verification fails or score is below threshold
+- Returns `400 Bad Request` if token is missing (and `Enabled` is `true`)
+- Returns `403 Forbidden` with body `{ "error": "reCAPTCHA verification failed." }` if score is below threshold
 - If `RecaptchaSettings.Enabled` is `false`, passes through without verification
 - Applied to `Login` and `Register` actions in `AuthController`
 
 ### Updated DTOs
-- `LoginRequest`: add `string? RecaptchaToken` property
-- `RegisterRequest`: add `string? RecaptchaToken` property
+- `LoginRequest`: add `string? RecaptchaToken` property (nullable so the DTO is valid when `Enabled=false`)
+- `RegisterRequest`: add `string? RecaptchaToken` property (nullable so the DTO is valid when `Enabled=false`)
+- Both implement a shared `IRecaptchaRequest` interface with `string? RecaptchaToken` so the filter can extract the token without knowing the concrete type
 
 ## 5. Testing
 
@@ -134,6 +141,7 @@ Bound from `Recaptcha` config section in `Program.cs`.
 - `apps/api/Codec.Api/Models/RegisterRequest.cs` — add `RecaptchaToken` property
 - `apps/api/Codec.Api/appsettings.json` — add `Recaptcha` config section
 - `apps/api/Codec.Api/appsettings.Development.json` — add dev reCAPTCHA config
+- `docs/AUTH.md` — document reCAPTCHA verification in auth flow
 - `apps/web/src/lib/components/LoginScreen.svelte` — load script, get token before submit
 - `apps/web/src/lib/api/client.ts` — add `recaptchaToken` param to login/register
 - `apps/web/src/lib/state/app-state.svelte.ts` — get reCAPTCHA token in login/register
