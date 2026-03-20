@@ -135,7 +135,10 @@ jobs:
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
               certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
-              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }}
+              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }} \
+              recaptchaSecretKey='${{ secrets.RECAPTCHA_SECRET_KEY }}' \
+              recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
+              recaptchaProjectId='${{ secrets.RECAPTCHA_PROJECT_ID }}'
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         if: steps.certs.outputs.certs-exist != 'true'
@@ -164,7 +167,10 @@ jobs:
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
               certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
-              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }}
+              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }} \
+              recaptchaSecretKey='${{ secrets.RECAPTCHA_SECRET_KEY }}' \
+              recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
+              recaptchaProjectId='${{ secrets.RECAPTCHA_PROJECT_ID }}'
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -192,7 +198,10 @@ jobs:
               redisEnabled=true \
               sfuDomainName='sfu.codec-chat.com' \
               certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
-              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }}
+              emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }} \
+              recaptchaSecretKey='${{ secrets.RECAPTCHA_SECRET_KEY }}' \
+              recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
+              recaptchaProjectId='${{ secrets.RECAPTCHA_PROJECT_ID }}'
 
       - name: Show deployment outputs
         run: |

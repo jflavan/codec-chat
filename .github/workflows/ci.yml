@@ -154,5 +154,6 @@ jobs:
           docker build \
             --build-arg PUBLIC_API_BASE_URL=https://placeholder.example.com \
             --build-arg PUBLIC_GOOGLE_CLIENT_ID=placeholder \
+            --build-arg PUBLIC_RECAPTCHA_SITE_KEY=placeholder \
             -t codec-web:${{ github.sha }} \
             ./apps/web
