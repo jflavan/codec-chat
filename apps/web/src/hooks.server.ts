@@ -31,8 +31,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 			'https://*.wp.com',
 			apiBase
 		].join(' '),
-		'connect-src': `'self' ${apiBase} ${wsBase} https://accounts.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com`,
-		'frame-src': 'https://accounts.google.com https://www.youtube-nocookie.com'
+		'connect-src': `'self' ${apiBase} ${wsBase} https://accounts.google.com https://www.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com`,
+		'frame-src': 'https://accounts.google.com https://www.google.com https://www.youtube-nocookie.com'
 	};
 
 	let csp = existing;

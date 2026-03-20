@@ -179,3 +179,4 @@ PUBLIC_RECAPTCHA_SITE_KEY=<your recaptcha enterprise site key, optional for loca
 - **Auth changes:** update `docs/AUTH.md`
 - **User-visible behavior changes:** update `docs/ARCHITECTURE.md`, `docs/FEATURES.md`, and `PLAN.md`
 - **Public env vars:** keep `apps/web/.env.example` in sync
+- **Adding external scripts or services:** update the CSP in `apps/web/src/hooks.server.ts` — add required origins to `connect-src`, `frame-src`, and/or `script-src` as needed. The CSP will silently block requests to unlisted origins in production.
