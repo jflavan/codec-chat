@@ -120,19 +120,19 @@ export class ApiClient {
 		return response.json() as Promise<T>;
 	}
 
-	async register(email: string, password: string, nickname: string): Promise<AuthResponse> {
+	async register(email: string, password: string, nickname: string, recaptchaToken?: string): Promise<AuthResponse> {
 		return this.requestNoRetry(`${this.baseUrl}/auth/register`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email, password, nickname })
+			body: JSON.stringify({ email, password, nickname, recaptchaToken })
 		});
 	}
 
-	async login(email: string, password: string): Promise<AuthResponse> {
+	async login(email: string, password: string, recaptchaToken?: string): Promise<AuthResponse> {
 		return this.requestNoRetry(`${this.baseUrl}/auth/login`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email, password })
+			body: JSON.stringify({ email, password, recaptchaToken })
 		});
 	}
 
