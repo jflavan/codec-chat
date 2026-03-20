@@ -284,7 +284,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'Recaptcha__Enabled'
-              value: 'true'
+              value: recaptchaSiteKey != '' ? 'true' : 'false'
             }
           ])
           probes: [
