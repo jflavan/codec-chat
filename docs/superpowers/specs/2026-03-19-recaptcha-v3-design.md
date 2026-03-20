@@ -17,13 +17,13 @@ Add invisible reCAPTCHA v3 verification to the login and register endpoints to p
 - Google Sign-In (already validated via Google JWKS)
 - Token refresh, logout, email verification endpoints (lower risk, require existing tokens)
 - `link-google` endpoint — requires a valid Google ID token in addition to credentials, so bot abuse risk is negligible
-- reCAPTCHA Enterprise (paid tier)
+**Implementation note:** Although the original design targeted standard reCAPTCHA v3, `gcloud recaptcha keys create` produces Enterprise keys. The implementation uses reCAPTCHA Enterprise (Assessment API, `enterprise.js` script, `grecaptcha.enterprise.execute()`). Enterprise is free up to 10,000 assessments/month and provides richer signal. The Enterprise approach requires a `ProjectId` config property and uses a different API endpoint (`recaptchaenterprise.googleapis.com`) than standard v3 (`google.com/recaptcha/api/siteverify`).
 
 ## 1. Google Cloud Setup
 
-Create a reCAPTCHA v3 site key pair using `gcloud recaptcha keys create`:
+Create a reCAPTCHA Enterprise site key using `gcloud recaptcha keys create`:
 - One key for the web domain (site key — public, used in browser)
-- The secret key is retrieved from the Google Cloud Console or via `gcloud` and stored securely
+- An API key for the Enterprise Assessment API (stored securely)
 
 ## 2. Infrastructure & CI/CD
 
