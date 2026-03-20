@@ -78,6 +78,16 @@ param emailEnabled bool = true
 @description('Sender email address for transactional emails (e.g., noreply@codec.app). Requires a verified Azure Communication Services Email domain.')
 param emailSenderAddress string = 'DoNotReply@codec.app'
 
+@description('reCAPTCHA Enterprise API key for bot verification.')
+@secure()
+param recaptchaSecretKey string = ''
+
+@description('reCAPTCHA v3 site key (public, used in frontend and API).')
+param recaptchaSiteKey string = ''
+
+@description('Google Cloud project ID for reCAPTCHA Enterprise.')
+param recaptchaProjectId string = ''
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -216,6 +226,17 @@ module gitHubTokenSecret 'modules/key-vault-secret.bicep' = if (gitHubToken != '
   }
 }
 
+// ── reCAPTCHA Enterprise secret key ───────────────────────────────────────────
+
+module recaptchaSecretKv 'modules/key-vault-secret.bicep' = {
+  name: 'recaptcha-secret-key'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Recaptcha--SecretKey'
+    secretValue: recaptchaSecretKey
+  }
+}
+
 // ── Azure Communication Services (transactional email) ────────────────────────
 
 module communicationServices 'modules/communication-services.bicep' = if (emailEnabled) {
@@ -344,6 +365,8 @@ module apiApp 'modules/container-app-api.bicep' = {
     emailConnectionStringKvUrl: emailEnabled ? communicationServices.?outputs.connectionStringSecretUri ?? '' : ''
     emailSenderAddress: emailEnabled ? communicationServices.?outputs.senderAddress ?? emailSenderAddress : emailSenderAddress
     frontendBaseUrl: effectiveWebUrl
+    recaptchaSiteKey: recaptchaSiteKey
+    recaptchaProjectId: recaptchaProjectId
   }
 }
 
@@ -358,6 +381,7 @@ module webApp 'modules/container-app-web.bicep' = {
     containerImage: webContainerImage
     publicApiBaseUrl: effectiveApiUrl
     publicGoogleClientId: googleClientId
+    publicRecaptchaSiteKey: recaptchaSiteKey
     customDomainName: webCustomDomain
     managedCertificateId: webCertId
   }

@@ -51,6 +51,7 @@ public class CodecWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Storage:Provider", "Local");
         builder.UseSetting("Voice:TurnSecret", "test-turn-secret");
         builder.UseSetting("Voice:TurnServerUrl", "turn:localhost:3478");
+        builder.UseSetting("Recaptcha:Enabled", "false");
 
         // Point Redis at the test container
         builder.UseSetting("Redis:ConnectionString", _redis.GetConnectionString());

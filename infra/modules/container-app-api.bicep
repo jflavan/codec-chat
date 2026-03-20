@@ -48,6 +48,12 @@ param emailSenderAddress string = ''
 @description('Frontend base URL for email verification links.')
 param frontendBaseUrl string = ''
 
+@description('reCAPTCHA v3 site key')
+param recaptchaSiteKey string = ''
+
+@description('Google Cloud project ID for reCAPTCHA Enterprise')
+param recaptchaProjectId string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -150,7 +156,13 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: emailConnectionStringKvUrl
           identity: 'system'
         }
-      ] : [])
+      ] : [], [
+        {
+          name: 'recaptcha-secret-key'
+          keyVaultUrl: '${keyVaultUri}secrets/Recaptcha--SecretKey'
+          identity: 'system'
+        }
+      ])
       registries: [
         {
           server: containerRegistryLoginServer
@@ -257,7 +269,24 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'Frontend__BaseUrl'
               value: frontendBaseUrl
             }
-          ] : [])
+          ] : [], [
+            {
+              name: 'Recaptcha__SecretKey'
+              secretRef: 'recaptcha-secret-key'
+            }
+            {
+              name: 'Recaptcha__SiteKey'
+              value: recaptchaSiteKey
+            }
+            {
+              name: 'Recaptcha__ProjectId'
+              value: recaptchaProjectId
+            }
+            {
+              name: 'Recaptcha__Enabled'
+              value: recaptchaSiteKey != '' ? 'true' : 'false'
+            }
+          ])
           probes: [
             {
               type: 'Liveness'

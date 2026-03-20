@@ -57,6 +57,7 @@ keyVault ──┬──► postgresql (stores conn string)  │
            ├──► googleClientIdSecret             │
            ├──► globalAdminEmailSecret           │
            ├──► gitHubTokenSecret (optional)     │
+           ├──► recaptchaSecretKv                 │
            ├──► voiceTurnSecretKv (if voice)     │
            └──► voiceSfuInternalKeyKv (if voice) │
 storageAccount ─────────────────────────────────┘
@@ -77,6 +78,7 @@ All sensitive values are stored in Key Vault and referenced at runtime via syste
 | `GlobalAdmin--Email` | GitHub Actions secret | API app |
 | `GitHub--Token` | GitHub Actions secret (optional) | API app |
 | `Redis--ConnectionString` | Redis Cache module (if Redis) | API app |
+| `Recaptcha--SecretKey` | GitHub Actions secret | API app |
 | `Voice--TurnSecret` | GitHub Actions secret (if voice) | API app |
 | `Voice--SfuInternalKey` | GitHub Actions secret (if voice) | API app |
 
@@ -95,7 +97,7 @@ ASP.NET Core 10 Web API with SignalR.
   - AcrPull on Container Registry
   - Storage Blob Data Contributor on Storage Account
   - Key Vault Secrets User on Key Vault
-- **Environment variables:** `ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__Default` (secret ref), `Google__ClientId` (secret ref), `Api__BaseUrl`, `Cors__AllowedOrigins`, `Storage__Provider`, `Storage__AzureBlob__ServiceUri`, `GlobalAdmin__Email` (secret ref), `Redis__ConnectionString` (secret ref), `OTEL_SERVICE_NAME`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, plus optional voice and GitHub config
+- **Environment variables:** `ASPNETCORE_ENVIRONMENT`, `ConnectionStrings__Default` (secret ref), `Google__ClientId` (secret ref), `Api__BaseUrl`, `Cors__AllowedOrigins`, `Storage__Provider`, `Storage__AzureBlob__ServiceUri`, `GlobalAdmin__Email` (secret ref), `Redis__ConnectionString` (secret ref), `Recaptcha__SecretKey` (secret ref), `Recaptcha__SiteKey`, `Recaptcha__ProjectId`, `Recaptcha__Enabled` (derived from site key), `OTEL_SERVICE_NAME`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, plus optional voice and GitHub config
 
 ### Web App (`ca-codec-prod-web`)
 
@@ -106,7 +108,7 @@ SvelteKit with adapter-node.
 - **Health probe:** Liveness (`/health`, 30s)
 - **Scaling:** 1 min, 2 max replicas
 - **RBAC roles:** AcrPull on Container Registry
-- **Environment variables:** `NODE_ENV`, `PUBLIC_API_BASE_URL`, `PUBLIC_GOOGLE_CLIENT_ID`
+- **Environment variables:** `NODE_ENV`, `PUBLIC_API_BASE_URL`, `PUBLIC_GOOGLE_CLIENT_ID`, `PUBLIC_RECAPTCHA_SITE_KEY`
 
 ## Custom Domains and TLS
 
