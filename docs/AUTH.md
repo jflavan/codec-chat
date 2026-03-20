@@ -430,6 +430,46 @@ app.Use(async (context, next) =>
 - Request minimal required scopes
 - Use `openid email profile` only
 
+## reCAPTCHA v3 Bot Protection
+
+Login and registration endpoints are protected by invisible reCAPTCHA v3 (Enterprise). This runs silently — no user interaction is required.
+
+### How It Works
+
+1. The frontend loads the reCAPTCHA Enterprise script on the login page
+2. At form submit time, `grecaptcha.enterprise.execute()` generates a score-based token
+3. The token is sent with the login/register request body as `recaptchaToken`
+4. The API's `[ValidateRecaptcha]` action filter verifies the token via Google's Enterprise Assessment API
+5. Requests with missing tokens get 400; failed verification gets 403
+
+### Configuration
+
+**API (`appsettings.json`):**
+```json
+"Recaptcha": {
+  "SecretKey": "<google-cloud-api-key>",
+  "SiteKey": "<recaptcha-site-key>",
+  "ProjectId": "<gcp-project-id>",
+  "ScoreThreshold": 0.5,
+  "Enabled": true
+}
+```
+
+- `SecretKey`: Google Cloud API key restricted to reCAPTCHA Enterprise (stored in Key Vault in production)
+- `SiteKey`: reCAPTCHA site key (public)
+- `ProjectId`: Google Cloud project ID
+- `ScoreThreshold`: Minimum score (0.0–1.0) to pass verification. Default 0.5.
+- `Enabled`: Set to `false` to bypass verification (local dev, tests)
+
+**Frontend (`.env`):**
+```
+PUBLIC_RECAPTCHA_SITE_KEY=<recaptcha-site-key>
+```
+
+### Fail-Closed Behavior
+
+If Google's assessment API is unreachable, verification fails and the request is rejected. Google Sign-In is unaffected and remains available as a fallback.
+
 ## Troubleshooting
 
 ### Error: "Invalid client ID"
