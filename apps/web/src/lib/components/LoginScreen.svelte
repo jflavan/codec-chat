@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
+	import { onMount } from 'svelte';
+	import { env } from '$env/dynamic/public';
 	import { getAppState } from '$lib/state/app-state.svelte.js';
 
 	const app = getAppState();
+	const siteKey = env.PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 
 	let mode = $state<'signin' | 'signup'>('signin');
 	let email = $state('');
@@ -11,6 +14,24 @@
 	let nickname = $state('');
 	let error = $state('');
 	let isSubmitting = $state(false);
+
+	onMount(() => {
+		if (!siteKey) return;
+		const script = document.createElement('script');
+		script.src = `https://www.google.com/recaptcha/enterprise.js?render=${siteKey}`;
+		script.async = true;
+		document.head.appendChild(script);
+		return () => script.remove();
+	});
+
+	async function getRecaptchaToken(action: string): Promise<string | undefined> {
+		if (!siteKey) return undefined;
+		try {
+			return await (window as any).grecaptcha.enterprise.execute(siteKey, { action });
+		} catch {
+			return undefined;
+		}
+	}
 
 	function validateEmail(v: string): boolean {
 		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -40,9 +61,11 @@
 
 		isSubmitting = true;
 		try {
+			const action = mode === 'signup' ? 'register' : 'login';
+			const recaptchaToken = await getRecaptchaToken(action);
 			const response = mode === 'signup'
-				? await app.register(email.trim(), password, nickname.trim())
-				: await app.login(email.trim(), password);
+				? await app.register(email.trim(), password, nickname.trim(), recaptchaToken)
+				: await app.login(email.trim(), password, recaptchaToken);
 			await app.handleLocalAuth(response);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
@@ -170,6 +193,13 @@
 				{/if}
 			</p>
 		</form>
+		{#if siteKey}
+			<p class="recaptcha-branding">
+				This site is protected by reCAPTCHA and the Google
+				<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and
+				<a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.
+			</p>
+		{/if}
 	</div>
 	<div class="scanlines"></div>
 </div>
@@ -446,5 +476,30 @@
 		.logo {
 			animation: none;
 		}
+	}
+
+	/* ───── reCAPTCHA ───── */
+
+	:global(.grecaptcha-badge) {
+		visibility: hidden !important;
+	}
+
+	.recaptcha-branding {
+		margin: 0;
+		font-family: 'Space Grotesk', monospace;
+		font-size: 11px;
+		color: var(--text-dim);
+		text-align: center;
+		line-height: 1.5;
+	}
+
+	.recaptcha-branding a {
+		color: var(--text-muted);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.recaptcha-branding a:hover {
+		color: var(--accent);
 	}
 </style>

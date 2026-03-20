@@ -9,6 +9,9 @@ param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 param publicApiBaseUrl string
 param publicGoogleClientId string
 
+@description('reCAPTCHA v3 site key for frontend')
+param publicRecaptchaSiteKey string = ''
+
 @description('Custom domain name for the web app (e.g., codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -74,6 +77,10 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'PUBLIC_GOOGLE_CLIENT_ID'
               value: publicGoogleClientId
+            }
+            {
+              name: 'PUBLIC_RECAPTCHA_SITE_KEY'
+              value: publicRecaptchaSiteKey
             }
           ]
           probes: [
