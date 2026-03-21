@@ -98,3 +98,4 @@ docs/superpowers/
 
 # Dolt database files (added by bd init)
 .dolt/
+.claude-flow/
