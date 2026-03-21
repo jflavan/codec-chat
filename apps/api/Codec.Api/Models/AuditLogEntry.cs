@@ -22,7 +22,9 @@ public enum AuditAction
     EmojiUploaded,
     EmojiRenamed,
     EmojiDeleted,
-    MessageDeletedByAdmin
+    MessageDeletedByAdmin,
+    MessagePinned,
+    MessageUnpinned
 }
 
 public class AuditLogEntry

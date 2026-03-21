@@ -1263,4 +1263,44 @@ describe('ApiClient', () => {
 			);
 		});
 	});
+
+	// --- Pinning ---
+
+	describe('getPinnedMessages', () => {
+		it('sends GET to /channels/{id}/pins', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse([]));
+			const result = await client.getPinnedMessages(token, 'ch-1');
+			expect(result).toEqual([]);
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/channels/ch-1/pins`,
+				expect.objectContaining({
+					headers: expect.objectContaining({ Authorization: `Bearer ${token}` })
+				})
+			);
+		});
+	});
+
+	describe('pinMessage', () => {
+		it('sends POST to /channels/{id}/pins/{msgId}', async () => {
+			const pinData = { messageId: 'msg-1', channelId: 'ch-1', pinnedBy: { userId: 'u-1', displayName: 'Test' }, pinnedAt: '2026-03-21T00:00:00Z' };
+			mockFetch.mockResolvedValueOnce(jsonResponse(pinData));
+			const result = await client.pinMessage(token, 'ch-1', 'msg-1');
+			expect(result).toEqual(pinData);
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/channels/ch-1/pins/msg-1`,
+				expect.objectContaining({ method: 'POST' })
+			);
+		});
+	});
+
+	describe('unpinMessage', () => {
+		it('sends DELETE to /channels/{id}/pins/{msgId}', async () => {
+			mockFetch.mockResolvedValueOnce(voidResponse());
+			await client.unpinMessage(token, 'ch-1', 'msg-1');
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/channels/ch-1/pins/msg-1`,
+				expect.objectContaining({ method: 'DELETE' })
+			);
+		});
+	});
 });

@@ -4,6 +4,7 @@
 	import TypingIndicator from './TypingIndicator.svelte';
 	import Composer from './Composer.svelte';
 	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
+	import PinnedMessagesPanel from './PinnedMessagesPanel.svelte';
 
 	const app = getAppState();
 
@@ -130,6 +131,20 @@
 			{/if}
 		</div>
 		<button
+			class="pin-btn"
+			onclick={() => app.togglePinnedPanel()}
+			title="Pinned Messages"
+			aria-label="Pinned Messages"
+			class:active={app.showPinnedPanel}
+		>
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+			</svg>
+			{#if app.pinnedMessageCount > 0}
+				<span class="pin-badge">{app.pinnedMessageCount}</span>
+			{/if}
+		</button>
+		<button
 			class="search-btn"
 			onclick={() => app.toggleSearch()}
 			title="Search messages"
@@ -173,6 +188,9 @@
 </main>
 {#if app.isSearchOpen}
 	<SearchPanel />
+{/if}
+{#if app.showPinnedPanel}
+	<PinnedMessagesPanel />
 {/if}
 </div>
 
@@ -323,6 +341,43 @@
 	}
 
 	/* ───── Search button ───── */
+
+	.pin-btn {
+		position: relative;
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 4px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+	.pin-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
+	}
+	.pin-btn.active {
+		color: var(--accent);
+	}
+	.pin-badge {
+		position: absolute;
+		top: -2px;
+		right: -2px;
+		background: var(--brand-500, #5865f2);
+		color: white;
+		font-size: 0.625rem;
+		font-weight: 700;
+		border-radius: 50%;
+		min-width: 16px;
+		height: 16px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 4px;
+	}
 
 	.search-btn {
 		background: none;

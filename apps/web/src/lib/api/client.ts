@@ -19,6 +19,7 @@ import type {
 	SearchFilters,
 	PaginatedSearchResults,
 	AroundMessages,
+	PinnedMessage,
 	PresenceEntry,
 	AuthResponse,
 	TokenRefreshResponse,
@@ -572,6 +573,32 @@ export class ApiClient {
 				method: 'POST',
 				headers: this.headers(token, true),
 				body: JSON.stringify({ emoji })
+			}
+		);
+	}
+
+	getPinnedMessages(token: string, channelId: string): Promise<PinnedMessage[]> {
+		return this.request(`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/pins`, {
+			headers: this.headers(token)
+		});
+	}
+
+	pinMessage(token: string, channelId: string, messageId: string): Promise<PinnedMessage> {
+		return this.request(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/pins/${encodeURIComponent(messageId)}`,
+			{
+				method: 'POST',
+				headers: this.headers(token)
+			}
+		);
+	}
+
+	unpinMessage(token: string, channelId: string, messageId: string): Promise<void> {
+		return this.request(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/pins/${encodeURIComponent(messageId)}`,
+			{
+				method: 'DELETE',
+				headers: this.headers(token)
 			}
 		);
 	}

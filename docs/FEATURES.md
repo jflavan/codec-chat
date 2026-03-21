@@ -52,6 +52,7 @@ This document tracks implemented and planned features for Codec.
 - Image lightbox — full-size preview overlay with keyboard dismiss
 - Link previews — Open Graph metadata, clickable embed cards, SSRF protection
 - YouTube embeds — click-to-play inline video players via `svelte-youtube-embed`
+- Message pinning — Owner/Admin can pin up to 50 messages per channel; pin indicator on messages; slide-in pinned messages panel; system notification messages on pin; real-time sync via SignalR; audit logged
 - Progressive loading — cursor-based pagination with scroll position preservation
 - Message search — full-text search with PostgreSQL trigram indexes; filters by scope, date range, and content type; jump-to-message with highlight animation
 
@@ -150,7 +151,6 @@ This document tracks implemented and planned features for Codec.
 
 ### Future
 - Video chat and screen sharing
-- Message pinning
 - Push notifications
 - User banning and message moderation
 - Custom roles and granular permissions

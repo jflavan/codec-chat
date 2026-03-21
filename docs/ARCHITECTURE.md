@@ -366,6 +366,9 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `POST /channels/{channelId}/messages/{messageId}/reactions` - Toggle an emoji reaction on a message (requires membership or Global Admin; broadcasts via SignalR)
 - `GET /channels/{channelId}/messages?around={messageId}` - Get messages around a target message (returns `{ hasMoreBefore, hasMoreAfter, messages }` centered on the target; used by jump-to-message)
 - `GET /servers/{serverId}/search?q=...` - Search messages across server channels (requires membership or Global Admin; filters: `channelId`, `authorId`, `before`, `after`, `has`; paginated results with channel names, reactions, reply context)
+- `GET /channels/{channelId}/pins` - List pinned messages in a channel (requires membership or Global Admin; ordered by most recently pinned; includes reactions and link previews)
+- `POST /channels/{channelId}/pins/{messageId}` - Pin a message (requires Owner, Admin, or Global Admin; 50-pin limit per channel; creates PinNotification system message; broadcasts `MessagePinned` and `ReceiveMessage` via SignalR; audit logged)
+- `DELETE /channels/{channelId}/pins/{messageId}` - Unpin a message (requires Owner, Admin, or Global Admin; broadcasts `MessageUnpinned` via SignalR; audit logged)
 
 #### Friends
 - `GET /friends` - List confirmed friends (returns the other user + friendship date)
@@ -459,6 +462,8 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `CustomEmojiDeleted` | `{ serverId, emojiId }` | A custom emoji was deleted (sent to server group) |
 | `ServerDescriptionChanged` | `{ serverId, description }` | Server description was updated (sent to server group) |
 | `ChannelDescriptionChanged` | `{ serverId, channelId, description }` | Channel description/topic was updated (sent to server group) |
+| `MessagePinned` | `{ messageId, channelId, pinnedBy, pinnedAt }` | A message was pinned in a channel (sent to channel group) |
+| `MessageUnpinned` | `{ messageId, channelId, unpinnedBy }` | A message was unpinned from a channel (sent to channel group) |
 | `CategoryCreated` | `{ serverId, category: { id, name, position } }` | A new channel category was created (sent to server group) |
 | `CategoryRenamed` | `{ serverId, categoryId, name }` | A category was renamed (sent to server group) |
 | `CategoryDeleted` | `{ serverId, categoryId }` | A category was deleted; affected channels become uncategorized (sent to server group) |

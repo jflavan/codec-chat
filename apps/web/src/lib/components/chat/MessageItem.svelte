@@ -106,8 +106,19 @@
 			cancelEdit();
 		}
 	}
+
+	const isPinned = $derived(app.pinnedMessageIds.has(message.id));
+	const isSystemMessage = $derived(message.messageType === 2);
 </script>
 
+{#if isSystemMessage}
+<div class="system-message">
+	<svg class="system-pin-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+		<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+	</svg>
+	<span class="system-message-text">{message.body}</span>
+</div>
+{:else}
 <article
 	class="message"
 	class:grouped
@@ -117,12 +128,25 @@
 	<MessageActionBar
 		{isOwnMessage}
 		canDelete={canDeleteMessage}
+		canPin={app.canPinMessages}
+		{isPinned}
+		onPin={() => app.pinMessage(message.id)}
+		onUnpin={() => app.unpinMessage(message.id)}
 		onReply={handleReply}
 		onReact={handleToggleReaction}
 		onEdit={startEdit}
 		onDelete={handleDelete}
 		isReactionPending={(emoji) => app.isReactionPending(message.id, emoji)}
 	/>
+
+	{#if isPinned}
+		<div class="pin-indicator">
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+			</svg>
+			<span>Pinned</span>
+		</div>
+	{/if}
 
 	{#if !grouped}
 		<div class="message-avatar-col">
@@ -254,6 +278,7 @@
 		</div>
 	{/if}
 </article>
+{/if}
 
 <style>
 	.message {
@@ -458,5 +483,28 @@
 			color: var(--text-muted);
 			opacity: 0.5;
 		}
+	}
+	.pin-indicator {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		padding: 2px 0 2px 72px;
+	}
+	.pin-indicator svg {
+		fill: var(--text-muted);
+	}
+	.system-message {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 4px 16px;
+		color: var(--text-muted);
+		font-size: 0.8125rem;
+	}
+	.system-pin-icon {
+		fill: var(--text-muted);
 	}
 </style>
