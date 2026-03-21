@@ -830,6 +830,7 @@ export class AppState {
 		if (previousChannelId) await this.hub.leaveChannel(previousChannelId);
 		await this.hub.joinChannel(channelId);
 		await this.loadMessages(channelId);
+		await this.loadPinnedMessages(channelId);
 	}
 
 	async sendMessage(): Promise<void> {
@@ -3059,6 +3060,8 @@ export class AppState {
 								},
 								...this.pinnedMessages
 							];
+						} else {
+							this.loadPinnedMessages();
 						}
 					}
 				}
