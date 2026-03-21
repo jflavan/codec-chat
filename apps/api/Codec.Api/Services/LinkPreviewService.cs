@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Codec.Api.Models;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Codec.Api.Services;
 
@@ -39,18 +41,30 @@ public interface ILinkPreviewService
 public sealed class LinkPreviewService : ILinkPreviewService
 {
     private readonly HttpClient _httpClient;
+    private readonly IDistributedCache? _cache;
     private readonly ILogger<LinkPreviewService> _logger;
 
     private const int MaxResponseBytes = 512 * 1024; // 512 KB
     private const int TimeoutSeconds = 5;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
+    private const string CacheKeyPrefix = "linkpreview:";
+
+    /// <summary>Sentinel value stored in the cache when a URL fetch fails or returns no metadata.</summary>
+    private const string FailedSentinel = "__failed__";
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
     private static readonly Regex UrlRegex = new(
         @"https?://[^\s<>""')\]},;]+",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public LinkPreviewService(HttpClient httpClient, ILogger<LinkPreviewService> logger)
+    public LinkPreviewService(HttpClient httpClient, ILogger<LinkPreviewService> logger, IDistributedCache? cache = null)
     {
         _httpClient = httpClient;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -92,6 +106,56 @@ public sealed class LinkPreviewService : ILinkPreviewService
             return null;
         }
 
+        if (_cache is null)
+        {
+            return await FetchMetadataFromSourceAsync(url, cancellationToken);
+        }
+
+        var cacheKey = CacheKeyPrefix + ComputeUrlHash(url);
+
+        // Check cache first.
+        try
+        {
+            var cached = await _cache.GetStringAsync(cacheKey, cancellationToken);
+            if (cached is not null)
+            {
+                if (cached == FailedSentinel)
+                {
+                    _logger.LogDebug("Cache hit (failed sentinel) for link preview: {Url}", SanitizeForLog(url));
+                    return null;
+                }
+
+                _logger.LogDebug("Cache hit for link preview: {Url}", SanitizeForLog(url));
+                return JsonSerializer.Deserialize<LinkPreviewResult>(cached, JsonOptions);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Redis unavailable — fall through to fetch.
+            _logger.LogDebug(ex, "Cache read failed for link preview, falling through to fetch: {Url}", SanitizeForLog(url));
+        }
+
+        var result = await FetchMetadataFromSourceAsync(url, cancellationToken);
+
+        // Cache the result (success or failure).
+        try
+        {
+            var options = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = CacheTtl };
+            var value = result is not null
+                ? JsonSerializer.Serialize(result, JsonOptions)
+                : FailedSentinel;
+            await _cache.SetStringAsync(cacheKey, value, options, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Cache write failed for link preview: {Url}", SanitizeForLog(url));
+        }
+
+        return result;
+    }
+
+    private async Task<LinkPreviewResult?> FetchMetadataFromSourceAsync(string url, CancellationToken cancellationToken)
+    {
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -128,6 +192,13 @@ public sealed class LinkPreviewService : ILinkPreviewService
             _logger.LogDebug(ex, "HTTP error fetching link preview for {Url}", SanitizeForLog(url));
             return null;
         }
+    }
+
+    private static string ComputeUrlHash(string url)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(url));
+        return Convert.ToHexStringLower(bytes);
     }
 
     /// <summary>
