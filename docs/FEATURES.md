@@ -144,8 +144,8 @@ This document tracks implemented and planned features for Codec.
 - ~~Presence indicators~~ (implemented)
 - ~~Server settings/configuration~~ (implemented)
 - ~~Channel categories/organization~~ (implemented)
-- Link preview caching and image proxying
-- Video embeds for Vimeo
+- ~~Link preview caching~~ (implemented: 1-hour Redis cache by URL SHA-256 hash; caches failures too; graceful degradation when Redis unavailable)
+- Image proxying
 - File uploads (documents, other media)
 
 ### Future
