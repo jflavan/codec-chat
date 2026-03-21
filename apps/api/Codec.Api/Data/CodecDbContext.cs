@@ -29,6 +29,7 @@ public class CodecDbContext : DbContext
     public DbSet<ChannelCategory> ChannelCategories => Set<ChannelCategory>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<ChannelNotificationOverride> ChannelNotificationOverrides => Set<ChannelNotificationOverride>();
+    public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -395,6 +396,31 @@ public class CodecDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(o => o.ChannelId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.MessageType)
+            .HasDefaultValue(MessageType.Regular);
+
+        modelBuilder.Entity<PinnedMessage>(e =>
+        {
+            e.HasOne(p => p.Message)
+                .WithMany()
+                .HasForeignKey(p => p.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(p => p.Channel)
+                .WithMany()
+                .HasForeignKey(p => p.ChannelId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(p => p.PinnedByUser)
+                .WithMany()
+                .HasForeignKey(p => p.PinnedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.HasIndex(p => new { p.ChannelId, p.MessageId }).IsUnique();
+            e.HasIndex(p => new { p.ChannelId, p.PinnedAt });
         });
     }
 }

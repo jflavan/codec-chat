@@ -22,7 +22,10 @@ import type {
 	TokenRefreshResponse,
 	ChannelCategory,
 	AuditLogEntry,
-	NotificationPreferences
+	NotificationPreferences,
+	PinnedMessage,
+	MessagePinnedEvent,
+	MessageUnpinnedEvent
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -110,6 +113,12 @@ export class AppState {
 
 	/* ───── notification preferences ───── */
 	notificationPreferences = $state<NotificationPreferences | null>(null);
+
+	/* ───── pinned messages ───── */
+	pinnedMessages = $state<PinnedMessage[]>([]);
+	showPinnedPanel = $state(false);
+	readonly pinnedMessageIds = $derived(new Set(this.pinnedMessages.map((p) => p.messageId)));
+	readonly pinnedMessageCount = $derived(this.pinnedMessages.length);
 
 	/* ───── selection ───── */
 	selectedServerId = $state<string | null>(null);
@@ -275,6 +284,10 @@ export class AppState {
 	);
 
 	readonly canManageRoles = $derived(
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+	);
+
+	readonly canPinMessages = $derived(
 		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
@@ -806,6 +819,8 @@ export class AppState {
 		this.pendingMentions = new Map();
 		this.replyingTo = null;
 		this.mobileNavOpen = false;
+		this.pinnedMessages = [];
+		this.showPinnedPanel = false;
 
 		// Clear mention badge for this channel
 		const next = new Map(this.channelMentionCounts);
@@ -815,6 +830,7 @@ export class AppState {
 		if (previousChannelId) await this.hub.leaveChannel(previousChannelId);
 		await this.hub.joinChannel(channelId);
 		await this.loadMessages(channelId);
+		await this.loadPinnedMessages(channelId);
 	}
 
 	async sendMessage(): Promise<void> {
@@ -1643,9 +1659,48 @@ export class AppState {
 			// Real-time update arrives via SignalR; fall back to local removal if disconnected.
 			if (!this.hub.isConnected) {
 				this.messages = this.messages.filter((m) => m.id !== messageId);
+				this.pinnedMessages = this.pinnedMessages.filter((p) => p.messageId !== messageId);
 			}
 		} catch (e) {
 			this.setError(e);
+		}
+	}
+
+	/* ───── pinning ───── */
+
+	async loadPinnedMessages(channelId?: string): Promise<void> {
+		const cid = channelId ?? this.selectedChannelId;
+		if (!cid || !this.idToken) return;
+		try {
+			this.pinnedMessages = await this.api.getPinnedMessages(this.idToken, cid);
+		} catch {
+			this.pinnedMessages = [];
+		}
+	}
+
+	async pinMessage(messageId: string): Promise<void> {
+		if (!this.selectedChannelId || !this.idToken) return;
+		try {
+			await this.api.pinMessage(this.idToken, this.selectedChannelId, messageId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	async unpinMessage(messageId: string): Promise<void> {
+		if (!this.selectedChannelId || !this.idToken) return;
+		try {
+			await this.api.unpinMessage(this.idToken, this.selectedChannelId, messageId);
+			this.pinnedMessages = this.pinnedMessages.filter((p) => p.messageId !== messageId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	togglePinnedPanel(): void {
+		this.showPinnedPanel = !this.showPinnedPanel;
+		if (this.showPinnedPanel) {
+			this.loadPinnedMessages();
 		}
 	}
 
@@ -2764,12 +2819,14 @@ export class AppState {
 			onMessageDeleted: (event) => {
 				if (event.channelId === this.selectedChannelId) {
 					this.messages = this.messages.filter((m) => m.id !== event.messageId);
+					this.pinnedMessages = this.pinnedMessages.filter((p) => p.messageId !== event.messageId);
 				}
 			},
 			onChannelPurged: (event) => {
 				if (event.channelId === this.selectedChannelId) {
 					this.messages = [];
 					this.hasMoreMessages = false;
+					this.pinnedMessages = [];
 				}
 			},
 			onDmMessageDeleted: (event) => {
@@ -2984,6 +3041,34 @@ export class AppState {
 					this.channels = this.channels.map((c) =>
 						c.id === event.channelId ? { ...c, description: event.description } : c
 					);
+				}
+			},
+			onMessagePinned: (event: MessagePinnedEvent) => {
+				if (event.channelId === this.selectedChannelId) {
+					if (this.showPinnedPanel) {
+						this.loadPinnedMessages();
+					} else {
+						const msg = this.messages.find((m) => m.id === event.messageId);
+						if (msg) {
+							this.pinnedMessages = [
+								{
+									messageId: event.messageId,
+									channelId: event.channelId,
+									pinnedBy: event.pinnedBy,
+									pinnedAt: event.pinnedAt,
+									message: msg
+								},
+								...this.pinnedMessages
+							];
+						} else {
+							this.loadPinnedMessages();
+						}
+					}
+				}
+			},
+			onMessageUnpinned: (event: MessageUnpinnedEvent) => {
+				if (event.channelId === this.selectedChannelId) {
+					this.pinnedMessages = this.pinnedMessages.filter((p) => p.messageId !== event.messageId);
 				}
 			},
 			onCategoryCreated: (event) => {

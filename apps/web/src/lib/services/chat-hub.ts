@@ -1,6 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
-import type { Message, Reaction, FriendUser, DirectMessage, DmParticipant, LinkPreview } from '$lib/types/index.js';
+import type { Message, Reaction, FriendUser, DirectMessage, DmParticipant, LinkPreview, MessagePinnedEvent, MessageUnpinnedEvent } from '$lib/types/index.js';
 
 export type ReactionUpdate = {
 	messageId: string;
@@ -280,6 +280,8 @@ export type SignalRCallbacks = {
 	onCategoryDeleted?: (event: CategoryDeletedEvent) => void;
 	onServerDescriptionChanged?: (event: ServerDescriptionChangedEvent) => void;
 	onChannelDescriptionChanged?: (event: ChannelDescriptionChangedEvent) => void;
+	onMessagePinned?: (event: MessagePinnedEvent) => void;
+	onMessageUnpinned?: (event: MessageUnpinnedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -452,6 +454,13 @@ export class ChatHubService {
 		}
 		if (callbacks.onChannelDescriptionChanged) {
 			connection.on('ChannelDescriptionChanged', callbacks.onChannelDescriptionChanged);
+		}
+
+		if (callbacks.onMessagePinned) {
+			connection.on('MessagePinned', callbacks.onMessagePinned);
+		}
+		if (callbacks.onMessageUnpinned) {
+			connection.on('MessageUnpinned', callbacks.onMessageUnpinned);
 		}
 
 		if (callbacks.onReconnecting) {

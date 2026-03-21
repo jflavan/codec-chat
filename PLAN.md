@@ -86,6 +86,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
+- **Message pinning** — `PinnedMessage` entity with unique `(ChannelId, MessageId)` index; pin/unpin/list endpoints in `ChannelsController` (Owner/Admin/GlobalAdmin, 50-pin limit); `PinNotification` system messages; `MessagePinned`/`MessageUnpinned` SignalR events; audit logging (`MessagePinned`/`MessageUnpinned` actions); frontend pin button in action bar, pin indicator on messages, slide-in pinned messages panel with unpin controls, reactive pin state in `AppState`
 
 ## Task breakdown: Session Persistence
 
