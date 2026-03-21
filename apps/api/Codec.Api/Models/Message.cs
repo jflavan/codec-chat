@@ -9,6 +9,7 @@ public class Message
     public string Body { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public Guid? ReplyToMessageId { get; set; }
+    public MessageType MessageType { get; set; } = MessageType.Regular;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? EditedAt { get; set; }
     public User? AuthorUser { get; set; }

@@ -100,6 +100,7 @@ export type Message = {
 	linkPreviews: LinkPreview[];
 	mentions: Mention[];
 	replyContext: ReplyContext | null;
+	messageType?: number;
 };
 
 /** Paginated message response from the API. */
@@ -328,3 +329,27 @@ export interface NotificationPreferences {
 	serverMuted: boolean;
 	channelOverrides: { channelId: string; isMuted: boolean }[];
 }
+
+/** A pinned message with pin metadata and the full message. */
+export type PinnedMessage = {
+	messageId: string;
+	channelId: string;
+	pinnedBy: { userId: string; displayName: string };
+	pinnedAt: string;
+	message: Message;
+};
+
+/** SignalR event when a message is pinned. */
+export type MessagePinnedEvent = {
+	messageId: string;
+	channelId: string;
+	pinnedBy: { userId: string; displayName: string };
+	pinnedAt: string;
+};
+
+/** SignalR event when a message is unpinned. */
+export type MessageUnpinnedEvent = {
+	messageId: string;
+	channelId: string;
+	unpinnedBy: { userId: string; displayName: string };
+};
