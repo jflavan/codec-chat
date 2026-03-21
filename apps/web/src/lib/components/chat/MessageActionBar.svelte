@@ -10,18 +10,26 @@
 	let {
 		isOwnMessage,
 		canDelete,
+		canPin = false,
+		isPinned = false,
 		onReply,
 		onReact,
 		onEdit,
 		onDelete,
+		onPin = () => {},
+		onUnpin = () => {},
 		isReactionPending = () => false
 	}: {
 		isOwnMessage: boolean;
 		canDelete: boolean;
+		canPin?: boolean;
+		isPinned?: boolean;
 		onReply: () => void;
 		onReact: (emoji: string) => void;
 		onEdit: () => void;
 		onDelete: () => void;
+		onPin?: () => void;
+		onUnpin?: () => void;
 		isReactionPending?: (emoji: string) => boolean;
 	} = $props();
 
@@ -86,6 +94,18 @@
 	class:picker-open={showPicker || showFullPicker}
 	class:flipped={isFlipped}
 >
+	{#if canPin}
+		<button
+			class="action-btn"
+			title={isPinned ? 'Unpin Message' : 'Pin Message'}
+			aria-label={isPinned ? 'Unpin Message' : 'Pin Message'}
+			onclick={isPinned ? onUnpin : onPin}
+		>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+			</svg>
+		</button>
+	{/if}
 	<button
 		class="action-btn"
 		onclick={onReply}
