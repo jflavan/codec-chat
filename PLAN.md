@@ -63,7 +63,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Response compression enabled (Brotli + Gzip) for faster API responses
 - User profile writes optimized — skips `SaveChangesAsync` when Google profile fields unchanged
 - Mention parsing cached per message batch to eliminate redundant regex execution
-- **Redis distributed cache** — message history pages cached with 5-minute TTL via `MessageCacheService`; channel-level invalidation on all mutations; SignalR Redis backplane for multi-instance scale-out; graceful degradation when Redis is unavailable
+- **Redis distributed cache** — message history pages cached with 5-minute TTL via `MessageCacheService`; channel-level invalidation on all mutations; link preview metadata cached with 1-hour TTL by URL hash in `LinkPreviewService`; SignalR Redis backplane for multi-instance scale-out; graceful degradation when Redis is unavailable
 - DM messages endpoint returns paginated `{ hasMore, messages }` response (matching channel pagination)
 - Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect; auto-refreshes the page on persistent WebSocket failure
 - SignalR reconnection lifecycle tracked via `isHubConnected` reactive state
@@ -1213,7 +1213,7 @@ Add email/password registration as a second auth method alongside Google Sign-In
 - ~~Add richer validation and error surfaces in UI~~ (implemented: authorization helpers, global ProblemDetails exception handler, DataAnnotations on request DTOs, frontend ProblemDetails parsing, character counters on form inputs)
 - ~~Presence indicators (online/offline/away)~~ (implemented: hybrid client+server heartbeat detection; PresenceTracker in-memory singleton with ConcurrentDictionary; PresenceBackgroundService for idle/offline scanning; PresenceState DB table; multi-tab support; push-based UserPresenceChanged SignalR events; PresenceDot component on member sidebar and DM list; online-first member sorting)
 - ~~Light mode theme toggle~~ (implemented: 4-theme system — Phosphor Green, Midnight, Ember, Light — with Appearance settings, localStorage persistence, flash prevention)
-- Mobile slide-out navigation for server/channel sidebars
+- ~~Mobile slide-out navigation for server/channel sidebars~~ (implemented: left drawer for servers/channels, right drawer for members, hamburger buttons in chat headers, slide animations with backdrop dismiss)
 - ~~Comprehensive unit and integration tests~~ (implemented: 448 tests across 3 suites; CI pipeline runs all tests on every PR)
 - Container image vulnerability scanning (Trivy or Microsoft Defender)
 - Voice Phase 2: deafen, per-user volume, push-to-talk

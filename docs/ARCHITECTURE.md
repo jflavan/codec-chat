@@ -7,7 +7,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
 - **Backend:** ASP.NET Core 10 Web API (Controller-based APIs)
 - **Real-time:** SignalR (WebSockets with automatic fallback); Redis backplane for multi-instance scale-out
-- **Caching:** Redis 8 distributed cache (`IDistributedCache`) for message history with channel-level invalidation
+- **Caching:** Redis 8 distributed cache (`IDistributedCache`) for message history with channel-level invalidation and link preview metadata with 1-hour TTL
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
 - **Authentication:** Google Identity Services (ID token validation)
 - **Observability:** OpenTelemetry (traces, metrics, logs) via `Codec.ServiceDefaults`; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard
@@ -717,6 +717,7 @@ DirectMessage ─┘
 - Fields: Id, MessageId (nullable FK), DirectMessageId (nullable FK), Url, Title, Description, ImageUrl, SiteName, CanonicalUrl, FetchedAt, Status
 - Check constraint: exactly one of MessageId or DirectMessageId must be non-null
 - Fetched asynchronously by `LinkPreviewService` after message posting; delivered to clients via `LinkPreviewsReady` SignalR event
+- Metadata cached in Redis by URL hash (`linkpreview:{SHA256}`) with 1-hour TTL; failed fetches cached too to avoid re-hitting broken URLs
 - SSRF protection: private IP blocking, DNS rebinding prevention via `SocketsHttpHandler.ConnectCallback`, redirect limiting
 
 ## Configuration
@@ -854,6 +855,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 - Async/await throughout API
 - Efficient EF Core queries (AsNoTracking)
 - Redis distributed cache for message history — paginated history pages cached with 5-minute TTL via `MessageCacheService`; channel-level invalidation on all mutations (send, edit, delete, purge, reactions); skips caching the "latest" page to avoid write amplification; graceful degradation when Redis is unavailable
+- Redis distributed cache for link preview metadata — `LinkPreviewService` caches fetched metadata by URL SHA-256 hash with 1-hour TTL; failed fetches cached as sentinels to prevent redundant requests; same graceful degradation pattern
 - SignalR Redis backplane — enables horizontal scaling across multiple API instances via Redis pub/sub
 - Response compression (Brotli + Gzip, `CompressionLevel.Fastest`) for `application/json` payloads
 - Optimized user profile writes — `UserService.GetOrCreateUserAsync` skips `SaveChangesAsync` when Google profile fields are unchanged
