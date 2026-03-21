@@ -35,5 +35,8 @@ export type {
 	ChannelCategory,
 	AuditLogEntry,
 	PaginatedAuditLog,
-	NotificationPreferences
+	NotificationPreferences,
+	PinnedMessage,
+	MessagePinnedEvent,
+	MessageUnpinnedEvent
 } from './models.js';

@@ -3,5 +3,6 @@ namespace Codec.Api.Models;
 public enum MessageType
 {
     Regular = 0,
-    VoiceCallEvent = 1
+    VoiceCallEvent = 1,
+    PinNotification = 2
 }
