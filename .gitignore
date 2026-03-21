@@ -96,6 +96,7 @@ docs/GCP_DEPLOYMENT_PLAN.md
 docs/plans/
 docs/superpowers/
 
-# Dolt database files (added by bd init)
+# Agent tool data
 .dolt/
+.beads/
 .claude-flow/
