@@ -319,4 +319,176 @@ public class ChannelsControllerTests : IDisposable
         var result = await _controller.GetMessages(_testChannel.Id, around: msg.Id);
         result.Should().BeOfType<OkObjectResult>();
     }
+
+    // --- Pin messages ---
+
+    private void SetupAdminUser()
+    {
+        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+    }
+
+    [Fact]
+    public async Task GetPinnedMessages_EmptyChannel_ReturnsEmptyList()
+    {
+        var result = await _controller.GetPinnedMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetPinnedMessages_ChannelNotFound_Returns404()
+    {
+        var result = await _controller.GetPinnedMessages(Guid.NewGuid());
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task PinMessage_Success_Returns201()
+    {
+        SetupAdminUser();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.PinMessage(_testChannel.Id, msg.Id, _auditService);
+        result.Should().BeOfType<CreatedResult>();
+
+        _db.PinnedMessages.Should().ContainSingle(p => p.MessageId == msg.Id && p.ChannelId == _testChannel.Id);
+    }
+
+    [Fact]
+    public async Task PinMessage_CreatesSystemMessage()
+    {
+        SetupAdminUser();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        await _controller.PinMessage(_testChannel.Id, msg.Id, _auditService);
+
+        _db.Messages.Should().Contain(m => m.MessageType == MessageType.PinNotification && m.AuthorName == "System");
+    }
+
+    [Fact]
+    public async Task PinMessage_CreatesAuditLogEntry()
+    {
+        SetupAdminUser();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        await _controller.PinMessage(_testChannel.Id, msg.Id, _auditService);
+
+        _db.AuditLogEntries.Should().ContainSingle(a => a.Action == AuditAction.MessagePinned);
+    }
+
+    [Fact]
+    public async Task PinMessage_ChannelNotFound_Returns404()
+    {
+        SetupAdminUser();
+        var result = await _controller.PinMessage(Guid.NewGuid(), Guid.NewGuid(), _auditService);
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task PinMessage_MessageNotFound_Returns404()
+    {
+        SetupAdminUser();
+        var result = await _controller.PinMessage(_testChannel.Id, Guid.NewGuid(), _auditService);
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task PinMessage_AlreadyPinned_Returns400()
+    {
+        SetupAdminUser();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
+        _db.Messages.Add(msg);
+        _db.PinnedMessages.Add(new PinnedMessage { MessageId = msg.Id, ChannelId = _testChannel.Id, PinnedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.PinMessage(_testChannel.Id, msg.Id, _auditService);
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task PinMessage_ExceedsLimit_Returns400()
+    {
+        SetupAdminUser();
+        for (var i = 0; i < 50; i++)
+        {
+            var m = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = $"Msg {i}" };
+            _db.Messages.Add(m);
+            _db.PinnedMessages.Add(new PinnedMessage { MessageId = m.Id, ChannelId = _testChannel.Id, PinnedByUserId = _testUser.Id });
+        }
+        var extraMsg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "51st" };
+        _db.Messages.Add(extraMsg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.PinMessage(_testChannel.Id, extraMsg.Id, _auditService);
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task PinMessage_RequiresAdmin_ThrowsForbidden()
+    {
+        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+            .ThrowsAsync(new Codec.Api.Services.Exceptions.ForbiddenException());
+
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        await FluentActions.Invoking(() => _controller.PinMessage(_testChannel.Id, msg.Id, _auditService))
+            .Should().ThrowAsync<Codec.Api.Services.Exceptions.ForbiddenException>();
+    }
+
+    [Fact]
+    public async Task UnpinMessage_Success_Returns204()
+    {
+        SetupAdminUser();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Unpin me" };
+        _db.Messages.Add(msg);
+        _db.PinnedMessages.Add(new PinnedMessage { MessageId = msg.Id, ChannelId = _testChannel.Id, PinnedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.UnpinMessage(_testChannel.Id, msg.Id, _auditService);
+        result.Should().BeOfType<NoContentResult>();
+
+        _db.PinnedMessages.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UnpinMessage_NotPinned_Returns404()
+    {
+        SetupAdminUser();
+        var result = await _controller.UnpinMessage(_testChannel.Id, Guid.NewGuid(), _auditService);
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task UnpinMessage_CreatesAuditLogEntry()
+    {
+        SetupAdminUser();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Unpin me" };
+        _db.Messages.Add(msg);
+        _db.PinnedMessages.Add(new PinnedMessage { MessageId = msg.Id, ChannelId = _testChannel.Id, PinnedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        await _controller.UnpinMessage(_testChannel.Id, msg.Id, _auditService);
+
+        _db.AuditLogEntries.Should().ContainSingle(a => a.Action == AuditAction.MessageUnpinned);
+    }
+
+    [Fact]
+    public async Task GetPinnedMessages_ReturnsPinnedMessages()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pinned" };
+        _db.Messages.Add(msg);
+        _db.PinnedMessages.Add(new PinnedMessage { MessageId = msg.Id, ChannelId = _testChannel.Id, PinnedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetPinnedMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
 }
