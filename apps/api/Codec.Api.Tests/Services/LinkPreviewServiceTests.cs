@@ -1,14 +1,18 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using Codec.Api.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Net;
 
 namespace Codec.Api.Tests.Services;
 
 public class LinkPreviewServiceTests
 {
     private readonly Mock<ILogger<LinkPreviewService>> _logger = new();
+    private readonly Mock<IDistributedCache> _cache = new();
 
     // --- ExtractUrls ---
 
@@ -218,15 +222,158 @@ public class LinkPreviewServiceTests
         result.Should().BeNull();
     }
 
+    // --- Caching ---
+
+    [Fact]
+    public async Task FetchMetadataAsync_CacheHit_ReturnsCachedResultWithoutHttpFetch()
+    {
+        var cached = new LinkPreviewResult("https://example.com", "Cached Title", "Desc", null, null, null);
+        var json = JsonSerializer.Serialize(cached, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Encoding.UTF8.GetBytes(json));
+
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var svc = CreateService(handler);
+
+        var result = await svc.FetchMetadataAsync("https://example.com");
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Cached Title");
+        handler.CallCount.Should().Be(0, "HTTP fetch should be skipped on cache hit");
+    }
+
+    [Fact]
+    public async Task FetchMetadataAsync_CacheHitFailedSentinel_ReturnsNullWithoutHttpFetch()
+    {
+        _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Encoding.UTF8.GetBytes("__failed__"));
+
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html><head><title>Should Not Reach</title></head></html>",
+                Encoding.UTF8, "text/html")
+        });
+        var svc = CreateService(handler);
+
+        var result = await svc.FetchMetadataAsync("https://example.com/broken");
+        result.Should().BeNull();
+        handler.CallCount.Should().Be(0, "HTTP fetch should be skipped for failed sentinel");
+    }
+
+    [Fact]
+    public async Task FetchMetadataAsync_CacheMiss_FetchesAndWritesToCache()
+    {
+        // Cache returns null (miss).
+        _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
+
+        var html = "<html><head><meta property=\"og:title\" content=\"Fresh\" /></head></html>";
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(html, Encoding.UTF8, "text/html")
+        });
+        var svc = CreateService(handler);
+
+        var result = await svc.FetchMetadataAsync("https://example.com/new");
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Fresh");
+        handler.CallCount.Should().Be(1);
+
+        _cache.Verify(c => c.SetAsync(
+            It.IsAny<string>(),
+            It.Is<byte[]>(b => !Encoding.UTF8.GetString(b).Contains("__failed__")),
+            It.IsAny<DistributedCacheEntryOptions>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task FetchMetadataAsync_CacheMiss_FailedFetch_WritesFailedSentinel()
+    {
+        _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
+
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var svc = CreateService(handler);
+
+        var result = await svc.FetchMetadataAsync("https://example.com/gone");
+        result.Should().BeNull();
+
+        _cache.Verify(c => c.SetAsync(
+            It.IsAny<string>(),
+            It.Is<byte[]>(b => Encoding.UTF8.GetString(b) == "__failed__"),
+            It.IsAny<DistributedCacheEntryOptions>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task FetchMetadataAsync_CacheReadThrows_StillFetches()
+    {
+        _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Redis down"));
+
+        var html = "<html><head><title>Fallback</title></head></html>";
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(html, Encoding.UTF8, "text/html")
+        });
+        var svc = CreateService(handler);
+
+        var result = await svc.FetchMetadataAsync("https://example.com/resilient");
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Fallback");
+        handler.CallCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task FetchMetadataAsync_CacheWriteThrows_StillReturnsResult()
+    {
+        _cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
+        _cache.Setup(c => c.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(),
+                It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Redis down"));
+
+        var html = "<html><head><title>Still Works</title></head></html>";
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(html, Encoding.UTF8, "text/html")
+        });
+        var svc = CreateService(handler);
+
+        var result = await svc.FetchMetadataAsync("https://example.com/write-fail");
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Still Works");
+    }
+
+    [Fact]
+    public async Task FetchMetadataAsync_NoCacheConfigured_StillFetches()
+    {
+        var html = "<html><head><title>No Cache</title></head></html>";
+        var handler = new MockHttpHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(html, Encoding.UTF8, "text/html")
+        });
+        var httpClient = new HttpClient(handler);
+        var svc = new LinkPreviewService(httpClient, _logger.Object); // no cache parameter
+
+        var result = await svc.FetchMetadataAsync("https://example.com/no-cache");
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("No Cache");
+    }
+
     private LinkPreviewService CreateService(HttpMessageHandler? handler = null)
     {
         var httpClient = handler is not null ? new HttpClient(handler) : new HttpClient();
-        return new LinkPreviewService(httpClient, _logger.Object);
+        return new LinkPreviewService(httpClient, _logger.Object, _cache.Object);
     }
 
     private class MockHttpHandler(HttpResponseMessage response) : HttpMessageHandler
     {
+        public int CallCount { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response);
+        {
+            CallCount++;
+            return Task.FromResult(response);
+        }
     }
 }
