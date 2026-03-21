@@ -75,7 +75,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.ChannelId,
                     m.ReplyToMessageId,
                     AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
-                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
+                    m.MessageType
                 })
                 .FirstOrDefaultAsync();
 
@@ -103,7 +104,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.ChannelId,
                     m.ReplyToMessageId,
                     AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
-                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
+                    m.MessageType
                 })
                 .ToListAsync();
 
@@ -126,7 +128,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.ChannelId,
                     m.ReplyToMessageId,
                     AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
-                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                    AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
+                    m.MessageType
                 })
                 .ToListAsync();
 
@@ -264,7 +267,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                         ? aroundReplyContextLookup.TryGetValue(message.ReplyToMessageId.Value, out var ctx)
                             ? ctx
                             : new ReplyContextDto(message.ReplyToMessageId.Value, string.Empty, null, null, string.Empty, true)
-                        : (ReplyContextDto?)null
+                        : (ReplyContextDto?)null,
+                    MessageType = (int)message.MessageType
                 };
             });
 
@@ -296,7 +300,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.ChannelId,
                 message.ReplyToMessageId,
                 AuthorCustomAvatarPath = message.AuthorUser != null ? message.AuthorUser.CustomAvatarPath : null,
-                AuthorGoogleAvatarUrl = message.AuthorUser != null ? message.AuthorUser.AvatarUrl : null
+                AuthorGoogleAvatarUrl = message.AuthorUser != null ? message.AuthorUser.AvatarUrl : null,
+                message.MessageType
             })
             .ToListAsync();
 
@@ -435,7 +440,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     ? replyContextLookup.TryGetValue(message.ReplyToMessageId.Value, out var ctx)
                         ? ctx
                         : new ReplyContextDto(message.ReplyToMessageId.Value, string.Empty, null, null, string.Empty, true)
-                    : (ReplyContextDto?)null
+                    : (ReplyContextDto?)null,
+                MessageType = (int)message.MessageType
             };
         });
 
@@ -550,7 +556,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             Reactions = Array.Empty<object>(),
             LinkPreviews = Array.Empty<object>(),
             Mentions = (IReadOnlyList<MentionDto>)mentions,
-            ReplyContext = replyContext
+            ReplyContext = replyContext,
+            MessageType = (int)message.MessageType
         };
 
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
@@ -889,6 +896,217 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         await messageCache.InvalidateChannelAsync(channelId);
 
         return Ok(new { action, reactions = updatedReactions });
+    }
+
+    /// <summary>
+    /// List pinned messages for a channel, ordered by most recently pinned.
+    /// </summary>
+    [HttpGet("{channelId:guid}/pins")]
+    public async Task<IActionResult> GetPinnedMessages(Guid channelId)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return NotFound(new { error = "Channel not found." });
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var pins = await db.PinnedMessages
+            .AsNoTracking()
+            .Where(p => p.ChannelId == channelId)
+            .OrderByDescending(p => p.PinnedAt)
+            .Include(p => p.Message)
+                .ThenInclude(m => m!.AuthorUser)
+            .Include(p => p.PinnedByUser)
+            .ToListAsync();
+
+        var pinMessageIds = pins.Select(p => p.MessageId).ToArray();
+
+        var reactionLookup = new Dictionary<Guid, IReadOnlyList<ReactionSummary>>();
+        if (pinMessageIds.Length > 0)
+        {
+            var reactions = await db.Reactions.AsNoTracking()
+                .Where(r => r.MessageId != null && pinMessageIds.Contains(r.MessageId.Value))
+                .ToListAsync();
+            reactionLookup = reactions
+                .GroupBy(r => r.MessageId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<ReactionSummary>)g
+                        .GroupBy(r => r.Emoji)
+                        .Select(eg => new ReactionSummary(eg.Key, eg.Count(), eg.Select(r => r.UserId).ToList()))
+                        .ToList());
+        }
+
+        var linkPreviewLookup = new Dictionary<Guid, IReadOnlyList<LinkPreviewDto>>();
+        if (pinMessageIds.Length > 0)
+        {
+            var linkPreviews = await db.LinkPreviews.AsNoTracking()
+                .Where(lp => lp.MessageId != null && pinMessageIds.Contains(lp.MessageId.Value)
+                    && lp.Status == LinkPreviewStatus.Success)
+                .ToListAsync();
+            linkPreviewLookup = linkPreviews
+                .GroupBy(lp => lp.MessageId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<LinkPreviewDto>)g
+                        .Select(lp => new LinkPreviewDto(lp.Url, lp.Title, lp.Description, lp.ImageUrl, lp.SiteName, lp.CanonicalUrl))
+                        .ToList());
+        }
+
+        var result = pins.Select(p =>
+        {
+            var msg = p.Message!;
+            return new
+            {
+                messageId = p.MessageId,
+                channelId = p.ChannelId,
+                pinnedBy = new
+                {
+                    userId = p.PinnedByUserId,
+                    displayName = p.PinnedByUser is not null ? userService.GetEffectiveDisplayName(p.PinnedByUser) : "Unknown"
+                },
+                pinnedAt = p.PinnedAt,
+                message = new
+                {
+                    id = msg.Id,
+                    authorName = msg.AuthorName,
+                    authorUserId = msg.AuthorUserId,
+                    body = msg.Body,
+                    imageUrl = msg.ImageUrl,
+                    createdAt = msg.CreatedAt,
+                    editedAt = msg.EditedAt,
+                    channelId = msg.ChannelId,
+                    authorAvatarUrl = avatarService.ResolveUrl(msg.AuthorUser?.CustomAvatarPath) ?? msg.AuthorUser?.AvatarUrl,
+                    reactions = reactionLookup.TryGetValue(msg.Id, out var reactions) ? reactions : Array.Empty<ReactionSummary>(),
+                    linkPreviews = linkPreviewLookup.TryGetValue(msg.Id, out var previews) ? previews : Array.Empty<LinkPreviewDto>(),
+                    mentions = Array.Empty<object>(),
+                    replyContext = (object?)null,
+                    messageType = (int)msg.MessageType
+                }
+            };
+        });
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Pin a message. Requires Owner/Admin role or GlobalAdmin.
+    /// </summary>
+    [HttpPost("{channelId:guid}/pins/{messageId:guid}")]
+    public async Task<IActionResult> PinMessage(Guid channelId, Guid messageId, [FromServices] AuditService audit)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return NotFound(new { error = "Channel not found." });
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var message = await db.Messages.AsNoTracking().FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
+        if (message is null) return NotFound(new { error = "Message not found." });
+
+        var alreadyPinned = await db.PinnedMessages.AnyAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
+        if (alreadyPinned) return BadRequest(new { error = "Message is already pinned." });
+
+        var pinCount = await db.PinnedMessages.CountAsync(p => p.ChannelId == channelId);
+        if (pinCount >= 50) return BadRequest(new { error = "This channel has reached the maximum of 50 pinned messages." });
+
+        var pin = new PinnedMessage
+        {
+            Id = Guid.NewGuid(),
+            MessageId = messageId,
+            ChannelId = channelId,
+            PinnedByUserId = appUser.Id,
+            PinnedAt = DateTimeOffset.UtcNow
+        };
+        db.PinnedMessages.Add(pin);
+
+        var authorName = userService.GetEffectiveDisplayName(appUser);
+        var systemMessage = new Message
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = channelId,
+            AuthorUserId = null,
+            AuthorName = "System",
+            Body = $"{authorName} pinned a message to this channel.",
+            MessageType = MessageType.PinNotification,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        db.Messages.Add(systemMessage);
+
+        audit.Log(channel.ServerId, appUser.Id, AuditAction.MessagePinned, "Message", messageId.ToString(),
+            $"Pinned message {messageId} in #{channel.Name}");
+
+        await db.SaveChangesAsync();
+
+        var displayName = userService.GetEffectiveDisplayName(appUser);
+        await chatHub.Clients.Group($"channel-{channelId}").SendAsync("MessagePinned", new
+        {
+            messageId,
+            channelId,
+            pinnedBy = new { userId = appUser.Id, displayName },
+            pinnedAt = pin.PinnedAt
+        });
+
+        await chatHub.Clients.Group($"channel-{channelId}").SendAsync("ReceiveMessage", new
+        {
+            id = systemMessage.Id,
+            channelId,
+            authorUserId = (Guid?)null,
+            authorName = "System",
+            authorAvatarUrl = (string?)null,
+            body = systemMessage.Body,
+            imageUrl = (string?)null,
+            createdAt = systemMessage.CreatedAt,
+            editedAt = (DateTimeOffset?)null,
+            reactions = Array.Empty<object>(),
+            linkPreviews = Array.Empty<object>(),
+            mentions = Array.Empty<object>(),
+            replyContext = (object?)null,
+            messageType = (int)MessageType.PinNotification
+        });
+
+        await messageCache.InvalidateChannelAsync(channelId);
+
+        return Created($"/channels/{channelId}/pins/{messageId}", new
+        {
+            messageId,
+            channelId,
+            pinnedBy = new { userId = appUser.Id, displayName },
+            pinnedAt = pin.PinnedAt
+        });
+    }
+
+    /// <summary>
+    /// Unpin a message. Requires Owner/Admin role or GlobalAdmin.
+    /// </summary>
+    [HttpDelete("{channelId:guid}/pins/{messageId:guid}")]
+    public async Task<IActionResult> UnpinMessage(Guid channelId, Guid messageId, [FromServices] AuditService audit)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return NotFound(new { error = "Channel not found." });
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var pin = await db.PinnedMessages.FirstOrDefaultAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
+        if (pin is null) return NotFound(new { error = "Message is not pinned." });
+
+        db.PinnedMessages.Remove(pin);
+
+        audit.Log(channel.ServerId, appUser.Id, AuditAction.MessageUnpinned, "Message", messageId.ToString(),
+            $"Unpinned message {messageId} in #{channel.Name}");
+
+        await db.SaveChangesAsync();
+
+        var displayName = userService.GetEffectiveDisplayName(appUser);
+        await chatHub.Clients.Group($"channel-{channelId}").SendAsync("MessageUnpinned", new
+        {
+            messageId,
+            channelId,
+            unpinnedBy = new { userId = appUser.Id, displayName }
+        });
+
+        return NoContent();
     }
 
     /// <summary>
