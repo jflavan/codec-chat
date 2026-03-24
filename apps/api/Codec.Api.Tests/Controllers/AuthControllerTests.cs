@@ -43,7 +43,8 @@ public class AuthControllerTests : IDisposable
         _avatarService.Setup(a => a.ResolveUrl(It.IsAny<string?>())).Returns((string?)null);
         _emailVerificationService = new EmailVerificationService(_db, _emailSender.Object, _config);
 
-        _controller = new AuthController(_db, _tokenService, _avatarService.Object, _config, _emailVerificationService, Mock.Of<ILogger<AuthController>>());
+        var oauthProviderService = new OAuthProviderService(Mock.Of<IHttpClientFactory>(), _config, Mock.Of<ILogger<OAuthProviderService>>());
+        _controller = new AuthController(_db, _tokenService, _avatarService.Object, _config, _emailVerificationService, oauthProviderService, Mock.Of<ILogger<AuthController>>());
     }
 
     public void Dispose() => _db.Dispose();

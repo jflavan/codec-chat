@@ -176,6 +176,14 @@ export class ApiClient {
 		});
 	}
 
+	async oauthCallback(provider: 'github' | 'discord', code: string): Promise<AuthResponse & { isNewUser?: boolean }> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/oauth/${provider}`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ code })
+		});
+	}
+
 	/* ───── User ───── */
 
 	getMe(token: string): Promise<UserProfile> {
