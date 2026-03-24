@@ -389,6 +389,71 @@ builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =
     }
 });
 
+// Image proxy HttpClient with DNS rebinding protection, redirect limits, and no cookies.
+builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>(client =>
+{
+    client.DefaultRequestHeaders.Add("User-Agent", "CodecBot/1.0 (+https://codec.chat)");
+    client.Timeout = TimeSpan.FromSeconds(15);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    AllowAutoRedirect = true,
+    MaxAutomaticRedirections = 3,
+    UseCookies = false,
+    PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    ConnectCallback = async (context, cancellationToken) =>
+    {
+        var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+        foreach (var ip in entries)
+        {
+            if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
+            {
+                throw new HttpRequestException($"Blocked connection to private IP {ip}.");
+            }
+
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                var bytes = ip.GetAddressBytes();
+                var isPrivate = bytes[0] switch
+                {
+                    10 => true,
+                    172 => bytes[1] >= 16 && bytes[1] <= 31,
+                    192 => bytes[1] == 168,
+                    169 => bytes[1] == 254,
+                    127 => true,
+                    0 => true,
+                    _ => false
+                };
+
+                if (isPrivate)
+                {
+                    throw new HttpRequestException($"Blocked connection to private IP {ip}.");
+                }
+            }
+            else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                var bytes = ip.GetAddressBytes();
+                if (bytes[0] is 0xFC or 0xFD)
+                {
+                    throw new HttpRequestException($"Blocked connection to private IP {ip}.");
+                }
+            }
+        }
+
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+});
+
 // GitHub Issues API client for in-app bug reports.
 var gitHubToken = builder.Configuration["GitHub:Token"];
 if (!string.IsNullOrWhiteSpace(gitHubToken))
