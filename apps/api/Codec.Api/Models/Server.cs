@@ -22,4 +22,5 @@ public class Server
     public List<CustomEmoji> CustomEmojis { get; set; } = [];
     public List<ChannelCategory> Categories { get; set; } = [];
     public List<AuditLogEntry> AuditLogEntries { get; set; } = [];
+    public List<Webhook> Webhooks { get; set; } = [];
 }
