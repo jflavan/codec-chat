@@ -222,6 +222,7 @@ else
     builder.Services.AddSingleton<IEmailSender, ConsoleEmailSender>();
 
 builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddScoped<OAuthProviderService>();
 
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.

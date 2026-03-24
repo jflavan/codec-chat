@@ -59,6 +59,16 @@ public class CodecDbContext : DbContext
             .HasFilter("\"GoogleSubject\" IS NOT NULL");
 
         modelBuilder.Entity<User>()
+            .HasIndex(user => user.GitHubSubject)
+            .IsUnique()
+            .HasFilter("\"GitHubSubject\" IS NOT NULL");
+
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.DiscordSubject)
+            .IsUnique()
+            .HasFilter("\"DiscordSubject\" IS NOT NULL");
+
+        modelBuilder.Entity<User>()
             .HasIndex(user => user.Email)
             .IsUnique()
             .HasFilter("\"Email\" IS NOT NULL");
