@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Serilog;
@@ -31,6 +32,20 @@ builder.Host.UseSerilog((ctx, config) => config
 
 builder.Services.AddControllers(options =>
     options.Filters.Add(new Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute()));
+
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Info = new()
+        {
+            Title = "Codec Chat API",
+            Version = "v1",
+            Description = "REST API for Codec, a Discord-like chat application. Supports servers, channels, messaging, voice, friends, and direct messages."
+        };
+        return Task.CompletedTask;
+    });
+});
 
 // Redis distributed cache + direct connection for tracking set operations.
 // Two connections are intentional: AddStackExchangeRedisCache manages its own internal
@@ -487,6 +502,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
+
+app.MapOpenApi();
+if (app.Environment.IsDevelopment())
+{
+    app.MapScalarApiReference();
+}
 
 app.MapDefaultEndpoints();
 
