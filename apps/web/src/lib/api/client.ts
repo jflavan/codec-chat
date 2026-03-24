@@ -535,6 +535,31 @@ export class ApiClient {
 		);
 	}
 
+	/* ───── Push Subscriptions ───── */
+
+	/** Get the server's VAPID public key for push subscriptions. */
+	getVapidPublicKey(): Promise<{ publicKey: string }> {
+		return this.request(`${this.baseUrl}/push-subscriptions/vapid-key`, {});
+	}
+
+	/** Register a push subscription with the server. */
+	subscribePush(token: string, subscription: { endpoint: string; p256dh: string; auth: string }): Promise<void> {
+		return this.request(`${this.baseUrl}/push-subscriptions`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify(subscription)
+		});
+	}
+
+	/** Remove a push subscription from the server. */
+	unsubscribePush(token: string, endpoint: string): Promise<void> {
+		return this.request(`${this.baseUrl}/push-subscriptions`, {
+			method: 'DELETE',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ endpoint })
+		});
+	}
+
 	/* ───── Messages ───── */
 
 	getMessages(token: string, channelId: string, options?: { before?: string; limit?: number }): Promise<PaginatedMessages> {

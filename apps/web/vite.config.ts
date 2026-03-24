@@ -127,6 +127,7 @@ export default defineConfig({
 				globPatterns: ['client/**/*.{html,js,css,ico,png,svg,webp,webmanifest}'],
 				cleanupOutdatedCaches: true,
 				navigateFallback: undefined,
+				importScripts: ['push-sw.js'],
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

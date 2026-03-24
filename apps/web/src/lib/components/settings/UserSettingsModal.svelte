@@ -4,6 +4,7 @@
 	import ProfileSettings from './ProfileSettings.svelte';
 	import AccountSettings from './AccountSettings.svelte';
 	import VoiceAudioSettings from './VoiceAudioSettings.svelte';
+	import NotificationSettings from './NotificationSettings.svelte';
 	import AppearanceSettings from './AppearanceSettings.svelte';
 
 	const app = getAppState();
@@ -59,6 +60,8 @@
 			</button>
 			{#if app.settingsCategory === 'profile'}
 				<ProfileSettings />
+			{:else if app.settingsCategory === 'notifications'}
+				<NotificationSettings />
 			{:else if app.settingsCategory === 'voice-audio'}
 				<VoiceAudioSettings />
 			{:else if app.settingsCategory === 'appearance'}
