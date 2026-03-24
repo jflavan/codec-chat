@@ -5,14 +5,23 @@
 
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
 	const MAX_NICKNAME_LENGTH = 32;
+	const MAX_STATUS_LENGTH = 128;
 
 	let nicknameInput = $state(app.me?.user.nickname ?? '');
+	let statusTextInput = $state(app.me?.user.statusText ?? '');
+	let statusEmojiInput = $state(app.me?.user.statusEmoji ?? '');
 	let isSaving = $state(false);
+	let isSavingStatus = $state(false);
 	let fileInput = $state<HTMLInputElement | undefined>(undefined);
 
-	// Keep local input in sync when profile changes from outside.
+	// Keep local inputs in sync when profile changes from outside.
 	$effect(() => {
 		nicknameInput = app.me?.user.nickname ?? '';
+	});
+
+	$effect(() => {
+		statusTextInput = app.me?.user.statusText ?? '';
+		statusEmojiInput = app.me?.user.statusEmoji ?? '';
 	});
 
 	const previewName = $derived(
@@ -23,6 +32,11 @@
 
 	const hasChanged = $derived(
 		nicknameInput.trim() !== (app.me?.user.nickname ?? '')
+	);
+
+	const hasStatusChanged = $derived(
+		statusTextInput.trim() !== (app.me?.user.statusText ?? '') ||
+		statusEmojiInput.trim() !== (app.me?.user.statusEmoji ?? '')
 	);
 
 	const hasCustomAvatar = $derived(
@@ -47,6 +61,29 @@
 			nicknameInput = '';
 		} finally {
 			isSaving = false;
+		}
+	}
+
+	async function saveStatus() {
+		const text = statusTextInput.trim() || null;
+		const emoji = statusEmojiInput.trim() || null;
+		if (!text && !emoji) return;
+		isSavingStatus = true;
+		try {
+			await app.setStatus(text, emoji);
+		} finally {
+			isSavingStatus = false;
+		}
+	}
+
+	async function clearStatus() {
+		isSavingStatus = true;
+		try {
+			await app.clearStatus();
+			statusTextInput = '';
+			statusEmojiInput = '';
+		} finally {
+			isSavingStatus = false;
 		}
 	}
 
@@ -142,6 +179,49 @@
 			{#if app.me.user.nickname}
 				<button class="reset-link" onclick={resetNickname} disabled={isSaving}>
 					Reset to Google display name
+				</button>
+			{/if}
+		</div>
+
+		<!-- Status Message Field -->
+		<div class="field-group">
+			<label class="field-label" for="status-emoji-input">
+				Custom Status
+				<span class="field-helper">Set a status message visible to other members</span>
+			</label>
+			<div class="status-row">
+				<input
+					id="status-emoji-input"
+					type="text"
+					class="status-emoji-input"
+					placeholder="😊"
+					maxlength={8}
+					bind:value={statusEmojiInput}
+				/>
+				<div class="input-wrapper">
+					<input
+						id="status-text-input"
+						type="text"
+						class="status-text-input"
+						placeholder="What's on your mind?"
+						maxlength={MAX_STATUS_LENGTH}
+						bind:value={statusTextInput}
+					/>
+					<span class="char-counter" class:warn={statusTextInput.length >= MAX_STATUS_LENGTH}>
+						{statusTextInput.length}/{MAX_STATUS_LENGTH}
+					</span>
+				</div>
+				<button
+					class="save-btn"
+					disabled={!hasStatusChanged || isSavingStatus || (!statusTextInput.trim() && !statusEmojiInput.trim())}
+					onclick={saveStatus}
+				>
+					{isSavingStatus ? 'Saving…' : 'Save'}
+				</button>
+			</div>
+			{#if app.me.user.statusText || app.me.user.statusEmoji}
+				<button class="reset-link" onclick={clearStatus} disabled={isSavingStatus}>
+					Clear status
 				</button>
 			{/if}
 		</div>
@@ -393,6 +473,60 @@
 	.reset-link:disabled {
 		opacity: 0.5;
 		cursor: wait;
+	}
+
+	/* ───── Status Field ───── */
+
+	.status-row {
+		display: flex;
+		align-items: stretch;
+		gap: 8px;
+	}
+
+	.status-emoji-input {
+		width: 52px;
+		padding: 10px 8px;
+		background: var(--input-bg);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		color: var(--text-normal);
+		font-size: 18px;
+		font-family: inherit;
+		text-align: center;
+		outline: none;
+		flex-shrink: 0;
+		transition: border-color 150ms ease, box-shadow 150ms ease;
+	}
+
+	.status-emoji-input::placeholder {
+		color: var(--text-dim);
+	}
+
+	.status-emoji-input:focus {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px rgba(0, 255, 102, 0.15);
+	}
+
+	.status-text-input {
+		width: 100%;
+		padding: 10px 56px 10px 12px;
+		background: var(--input-bg);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		color: var(--text-normal);
+		font-size: 16px;
+		font-family: inherit;
+		outline: none;
+		transition: border-color 150ms ease, box-shadow 150ms ease;
+	}
+
+	.status-text-input::placeholder {
+		color: var(--text-dim);
+	}
+
+	.status-text-input:focus {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px rgba(0, 255, 102, 0.15);
 	}
 
 	/* Visually hidden */

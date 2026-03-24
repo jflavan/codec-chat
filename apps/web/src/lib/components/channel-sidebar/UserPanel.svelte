@@ -56,7 +56,11 @@
 			</button>
 			<div class="user-panel-names">
 				<span class="user-panel-display">{app.me.user.effectiveDisplayName}</span>
-				{#if app.currentServerRole}
+				{#if app.me.user.statusText || app.me.user.statusEmoji}
+					<span class="user-panel-custom-status">
+						{#if app.me.user.statusEmoji}{app.me.user.statusEmoji} {/if}{app.me.user.statusText ?? ''}
+					</span>
+				{:else if app.currentServerRole}
 					<span class="user-panel-role">{app.currentServerRole}</span>
 				{/if}
 			</div>
@@ -222,6 +226,14 @@
 	.user-panel-role {
 		font-size: 12px;
 		color: var(--text-muted);
+	}
+
+	.user-panel-custom-status {
+		font-size: 12px;
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.user-panel-status {

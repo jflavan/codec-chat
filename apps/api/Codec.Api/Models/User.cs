@@ -14,6 +14,17 @@ public class User
     /// </summary>
     public string? Nickname { get; set; }
 
+    /// <summary>
+    /// Custom status message text displayed in member lists. Nullable; max 128 characters.
+    /// </summary>
+    public string? StatusText { get; set; }
+
+    /// <summary>
+    /// Optional emoji displayed alongside the status text. Nullable; max 8 characters
+    /// (supports multi-codepoint emoji like flags/ZWJ sequences).
+    /// </summary>
+    public string? StatusEmoji { get; set; }
+
     public string? Email { get; set; }
     public string? AvatarUrl { get; set; }
 

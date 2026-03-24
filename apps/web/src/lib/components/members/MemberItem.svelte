@@ -17,10 +17,20 @@
 		{/if}
 		<PresenceDot status={presence} />
 	</div>
-	<span class="member-name">{member.displayName}</span>
-	{#if member.role === 'Owner' || member.role === 'Admin'}
-		<span class="role-badge role-badge-{member.role.toLowerCase()}">{member.role}</span>
-	{/if}
+	<div class="member-info">
+		<div class="member-name-row">
+			<span class="member-name">{member.displayName}</span>
+			{#if member.role === 'Owner' || member.role === 'Admin'}
+				<span class="role-badge role-badge-{member.role.toLowerCase()}">{member.role}</span>
+			{/if}
+		</div>
+		{#if member.statusText || member.statusEmoji}
+			<span class="member-status" title={[member.statusEmoji, member.statusText].filter(Boolean).join(' ')}>
+				{#if member.statusEmoji}<span class="status-emoji">{member.statusEmoji}</span>{/if}
+				{#if member.statusText}<span class="status-text">{member.statusText}</span>{/if}
+			</span>
+		{/if}
+	</div>
 </li>
 
 <style>
@@ -75,6 +85,21 @@
 		flex-shrink: 0;
 	}
 
+	.member-info {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.member-name-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		overflow: hidden;
+	}
+
 	.member-name {
 		font-size: 14px;
 		font-weight: 500;
@@ -86,6 +111,26 @@
 
 	.member-item:hover .member-name {
 		color: var(--text-normal);
+	}
+
+	.member-status {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		line-height: 1.3;
+		margin-top: 1px;
+	}
+
+	.status-emoji {
+		flex-shrink: 0;
+	}
+
+	.status-text {
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.role-badge {

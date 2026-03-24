@@ -1,9 +1,11 @@
 using Codec.Api.Data;
 using Codec.Api.Filters;
+using Codec.Api.Hubs;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Controllers;
@@ -14,7 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("")]
-public class UsersController(IUserService userService, IAvatarService avatarService, CodecDbContext db) : ControllerBase
+public class UsersController(IUserService userService, IAvatarService avatarService, CodecDbContext db, IHubContext<ChatHub> hub) : ControllerBase
 {
     /// <summary>
     /// Returns the authenticated user's profile and JWT claims.
@@ -62,7 +64,9 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
                 appUser.GitHubSubject,
                 appUser.DiscordSubject,
                 appUser.IsGlobalAdmin,
-                appUser.EmailVerified
+                appUser.EmailVerified,
+                appUser.StatusText,
+                appUser.StatusEmoji
             },
             isNewUser,
             claims
@@ -118,6 +122,90 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             Nickname = (string?)null,
             EffectiveDisplayName = userService.GetEffectiveDisplayName(appUser)
         });
+    }
+
+    /// <summary>
+    /// Sets or updates the current user's custom status message.
+    /// </summary>
+    [HttpPut("me/status")]
+    [RequireEmailVerified]
+    public async Task<IActionResult> SetStatus([FromBody] SetStatusRequest request)
+    {
+        var text = request.StatusText?.Trim();
+        var emoji = request.StatusEmoji?.Trim();
+
+        if (string.IsNullOrEmpty(text) && string.IsNullOrEmpty(emoji))
+        {
+            return BadRequest(new { error = "At least one of statusText or statusEmoji must be provided." });
+        }
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        appUser.StatusText = string.IsNullOrEmpty(text) ? null : text;
+        appUser.StatusEmoji = string.IsNullOrEmpty(emoji) ? null : emoji;
+        appUser.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        await BroadcastStatusChangeAsync(appUser);
+
+        return Ok(new { appUser.StatusText, appUser.StatusEmoji });
+    }
+
+    /// <summary>
+    /// Clears the current user's custom status message.
+    /// </summary>
+    [HttpDelete("me/status")]
+    [RequireEmailVerified]
+    public async Task<IActionResult> ClearStatus()
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+
+        if (appUser.StatusText is null && appUser.StatusEmoji is null)
+        {
+            return NotFound(new { error = "No status is set." });
+        }
+
+        appUser.StatusText = null;
+        appUser.StatusEmoji = null;
+        appUser.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        await BroadcastStatusChangeAsync(appUser);
+
+        return Ok(new { StatusText = (string?)null, StatusEmoji = (string?)null });
+    }
+
+    /// <summary>
+    /// Broadcasts a user status change to all servers the user belongs to and to their friends.
+    /// </summary>
+    private async Task BroadcastStatusChangeAsync(User appUser)
+    {
+        var payload = new
+        {
+            userId = appUser.Id.ToString(),
+            statusText = appUser.StatusText,
+            statusEmoji = appUser.StatusEmoji
+        };
+
+        var serverIds = await db.ServerMembers
+            .AsNoTracking()
+            .Where(m => m.UserId == appUser.Id)
+            .Select(m => m.ServerId)
+            .ToListAsync();
+
+        var serverTasks = serverIds.Select(serverId =>
+            hub.Clients.Group($"server-{serverId}").SendAsync("UserStatusChanged", payload));
+
+        var friendUserIds = await db.Friendships
+            .Where(f => f.Status == FriendshipStatus.Accepted)
+            .Where(f => f.RequesterId == appUser.Id || f.RecipientId == appUser.Id)
+            .Select(f => f.RequesterId == appUser.Id ? f.RecipientId : f.RequesterId)
+            .Distinct()
+            .ToListAsync();
+
+        var friendTasks = friendUserIds.Select(friendId =>
+            hub.Clients.Group($"user-{friendId}").SendAsync("UserStatusChanged", payload));
+
+        await Task.WhenAll(serverTasks.Concat(friendTasks));
     }
 
     /// <summary>
