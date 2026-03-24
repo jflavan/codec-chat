@@ -31,6 +31,7 @@ public class CodecDbContext : DbContext
     public DbSet<ChannelNotificationOverride> ChannelNotificationOverrides => Set<ChannelNotificationOverride>();
     public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
     public DbSet<SamlIdentityProvider> SamlIdentityProviders => Set<SamlIdentityProvider>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -459,6 +460,17 @@ public class CodecDbContext : DbContext
 
             e.HasIndex(p => new { p.ChannelId, p.MessageId }).IsUnique();
             e.HasIndex(p => new { p.ChannelId, p.PinnedAt });
+        });
+
+        modelBuilder.Entity<PushSubscription>(e =>
+        {
+            e.HasOne(ps => ps.User)
+                .WithMany()
+                .HasForeignKey(ps => ps.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(ps => ps.UserId);
+            e.HasIndex(ps => ps.Endpoint).IsUnique();
         });
     }
 }

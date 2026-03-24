@@ -49,6 +49,7 @@ import {
 	requestFreshToken,
 	consumeRedirectCredential
 } from '$lib/auth/google.js';
+import { PushNotificationManager } from '$lib/services/push-notifications.js';
 import { getTheme, applyTheme, type ThemeId } from '$lib/utils/theme.js';
 
 const CTX_KEY = Symbol('app-state');
@@ -114,6 +115,10 @@ export class AppState {
 	/* ───── notification preferences ───── */
 	notificationPreferences = $state<NotificationPreferences | null>(null);
 
+	/* ───── push notifications ───── */
+	pushNotificationsEnabled = $state(false);
+	pushNotificationsSupported = $state(false);
+
 	/* ───── pinned messages ───── */
 	pinnedMessages = $state<PinnedMessage[]>([]);
 	showPinnedPanel = $state(false);
@@ -166,7 +171,7 @@ export class AppState {
 	friendsTab = $state<'all' | 'pending' | 'add'>('all');
 	friendSearchQuery = $state('');
 	settingsOpen = $state(false);
-	settingsCategory = $state<'profile' | 'account' | 'voice-audio' | 'appearance'>('profile');
+	settingsCategory = $state<'profile' | 'account' | 'voice-audio' | 'appearance' | 'notifications'>('profile');
 	theme = $state<ThemeId>(getTheme());
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
@@ -344,6 +349,7 @@ export class AppState {
 	private audioParticipantUserMap = new Map<string, string>();
 	private pttKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
 	private pttKeyupHandler: ((e: KeyboardEvent) => void) | null = null;
+	private pushManager: PushNotificationManager;
 
 	constructor(
 		private readonly apiBaseUrl: string,
@@ -351,6 +357,8 @@ export class AppState {
 	) {
 		this.api = new ApiClient(apiBaseUrl, () => this.refreshToken());
 		this.hub = new ChatHubService(`${apiBaseUrl}/hubs/chat`);
+		this.pushManager = new PushNotificationManager(this.api, () => this.idToken);
+		this.pushNotificationsSupported = this.pushManager.isSupported;
 	}
 
 	/**
@@ -508,6 +516,9 @@ export class AppState {
 		]);
 		this.isInitialLoading = false;
 		this.showAlphaNotification = true;
+
+		// Check push subscription status (non-blocking).
+		this.checkPushSubscription();
 	}
 
 	async register(email: string, password: string, nickname: string, recaptchaToken?: string): Promise<AuthResponse> {
@@ -577,6 +588,7 @@ export class AppState {
 		]);
 		this.isInitialLoading = false;
 		this.showAlphaNotification = true;
+		this.checkPushSubscription();
 	}
 
 	async resendVerification(): Promise<void> {
@@ -601,6 +613,7 @@ export class AppState {
 				]);
 				this.isInitialLoading = false;
 				this.showAlphaNotification = true;
+				this.checkPushSubscription();
 				return true;
 			}
 		} catch {
@@ -625,6 +638,7 @@ export class AppState {
 		]);
 		this.isInitialLoading = false;
 		this.showAlphaNotification = true;
+		this.checkPushSubscription();
 	}
 
 	async refreshAccessToken(): Promise<boolean> {
@@ -1365,6 +1379,24 @@ export class AppState {
 
 	isChannelMuted(channelId: string): boolean {
 		return this.notificationPreferences?.channelOverrides.find((o) => o.channelId === channelId)?.isMuted ?? false;
+	}
+
+	/* ═══════════════════ Push Notifications ═══════════════════ */
+
+	async checkPushSubscription(): Promise<void> {
+		this.pushNotificationsEnabled = await this.pushManager.isSubscribed();
+	}
+
+	async enablePushNotifications(): Promise<boolean> {
+		const success = await this.pushManager.subscribe();
+		this.pushNotificationsEnabled = success;
+		return success;
+	}
+
+	async disablePushNotifications(): Promise<boolean> {
+		const success = await this.pushManager.unsubscribe();
+		if (success) this.pushNotificationsEnabled = false;
+		return success;
 	}
 
 	/** Join a server via invite code. */

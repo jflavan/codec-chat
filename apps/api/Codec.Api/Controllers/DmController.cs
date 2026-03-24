@@ -17,7 +17,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("dm")]
-public class DmController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory) : ControllerBase
+public class DmController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, PushNotificationService? pushService = null) : ControllerBase
 {
     /// <summary>
     /// Creates a new DM channel between the current user and the specified recipient,
@@ -659,6 +659,21 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         // Also broadcast to the DM channel group for the sender's own open tabs.
         await chatHub.Clients.Group($"dm-{channelId}")
             .SendAsync("ReceiveDm", payload);
+
+        // Send push notification to the other participant.
+        if (pushService is not null)
+        {
+            var truncatedBody = message.Body.Length > 200 ? message.Body[..200] + "…" : message.Body;
+            _ = pushService.SendToUserAsync(otherMember.UserId, new PushPayload
+            {
+                Type = "dm",
+                Title = $"DM from {message.AuthorName}",
+                Body = truncatedBody,
+                Icon = authorAvatarUrl,
+                Tag = $"dm-{channelId}",
+                Url = "/"
+            });
+        }
 
         // If the other participant's conversation was just re-opened, notify them.
         if (!members.First(m => m.UserId == otherMember.UserId).IsOpen)
