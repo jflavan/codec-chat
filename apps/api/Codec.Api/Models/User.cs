@@ -4,6 +4,8 @@ public class User
 {
     public Guid Id { get; set; }
     public string? GoogleSubject { get; set; }
+    public string? GitHubSubject { get; set; }
+    public string? DiscordSubject { get; set; }
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>

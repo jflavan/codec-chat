@@ -222,6 +222,7 @@ else
     builder.Services.AddSingleton<IEmailSender, ConsoleEmailSender>();
 
 builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddScoped<OAuthProviderService>();
 
 builder.Services.Configure<Codec.Api.Models.SamlSettings>(builder.Configuration.GetSection("Saml"));
 builder.Services.AddScoped<SamlService>();

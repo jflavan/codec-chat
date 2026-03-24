@@ -4,7 +4,7 @@ const AUTH_TYPE_KEY = 'codec_auth_type';
 const REFRESH_TOKEN_KEY = 'codec_refresh_token';
 const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
-export type AuthType = 'google' | 'local';
+export type AuthType = 'google' | 'local' | 'github' | 'discord';
 
 /** Decode a JWT payload without verifying the signature (client-side only). */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {

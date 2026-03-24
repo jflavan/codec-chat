@@ -354,7 +354,8 @@ export class AppState {
 	}
 
 	/**
-	 * Attempt to silently refresh the Google ID token.
+	 * Attempt to silently refresh the auth token.
+	 * For Google: uses One Tap. For local/GitHub/Discord: uses refresh token.
 	 * Concurrent calls are deduplicated so only one refresh runs at a time.
 	 * Signs the user out if the refresh fails.
 	 */
@@ -363,6 +364,10 @@ export class AppState {
 
 		this.refreshPromise = (async () => {
 			try {
+				if (this.authType === 'local' || this.authType === 'github' || this.authType === 'discord') {
+					const success = await this.refreshAccessToken();
+					return success ? this.idToken : null;
+				}
 				const freshToken = await requestFreshToken();
 				this.idToken = freshToken;
 				persistToken(freshToken);
@@ -436,8 +441,8 @@ export class AppState {
 				this.handleCredential(stored);
 				return;
 			}
-			// For local auth, try refresh token
-			if (this.authType === 'local') {
+			// For local/oauth auth, try refresh token
+			if (this.authType === 'local' || this.authType === 'github' || this.authType === 'discord') {
 				this.refreshAccessToken().then((success) => {
 					if (success && this.idToken) {
 						this.handleCredential(this.idToken);
@@ -515,6 +520,35 @@ export class AppState {
 
 	async linkGoogle(email: string, password: string, googleCredential: string): Promise<AuthResponse> {
 		return this.api.linkGoogle(email, password, googleCredential);
+	}
+
+	async handleOAuthCallback(provider: 'github' | 'discord', code: string): Promise<void> {
+		const response = await this.api.oauthCallback(provider, code);
+		this.idToken = response.accessToken;
+		this.status = 'Signed in';
+		persistToken(response.accessToken);
+		persistRefreshToken(response.refreshToken);
+		setAuthType(provider);
+		this.authType = provider;
+
+		if (response.isNewUser) {
+			this.needsNickname = true;
+			this.isInitialLoading = false;
+			return;
+		}
+
+		this.isInitialLoading = true;
+		await this.loadMe();
+
+		await Promise.all([
+			this.loadServers(),
+			this.loadFriends(),
+			this.loadFriendRequests(),
+			this.loadDmConversations(),
+			this.startSignalR()
+		]);
+		this.isInitialLoading = false;
+		this.showAlphaNotification = true;
 	}
 
 	async handleLocalAuth(response: AuthResponse): Promise<void> {

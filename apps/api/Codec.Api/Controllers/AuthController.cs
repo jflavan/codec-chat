@@ -23,6 +23,7 @@ public class AuthController(
     IAvatarService avatarService,
     IConfiguration configuration,
     EmailVerificationService emailVerificationService,
+    OAuthProviderService oauthProviderService,
     ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("register")]
@@ -359,6 +360,151 @@ public class AuthController(
                 user.Email,
                 AvatarUrl = avatarService.ResolveUrl(user.CustomAvatarPath) ?? user.AvatarUrl,
                 user.IsGlobalAdmin
+            }
+        });
+    }
+
+    [HttpPost("oauth/github")]
+    public async Task<IActionResult> GitHubCallback([FromBody] OAuthCallbackRequest request)
+    {
+        var userInfo = await oauthProviderService.ExchangeGitHubCodeAsync(request.Code);
+        if (userInfo is null)
+            return BadRequest(new { error = "Failed to authenticate with GitHub." });
+
+        return await HandleOAuthLogin(userInfo, "github");
+    }
+
+    [HttpPost("oauth/discord")]
+    public async Task<IActionResult> DiscordCallback([FromBody] OAuthCallbackRequest request)
+    {
+        var userInfo = await oauthProviderService.ExchangeDiscordCodeAsync(request.Code);
+        if (userInfo is null)
+            return BadRequest(new { error = "Failed to authenticate with Discord." });
+
+        return await HandleOAuthLogin(userInfo, "discord");
+    }
+
+    [HttpGet("oauth/config")]
+    public IActionResult GetOAuthConfig()
+    {
+        return Ok(new
+        {
+            github = new
+            {
+                clientId = configuration["OAuth:GitHub:ClientId"] ?? "",
+                enabled = !string.IsNullOrWhiteSpace(configuration["OAuth:GitHub:ClientId"])
+            },
+            discord = new
+            {
+                clientId = configuration["OAuth:Discord:ClientId"] ?? "",
+                enabled = !string.IsNullOrWhiteSpace(configuration["OAuth:Discord:ClientId"])
+            }
+        });
+    }
+
+    private async Task<IActionResult> HandleOAuthLogin(OAuthUserInfo userInfo, string provider)
+    {
+        User? user;
+        var isNew = false;
+
+        if (provider == "github")
+        {
+            user = await db.Users.FirstOrDefaultAsync(u => u.GitHubSubject == userInfo.Subject);
+        }
+        else
+        {
+            user = await db.Users.FirstOrDefaultAsync(u => u.DiscordSubject == userInfo.Subject);
+        }
+
+        if (user is null && userInfo.Email is not null)
+        {
+            // Check if there's an existing account with this email
+            var email = userInfo.Email.Trim().ToLowerInvariant();
+            var existingByEmail = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (existingByEmail is not null)
+            {
+                // Link the OAuth provider to the existing account
+                if (provider == "github")
+                    existingByEmail.GitHubSubject = userInfo.Subject;
+                else
+                    existingByEmail.DiscordSubject = userInfo.Subject;
+
+                if (existingByEmail.AvatarUrl is null && existingByEmail.CustomAvatarPath is null && userInfo.AvatarUrl is not null)
+                    existingByEmail.AvatarUrl = userInfo.AvatarUrl;
+
+                existingByEmail.UpdatedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync();
+                user = existingByEmail;
+            }
+        }
+
+        if (user is null)
+        {
+            // Create new user
+            user = new User
+            {
+                DisplayName = userInfo.DisplayName,
+                Email = userInfo.Email?.Trim().ToLowerInvariant(),
+                AvatarUrl = userInfo.AvatarUrl,
+                EmailVerified = userInfo.Email is not null,
+                GitHubSubject = provider == "github" ? userInfo.Subject : null,
+                DiscordSubject = provider == "discord" ? userInfo.Subject : null
+            };
+
+            db.Users.Add(user);
+
+            var defaultServerExists = await db.Servers
+                .AsNoTracking()
+                .AnyAsync(s => s.Id == Server.DefaultServerId);
+
+            if (defaultServerExists)
+            {
+                db.ServerMembers.Add(new ServerMember
+                {
+                    ServerId = Server.DefaultServerId,
+                    User = user,
+                    Role = ServerRole.Member,
+                    JoinedAt = DateTimeOffset.UtcNow
+                });
+            }
+
+            try
+            {
+                await db.SaveChangesAsync();
+                isNew = true;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // Concurrent creation — re-fetch
+                db.Entry(user).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                user = provider == "github"
+                    ? await db.Users.FirstOrDefaultAsync(u => u.GitHubSubject == userInfo.Subject)
+                    : await db.Users.FirstOrDefaultAsync(u => u.DiscordSubject == userInfo.Subject);
+                if (user is null)
+                    return Conflict(new { error = "Account creation conflict. Please try again." });
+            }
+        }
+
+        var accessToken = tokenService.GenerateAccessToken(user);
+        var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
+        var effectiveAvatarUrl = avatarService.ResolveUrl(user.CustomAvatarPath) ?? user.AvatarUrl;
+
+        return Ok(new
+        {
+            accessToken,
+            refreshToken,
+            isNewUser = isNew,
+            user = new
+            {
+                user.Id,
+                user.DisplayName,
+                user.Nickname,
+                EffectiveDisplayName = user.EffectiveDisplayName,
+                user.Email,
+                AvatarUrl = effectiveAvatarUrl,
+                user.IsGlobalAdmin,
+                user.EmailVerified
             }
         });
     }
