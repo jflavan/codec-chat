@@ -94,6 +94,14 @@ public class CodecDbContext : DbContext
             .Property(user => user.Nickname)
             .HasMaxLength(32);
 
+        modelBuilder.Entity<User>()
+            .Property(user => user.StatusText)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<User>()
+            .Property(user => user.StatusEmoji)
+            .HasMaxLength(8);
+
         // EffectiveDisplayName is a computed property; tell EF Core to ignore it.
         modelBuilder.Entity<User>()
             .Ignore(user => user.EffectiveDisplayName);

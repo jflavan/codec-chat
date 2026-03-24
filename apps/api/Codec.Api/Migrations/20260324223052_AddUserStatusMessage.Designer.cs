@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260324223052_AddUserStatusMessage")]
+    partial class AddUserStatusMessage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -693,9 +696,6 @@ namespace Codec.Api.Migrations
                     b.Property<string>("CustomAvatarPath")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiscordSubject")
-                        .HasColumnType("text");
-
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -717,9 +717,6 @@ namespace Codec.Api.Migrations
 
                     b.Property<int>("FailedLoginAttempts")
                         .HasColumnType("integer");
-
-                    b.Property<string>("GitHubSubject")
-                        .HasColumnType("text");
 
                     b.Property<string>("GoogleSubject")
                         .HasColumnType("text");
@@ -756,10 +753,6 @@ namespace Codec.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DiscordSubject")
-                        .IsUnique()
-                        .HasFilter("\"DiscordSubject\" IS NOT NULL");
-
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasFilter("\"Email\" IS NOT NULL");
@@ -767,10 +760,6 @@ namespace Codec.Api.Migrations
                     b.HasIndex("EmailVerificationToken")
                         .IsUnique()
                         .HasFilter("\"EmailVerificationToken\" IS NOT NULL");
-
-                    b.HasIndex("GitHubSubject")
-                        .IsUnique()
-                        .HasFilter("\"GitHubSubject\" IS NOT NULL");
 
                     b.HasIndex("GoogleSubject")
                         .IsUnique()

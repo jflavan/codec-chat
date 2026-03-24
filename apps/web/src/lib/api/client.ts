@@ -233,6 +233,29 @@ export class ApiClient {
 		});
 	}
 
+	/** Set or update the current user's custom status message. */
+	async setStatus(
+		token: string,
+		statusText?: string | null,
+		statusEmoji?: string | null
+	): Promise<{ statusText: string | null; statusEmoji: string | null }> {
+		return this.request(`${this.baseUrl}/me/status`, {
+			method: 'PUT',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ statusText, statusEmoji })
+		});
+	}
+
+	/** Clear the current user's custom status message. */
+	async clearStatus(
+		token: string
+	): Promise<{ statusText: null; statusEmoji: null }> {
+		return this.request(`${this.baseUrl}/me/status`, {
+			method: 'DELETE',
+			headers: this.headers(token)
+		});
+	}
+
 	/** Upload a server-specific avatar image. */
 	async uploadServerAvatar(
 		token: string,

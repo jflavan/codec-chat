@@ -170,6 +170,12 @@ export type UserPresenceChangedEvent = {
 	status: 'online' | 'idle' | 'offline';
 };
 
+export type UserStatusChangedEvent = {
+	userId: string;
+	statusText: string | null;
+	statusEmoji: string | null;
+};
+
 export type UserJoinedVoiceEvent = {
 	channelId: string;
 	userId: string;
@@ -273,6 +279,7 @@ export type SignalRCallbacks = {
 	onCustomEmojiUpdated?: (event: CustomEmojiUpdatedEvent) => void;
 	onCustomEmojiDeleted?: (event: CustomEmojiDeletedEvent) => void;
 	onUserPresenceChanged?: (event: UserPresenceChangedEvent) => void;
+	onUserStatusChanged?: (event: UserStatusChangedEvent) => void;
 	onChannelOrderChanged?: (event: ChannelOrderChangedEvent) => void;
 	onCategoryOrderChanged?: (event: CategoryOrderChangedEvent) => void;
 	onCategoryCreated?: (event: CategoryCreatedEvent) => void;
@@ -433,6 +440,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onUserPresenceChanged) {
 			connection.on('UserPresenceChanged', callbacks.onUserPresenceChanged);
+		}
+		if (callbacks.onUserStatusChanged) {
+			connection.on('UserStatusChanged', callbacks.onUserStatusChanged);
 		}
 		if (callbacks.onChannelOrderChanged) {
 			connection.on('ChannelOrderChanged', callbacks.onChannelOrderChanged);

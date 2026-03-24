@@ -1476,6 +1476,50 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Status ═══════════════════ */
+
+	/** Set or update the current user's custom status message. */
+	async setStatus(statusText?: string | null, statusEmoji?: string | null): Promise<void> {
+		if (!this.idToken) return;
+		this.error = null;
+		try {
+			const result = await this.api.setStatus(this.idToken, statusText, statusEmoji);
+			if (this.me) {
+				this.me = {
+					...this.me,
+					user: {
+						...this.me.user,
+						statusText: result.statusText,
+						statusEmoji: result.statusEmoji
+					}
+				};
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Clear the current user's custom status message. */
+	async clearStatus(): Promise<void> {
+		if (!this.idToken) return;
+		this.error = null;
+		try {
+			const result = await this.api.clearStatus(this.idToken);
+			if (this.me) {
+				this.me = {
+					...this.me,
+					user: {
+						...this.me.user,
+						statusText: result.statusText,
+						statusEmoji: result.statusEmoji
+					}
+				};
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
 	/** Upload a server-specific avatar for the current user. */
 	async uploadServerAvatar(serverId: string, file: File): Promise<void> {
 		if (!this.idToken) return;
@@ -2966,6 +3010,25 @@ export class AppState {
 					this.userPresence.delete(event.userId);
 				} else {
 					this.userPresence.set(event.userId, event.status);
+				}
+			},
+			onUserStatusChanged: (event) => {
+				// Update member list with new status
+				this.members = this.members.map((m) =>
+					m.userId === event.userId
+						? { ...m, statusText: event.statusText, statusEmoji: event.statusEmoji }
+						: m
+				);
+				// Update own profile if it's our status
+				if (this.me && event.userId === this.me.user.id) {
+					this.me = {
+						...this.me,
+						user: {
+							...this.me.user,
+							statusText: event.statusText,
+							statusEmoji: event.statusEmoji
+						}
+					};
 				}
 			},
 			onNewProducer: async (event) => {
