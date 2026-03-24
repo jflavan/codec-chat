@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260324222748_AddFileAttachmentFields")]
+    partial class AddFileAttachmentFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -565,51 +568,6 @@ namespace Codec.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.SamlIdentityProvider", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("AllowJitProvisioning")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("CertificatePem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SingleSignOnUrl")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EntityId")
-                        .IsUnique();
-
-                    b.ToTable("SamlIdentityProviders");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.Server", b =>
                 {
                     b.Property<Guid>("Id")
@@ -717,9 +675,6 @@ namespace Codec.Api.Migrations
                     b.Property<string>("CustomAvatarPath")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiscordSubject")
-                        .HasColumnType("text");
-
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -742,9 +697,6 @@ namespace Codec.Api.Migrations
                     b.Property<int>("FailedLoginAttempts")
                         .HasColumnType("integer");
 
-                    b.Property<string>("GitHubSubject")
-                        .HasColumnType("text");
-
                     b.Property<string>("GoogleSubject")
                         .HasColumnType("text");
 
@@ -761,28 +713,10 @@ namespace Codec.Api.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("SamlIdentityProviderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SamlNameId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StatusEmoji")
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)");
-
-                    b.Property<string>("StatusText")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DiscordSubject")
-                        .IsUnique()
-                        .HasFilter("\"DiscordSubject\" IS NOT NULL");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -792,19 +726,9 @@ namespace Codec.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"EmailVerificationToken\" IS NOT NULL");
 
-                    b.HasIndex("GitHubSubject")
-                        .IsUnique()
-                        .HasFilter("\"GitHubSubject\" IS NOT NULL");
-
                     b.HasIndex("GoogleSubject")
                         .IsUnique()
                         .HasFilter("\"GoogleSubject\" IS NOT NULL");
-
-                    b.HasIndex("SamlIdentityProviderId");
-
-                    b.HasIndex("SamlNameId", "SamlIdentityProviderId")
-                        .IsUnique()
-                        .HasFilter("\"SamlNameId\" IS NOT NULL");
 
                     b.ToTable("Users");
                 });
@@ -1197,16 +1121,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("Server");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.User", b =>
-                {
-                    b.HasOne("Codec.Api.Models.SamlIdentityProvider", "SamlIdentityProvider")
-                        .WithMany()
-                        .HasForeignKey("SamlIdentityProviderId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("SamlIdentityProvider");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.VoiceCall", b =>

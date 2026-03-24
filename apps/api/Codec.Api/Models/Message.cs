@@ -8,6 +8,10 @@ public class Message
     public string AuthorName { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
+    public string? FileUrl { get; set; }
+    public string? FileName { get; set; }
+    public long? FileSize { get; set; }
+    public string? FileContentType { get; set; }
     public Guid? ReplyToMessageId { get; set; }
     public MessageType MessageType { get; set; } = MessageType.Regular;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

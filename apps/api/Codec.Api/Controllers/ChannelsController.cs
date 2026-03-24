@@ -70,6 +70,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.AuthorUserId,
                     m.Body,
                     m.ImageUrl,
+                    m.FileUrl,
+                    m.FileName,
+                    m.FileSize,
+                    m.FileContentType,
                     m.CreatedAt,
                     m.EditedAt,
                     m.ChannelId,
@@ -99,6 +103,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.AuthorUserId,
                     m.Body,
                     m.ImageUrl,
+                    m.FileUrl,
+                    m.FileName,
+                    m.FileSize,
+                    m.FileContentType,
                     m.CreatedAt,
                     m.EditedAt,
                     m.ChannelId,
@@ -123,6 +131,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.AuthorUserId,
                     m.Body,
                     m.ImageUrl,
+                    m.FileUrl,
+                    m.FileName,
+                    m.FileSize,
+                    m.FileContentType,
                     m.CreatedAt,
                     m.EditedAt,
                     m.ChannelId,
@@ -252,6 +264,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     message.AuthorUserId,
                     message.Body,
                     message.ImageUrl,
+                    message.FileUrl,
+                    message.FileName,
+                    message.FileSize,
+                    message.FileContentType,
                     message.CreatedAt,
                     message.EditedAt,
                     message.ChannelId,
@@ -295,6 +311,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.AuthorUserId,
                 message.Body,
                 message.ImageUrl,
+                message.FileUrl,
+                message.FileName,
+                message.FileSize,
+                message.FileContentType,
                 message.CreatedAt,
                 message.EditedAt,
                 message.ChannelId,
@@ -464,9 +484,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     [HttpPost("{channelId:guid}/messages")]
     public async Task<IActionResult> PostMessage(Guid channelId, [FromBody] CreateMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Body) && string.IsNullOrWhiteSpace(request.ImageUrl))
+        if (string.IsNullOrWhiteSpace(request.Body) && string.IsNullOrWhiteSpace(request.ImageUrl) && string.IsNullOrWhiteSpace(request.FileUrl))
         {
-            return BadRequest(new { error = "Message body or image is required." });
+            return BadRequest(new { error = "Message body, image, or file is required." });
         }
 
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(item => item.Id == channelId);
@@ -522,6 +542,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             AuthorName = authorName,
             Body = request.Body?.Trim() ?? string.Empty,
             ImageUrl = request.ImageUrl,
+            FileUrl = request.FileUrl,
+            FileName = request.FileName,
+            FileSize = request.FileSize,
+            FileContentType = request.FileContentType,
             ReplyToMessageId = request.ReplyToMessageId
         };
 
@@ -549,6 +573,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             message.AuthorUserId,
             message.Body,
             message.ImageUrl,
+            message.FileUrl,
+            message.FileName,
+            message.FileSize,
+            message.FileContentType,
             message.CreatedAt,
             message.EditedAt,
             message.ChannelId,
@@ -973,6 +1001,10 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     authorUserId = msg.AuthorUserId,
                     body = msg.Body,
                     imageUrl = msg.ImageUrl,
+                    fileUrl = msg.FileUrl,
+                    fileName = msg.FileName,
+                    fileSize = msg.FileSize,
+                    fileContentType = msg.FileContentType,
                     createdAt = msg.CreatedAt,
                     editedAt = msg.EditedAt,
                     channelId = msg.ChannelId,

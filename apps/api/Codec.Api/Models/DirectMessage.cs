@@ -13,6 +13,10 @@ public class DirectMessage
     public string Body { get; set; } = string.Empty;
     public MessageType MessageType { get; set; } = MessageType.Regular;
     public string? ImageUrl { get; set; }
+    public string? FileUrl { get; set; }
+    public string? FileName { get; set; }
+    public long? FileSize { get; set; }
+    public string? FileContentType { get; set; }
     public Guid? ReplyToDirectMessageId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? EditedAt { get; set; }
