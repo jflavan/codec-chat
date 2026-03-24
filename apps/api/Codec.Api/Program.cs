@@ -223,6 +223,9 @@ else
 
 builder.Services.AddScoped<EmailVerificationService>();
 
+builder.Services.Configure<Codec.Api.Models.SamlSettings>(builder.Configuration.GetSection("Saml"));
+builder.Services.AddScoped<SamlService>();
+
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.
 // Accepts self-signed TLS certs because the SFU VM uses a snakeoil cert
