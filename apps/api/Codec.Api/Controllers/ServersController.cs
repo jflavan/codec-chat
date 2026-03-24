@@ -346,6 +346,186 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         return NoContent();
     }
 
+    /* ═══════════════════ Server Bans ═══════════════════ */
+
+    /// <summary>
+    /// Bans a user from a server. Removes them if currently a member, prevents rejoin,
+    /// and optionally deletes their messages. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPost("{serverId:guid}/bans/{targetUserId:guid}")]
+    public async Task<IActionResult> BanMember(Guid serverId, Guid targetUserId, [FromBody] BanMemberRequest request, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        if (targetUserId == appUser.Id)
+        {
+            return BadRequest(new { error = "You cannot ban yourself." });
+        }
+
+        var targetMembership = await db.ServerMembers
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+
+        if (targetMembership is not null && targetMembership.Role is ServerRole.Owner)
+        {
+            return BadRequest(new { error = "Cannot ban the server owner." });
+        }
+
+        if (targetMembership is not null
+            && callerMembership.Role is ServerRole.Admin
+            && targetMembership.Role is ServerRole.Admin)
+        {
+            return Forbid();
+        }
+
+        var existingBan = await db.BannedMembers
+            .FindAsync(serverId, targetUserId);
+
+        if (existingBan is not null)
+        {
+            return Conflict(new { error = "User is already banned from this server." });
+        }
+
+        var targetUser = await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == targetUserId);
+
+        if (targetUser is null)
+        {
+            return NotFound(new { error = "User not found." });
+        }
+
+        var bannedDisplayName = !string.IsNullOrWhiteSpace(targetUser.Nickname)
+            ? targetUser.Nickname : targetUser.DisplayName;
+
+        // Remove membership if they're currently a member
+        if (targetMembership is not null)
+        {
+            db.ServerMembers.Remove(targetMembership);
+        }
+
+        // Create ban record
+        var ban = new BannedMember
+        {
+            ServerId = serverId,
+            UserId = targetUserId,
+            BannedByUserId = appUser.Id,
+            Reason = request.Reason?.Trim(),
+            BannedAt = DateTimeOffset.UtcNow
+        };
+        db.BannedMembers.Add(ban);
+
+        // Optionally delete the banned user's messages from all channels in this server
+        int deletedMessageCount = 0;
+        if (request.DeleteMessages)
+        {
+            var channelIds = await db.Channels
+                .AsNoTracking()
+                .Where(c => c.ServerId == serverId)
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            var messagesToDelete = await db.Messages
+                .Where(m => channelIds.Contains(m.ChannelId) && m.AuthorUserId == targetUserId)
+                .ToListAsync();
+
+            deletedMessageCount = messagesToDelete.Count;
+            db.Messages.RemoveRange(messagesToDelete);
+        }
+
+        audit.Log(serverId, appUser.Id, AuditAction.MemberBanned,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: bannedDisplayName + (request.Reason is not null ? $" — {request.Reason.Trim()}" : ""));
+        await db.SaveChangesAsync();
+
+        var serverName = await db.Servers
+            .AsNoTracking()
+            .Where(s => s.Id == serverId)
+            .Select(s => s.Name)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
+        // Notify the banned user
+        await hub.Clients.Group($"user-{targetUserId}").SendAsync("BannedFromServer", new
+        {
+            serverId,
+            serverName
+        });
+
+        // Notify remaining members
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberBanned", new
+        {
+            serverId,
+            userId = targetUserId,
+            deletedMessageCount
+        });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Unbans a user from a server. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/bans/{targetUserId:guid}")]
+    public async Task<IActionResult> UnbanMember(Guid serverId, Guid targetUserId, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var ban = await db.BannedMembers.FindAsync(serverId, targetUserId);
+
+        if (ban is null)
+        {
+            return NotFound(new { error = "User is not banned from this server." });
+        }
+
+        var unbannedDisplayName = await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == targetUserId)
+            .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
+        db.BannedMembers.Remove(ban);
+        audit.Log(serverId, appUser.Id, AuditAction.MemberUnbanned,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: unbannedDisplayName);
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberUnbanned", new
+        {
+            serverId,
+            userId = targetUserId
+        });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Lists all banned users for a server. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpGet("{serverId:guid}/bans")]
+    public async Task<IActionResult> GetBans(Guid serverId)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var bans = await db.BannedMembers
+            .AsNoTracking()
+            .Where(b => b.ServerId == serverId)
+            .Join(db.Users, b => b.UserId, u => u.Id, (b, u) => new
+            {
+                b.UserId,
+                DisplayName = u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName,
+                AvatarUrl = u.CustomAvatarPath ?? u.AvatarUrl,
+                b.Reason,
+                b.BannedAt,
+                b.BannedByUserId
+            })
+            .OrderByDescending(b => b.BannedAt)
+            .ToListAsync();
+
+        return Ok(bans);
+    }
+
     /// <summary>
     /// Changes a member's role within a server.
     /// Owner can promote to Admin or demote to Member.
@@ -966,6 +1146,15 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         if (invite.MaxUses is not null && invite.UseCount >= invite.MaxUses)
         {
             return BadRequest(new { error = "This invite has reached maximum uses." });
+        }
+
+        // Check if the user is banned from this server
+        var isBanned = await db.BannedMembers
+            .AnyAsync(b => b.ServerId == invite.ServerId && b.UserId == appUser.Id);
+
+        if (isBanned)
+        {
+            return StatusCode(403, new { error = "You are banned from this server." });
         }
 
         var existingMembership = await db.ServerMembers

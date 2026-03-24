@@ -8,6 +8,7 @@
 	import ServerInvites from './ServerInvites.svelte';
 	import ServerWebhooks from './ServerWebhooks.svelte';
 	import ServerAuditLog from './ServerAuditLog.svelte';
+	import ServerBans from './ServerBans.svelte';
 
 	const app = getAppState();
 
@@ -70,6 +71,8 @@
 				<ServerEmojis />
 			{:else if app.serverSettingsCategory === 'members'}
 				<ServerMembers />
+			{:else if app.serverSettingsCategory === 'bans'}
+				<ServerBans />
 			{:else if app.serverSettingsCategory === 'audit-log'}
 				<ServerAuditLog />
 			{:else}

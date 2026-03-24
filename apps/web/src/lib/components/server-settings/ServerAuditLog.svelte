@@ -50,6 +50,8 @@
 			EmojiRenamed: 'renamed a custom emoji',
 			EmojiDeleted: 'deleted an emoji',
 			MessageDeletedByAdmin: 'deleted a message',
+			MemberBanned: 'banned a member',
+			MemberUnbanned: 'unbanned a member',
 		};
 		const description = actionMap[action] ?? action.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
 		return description + details;

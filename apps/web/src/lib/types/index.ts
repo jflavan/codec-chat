@@ -41,5 +41,6 @@ export type {
 	MessageUnpinnedEvent,
 	Webhook,
 	WebhookDelivery,
-	WebhookEventType
+	WebhookEventType,
+	BannedMember
 } from './models.js';
