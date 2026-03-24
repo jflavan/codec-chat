@@ -4,79 +4,95 @@ See [ROLES.md](ROLES.md) for the user-facing permission matrix.
 
 ## Data Model
 
-**`ServerRole` enum** (`apps/api/Codec.Api/Models/ServerRole.cs`):
+**`ServerRoleEntity`** (`apps/api/Codec.Api/Models/ServerRoleEntity.cs`) — custom or system role within a server. Properties: `Id`, `ServerId`, `Name`, `Color`, `Position`, `Permissions` (bitmask), `IsSystemRole`, `IsHoisted`, `IsMentionable`.
 
-| Value | Name |
-|---|---|
-| 0 | Owner |
-| 1 | Admin |
-| 2 | Member |
+**`Permission`** (`apps/api/Codec.Api/Models/Permission.cs`) — `[Flags] enum` with granular permission flags stored as `long`. Use `PermissionExtensions.Has()` for checks (auto-grants on `Administrator`).
 
-**`ServerMember`** (`apps/api/Codec.Api/Models/ServerMember.cs`) — join table linking users to servers. The `Role` field defaults to `ServerRole.Member`. Primary key is (`ServerId`, `UserId`).
+**`ServerMember`** (`apps/api/Codec.Api/Models/ServerMember.cs`) — join table linking users to servers. The `RoleId` field references a `ServerRoleEntity`. Primary key is (`ServerId`, `UserId`).
 
-**`User.IsGlobalAdmin`** (`apps/api/Codec.Api/Models/User.cs:28`) — platform-wide admin flag, independent of server membership. Set at startup for the user matching `GlobalAdmin:Email` in config.
+**`User.IsGlobalAdmin`** — platform-wide admin flag, independent of server membership.
 
 ## Enforcement Patterns
 
-### Backend (ServersController)
+### Backend (UserService)
 
-All role-gated endpoints follow this pattern in `apps/api/Codec.Api/Controllers/ServersController.cs`:
-
-1. Check `appUser.IsGlobalAdmin` — if true, skip membership check.
-2. Look up `ServerMember` for the current user and server.
-3. Return `Forbid()` if no membership or insufficient role.
+Permission checks go through `IUserService`:
 
 ```csharp
-if (!appUser.IsGlobalAdmin)
-{
-    var membership = await db.ServerMembers
-        .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == appUser.Id);
+// Check specific permission
+await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
-    if (membership is null)
-        return Forbid();
+// Check admin-equivalent (Administrator flag)
+await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-    if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
-        return Forbid();
-}
+// Check server owner
+await userService.EnsureOwnerAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 ```
 
-**Admin kick restriction:** Admins cannot kick other Admins. The controller checks `callerRole is ServerRole.Admin && targetMembership.Role is ServerRole.Admin` and returns `Forbid()`.
+All methods:
+1. Check `isGlobalAdmin` — if true, bypass all checks.
+2. Load `ServerMember` with its `Role` (Include).
+3. Check `role.Permissions.Has(permission)` — `Administrator` auto-grants everything.
+4. Throw `ForbiddenException` on failure.
+
+**Hierarchy enforcement:** When assigning roles, check that the caller's role position is lower (higher rank) than the target role's position. Members cannot assign roles equal to or above their own.
 
 ### Frontend (AppState)
 
-`apps/web/src/lib/state/app-state.svelte.ts` (lines 196-220) exposes derived permission flags:
+`apps/web/src/lib/state/app-state.svelte.ts` uses `hasPermission()` for derived flags:
 
-| Property | Allowed Roles |
-|---|---|
-| `canManageChannels` | Owner, Admin, Global Admin |
-| `canKickMembers` | Owner, Admin, Global Admin |
-| `canManageInvites` | Owner, Admin, Global Admin |
-| `canDeleteServer` | Owner, Global Admin |
-| `canDeleteChannel` | Owner, Admin, Global Admin |
+```typescript
+readonly canManageChannels = $derived(
+    this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageChannels)
+);
+```
 
-Components use these flags to show/hide UI elements (e.g., kick buttons in `MemberItem.svelte`, channel management controls).
+The `currentServerPermissions` number comes from the API's `permissions` field on the server membership response.
 
-### SignalR (ChatHub)
+### Role Management (RolesController)
 
-`apps/api/Codec.Api/Hubs/ChatHub.cs` — on connect, Global Admins are automatically added to all server groups so they receive real-time events for every server.
+`apps/api/Codec.Api/Controllers/RolesController.cs` provides CRUD endpoints:
+
+| Method | Endpoint | Permission Required |
+|---|---|---|
+| GET | `/servers/{id}/roles` | Membership |
+| POST | `/servers/{id}/roles` | ManageRoles |
+| PATCH | `/servers/{id}/roles/{roleId}` | ManageRoles |
+| DELETE | `/servers/{id}/roles/{roleId}` | ManageRoles |
+| PUT | `/servers/{id}/roles/reorder` | ManageRoles |
+
+### SignalR Events
+
+| Event | Payload | When |
+|---|---|---|
+| `MemberRoleChanged` | `{ serverId, userId, newRole, permissions }` | Member's role changed |
+| `RoleCreated` | `{ serverId, role: { id, name, color, position, permissions, ... } }` | New role created |
+| `RoleUpdated` | `{ serverId, role: { ... } }` | Role properties changed |
+| `RoleDeleted` | `{ serverId, roleId, roleName }` | Role deleted |
+| `RolesReordered` | `{ serverId }` | Role positions changed |
 
 ## Key Files
 
 | Area | File |
 |---|---|
-| Role enum | `apps/api/Codec.Api/Models/ServerRole.cs` |
+| Role entity | `apps/api/Codec.Api/Models/ServerRoleEntity.cs` |
+| Permission flags | `apps/api/Codec.Api/Models/Permission.cs` |
 | Membership model | `apps/api/Codec.Api/Models/ServerMember.cs` |
-| Global admin flag | `apps/api/Codec.Api/Models/User.cs` |
-| Permission checks | `apps/api/Codec.Api/Controllers/ServersController.cs` |
-| Real-time groups | `apps/api/Codec.Api/Hubs/ChatHub.cs` |
+| Permission checks | `apps/api/Codec.Api/Services/UserService.cs` |
+| Role CRUD | `apps/api/Codec.Api/Controllers/RolesController.cs` |
+| Member management | `apps/api/Codec.Api/Controllers/ServersController.cs` |
 | Seed data | `apps/api/Codec.Api/Data/SeedData.cs` |
+| Migration | `apps/api/Codec.Api/Migrations/20260324223326_CustomRolesAndPermissions.cs` |
+| Frontend types | `apps/web/src/lib/types/models.ts` |
 | Frontend state | `apps/web/src/lib/state/app-state.svelte.ts` |
-| Member list UI | `apps/web/src/lib/components/server/MembersSidebar.svelte` |
-| Member item UI | `apps/web/src/lib/components/server/MemberItem.svelte` |
+| Role mgmt UI | `apps/web/src/lib/components/server-settings/ServerRoles.svelte` |
+| Member list | `apps/web/src/lib/components/members/MembersSidebar.svelte` |
 
-## Adding a New Role-Gated Feature
+## Adding a New Permission
 
-1. **Backend:** Add a permission check in the relevant controller following the pattern above. Check `IsGlobalAdmin` first, then membership role.
-2. **Frontend state:** Add a `readonly canDoThing = $derived(...)` property in `AppState`.
-3. **Frontend UI:** Gate the UI element with the new derived property.
-4. **Documentation:** Update the permission matrix in `docs/ROLES.md`.
+1. **Backend:** Add a new flag to the `Permission` enum with the next available bit position.
+2. **Backend:** Add it to `AdminDefaults` and/or `MemberDefaults` in `PermissionExtensions` if it should be granted by default.
+3. **Backend:** Use `EnsurePermissionAsync(serverId, userId, Permission.NewFlag, isGlobalAdmin)` in your controller.
+4. **Frontend:** Add the flag value to `Permission` in `apps/web/src/lib/types/models.ts`.
+5. **Frontend:** Add a `canDoThing` derived property in `AppState` using `hasPermission()`.
+6. **Documentation:** Update `docs/ROLES.md` permission table.
