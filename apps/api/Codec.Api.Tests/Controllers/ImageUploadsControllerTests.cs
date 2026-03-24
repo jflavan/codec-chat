@@ -12,12 +12,13 @@ namespace Codec.Api.Tests.Controllers;
 public class ImageUploadsControllerTests
 {
     private readonly Mock<IImageUploadService> _imageUpload = new();
+    private readonly Mock<IFileUploadService> _fileUpload = new();
     private readonly Mock<IUserService> _userService = new();
     private readonly ImageUploadsController _controller;
 
     public ImageUploadsControllerTests()
     {
-        _controller = new ImageUploadsController(_imageUpload.Object, _userService.Object);
+        _controller = new ImageUploadsController(_imageUpload.Object, _fileUpload.Object, _userService.Object);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
