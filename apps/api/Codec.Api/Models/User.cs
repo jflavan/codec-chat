@@ -27,6 +27,19 @@ public class User
     public string? PasswordHash { get; set; }
 
     /// <summary>
+    /// SAML NameID from the identity provider. Used to match SAML assertions
+    /// to existing users. Null for non-SAML accounts.
+    /// </summary>
+    public string? SamlNameId { get; set; }
+
+    /// <summary>
+    /// The SAML identity provider that provisioned this user via JIT.
+    /// Null for non-SAML accounts.
+    /// </summary>
+    public Guid? SamlIdentityProviderId { get; set; }
+    public SamlIdentityProvider? SamlIdentityProvider { get; set; }
+
+    /// <summary>
     /// Indicates whether this user has global admin privileges, allowing them to
     /// delete any server, channel, or message regardless of ownership.
     /// </summary>

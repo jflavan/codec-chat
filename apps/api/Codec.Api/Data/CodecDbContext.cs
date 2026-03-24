@@ -30,6 +30,7 @@ public class CodecDbContext : DbContext
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<ChannelNotificationOverride> ChannelNotificationOverrides => Set<ChannelNotificationOverride>();
     public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
+    public DbSet<SamlIdentityProvider> SamlIdentityProviders => Set<SamlIdentityProvider>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +68,17 @@ public class CodecDbContext : DbContext
             .HasIndex(user => user.EmailVerificationToken)
             .IsUnique()
             .HasFilter("\"EmailVerificationToken\" IS NOT NULL");
+
+        modelBuilder.Entity<User>()
+            .HasIndex(user => new { user.SamlNameId, user.SamlIdentityProviderId })
+            .IsUnique()
+            .HasFilter("\"SamlNameId\" IS NOT NULL");
+
+        modelBuilder.Entity<User>()
+            .HasOne(user => user.SamlIdentityProvider)
+            .WithMany()
+            .HasForeignKey(user => user.SamlIdentityProviderId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<User>()
             .Property(user => user.Nickname)
@@ -401,6 +413,14 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<Message>()
             .Property(m => m.MessageType)
             .HasDefaultValue(MessageType.Regular);
+
+        modelBuilder.Entity<SamlIdentityProvider>(e =>
+        {
+            e.HasIndex(p => p.EntityId).IsUnique();
+            e.Property(p => p.EntityId).HasMaxLength(500);
+            e.Property(p => p.DisplayName).HasMaxLength(200);
+            e.Property(p => p.SingleSignOnUrl).HasMaxLength(2000);
+        });
 
         modelBuilder.Entity<PinnedMessage>(e =>
         {
