@@ -281,13 +281,21 @@ public class SamlService(
 
         if (defaultServerExists)
         {
-            db.ServerMembers.Add(new ServerMember
+            var defaultMemberRole = await db.ServerRoles
+                .AsNoTracking()
+                .Where(r => r.ServerId == Server.DefaultServerId && r.IsSystemRole && r.Name == "Member")
+                .FirstOrDefaultAsync();
+
+            if (defaultMemberRole is not null)
             {
-                ServerId = Server.DefaultServerId,
-                User = user,
-                Role = ServerRole.Member,
-                JoinedAt = DateTimeOffset.UtcNow
-            });
+                db.ServerMembers.Add(new ServerMember
+                {
+                    ServerId = Server.DefaultServerId,
+                    User = user,
+                    RoleId = defaultMemberRole.Id,
+                    JoinedAt = DateTimeOffset.UtcNow
+                });
+            }
         }
 
         try
