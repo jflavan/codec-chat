@@ -1,52 +1,54 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { hasPermission, Permission } from '$lib/types/index.js';
 
 	const app = getAppState();
 
-	let demotingUserId = $state<string | null>(null);
 	let kickingUserId = $state<string | null>(null);
+	let changingRoleUserId = $state<string | null>(null);
 	let banningUserId = $state<string | null>(null);
 	let banReason = $state('');
 	let banDeleteMessages = $state(false);
 
-	const canDemote = () =>
-		app.isGlobalAdmin || app.currentServerRole === 'Owner';
+	const isOwner = $derived(app.currentServerRole === 'Owner');
 
-	const canKick = (member: { userId: string; role: string }) =>
+	const canKick = (member: { userId: string; role: string; rolePosition: number }) =>
 		app.canKickMembers &&
 		member.userId !== app.me?.user.id &&
 		member.role !== 'Owner' &&
-		!(app.currentServerRole === 'Admin' && member.role === 'Admin');
+		(isOwner || member.rolePosition > (app.members.find(m => m.userId === app.me?.user.id)?.rolePosition ?? 999));
 
-	const canBan = (member: { userId: string; role: string }) =>
+	const canBan = (member: { userId: string; role: string; rolePosition: number }) =>
 		app.canBanMembers &&
 		member.userId !== app.me?.user.id &&
 		member.role !== 'Owner' &&
-		!(app.currentServerRole === 'Admin' && member.role === 'Admin');
+		(isOwner || member.rolePosition > (app.members.find(m => m.userId === app.me?.user.id)?.rolePosition ?? 999));
 
-	const canPromote = (memberRole: string) =>
-		memberRole === 'Member' && app.canManageRoles;
+	const canChangeRole = (member: { userId: string; role: string }) =>
+		app.canManageRoles &&
+		member.userId !== app.me?.user.id &&
+		member.role !== 'Owner';
 
-	async function promote(userId: string): Promise<void> {
-		await app.updateMemberRole(userId, 'Admin');
-	}
+	/** Roles that the current user can assign (only roles below their own position). */
+	const assignableRoles = $derived(() => {
+		const myPosition = app.members.find(m => m.userId === app.me?.user.id)?.rolePosition ?? 999;
+		return app.serverRoles
+			.filter(r => !r.isSystemRole || r.name !== 'Owner')
+			.filter(r => isOwner || r.position > myPosition);
+	});
 
-	async function demote(userId: string): Promise<void> {
-		kickingUserId = null;
-		if (demotingUserId !== userId) {
-			demotingUserId = userId;
-			return;
+	$effect(() => {
+		if (app.selectedServerId && app.canManageRoles) {
+			app.loadRoles();
 		}
-		await app.updateMemberRole(userId, 'Member');
-		demotingUserId = null;
-	}
+	});
 
-	function cancelDemote(): void {
-		demotingUserId = null;
+	async function changeRole(userId: string, roleName: string): Promise<void> {
+		await app.updateMemberRole(userId, roleName);
+		changingRoleUserId = null;
 	}
 
 	async function kick(userId: string): Promise<void> {
-		demotingUserId = null;
 		if (kickingUserId !== userId) {
 			kickingUserId = userId;
 			return;
@@ -61,7 +63,7 @@
 
 	async function ban(userId: string): Promise<void> {
 		kickingUserId = null;
-		demotingUserId = null;
+		changingRoleUserId = null;
 		if (banningUserId !== userId) {
 			banningUserId = userId;
 			banReason = '';
@@ -81,24 +83,7 @@
 	}
 </script>
 
-{#snippet kickButton(member: { userId: string; displayName: string; role: string })}
-	{#if canKick(member)}
-		{#if kickingUserId === member.userId}
-			<button class="role-btn role-btn-danger" onclick={() => kick(member.userId)}>
-				Are you sure?
-			</button>
-			<button class="role-btn role-btn-cancel" onclick={cancelKick}>
-				Cancel
-			</button>
-		{:else}
-			<button class="role-btn role-btn-kick" onclick={() => kick(member.userId)} aria-label="Kick {member.displayName}">
-				Kick
-			</button>
-		{/if}
-	{/if}
-{/snippet}
-
-{#snippet banButton(member: { userId: string; displayName: string; role: string })}
+{#snippet banButton(member: { userId: string; displayName: string; role: string; rolePosition: number })}
 	{#if canBan(member)}
 		{#if banningUserId === member.userId}
 			<div class="ban-confirm">
@@ -147,32 +132,54 @@
 
 				<div class="member-info">
 					<span class="member-name">{member.displayName}</span>
-					<span class="member-role role-{member.role.toLowerCase()}">{member.role}</span>
+					<span
+						class="member-role"
+						style:color={member.roleColor ?? 'var(--text-muted)'}
+					>
+						{member.role}
+					</span>
 				</div>
 
 				<div class="member-actions">
 					{#if member.role === 'Owner' || member.userId === app.me?.user.id}
 						<!-- No actions for owner or self -->
-					{:else if member.role === 'Admin' && canDemote()}
-						{#if demotingUserId === member.userId}
-							<button class="role-btn role-btn-danger" onclick={() => demote(member.userId)}>
-								Are you sure?
-							</button>
-							<button class="role-btn role-btn-cancel" onclick={cancelDemote}>
-								Cancel
-							</button>
-						{:else}
-							<button class="role-btn role-btn-demote" onclick={() => demote(member.userId)}>
-								Remove Admin
-							</button>
+					{:else}
+						{#if canChangeRole(member)}
+							{#if changingRoleUserId === member.userId}
+								<select
+									class="role-select"
+									value={member.role}
+									onchange={(e) => changeRole(member.userId, (e.target as HTMLSelectElement).value)}
+								>
+									{#each assignableRoles() as role (role.id)}
+										<option value={role.name} selected={role.name === member.role}>{role.name}</option>
+									{/each}
+								</select>
+								<button class="role-btn role-btn-cancel" onclick={() => (changingRoleUserId = null)}>
+									Cancel
+								</button>
+							{:else}
+								<button class="role-btn role-btn-promote" onclick={() => (changingRoleUserId = member.userId)}>
+									Change Role
+								</button>
+							{/if}
 						{/if}
-						{@render kickButton(member)}
-						{@render banButton(member)}
-					{:else if canPromote(member.role)}
-						<button class="role-btn role-btn-promote" onclick={() => promote(member.userId)}>
-							Make Admin
-						</button>
-						{@render kickButton(member)}
+
+						{#if canKick(member)}
+							{#if kickingUserId === member.userId}
+								<button class="role-btn role-btn-danger" onclick={() => kick(member.userId)}>
+									Are you sure?
+								</button>
+								<button class="role-btn role-btn-cancel" onclick={cancelKick}>
+									Cancel
+								</button>
+							{:else}
+								<button class="role-btn role-btn-kick" onclick={() => kick(member.userId)} aria-label="Kick {member.displayName}">
+									Kick
+								</button>
+							{/if}
+						{/if}
+
 						{@render banButton(member)}
 					{/if}
 				</div>
@@ -264,23 +271,21 @@
 		letter-spacing: 0.5px;
 	}
 
-	.role-owner {
-		color: var(--accent);
-	}
-
-	.role-admin {
-		color: #f0b232;
-	}
-
-	.role-member {
-		color: var(--text-muted);
-	}
-
 	.member-actions {
 		display: flex;
 		gap: 6px;
 		margin-left: auto;
 		flex-shrink: 0;
+	}
+
+	.role-select {
+		padding: 4px 8px;
+		font-size: 12px;
+		border-radius: 3px;
+		border: 1px solid var(--border);
+		background: var(--bg-tertiary);
+		color: var(--text-normal);
+		cursor: pointer;
 	}
 
 	.role-btn {
@@ -301,18 +306,6 @@
 
 	.role-btn-promote:hover {
 		background: var(--accent-hover);
-	}
-
-	.role-btn-demote {
-		background: transparent;
-		color: var(--text-muted);
-		border-color: var(--text-muted);
-	}
-
-	.role-btn-demote:hover {
-		background: var(--danger);
-		color: #fff;
-		border-color: var(--danger);
 	}
 
 	.role-btn-kick {

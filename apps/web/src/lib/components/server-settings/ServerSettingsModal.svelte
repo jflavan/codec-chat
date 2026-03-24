@@ -4,6 +4,7 @@
 	import ServerSettings from './ServerSettings.svelte';
 	import ServerEmojis from './ServerEmojis.svelte';
 	import ServerMembers from './ServerMembers.svelte';
+	import ServerRoles from './ServerRoles.svelte';
 	import ServerChannels from './ServerChannels.svelte';
 	import ServerInvites from './ServerInvites.svelte';
 	import ServerWebhooks from './ServerWebhooks.svelte';
@@ -69,6 +70,8 @@
 				<ServerWebhooks />
 			{:else if app.serverSettingsCategory === 'emojis'}
 				<ServerEmojis />
+			{:else if app.serverSettingsCategory === 'roles'}
+				<ServerRoles />
 			{:else if app.serverSettingsCategory === 'members'}
 				<ServerMembers />
 			{:else if app.serverSettingsCategory === 'bans'}

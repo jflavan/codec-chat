@@ -4,6 +4,8 @@
 	import PresenceDot from '$lib/components/shared/PresenceDot.svelte';
 
 	let { member, presence = 'offline' }: { member: Member; presence?: PresenceStatus } = $props();
+
+	const showBadge = $derived(member.role !== 'Member' && member.roleIsHoisted);
 </script>
 
 <li class="member-item" class:offline={presence === 'offline'}>
@@ -20,8 +22,14 @@
 	<div class="member-info">
 		<div class="member-name-row">
 			<span class="member-name">{member.displayName}</span>
-			{#if member.role === 'Owner' || member.role === 'Admin'}
-				<span class="role-badge role-badge-{member.role.toLowerCase()}">{member.role}</span>
+			{#if showBadge}
+				<span
+					class="role-badge"
+					style:color={member.roleColor ?? 'var(--text-muted)'}
+					style:background={member.roleColor ? `${member.roleColor}26` : 'var(--bg-tertiary)'}
+				>
+					{member.role}
+				</span>
 			{/if}
 		</div>
 		{#if member.statusText || member.statusEmoji}
@@ -142,15 +150,5 @@
 		border-radius: 3px;
 		flex-shrink: 0;
 		line-height: 1.4;
-	}
-
-	.role-badge-owner {
-		color: var(--accent);
-		background: rgba(var(--accent-rgb), 0.15);
-	}
-
-	.role-badge-admin {
-		color: #f0b232;
-		background: rgba(240, 178, 50, 0.15);
 	}
 </style>
