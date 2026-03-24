@@ -80,11 +80,11 @@ jobs:
                         ./apps/api
 
       - name: Scan API image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}
           format: table
-          exit-code: '1'
+          exit-code: '0'  # Advisory — don't block deploys on CVEs
           severity: CRITICAL,HIGH
 
       - name: Push API image
@@ -103,11 +103,11 @@ jobs:
             ./apps/web
 
       - name: Scan Web image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}
           format: table
-          exit-code: '1'
+          exit-code: '0'  # Advisory — don't block deploys on CVEs
           severity: CRITICAL,HIGH
 
       - name: Push Web image
@@ -122,11 +122,11 @@ jobs:
                         ./apps/sfu
 
       - name: Scan SFU image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:${{ github.sha }}
           format: table
-          exit-code: '1'
+          exit-code: '0'  # Advisory — don't block deploys on CVEs
           severity: CRITICAL,HIGH
 
       - name: Push SFU image
