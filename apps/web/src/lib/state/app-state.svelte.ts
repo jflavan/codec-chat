@@ -13,6 +13,7 @@ import type {
 	DmConversation,
 	DirectMessage,
 	ServerInvite,
+	ServerRole,
 	VoiceChannelMember,
 	CustomEmoji,
 	SearchFilters,
@@ -30,6 +31,7 @@ import type {
 	WebhookDelivery,
 	BannedMember
 } from '$lib/types/index.js';
+import { Permission, hasPermission } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
 import type { ReactionUpdate, DmReactionUpdate } from '$lib/services/chat-hub.js';
@@ -188,7 +190,7 @@ export class AppState {
 	theme = $state<ThemeId>(getTheme());
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'members' | 'bans' | 'audit-log'>('general');
+	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
@@ -295,12 +297,22 @@ export class AppState {
 		this.servers.find((s) => s.serverId === this.selectedServerId)?.role ?? null
 	);
 
+	readonly currentServerPermissions = $derived(
+		this.servers.find((s) => s.serverId === this.selectedServerId)?.permissions ?? 0
+	);
+
+	/** Check if the current user has a specific permission in the selected server. */
+	hasPermission(perm: number): boolean {
+		if (this.isGlobalAdmin) return true;
+		return hasPermission(this.currentServerPermissions, perm);
+	}
+
 	readonly canManageChannels = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageChannels)
 	);
 
 	readonly canKickMembers = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.KickMembers)
 	);
 
 	readonly canBanMembers = $derived(
@@ -308,7 +320,7 @@ export class AppState {
 	);
 
 	readonly canManageInvites = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageInvites)
 	);
 
 	readonly canDeleteServer = $derived(
@@ -316,15 +328,23 @@ export class AppState {
 	);
 
 	readonly canDeleteChannel = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageChannels)
 	);
 
 	readonly canManageRoles = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageRoles)
 	);
 
 	readonly canPinMessages = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.PinMessages)
+	);
+
+	readonly canManageEmojis = $derived(
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageEmojis)
+	);
+
+	readonly canViewAuditLog = $derived(
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ViewAuditLog)
 	);
 
 	readonly selectedServerName = $derived(
@@ -1197,7 +1217,7 @@ export class AppState {
 	}
 
 	/** Change a member's role in the currently selected server. */
-	async updateMemberRole(userId: string, role: 'Admin' | 'Member'): Promise<void> {
+	async updateMemberRole(userId: string, role: string): Promise<void> {
 		if (!this.idToken || !this.selectedServerId) return;
 		try {
 			await this.api.updateMemberRole(this.idToken, this.selectedServerId, userId, role);
@@ -1239,6 +1259,60 @@ export class AppState {
 		try {
 			await this.api.unbanMember(this.idToken, this.selectedServerId, userId);
 			await this.loadBans();
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/* ═══════════════════ Server Roles ═══════════════════ */
+
+	serverRoles = $state<ServerRole[]>([]);
+	isLoadingRoles = $state(false);
+
+	/** Load roles for the currently selected server. */
+	async loadRoles(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isLoadingRoles = true;
+		try {
+			this.serverRoles = await this.api.getRoles(this.idToken, this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingRoles = false;
+		}
+	}
+
+	/** Create a new role in the currently selected server. */
+	async createRole(name: string, options?: { color?: string; permissions?: number; isHoisted?: boolean; isMentionable?: boolean }): Promise<ServerRole | null> {
+		if (!this.idToken || !this.selectedServerId) return null;
+		try {
+			const role = await this.api.createRole(this.idToken, this.selectedServerId, name, options);
+			this.serverRoles = [...this.serverRoles, role].sort((a, b) => a.position - b.position);
+			return role;
+		} catch (e) {
+			this.setError(e);
+			return null;
+		}
+	}
+
+	/** Update a role in the currently selected server. */
+	async updateRole(roleId: string, updates: { name?: string; color?: string | null; permissions?: number; isHoisted?: boolean; isMentionable?: boolean }): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			const updated = await this.api.updateRole(this.idToken, this.selectedServerId, roleId, updates);
+			this.serverRoles = this.serverRoles.map((r) => (r.id === roleId ? updated : r));
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Delete a role from the currently selected server. */
+	async deleteRole(roleId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.deleteRole(this.idToken, this.selectedServerId, roleId);
+			this.serverRoles = this.serverRoles.filter((r) => r.id !== roleId);
+			await this.loadMembers(this.selectedServerId);
 		} catch (e) {
 			this.setError(e);
 		}

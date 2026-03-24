@@ -11,9 +11,36 @@
 		return aOnline - bOnline;
 	}
 
-	const owners = $derived(app.members.filter((m) => m.role === 'Owner').sort(byPresence));
-	const admins = $derived(app.members.filter((m) => m.role === 'Admin').sort(byPresence));
-	const regulars = $derived(app.members.filter((m) => m.role === 'Member').sort(byPresence));
+	/** Group members by their hoisted role, ordered by role position. */
+	const roleGroups = $derived(() => {
+		const groups: { name: string; color?: string | null; members: Member[] }[] = [];
+		const hoisted = new Map<string, { name: string; color?: string | null; position: number; members: Member[] }>();
+		const unhoisted: Member[] = [];
+
+		for (const m of app.members) {
+			if (m.roleIsHoisted) {
+				const key = m.role;
+				if (!hoisted.has(key)) {
+					hoisted.set(key, { name: m.role, color: m.roleColor, position: m.rolePosition, members: [] });
+				}
+				hoisted.get(key)!.members.push(m);
+			} else {
+				unhoisted.push(m);
+			}
+		}
+
+		// Sort groups by position (lower = higher rank)
+		const sorted = [...hoisted.values()].sort((a, b) => a.position - b.position);
+		for (const g of sorted) {
+			groups.push({ name: g.name, color: g.color, members: g.members.sort(byPresence) });
+		}
+
+		if (unhoisted.length > 0) {
+			groups.push({ name: 'Other', color: null, members: unhoisted.sort(byPresence) });
+		}
+
+		return groups;
+	});
 </script>
 
 <aside class="members-sidebar" aria-label="Members">
@@ -26,32 +53,16 @@
 	{:else if app.members.length === 0}
 		<p class="muted sidebar-status">No members yet.</p>
 	{:else}
-		{#if owners.length > 0}
-			<h3 class="member-group-heading">Owner — {owners.length}</h3>
-			<ul class="member-list" role="list">
-				{#each owners as member (member.userId)}
-					<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
-				{/each}
-			</ul>
-		{/if}
-
-		{#if admins.length > 0}
-			<h3 class="member-group-heading">Admin — {admins.length}</h3>
-			<ul class="member-list" role="list">
-				{#each admins as member (member.userId)}
-					<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
-				{/each}
-			</ul>
-		{/if}
-
-		{#if regulars.length > 0}
-			<h3 class="member-group-heading">Other — {regulars.length}</h3>
-			<ul class="member-list" role="list">
-				{#each regulars as member (member.userId)}
-					<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
-				{/each}
-			</ul>
-		{/if}
+		{#each roleGroups() as group (group.name)}
+			{#if group.members.length > 0}
+				<h3 class="member-group-heading">{group.name} — {group.members.length}</h3>
+				<ul class="member-list" role="list">
+					{#each group.members as member (member.userId)}
+						<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
+					{/each}
+				</ul>
+			{/if}
+		{/each}
 	{/if}
 </aside>
 
