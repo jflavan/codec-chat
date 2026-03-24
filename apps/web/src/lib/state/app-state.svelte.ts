@@ -27,7 +27,8 @@ import type {
 	MessagePinnedEvent,
 	MessageUnpinnedEvent,
 	Webhook,
-	WebhookDelivery
+	WebhookDelivery,
+	BannedMember
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -167,6 +168,8 @@ export class AppState {
 	isSendingDm = $state(false);
 	isLoadingInvites = $state(false);
 	isCreatingInvite = $state(false);
+	isLoadingBans = $state(false);
+	bans = $state<BannedMember[]>([]);
 
 	/* ───── UI toggles ───── */
 	showCreateServer = $state(false);
@@ -180,7 +183,7 @@ export class AppState {
 	theme = $state<ThemeId>(getTheme());
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'members' | 'audit-log'>('general');
+	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'members' | 'bans' | 'audit-log'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
@@ -282,6 +285,10 @@ export class AppState {
 	);
 
 	readonly canKickMembers = $derived(
+		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+	);
+
+	readonly canBanMembers = $derived(
 		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
 	);
 
@@ -1166,6 +1173,43 @@ export class AppState {
 		try {
 			await this.api.updateMemberRole(this.idToken, this.selectedServerId, userId, role);
 			await this.loadMembers(this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/* ═══════════════════ Server Bans ═══════════════════ */
+
+	/** Load banned users for the currently selected server. */
+	async loadBans(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isLoadingBans = true;
+		try {
+			this.bans = await this.api.getBans(this.idToken, this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingBans = false;
+		}
+	}
+
+	/** Ban a member from the currently selected server. */
+	async banMember(userId: string, options?: { reason?: string; deleteMessages?: boolean }): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.banMember(this.idToken, this.selectedServerId, userId, options);
+			await this.loadMembers(this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Unban a user from the currently selected server. */
+	async unbanMember(userId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.unbanMember(this.idToken, this.selectedServerId, userId);
+			await this.loadBans();
 		} catch (e) {
 			this.setError(e);
 		}
@@ -3001,6 +3045,40 @@ export class AppState {
 					}
 				}
 				this.setTransientError(`You were kicked from "${event.serverName}".`);
+			},
+			onBannedFromServer: async (event) => {
+				try {
+					await this.hub.leaveServer(event.serverId);
+				} catch (error) {
+					console.error('Failed to leave server after being banned:', error);
+					this.setTransientError('There was a problem updating your connection after being banned. Some data may be out of date.');
+				}
+				this.servers = this.servers.filter((s) => s.serverId !== event.serverId);
+				if (this.selectedServerId === event.serverId) {
+					this.selectedServerId = this.servers[0]?.serverId ?? null;
+					this.channels = [];
+					this.messages = [];
+					this.hasMoreMessages = false;
+					this.members = [];
+					if (this.selectedServerId) {
+						this.loadChannels(this.selectedServerId);
+						this.loadMembers(this.selectedServerId);
+					}
+				}
+				this.setTransientError(`You were banned from "${event.serverName}".`);
+			},
+			onMemberBanned: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.members = this.members.filter((m) => m.userId !== event.userId);
+					if (event.deletedMessageCount > 0) {
+						this.messages = this.messages.filter((m) => m.authorUserId !== event.userId);
+					}
+				}
+			},
+			onMemberUnbanned: (event) => {
+				if (event.serverId === this.selectedServerId) {
+					this.bans = this.bans.filter((b) => b.userId !== event.userId);
+				}
 			},
 			onLinkPreviewsReady: (event) => {
 				// Patch link previews into the matching channel message.

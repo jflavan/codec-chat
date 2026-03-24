@@ -112,6 +112,22 @@ export type MemberRoleChangedEvent = {
 	newRole: string;
 };
 
+export type BannedFromServerEvent = {
+	serverId: string;
+	serverName: string;
+};
+
+export type MemberBannedEvent = {
+	serverId: string;
+	userId: string;
+	deletedMessageCount: number;
+};
+
+export type MemberUnbannedEvent = {
+	serverId: string;
+	userId: string;
+};
+
 export type MessageDeletedEvent = {
 	messageId: string;
 	channelId: string;
@@ -255,6 +271,9 @@ export type SignalRCallbacks = {
 	onMemberJoined?: (event: MemberJoinedEvent) => void;
 	onMemberLeft?: (event: MemberLeftEvent) => void;
 	onMemberRoleChanged?: (event: MemberRoleChangedEvent) => void;
+	onBannedFromServer?: (event: BannedFromServerEvent) => void;
+	onMemberBanned?: (event: MemberBannedEvent) => void;
+	onMemberUnbanned?: (event: MemberUnbannedEvent) => void;
 	onMessageDeleted?: (event: MessageDeletedEvent) => void;
 	onDmMessageDeleted?: (event: DmMessageDeletedEvent) => void;
 	onMessageEdited?: (event: MessageEditedEvent) => void;
@@ -368,6 +387,15 @@ export class ChatHubService {
 		}
 		if (callbacks.onMemberRoleChanged) {
 			connection.on('MemberRoleChanged', callbacks.onMemberRoleChanged);
+		}
+		if (callbacks.onBannedFromServer) {
+			connection.on('BannedFromServer', callbacks.onBannedFromServer);
+		}
+		if (callbacks.onMemberBanned) {
+			connection.on('MemberBanned', callbacks.onMemberBanned);
+		}
+		if (callbacks.onMemberUnbanned) {
+			connection.on('MemberUnbanned', callbacks.onMemberUnbanned);
 		}
 		if (callbacks.onMessageDeleted) {
 			connection.on('MessageDeleted', callbacks.onMessageDeleted);

@@ -33,6 +33,7 @@ public class CodecDbContext : DbContext
     public DbSet<SamlIdentityProvider> SamlIdentityProviders => Set<SamlIdentityProvider>();
     public DbSet<Webhook> Webhooks => Set<Webhook>();
     public DbSet<WebhookDeliveryLog> WebhookDeliveryLogs => Set<WebhookDeliveryLog>();
+    public DbSet<BannedMember> BannedMembers => Set<BannedMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -487,6 +488,24 @@ public class CodecDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(l => new { l.WebhookId, l.CreatedAt })
                 .IsDescending(false, true);
+        });
+
+        modelBuilder.Entity<BannedMember>(e =>
+        {
+            e.HasKey(b => new { b.ServerId, b.UserId });
+            e.HasOne(b => b.Server)
+                .WithMany()
+                .HasForeignKey(b => b.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(b => b.User)
+                .WithMany()
+                .HasForeignKey(b => b.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(b => b.BannedByUser)
+                .WithMany()
+                .HasForeignKey(b => b.BannedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(b => b.Reason).HasMaxLength(512);
         });
     }
 }

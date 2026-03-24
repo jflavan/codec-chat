@@ -27,7 +27,8 @@ import type {
 	PaginatedAuditLog,
 	NotificationPreferences,
 	Webhook,
-	WebhookDelivery
+	WebhookDelivery,
+	BannedMember
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -817,6 +818,32 @@ export class ApiClient {
 		return this.requestVoid(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/role`,
 			{ method: 'PATCH', headers: this.headers(token, true), body: JSON.stringify({ role }) }
+		);
+	}
+
+	/* ───── Server Bans ───── */
+
+	/** Ban a member from a server (requires Owner or Admin role). */
+	banMember(token: string, serverId: string, userId: string, options?: { reason?: string; deleteMessages?: boolean }): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/bans/${encodeURIComponent(userId)}`,
+			{ method: 'POST', headers: this.headers(token, true), body: JSON.stringify({ reason: options?.reason, deleteMessages: options?.deleteMessages ?? false }) }
+		);
+	}
+
+	/** Unban a user from a server (requires Owner or Admin role). */
+	unbanMember(token: string, serverId: string, userId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/bans/${encodeURIComponent(userId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/** Get banned users for a server (requires Owner or Admin role). */
+	getBans(token: string, serverId: string): Promise<BannedMember[]> {
+		return this.request<BannedMember[]>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/bans`,
+			{ headers: this.headers(token) }
 		);
 	}
 

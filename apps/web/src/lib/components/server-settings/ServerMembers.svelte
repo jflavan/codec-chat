@@ -5,12 +5,21 @@
 
 	let demotingUserId = $state<string | null>(null);
 	let kickingUserId = $state<string | null>(null);
+	let banningUserId = $state<string | null>(null);
+	let banReason = $state('');
+	let banDeleteMessages = $state(false);
 
 	const canDemote = () =>
 		app.isGlobalAdmin || app.currentServerRole === 'Owner';
 
 	const canKick = (member: { userId: string; role: string }) =>
 		app.canKickMembers &&
+		member.userId !== app.me?.user.id &&
+		member.role !== 'Owner' &&
+		!(app.currentServerRole === 'Admin' && member.role === 'Admin');
+
+	const canBan = (member: { userId: string; role: string }) =>
+		app.canBanMembers &&
 		member.userId !== app.me?.user.id &&
 		member.role !== 'Owner' &&
 		!(app.currentServerRole === 'Admin' && member.role === 'Admin');
@@ -49,6 +58,27 @@
 	function cancelKick(): void {
 		kickingUserId = null;
 	}
+
+	async function ban(userId: string): Promise<void> {
+		kickingUserId = null;
+		demotingUserId = null;
+		if (banningUserId !== userId) {
+			banningUserId = userId;
+			banReason = '';
+			banDeleteMessages = false;
+			return;
+		}
+		await app.banMember(userId, { reason: banReason || undefined, deleteMessages: banDeleteMessages });
+		banningUserId = null;
+		banReason = '';
+		banDeleteMessages = false;
+	}
+
+	function cancelBan(): void {
+		banningUserId = null;
+		banReason = '';
+		banDeleteMessages = false;
+	}
 </script>
 
 {#snippet kickButton(member: { userId: string; displayName: string; role: string })}
@@ -63,6 +93,38 @@
 		{:else}
 			<button class="role-btn role-btn-kick" onclick={() => kick(member.userId)} aria-label="Kick {member.displayName}">
 				Kick
+			</button>
+		{/if}
+	{/if}
+{/snippet}
+
+{#snippet banButton(member: { userId: string; displayName: string; role: string })}
+	{#if canBan(member)}
+		{#if banningUserId === member.userId}
+			<div class="ban-confirm">
+				<input
+					class="ban-reason-input"
+					type="text"
+					placeholder="Reason (optional)"
+					bind:value={banReason}
+					maxlength="512"
+				/>
+				<label class="ban-delete-label">
+					<input type="checkbox" bind:checked={banDeleteMessages} />
+					Delete messages
+				</label>
+				<div class="ban-confirm-actions">
+					<button class="role-btn role-btn-danger" onclick={() => ban(member.userId)}>
+						Confirm Ban
+					</button>
+					<button class="role-btn role-btn-cancel" onclick={cancelBan}>
+						Cancel
+					</button>
+				</div>
+			</div>
+		{:else}
+			<button class="role-btn role-btn-ban" onclick={() => ban(member.userId)} aria-label="Ban {member.displayName}">
+				Ban
 			</button>
 		{/if}
 	{/if}
@@ -105,11 +167,13 @@
 							</button>
 						{/if}
 						{@render kickButton(member)}
+						{@render banButton(member)}
 					{:else if canPromote(member.role)}
 						<button class="role-btn role-btn-promote" onclick={() => promote(member.userId)}>
 							Make Admin
 						</button>
 						{@render kickButton(member)}
+						{@render banButton(member)}
 					{/if}
 				</div>
 			</li>
@@ -278,5 +342,53 @@
 	.role-btn-cancel:hover {
 		color: var(--text-normal);
 		border-color: var(--text-normal);
+	}
+
+	.role-btn-ban {
+		background: transparent;
+		color: var(--danger);
+		border-color: var(--danger);
+	}
+
+	.role-btn-ban:hover {
+		background: var(--danger);
+		color: #fff;
+	}
+
+	.ban-confirm {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 8px;
+		background: var(--bg-tertiary);
+		border-radius: 4px;
+		min-width: 200px;
+	}
+
+	.ban-reason-input {
+		padding: 6px 8px;
+		border: 1px solid var(--text-muted);
+		border-radius: 3px;
+		background: var(--bg-primary);
+		color: var(--text-normal);
+		font-size: 12px;
+	}
+
+	.ban-reason-input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.ban-delete-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12px;
+		color: var(--text-muted);
+		cursor: pointer;
+	}
+
+	.ban-confirm-actions {
+		display: flex;
+		gap: 6px;
 	}
 </style>

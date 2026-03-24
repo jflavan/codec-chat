@@ -401,3 +401,13 @@ export type WebhookDelivery = {
 	attempt: number;
 	createdAt: string;
 };
+
+/** A banned user in a server. */
+export type BannedMember = {
+	userId: string;
+	displayName: string;
+	avatarUrl?: string | null;
+	reason?: string | null;
+	bannedAt: string;
+	bannedByUserId: string;
+};
