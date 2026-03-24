@@ -111,7 +111,7 @@
 
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			if (app.messageBody.trim() || app.pendingImage) {
+			if (app.messageBody.trim() || app.pendingImage || app.pendingFile) {
 				app.sendMessage();
 				requestAnimationFrame(() => autoResize());
 			}
@@ -167,7 +167,11 @@
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (file) {
-			app.attachImage(file);
+			if (file.type.startsWith('image/')) {
+				app.attachImage(file);
+			} else {
+				app.attachFile(file);
+			}
 		}
 		input.value = '';
 	}
@@ -201,6 +205,22 @@
 				class="remove-preview"
 				onclick={() => app.clearPendingImage()}
 				aria-label="Remove image"
+			>
+				<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+					<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+				</svg>
+			</button>
+		</div>
+	{/if}
+	{#if app.pendingFile}
+		<div class="file-preview">
+			<svg class="file-preview-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h7v5h5v11H6z"/></svg>
+			<span class="file-preview-name">{app.pendingFile.name}</span>
+			<button
+				type="button"
+				class="remove-preview"
+				onclick={() => app.clearPendingFile()}
+				aria-label="Remove file"
 			>
 				<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 					<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
@@ -249,13 +269,13 @@
 		</div>
 	{:else}
 		<div class="composer-row">
-			<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} />
+			<input type="file" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} />
 			<button
 				class="composer-attach"
 				type="button"
 				onclick={() => fileInputEl?.click()}
 				disabled={!app.selectedChannelId || app.isSending}
-				aria-label="Attach image"
+				aria-label="Attach file"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 					<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
@@ -293,7 +313,7 @@
 			<button
 				class="composer-send"
 				type="submit"
-				disabled={!app.selectedChannelId || (!app.messageBody.trim() && !app.pendingImage) || app.isSending}
+				disabled={!app.selectedChannelId || (!app.messageBody.trim() && !app.pendingImage && !app.pendingFile) || app.isSending}
 				aria-label="Send message"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -531,6 +551,34 @@
 
 	.remove-preview:hover {
 		background: rgba(0, 0, 0, 0.85);
+	}
+
+	/* ───── File preview ───── */
+
+	.file-preview {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 8px;
+		padding: 8px 32px 8px 12px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--bg-secondary);
+		max-width: 300px;
+	}
+
+	.file-preview-icon {
+		flex-shrink: 0;
+		color: var(--text-muted);
+	}
+
+	.file-preview-name {
+		font-size: 13px;
+		color: var(--text-normal);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.sr-only {

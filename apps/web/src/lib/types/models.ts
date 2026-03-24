@@ -91,6 +91,10 @@ export type Message = {
 	authorName: string;
 	body: string;
 	imageUrl?: string | null;
+	fileUrl?: string | null;
+	fileName?: string | null;
+	fileSize?: number | null;
+	fileContentType?: string | null;
 	createdAt: string;
 	editedAt?: string | null;
 	channelId: string;
@@ -234,6 +238,10 @@ export type DirectMessage = {
 	authorName: string;
 	body: string;
 	imageUrl?: string | null;
+	fileUrl?: string | null;
+	fileName?: string | null;
+	fileSize?: number | null;
+	fileContentType?: string | null;
 	createdAt: string;
 	editedAt?: string | null;
 	authorAvatarUrl?: string | null;

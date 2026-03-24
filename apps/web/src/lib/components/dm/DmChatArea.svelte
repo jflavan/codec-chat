@@ -4,6 +4,7 @@
 	import { formatTime } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
 	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
+	import FileCard from '$lib/components/chat/FileCard.svelte';
 	import YouTubeEmbed from '$lib/components/chat/YouTubeEmbed.svelte';
 	import ReplyReference from '$lib/components/chat/ReplyReference.svelte';
 	import ReplyComposerBar from '$lib/components/chat/ReplyComposerBar.svelte';
@@ -211,7 +212,11 @@
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (file) {
-			app.attachDmImage(file);
+			if (file.type.startsWith('image/')) {
+				app.attachDmImage(file);
+			} else {
+				app.attachDmFile(file);
+			}
 		}
 		input.value = '';
 	}
@@ -281,8 +286,12 @@
 		isDragOver = false;
 		if (!app.activeDmChannelId) return;
 		const file = e.dataTransfer?.files[0];
-		if (file?.type.startsWith('image/')) {
-			app.attachDmImage(file);
+		if (file) {
+			if (file.type.startsWith('image/')) {
+				app.attachDmImage(file);
+			} else {
+				app.attachDmFile(file);
+			}
 		}
 	}
 </script>
@@ -445,6 +454,9 @@
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 								</button>
 							{/if}
+							{#if message.fileUrl && message.fileName}
+								<FileCard fileUrl={message.fileUrl} fileName={message.fileName} fileSize={message.fileSize} fileContentType={message.fileContentType} />
+							{/if}
 							{#if message.linkPreviews?.length}
 								<div class="link-previews">
 									{#each message.linkPreviews as preview}
@@ -500,6 +512,9 @@
 								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 								</button>
+							{/if}
+							{#if message.fileUrl && message.fileName}
+								<FileCard fileUrl={message.fileUrl} fileName={message.fileName} fileSize={message.fileSize} fileContentType={message.fileContentType} />
 							{/if}
 							{#if message.linkPreviews?.length}
 								<div class="link-previews">
@@ -582,6 +597,22 @@
 				</button>
 			</div>
 		{/if}
+		{#if app.pendingDmFile}
+			<div class="file-preview">
+				<svg class="file-preview-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h7v5h5v11H6z"/></svg>
+				<span class="file-preview-name">{app.pendingDmFile.name}</span>
+				<button
+					type="button"
+					class="remove-preview"
+					onclick={() => app.clearPendingDmFile()}
+					aria-label="Remove file"
+				>
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+						<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+					</svg>
+				</button>
+			</div>
+		{/if}
 		{#if !app.isHubConnected}
 			<div class="composer-row">
 				<div class="composer-input-wrapper composer-disconnected">
@@ -590,13 +621,13 @@
 			</div>
 		{:else}
 			<div class="composer-row">
-			<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" bind:this={dmFileInputEl} onchange={handleDmFileSelect} />
+			<input type="file" class="sr-only" bind:this={dmFileInputEl} onchange={handleDmFileSelect} />
 			<button
 				class="composer-attach"
 				type="button"
 				onclick={() => dmFileInputEl?.click()}
 				disabled={!app.activeDmChannelId || app.isSendingDm}
-				aria-label="Attach image"
+				aria-label="Attach file"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 					<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
@@ -621,7 +652,7 @@
 			<button
 				class="composer-send"
 				type="submit"
-				disabled={!app.activeDmChannelId || (!app.dmMessageBody.trim() && !app.pendingDmImage) || app.isSendingDm}
+				disabled={!app.activeDmChannelId || (!app.dmMessageBody.trim() && !app.pendingDmImage && !app.pendingDmFile) || app.isSendingDm}
 				aria-label="Send message"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -1147,6 +1178,32 @@
 
 	.remove-preview:hover {
 		background: rgba(0, 0, 0, 0.85);
+	}
+
+	.file-preview {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 8px;
+		padding: 8px 32px 8px 12px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--bg-secondary);
+		max-width: 300px;
+	}
+
+	.file-preview-icon {
+		flex-shrink: 0;
+		color: var(--text-muted);
+	}
+
+	.file-preview-name {
+		font-size: 13px;
+		color: var(--text-normal);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.sr-only {

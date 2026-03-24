@@ -4,6 +4,7 @@
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
 	import LinkPreviewCard from './LinkPreviewCard.svelte';
+	import FileCard from './FileCard.svelte';
 	import YouTubeEmbed from './YouTubeEmbed.svelte';
 	import ReplyReference from './ReplyReference.svelte';
 	import MessageActionBar from './MessageActionBar.svelte';
@@ -191,6 +192,9 @@
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
+			{#if message.fileUrl && message.fileName}
+				<FileCard fileUrl={message.fileUrl} fileName={message.fileName} fileSize={message.fileSize} fileContentType={message.fileContentType} />
+			{/if}
 			{#if message.linkPreviews?.length}
 				<div class="link-previews">
 					{#each message.linkPreviews as preview}
@@ -250,6 +254,9 @@
 				<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
+			{/if}
+			{#if message.fileUrl && message.fileName}
+				<FileCard fileUrl={message.fileUrl} fileName={message.fileName} fileSize={message.fileSize} fileContentType={message.fileContentType} />
 			{/if}
 			{#if message.linkPreviews?.length}
 				<div class="link-previews">
