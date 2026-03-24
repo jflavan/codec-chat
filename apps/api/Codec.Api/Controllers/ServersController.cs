@@ -654,7 +654,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             serverId,
             userId = targetUserId,
-            newRole = newRole.ToString()
+            newRole = newRoleEntity.Name
         });
 
         return Ok(new
