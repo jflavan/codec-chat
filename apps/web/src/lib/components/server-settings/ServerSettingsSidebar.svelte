@@ -3,22 +3,26 @@
 
 	const app = getAppState();
 
-	// Only show Emojis tab if user is admin, owner, or global admin
-	const isAdminOrOwner = $derived(
-		app.isGlobalAdmin || app.currentServerRole === 'Admin' || app.currentServerRole === 'Owner'
-	);
-
 	const categories = $derived.by(() => {
-		const cats: { id: 'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'members' | 'bans' | 'audit-log'; label: string }[] = [
+		const cats: { id: 'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'; label: string }[] = [
 			{ id: 'general', label: 'General' }
 		];
-		if (isAdminOrOwner) {
+		if (app.canManageChannels) {
 			cats.push({ id: 'channels', label: 'Channels' });
+		}
+		if (app.canManageInvites) {
 			cats.push({ id: 'invites', label: 'Invites' });
 			cats.push({ id: 'webhooks', label: 'Webhooks' });
+		}
+		if (app.canManageEmojis) {
 			cats.push({ id: 'emojis', label: 'Emojis' });
+		}
+		if (app.canManageRoles) {
+			cats.push({ id: 'roles', label: 'Roles' });
 			cats.push({ id: 'members', label: 'Members' });
 			cats.push({ id: 'bans', label: 'Bans' });
+		}
+		if (app.canViewAuditLog) {
 			cats.push({ id: 'audit-log', label: 'Audit Log' });
 		}
 		return cats;

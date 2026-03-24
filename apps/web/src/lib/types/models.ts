@@ -15,7 +15,53 @@ export type MemberServer = {
 	iconUrl?: string | null;
 	role: string | null;
 	sortOrder: number;
+	permissions: number;
 };
+
+/** A custom or system role within a server. */
+export type ServerRole = {
+	id: string;
+	name: string;
+	color?: string | null;
+	position: number;
+	permissions: number;
+	isSystemRole: boolean;
+	isHoisted: boolean;
+	isMentionable: boolean;
+	memberCount?: number;
+};
+
+/** Granular permission flags (matches the API Permission enum). */
+export const Permission = {
+	None: 0,
+	ViewChannels: 1 << 0,
+	ManageChannels: 1 << 1,
+	ManageServer: 1 << 2,
+	ManageRoles: 1 << 3,
+	ManageEmojis: 1 << 4,
+	ViewAuditLog: 1 << 5,
+	CreateInvites: 1 << 6,
+	ManageInvites: 1 << 7,
+	KickMembers: 1 << 10,
+	BanMembers: 1 << 11,
+	SendMessages: 1 << 20,
+	EmbedLinks: 1 << 21,
+	AttachFiles: 1 << 22,
+	AddReactions: 1 << 23,
+	MentionEveryone: 1 << 24,
+	ManageMessages: 1 << 25,
+	PinMessages: 1 << 26,
+	Connect: 1 << 30,
+	// Note: values > 2^31 need BigInt in JS but we use number for the commonly checked ones
+	Administrator: 2 ** 40,
+} as const;
+
+/** Check if a permission set includes the given flag. */
+export function hasPermission(permissions: number, flag: number): boolean {
+	// Administrator grants everything
+	if ((permissions & Permission.Administrator) !== 0) return true;
+	return (permissions & flag) === flag;
+}
 
 /** Channel type discriminator. */
 export type ChannelType = 'text' | 'voice';
@@ -122,6 +168,10 @@ export type Member = {
 	email?: string | null;
 	avatarUrl?: string | null;
 	role: string;
+	rolePosition: number;
+	roleColor?: string | null;
+	roleIsHoisted: boolean;
+	permissions: number;
 	joinedAt: string;
 	statusText?: string | null;
 	statusEmoji?: string | null;

@@ -110,6 +110,7 @@ export type MemberRoleChangedEvent = {
 	serverId: string;
 	userId: string;
 	newRole: string;
+	permissions?: number;
 };
 
 export type BannedFromServerEvent = {

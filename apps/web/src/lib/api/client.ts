@@ -838,8 +838,8 @@ export class ApiClient {
 		);
 	}
 
-	/** Change a member's role in a server (requires Owner or Admin role). */
-	updateMemberRole(token: string, serverId: string, userId: string, role: 'Admin' | 'Member'): Promise<void> {
+	/** Change a member's role in a server (requires ManageRoles permission). */
+	updateMemberRole(token: string, serverId: string, userId: string, role: string): Promise<void> {
 		return this.requestVoid(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/role`,
 			{ method: 'PATCH', headers: this.headers(token, true), body: JSON.stringify({ role }) }
@@ -868,7 +868,55 @@ export class ApiClient {
 	getBans(token: string, serverId: string): Promise<BannedMember[]> {
 		return this.request<BannedMember[]>(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/bans`,
+	/* ───── Server Roles ───── */
+
+	/** List all roles for a server. */
+	getRoles(token: string, serverId: string): Promise<import('$lib/types/models.js').ServerRole[]> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/roles`,
 			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Create a new role in a server. */
+	createRole(
+		token: string,
+		serverId: string,
+		name: string,
+		options?: { color?: string; permissions?: number; isHoisted?: boolean; isMentionable?: boolean }
+	): Promise<import('$lib/types/models.js').ServerRole> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/roles`,
+			{
+				method: 'POST',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ name, ...options })
+			}
+		);
+	}
+
+	/** Update a role in a server. */
+	updateRole(
+		token: string,
+		serverId: string,
+		roleId: string,
+		updates: { name?: string; color?: string | null; permissions?: number; isHoisted?: boolean; isMentionable?: boolean }
+	): Promise<import('$lib/types/models.js').ServerRole> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/roles/${encodeURIComponent(roleId)}`,
+			{
+				method: 'PATCH',
+				headers: this.headers(token, true),
+				body: JSON.stringify(updates)
+			}
+		);
+	}
+
+	/** Delete a role from a server. */
+	deleteRole(token: string, serverId: string, roleId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/roles/${encodeURIComponent(roleId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
 		);
 	}
 

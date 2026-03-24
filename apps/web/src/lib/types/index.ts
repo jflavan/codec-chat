@@ -24,6 +24,7 @@ export type {
 	DirectMessage,
 	ActiveCallResponse,
 	ServerInvite,
+	ServerRole,
 	SearchResult,
 	PaginatedSearchResults,
 	AroundMessages,
@@ -44,3 +45,4 @@ export type {
 	WebhookEventType,
 	BannedMember
 } from './models.js';
+export { Permission, hasPermission } from './models.js';
