@@ -6,6 +6,7 @@
 	import ServerMembers from './ServerMembers.svelte';
 	import ServerChannels from './ServerChannels.svelte';
 	import ServerInvites from './ServerInvites.svelte';
+	import ServerWebhooks from './ServerWebhooks.svelte';
 	import ServerAuditLog from './ServerAuditLog.svelte';
 
 	const app = getAppState();
@@ -63,6 +64,8 @@
 				<ServerChannels />
 			{:else if app.serverSettingsCategory === 'invites'}
 				<ServerInvites />
+			{:else if app.serverSettingsCategory === 'webhooks'}
+				<ServerWebhooks />
 			{:else if app.serverSettingsCategory === 'emojis'}
 				<ServerEmojis />
 			{:else if app.serverSettingsCategory === 'members'}

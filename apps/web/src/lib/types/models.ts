@@ -365,3 +365,39 @@ export type MessageUnpinnedEvent = {
 	channelId: string;
 	unpinnedBy: { userId: string; displayName: string };
 };
+
+/** Supported webhook event types. */
+export type WebhookEventType =
+	| 'MessageCreated'
+	| 'MessageUpdated'
+	| 'MessageDeleted'
+	| 'MemberJoined'
+	| 'MemberLeft'
+	| 'MemberRoleChanged'
+	| 'ChannelCreated'
+	| 'ChannelUpdated'
+	| 'ChannelDeleted';
+
+/** An outgoing webhook configured for a server. */
+export type Webhook = {
+	id: string;
+	serverId: string;
+	name: string;
+	url: string;
+	eventTypes: string[];
+	isActive: boolean;
+	createdByUserId: string;
+	createdAt: string;
+	hasSecret: boolean;
+};
+
+/** A single delivery attempt for a webhook. */
+export type WebhookDelivery = {
+	id: string;
+	eventType: string;
+	statusCode: number | null;
+	errorMessage: string | null;
+	success: boolean;
+	attempt: number;
+	createdAt: string;
+};

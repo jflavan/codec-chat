@@ -38,5 +38,8 @@ export type {
 	NotificationPreferences,
 	PinnedMessage,
 	MessagePinnedEvent,
-	MessageUnpinnedEvent
+	MessageUnpinnedEvent,
+	Webhook,
+	WebhookDelivery,
+	WebhookEventType
 } from './models.js';

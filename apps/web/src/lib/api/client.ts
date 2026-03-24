@@ -25,7 +25,9 @@ import type {
 	TokenRefreshResponse,
 	ChannelCategory,
 	PaginatedAuditLog,
-	NotificationPreferences
+	NotificationPreferences,
+	Webhook,
+	WebhookDelivery
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -860,6 +862,65 @@ export class ApiClient {
 		return this.request(
 			`${this.baseUrl}/invites/${encodeURIComponent(code)}`,
 			{ method: 'POST', headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Webhooks ───── */
+
+	/** List webhooks for a server (requires Owner or Admin role). */
+	getWebhooks(token: string, serverId: string): Promise<Webhook[]> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Create a new webhook for a server (requires Owner or Admin role). */
+	createWebhook(
+		token: string,
+		serverId: string,
+		data: { name: string; url: string; secret?: string; eventTypes: string[] }
+	): Promise<Webhook> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks`,
+			{
+				method: 'POST',
+				headers: this.headers(token),
+				body: JSON.stringify(data)
+			}
+		);
+	}
+
+	/** Update an existing webhook (requires Owner or Admin role). */
+	updateWebhook(
+		token: string,
+		serverId: string,
+		webhookId: string,
+		data: { name?: string; url?: string; secret?: string; eventTypes?: string[]; isActive?: boolean }
+	): Promise<Webhook> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks/${encodeURIComponent(webhookId)}`,
+			{
+				method: 'PATCH',
+				headers: this.headers(token),
+				body: JSON.stringify(data)
+			}
+		);
+	}
+
+	/** Delete a webhook (requires Owner or Admin role). */
+	deleteWebhook(token: string, serverId: string, webhookId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks/${encodeURIComponent(webhookId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/** Get recent delivery logs for a webhook (requires Owner or Admin role). */
+	getWebhookDeliveries(token: string, serverId: string, webhookId: string): Promise<WebhookDelivery[]> {
+		return this.request(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks/${encodeURIComponent(webhookId)}/deliveries`,
+			{ headers: this.headers(token) }
 		);
 	}
 

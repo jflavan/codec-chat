@@ -24,7 +24,10 @@ public enum AuditAction
     EmojiDeleted,
     MessageDeletedByAdmin,
     MessagePinned,
-    MessageUnpinned
+    MessageUnpinned,
+    WebhookCreated,
+    WebhookUpdated,
+    WebhookDeleted
 }
 
 public class AuditLogEntry
