@@ -1,11 +1,13 @@
 using System.Security.Claims;
 using Codec.Api.Controllers;
 using Codec.Api.Data;
+using Codec.Api.Hubs;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -16,6 +18,7 @@ public class UsersControllerTests : IDisposable
     private readonly CodecDbContext _db;
     private readonly Mock<IUserService> _userService = new();
     private readonly Mock<IAvatarService> _avatarService = new();
+    private readonly Mock<IHubContext<ChatHub>> _hub = new();
     private readonly UsersController _controller;
     private readonly User _testUser;
 
@@ -35,7 +38,7 @@ public class UsersControllerTests : IDisposable
             AvatarUrl = "https://google.com/pic.jpg"
         };
 
-        _controller = new UsersController(_userService.Object, _avatarService.Object, _db);
+        _controller = new UsersController(_userService.Object, _avatarService.Object, _db, _hub.Object);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

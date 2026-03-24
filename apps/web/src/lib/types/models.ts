@@ -117,6 +117,8 @@ export type Member = {
 	avatarUrl?: string | null;
 	role: string;
 	joinedAt: string;
+	statusText?: string | null;
+	statusEmoji?: string | null;
 };
 
 /** Current user profile returned by GET /me. */
@@ -130,6 +132,8 @@ export type UserProfile = {
 		avatarUrl?: string;
 		isGlobalAdmin?: boolean;
 		emailVerified?: boolean;
+		statusText?: string | null;
+		statusEmoji?: string | null;
 	};
 	isNewUser?: boolean;
 	needsLinking?: boolean;

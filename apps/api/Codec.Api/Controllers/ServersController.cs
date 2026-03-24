@@ -243,7 +243,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 member.User.Email,
                 member.User.AvatarUrl,
                 member.User.CustomAvatarPath,
-                ServerCustomAvatarPath = member.CustomAvatarPath
+                ServerCustomAvatarPath = member.CustomAvatarPath,
+                member.User.StatusText,
+                member.User.StatusEmoji
             })
             .OrderBy(member => member.DisplayName)
             .ToListAsync();
@@ -260,7 +262,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 member.Email,
                 AvatarUrl = avatarService.ResolveUrl(member.ServerCustomAvatarPath)
                          ?? avatarService.ResolveUrl(member.CustomAvatarPath)
-                         ?? member.AvatarUrl
+                         ?? member.AvatarUrl,
+                member.StatusText,
+                member.StatusEmoji
             };
         });
 
