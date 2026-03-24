@@ -17,6 +17,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.RateLimiting;
 using StackExchange.Redis;
+using Lib.Net.Http.WebPush;
+using Lib.Net.Http.WebPush.Authentication;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Services;
@@ -322,6 +324,22 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutSe
 
 builder.Services.AddSingleton<PresenceTracker>();
 builder.Services.AddHostedService<PresenceBackgroundService>();
+
+// Web Push notification service (VAPID-authenticated).
+var vapidPublicKey = builder.Configuration["Vapid:PublicKey"];
+var vapidPrivateKey = builder.Configuration["Vapid:PrivateKey"];
+var vapidSubject = builder.Configuration["Vapid:Subject"] ?? "mailto:noreply@codec.chat";
+if (!string.IsNullOrWhiteSpace(vapidPublicKey) && !string.IsNullOrWhiteSpace(vapidPrivateKey))
+{
+    builder.Services.AddSingleton(new PushServiceClient
+    {
+        DefaultAuthentication = new VapidAuthentication(vapidPublicKey, vapidPrivateKey)
+        {
+            Subject = vapidSubject
+        }
+    });
+    builder.Services.AddSingleton<PushNotificationService>();
+}
 
 builder.Services.AddSingleton<IAvatarService, AvatarService>();
 builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();

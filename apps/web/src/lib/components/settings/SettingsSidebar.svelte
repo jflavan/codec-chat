@@ -6,6 +6,7 @@
 	const categories = [
 		{ id: 'profile' as const, label: 'My Profile', icon: '👤' },
 		{ id: 'account' as const, label: 'My Account', icon: '🔒' },
+		{ id: 'notifications' as const, label: 'Notifications', icon: '🔔' },
 		{ id: 'voice-audio' as const, label: 'Voice & Audio', icon: '🎙️' },
 		{ id: 'appearance' as const, label: 'Appearance', icon: '🎨' }
 	];

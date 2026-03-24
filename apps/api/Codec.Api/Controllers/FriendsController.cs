@@ -17,7 +17,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("friends")]
-public class FriendsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService) : ControllerBase
+public class FriendsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, PushNotificationService? pushService = null) : ControllerBase
 {
     /// <summary>
     /// Lists the current user's confirmed friends.
@@ -171,6 +171,20 @@ public class FriendsController(CodecDbContext db, IUserService userService, IHub
                 Requester = new { appUser.Id, DisplayName = requesterName, AvatarUrl = requesterAvatarUrl },
                 friendship.CreatedAt
             });
+
+        // Send push notification for the friend request.
+        if (pushService is not null)
+        {
+            _ = pushService.SendToUserAsync(request.RecipientUserId, new PushPayload
+            {
+                Type = "friend_request",
+                Title = "Friend Request",
+                Body = $"{requesterName} sent you a friend request",
+                Icon = requesterAvatarUrl,
+                Tag = $"friend-{friendship.Id}",
+                Url = "/"
+            });
+        }
 
         return Created($"/friends/requests/{friendship.Id}", payload);
     }

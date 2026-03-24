@@ -18,7 +18,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("channels")]
-public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService) : ControllerBase
+public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService, PushNotificationService? pushService = null) : ControllerBase
 {
     private static readonly System.Text.Json.JsonSerializerOptions CamelCaseJsonOptions = new()
     {
@@ -647,6 +647,21 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     message.Body
                 });
             }
+        }
+
+        // Send push notifications to all mentioned users (excluding the author).
+        if (pushService is not null && notifiedUserIds.Count > 1) // > 1 because author is always in the set
+        {
+            var truncatedBody = message.Body.Length > 200 ? message.Body[..200] + "…" : message.Body;
+            var mentionedIds = notifiedUserIds.Where(id => id != appUser.Id);
+            _ = pushService.SendToUsersAsync(mentionedIds, new PushPayload
+            {
+                Type = "mention",
+                Title = $"{message.AuthorName} mentioned you in #{channel.Name}",
+                Body = truncatedBody,
+                Tag = $"mention-{channel.Id}",
+                Url = "/"
+            });
         }
 
         // Fire-and-forget: extract URLs and fetch link previews in the background.
