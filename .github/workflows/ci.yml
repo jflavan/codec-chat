@@ -142,6 +142,13 @@ jobs:
         uses: actions/checkout@v4
       - name: Build API Docker image
         run: docker build -t codec-api:${{ github.sha }} ./apps/api
+      - name: Scan API image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: codec-api:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
 
   docker-build-web:
     runs-on: ubuntu-latest
@@ -157,3 +164,10 @@ jobs:
             --build-arg PUBLIC_RECAPTCHA_SITE_KEY=placeholder \
             -t codec-web:${{ github.sha }} \
             ./apps/web
+      - name: Scan Web image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: codec-web:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
