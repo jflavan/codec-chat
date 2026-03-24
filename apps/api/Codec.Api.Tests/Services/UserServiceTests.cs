@@ -33,6 +33,16 @@ public class UserServiceTests : IDisposable
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
     }
 
+    /// <summary>Helper to create the three default system roles for a server.</summary>
+    private (ServerRoleEntity owner, ServerRoleEntity admin, ServerRoleEntity member) CreateDefaultRoles(Guid serverId)
+    {
+        var ownerRole = new ServerRoleEntity { ServerId = serverId, Name = "Owner", Position = 0, Permissions = Permission.Administrator, IsSystemRole = true, IsHoisted = true };
+        var adminRole = new ServerRoleEntity { ServerId = serverId, Name = "Admin", Position = 1, Permissions = PermissionExtensions.AdminDefaults, IsSystemRole = true, IsHoisted = true };
+        var memberRole = new ServerRoleEntity { ServerId = serverId, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
+        _db.ServerRoles.AddRange(ownerRole, adminRole, memberRole);
+        return (ownerRole, adminRole, memberRole);
+    }
+
     // --- GetOrCreateUserAsync (Google JWT) ---
 
     [Fact]
@@ -87,18 +97,23 @@ public class UserServiceTests : IDisposable
     public async Task GetOrCreateUserAsync_JoinsDefaultServer()
     {
         // Create default server
-        _db.Servers.Add(new Server { Id = Server.DefaultServerId, Name = "Codec HQ" });
+        var defaultServer = new Server { Id = Server.DefaultServerId, Name = "Codec HQ" };
+        _db.Servers.Add(defaultServer);
+        var (_, _, memberRole) = CreateDefaultRoles(defaultServer.Id);
         await _db.SaveChangesAsync();
 
         var principal = CreatePrincipal("google-4", "NewUser");
         var (user, _) = await _svc.GetOrCreateUserAsync(principal);
 
-        var membership = await _db.ServerMembers.FirstOrDefaultAsync(m => m.UserId == user.Id && m.ServerId == Server.DefaultServerId);
+        var membership = await _db.ServerMembers
+            .Include(m => m.Role)
+            .FirstOrDefaultAsync(m => m.UserId == user.Id && m.ServerId == Server.DefaultServerId);
         membership.Should().NotBeNull();
-        membership!.Role.Should().Be(ServerRole.Member);
+        membership!.Role.Should().NotBeNull();
+        membership.Role!.Name.Should().Be("Member");
     }
 
-    // --- GetOrCreateUserAsync (Local JWT — issuer "codec-api") ---
+    // --- GetOrCreateUserAsync (Local JWT --- issuer "codec-api") ---
 
     [Fact]
     public async Task GetOrCreateUserAsync_LocalJwt_ReturnsExistingUserById()
@@ -212,7 +227,8 @@ public class UserServiceTests : IDisposable
         var user = new User { GoogleSubject = "g-5", DisplayName = "X" };
         _db.Servers.Add(server);
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, Role = ServerRole.Member });
+        var (_, _, memberRole) = CreateDefaultRoles(server.Id);
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         (await _svc.IsMemberAsync(server.Id, user.Id)).Should().BeTrue();
@@ -237,11 +253,13 @@ public class UserServiceTests : IDisposable
         var user = new User { GoogleSubject = "g-6", DisplayName = "X" };
         _db.Servers.Add(server);
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, Role = ServerRole.Admin });
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var member = await _svc.EnsureMemberAsync(server.Id, user.Id);
-        member.Role.Should().Be(ServerRole.Admin);
+        member.Role.Should().NotBeNull();
+        member.Role!.Name.Should().Be("Admin");
     }
 
     [Fact]
@@ -282,11 +300,13 @@ public class UserServiceTests : IDisposable
         var user = new User { GoogleSubject = "g-7", DisplayName = "X" };
         _db.Servers.Add(server);
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, Role = ServerRole.Admin });
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var member = await _svc.EnsureAdminAsync(server.Id, user.Id);
-        member.Role.Should().Be(ServerRole.Admin);
+        member.Role.Should().NotBeNull();
+        member.Role!.Name.Should().Be("Admin");
     }
 
     [Fact]
@@ -296,7 +316,8 @@ public class UserServiceTests : IDisposable
         var user = new User { GoogleSubject = "g-8", DisplayName = "X" };
         _db.Servers.Add(server);
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, Role = ServerRole.Member });
+        var (_, _, memberRole) = CreateDefaultRoles(server.Id);
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         await _svc.Invoking(s => s.EnsureAdminAsync(server.Id, user.Id))
@@ -312,11 +333,14 @@ public class UserServiceTests : IDisposable
         var user = new User { GoogleSubject = "g-9", DisplayName = "X" };
         _db.Servers.Add(server);
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, Role = ServerRole.Owner });
+        var (ownerRole, _, _) = CreateDefaultRoles(server.Id);
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = ownerRole.Id });
         await _db.SaveChangesAsync();
 
         var member = await _svc.EnsureOwnerAsync(server.Id, user.Id);
-        member.Role.Should().Be(ServerRole.Owner);
+        member.Role.Should().NotBeNull();
+        member.Role!.Name.Should().Be("Owner");
+        member.Role.Position.Should().Be(0);
     }
 
     [Fact]
@@ -326,7 +350,8 @@ public class UserServiceTests : IDisposable
         var user = new User { GoogleSubject = "g-10", DisplayName = "X" };
         _db.Servers.Add(server);
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, Role = ServerRole.Admin });
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         await _svc.Invoking(s => s.EnsureOwnerAsync(server.Id, user.Id))
