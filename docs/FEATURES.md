@@ -153,7 +153,7 @@ This document tracks implemented and planned features for Codec.
 - Video chat and screen sharing
 - Push notifications
 - User banning and message moderation
-- Custom roles and granular permissions
+- ~~Custom roles and granular permissions~~ (implemented)
 - Status messages
 - Additional OAuth providers (GitHub, Discord) — same nickname-on-signup flow
 - SAML/SSO support
