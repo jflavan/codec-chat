@@ -18,7 +18,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("channels")]
-public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache) : ControllerBase
+public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService) : ControllerBase
 {
     private static readonly System.Text.Json.JsonSerializerOptions CamelCaseJsonOptions = new()
     {
@@ -591,6 +591,17 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("ReceiveMessage", payload);
         await messageCache.InvalidateChannelAsync(channelId);
 
+        webhookService.DispatchEvent(channel.ServerId, WebhookEventType.MessageCreated, new
+        {
+            messageId = message.Id,
+            channelId,
+            authorUserId = appUser.Id,
+            authorName = message.AuthorName,
+            body = message.Body,
+            imageUrl = message.ImageUrl,
+            createdAt = message.CreatedAt
+        });
+
         // Notify each mentioned user who is a member of this server.
         var notifiedUserIds = new HashSet<Guid> { appUser.Id }; // skip author
 
@@ -756,6 +767,14 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
         await db.SaveChangesAsync();
 
+        webhookService.DispatchEvent(channel.ServerId, WebhookEventType.MessageDeleted, new
+        {
+            messageId,
+            channelId,
+            deletedByUserId = appUser.Id,
+            isAdminDelete
+        });
+
         await chatHub.Clients.Group(channelId.ToString()).SendAsync("MessageDeleted", new
         {
             MessageId = messageId,
@@ -848,6 +867,14 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
             ChannelId = channelId,
             Body = message.Body,
             EditedAt = message.EditedAt
+        });
+
+        webhookService.DispatchEvent(channel.ServerId, WebhookEventType.MessageUpdated, new
+        {
+            messageId,
+            channelId,
+            body = message.Body,
+            editedAt = message.EditedAt
         });
         await messageCache.InvalidateChannelAsync(channelId);
 

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -49,7 +50,8 @@ public class ServersControllerTests : IDisposable
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxy.Object);
         clients.Setup(c => c.All).Returns(clientProxy.Object);
 
-        _controller = new ServersController(_db, _userService.Object, _avatarService.Object, _emojiService.Object, _hub.Object, _httpFactory.Object, _config.Object, _messageCache);
+        var webhookService = new WebhookService(new Mock<IServiceScopeFactory>().Object, new Mock<IHttpClientFactory>().Object, new Mock<ILogger<WebhookService>>().Object);
+        _controller = new ServersController(_db, _userService.Object, _avatarService.Object, _emojiService.Object, _hub.Object, _httpFactory.Object, _config.Object, _messageCache, webhookService);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

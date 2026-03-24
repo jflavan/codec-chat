@@ -19,7 +19,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("servers")]
-public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config, MessageCacheService messageCache) : ControllerBase
+public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config, MessageCacheService messageCache, WebhookService webhookService) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -337,6 +337,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             userId = targetUserId
         });
 
+        webhookService.DispatchEvent(serverId, WebhookEventType.MemberLeft, new
+        {
+            serverId,
+            userId = targetUserId
+        });
+
         return NoContent();
     }
 
@@ -414,6 +420,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             newRole = newRole.ToString()
         });
 
+        webhookService.DispatchEvent(serverId, WebhookEventType.MemberRoleChanged, new
+        {
+            serverId,
+            userId = targetUserId,
+            newRole = newRole.ToString()
+        });
+
         return Ok(new
         {
             targetMembership.UserId,
@@ -484,6 +497,14 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             targetType: "Channel", targetId: channel.Id.ToString(),
             details: channel.Name);
         await db.SaveChangesAsync();
+
+        webhookService.DispatchEvent(serverId, WebhookEventType.ChannelCreated, new
+        {
+            channelId = channel.Id,
+            serverId,
+            name = channel.Name,
+            type = channel.Type.ToString().ToLowerInvariant()
+        });
 
         return Created($"/servers/{serverId}/channels/{channel.Id}", new
         {
@@ -559,6 +580,17 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             });
             audit.Log(serverId, appUser.Id, AuditAction.ChannelDescriptionChanged,
                 targetType: "Channel", targetId: channelId.ToString());
+        }
+
+        if (nameChanged || descriptionChanged)
+        {
+            webhookService.DispatchEvent(serverId, WebhookEventType.ChannelUpdated, new
+            {
+                channelId,
+                serverId,
+                name = channel.Name,
+                description = channel.Description
+            });
         }
 
         if (nameChanged || descriptionChanged)
@@ -967,6 +999,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverId = invite.ServerId
         });
 
+        webhookService.DispatchEvent(invite.ServerId, WebhookEventType.MemberJoined, new
+        {
+            serverId = invite.ServerId,
+            userId = appUser.Id,
+            displayName = appUser.EffectiveDisplayName
+        });
+
         return Created($"/servers/{invite.ServerId}/members/{appUser.Id}", new
         {
             serverId = invite.ServerId,
@@ -1101,6 +1140,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             serverId,
             channelId
+        });
+
+        webhookService.DispatchEvent(serverId, WebhookEventType.ChannelDeleted, new
+        {
+            channelId,
+            serverId,
+            name = channel.Name
         });
 
         return NoContent();
@@ -1792,5 +1838,230 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             serverMuted = member?.IsMuted ?? false,
             channelOverrides
         });
+    }
+
+    /* ═══════════════════ Webhooks ═══════════════════ */
+
+    private static readonly HashSet<string> ValidEventTypes = Enum.GetValues<WebhookEventType>()
+        .Select(e => e.ToString())
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Creates a new webhook for a server. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPost("{serverId:guid}/webhooks")]
+    public async Task<IActionResult> CreateWebhook(
+        Guid serverId,
+        [FromBody] CreateWebhookRequest request,
+        [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var invalidTypes = request.EventTypes.Where(t => !ValidEventTypes.Contains(t)).ToList();
+        if (invalidTypes.Count > 0)
+        {
+            return BadRequest(new { error = $"Invalid event types: {string.Join(", ", invalidTypes)}" });
+        }
+
+        var webhook = new Webhook
+        {
+            ServerId = serverId,
+            Name = request.Name.Trim(),
+            Url = request.Url.Trim(),
+            Secret = request.Secret,
+            EventTypes = string.Join(",", request.EventTypes),
+            IsActive = true,
+            CreatedByUserId = appUser.Id,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.Webhooks.Add(webhook);
+        audit.Log(serverId, appUser.Id, AuditAction.WebhookCreated,
+            targetType: "Webhook", targetId: webhook.Id.ToString(),
+            details: webhook.Name);
+        await db.SaveChangesAsync();
+
+        return Created($"/servers/{serverId}/webhooks/{webhook.Id}", new
+        {
+            webhook.Id,
+            webhook.ServerId,
+            webhook.Name,
+            webhook.Url,
+            EventTypes = webhook.EventTypes.Split(','),
+            webhook.IsActive,
+            webhook.CreatedByUserId,
+            webhook.CreatedAt,
+            HasSecret = webhook.Secret is not null
+        });
+    }
+
+    /// <summary>
+    /// Lists webhooks for a server. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpGet("{serverId:guid}/webhooks")]
+    public async Task<IActionResult> GetWebhooks(Guid serverId)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var webhooks = await db.Webhooks
+            .AsNoTracking()
+            .Where(w => w.ServerId == serverId)
+            .OrderByDescending(w => w.CreatedAt)
+            .Select(w => new
+            {
+                w.Id,
+                w.ServerId,
+                w.Name,
+                w.Url,
+                EventTypes = w.EventTypes,
+                w.IsActive,
+                w.CreatedByUserId,
+                w.CreatedAt,
+                HasSecret = w.Secret != null
+            })
+            .ToListAsync();
+
+        // Split EventTypes string into array for each webhook
+        var result = webhooks.Select(w => new
+        {
+            w.Id,
+            w.ServerId,
+            w.Name,
+            w.Url,
+            EventTypes = w.EventTypes.Split(',', StringSplitOptions.RemoveEmptyEntries),
+            w.IsActive,
+            w.CreatedByUserId,
+            w.CreatedAt,
+            w.HasSecret
+        });
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Updates a webhook. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpPatch("{serverId:guid}/webhooks/{webhookId:guid}")]
+    public async Task<IActionResult> UpdateWebhook(
+        Guid serverId,
+        Guid webhookId,
+        [FromBody] UpdateWebhookRequest request,
+        [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var webhook = await db.Webhooks
+            .FirstOrDefaultAsync(w => w.Id == webhookId && w.ServerId == serverId);
+
+        if (webhook is null)
+        {
+            return NotFound(new { error = "Webhook not found." });
+        }
+
+        if (request.Name is not null) webhook.Name = request.Name.Trim();
+        if (request.Url is not null) webhook.Url = request.Url.Trim();
+        if (request.Secret is not null) webhook.Secret = request.Secret;
+        if (request.IsActive.HasValue) webhook.IsActive = request.IsActive.Value;
+
+        if (request.EventTypes is not null)
+        {
+            var invalidTypes = request.EventTypes.Where(t => !ValidEventTypes.Contains(t)).ToList();
+            if (invalidTypes.Count > 0)
+            {
+                return BadRequest(new { error = $"Invalid event types: {string.Join(", ", invalidTypes)}" });
+            }
+            webhook.EventTypes = string.Join(",", request.EventTypes);
+        }
+
+        audit.Log(serverId, appUser.Id, AuditAction.WebhookUpdated,
+            targetType: "Webhook", targetId: webhookId.ToString(),
+            details: webhook.Name);
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            webhook.Id,
+            webhook.ServerId,
+            webhook.Name,
+            webhook.Url,
+            EventTypes = webhook.EventTypes.Split(','),
+            webhook.IsActive,
+            webhook.CreatedByUserId,
+            webhook.CreatedAt,
+            HasSecret = webhook.Secret is not null
+        });
+    }
+
+    /// <summary>
+    /// Deletes a webhook. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/webhooks/{webhookId:guid}")]
+    public async Task<IActionResult> DeleteWebhook(
+        Guid serverId,
+        Guid webhookId,
+        [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var webhook = await db.Webhooks
+            .FirstOrDefaultAsync(w => w.Id == webhookId && w.ServerId == serverId);
+
+        if (webhook is null)
+        {
+            return NotFound(new { error = "Webhook not found." });
+        }
+
+        var webhookName = webhook.Name;
+        db.Webhooks.Remove(webhook);
+        audit.Log(serverId, appUser.Id, AuditAction.WebhookDeleted,
+            targetType: "Webhook", targetId: webhookId.ToString(),
+            details: webhookName);
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Gets recent delivery logs for a webhook. Requires Owner, Admin, or global admin role.
+    /// </summary>
+    [HttpGet("{serverId:guid}/webhooks/{webhookId:guid}/deliveries")]
+    public async Task<IActionResult> GetWebhookDeliveries(
+        Guid serverId,
+        Guid webhookId,
+        [FromQuery] int limit = 25)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        var webhookExists = await db.Webhooks
+            .AnyAsync(w => w.Id == webhookId && w.ServerId == serverId);
+
+        if (!webhookExists)
+        {
+            return NotFound(new { error = "Webhook not found." });
+        }
+
+        var deliveries = await db.WebhookDeliveryLogs
+            .AsNoTracking()
+            .Where(l => l.WebhookId == webhookId)
+            .OrderByDescending(l => l.CreatedAt)
+            .Take(Math.Min(limit, 100))
+            .Select(l => new
+            {
+                l.Id,
+                l.EventType,
+                l.StatusCode,
+                l.ErrorMessage,
+                l.Success,
+                l.Attempt,
+                l.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(deliveries);
     }
 }

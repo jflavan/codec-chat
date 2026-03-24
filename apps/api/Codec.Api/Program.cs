@@ -328,6 +328,13 @@ builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();
 builder.Services.AddSingleton<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<ICustomEmojiService, CustomEmojiService>();
 
+builder.Services.AddSingleton<WebhookService>();
+builder.Services.AddHttpClient("webhook", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.Add("User-Agent", "CodecWebhook/1.0");
+});
+
 // Link preview HttpClient with DNS rebinding protection, redirect limits, and no cookies.
 builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =>
 {

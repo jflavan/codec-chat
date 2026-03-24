@@ -25,7 +25,9 @@ import type {
 	NotificationPreferences,
 	PinnedMessage,
 	MessagePinnedEvent,
-	MessageUnpinnedEvent
+	MessageUnpinnedEvent,
+	Webhook,
+	WebhookDelivery
 } from '$lib/types/index.js';
 import { ApiClient, ApiError } from '$lib/api/client.js';
 import { ChatHubService } from '$lib/services/chat-hub.js';
@@ -120,6 +122,14 @@ export class AppState {
 	readonly pinnedMessageIds = $derived(new Set(this.pinnedMessages.map((p) => p.messageId)));
 	readonly pinnedMessageCount = $derived(this.pinnedMessages.length);
 
+	/* ───── webhooks ───── */
+	webhooks = $state<Webhook[]>([]);
+	webhookDeliveries = $state<WebhookDelivery[]>([]);
+	isLoadingWebhooks = $state(false);
+	isCreatingWebhook = $state(false);
+	selectedWebhookId = $state<string | null>(null);
+	isLoadingDeliveries = $state(false);
+
 	/* ───── selection ───── */
 	selectedServerId = $state<string | null>(null);
 	selectedChannelId = $state<string | null>(null);
@@ -170,7 +180,7 @@ export class AppState {
 	theme = $state<ThemeId>(getTheme());
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'emojis' | 'members' | 'audit-log'>('general');
+	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'members' | 'audit-log'>('general');
 	isUpdatingServerName = $state(false);
 	isUpdatingChannelName = $state(false);
 	isUploadingServerIcon = $state(false);
@@ -687,6 +697,9 @@ export class AppState {
 		this.selectedServerId = null;
 		this.selectedChannelId = null;
 		this.serverInvites = [];
+		this.webhooks = [];
+		this.webhookDeliveries = [];
+		this.selectedWebhookId = null;
 		this.customEmojis = [];
 		this.categories = [];
 		this.auditLogEntries = [];
@@ -1195,6 +1208,87 @@ export class AppState {
 			this.serverInvites = this.serverInvites.filter((i) => i.id !== inviteId);
 		} catch (e) {
 			this.setError(e);
+		}
+	}
+
+	/* ═══════════════════ Webhooks ═══════════════════ */
+
+	/** Load webhooks for the currently selected server. */
+	async loadWebhooks(): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isLoadingWebhooks = true;
+		try {
+			this.webhooks = await this.api.getWebhooks(this.idToken, this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingWebhooks = false;
+		}
+	}
+
+	/** Create a new webhook for the currently selected server. */
+	async createWebhook(data: {
+		name: string;
+		url: string;
+		secret?: string;
+		eventTypes: string[];
+	}): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isCreatingWebhook = true;
+		try {
+			const webhook = await this.api.createWebhook(this.idToken, this.selectedServerId, data);
+			this.webhooks = [webhook, ...this.webhooks];
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isCreatingWebhook = false;
+		}
+	}
+
+	/** Update an existing webhook. */
+	async updateWebhook(
+		webhookId: string,
+		data: { name?: string; url?: string; secret?: string; eventTypes?: string[]; isActive?: boolean }
+	): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			const updated = await this.api.updateWebhook(this.idToken, this.selectedServerId, webhookId, data);
+			this.webhooks = this.webhooks.map((w) => (w.id === webhookId ? updated : w));
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Delete a webhook from the currently selected server. */
+	async deleteWebhook(webhookId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.deleteWebhook(this.idToken, this.selectedServerId, webhookId);
+			this.webhooks = this.webhooks.filter((w) => w.id !== webhookId);
+			if (this.selectedWebhookId === webhookId) {
+				this.selectedWebhookId = null;
+				this.webhookDeliveries = [];
+			}
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Load delivery logs for a specific webhook. */
+	async loadWebhookDeliveries(webhookId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		this.isLoadingDeliveries = true;
+		this.selectedWebhookId = webhookId;
+		try {
+			this.webhookDeliveries = await this.api.getWebhookDeliveries(
+				this.idToken,
+				this.selectedServerId,
+				webhookId
+			);
+		} catch (e) {
+			this.setError(e);
+		} finally {
+			this.isLoadingDeliveries = false;
 		}
 	}
 

@@ -31,6 +31,8 @@ public class CodecDbContext : DbContext
     public DbSet<ChannelNotificationOverride> ChannelNotificationOverrides => Set<ChannelNotificationOverride>();
     public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
     public DbSet<SamlIdentityProvider> SamlIdentityProviders => Set<SamlIdentityProvider>();
+    public DbSet<Webhook> Webhooks => Set<Webhook>();
+    public DbSet<WebhookDeliveryLog> WebhookDeliveryLogs => Set<WebhookDeliveryLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -459,6 +461,32 @@ public class CodecDbContext : DbContext
 
             e.HasIndex(p => new { p.ChannelId, p.MessageId }).IsUnique();
             e.HasIndex(p => new { p.ChannelId, p.PinnedAt });
+        });
+
+        modelBuilder.Entity<Webhook>(e =>
+        {
+            e.HasOne(w => w.Server)
+                .WithMany(s => s.Webhooks)
+                .HasForeignKey(w => w.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(w => w.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(w => w.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(w => w.ServerId);
+            e.Property(w => w.Name).HasMaxLength(100);
+            e.Property(w => w.Url).HasMaxLength(2048);
+            e.Property(w => w.Secret).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<WebhookDeliveryLog>(e =>
+        {
+            e.HasOne(l => l.Webhook)
+                .WithMany(w => w.DeliveryLogs)
+                .HasForeignKey(l => l.WebhookId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(l => new { l.WebhookId, l.CreatedAt })
+                .IsDescending(false, true);
         });
     }
 }

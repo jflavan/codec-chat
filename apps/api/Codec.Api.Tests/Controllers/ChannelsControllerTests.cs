@@ -54,7 +54,8 @@ public class ChannelsControllerTests : IDisposable
         _hub.Setup(h => h.Clients).Returns(clients.Object);
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxy.Object);
 
-        _controller = new ChannelsController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, _messageCache);
+        var webhookService = new WebhookService(_scopeFactory.Object, new Mock<IHttpClientFactory>().Object, new Mock<ILogger<WebhookService>>().Object);
+        _controller = new ChannelsController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, _messageCache, webhookService);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
