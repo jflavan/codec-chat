@@ -203,6 +203,10 @@ export class AppState {
 	pendingDmImage = $state<File | null>(null);
 	pendingDmImagePreview = $state<string | null>(null);
 
+	/* ───── file attachments ───── */
+	pendingFile = $state<File | null>(null);
+	pendingDmFile = $state<File | null>(null);
+
 	/* ───── image lightbox ───── */
 	lightboxImageUrl = $state<string | null>(null);
 
@@ -872,10 +876,11 @@ export class AppState {
 
 		const body = this.resolveMentions(this.messageBody.trim());
 		const imageFile = this.pendingImage;
+		const file = this.pendingFile;
 		const replyToMessageId = this.replyingTo?.context === 'channel' ? this.replyingTo.messageId : null;
 
-		if (!body && !imageFile) {
-			this.error = 'Message body or image is required.';
+		if (!body && !imageFile && !file) {
+			this.error = 'Message body, image, or file is required.';
 			return;
 		}
 
@@ -887,10 +892,16 @@ export class AppState {
 				imageUrl = result.imageUrl;
 			}
 
-			await this.api.sendMessage(this.idToken, this.selectedChannelId, body, imageUrl, replyToMessageId);
+			let fileFields: { fileUrl: string; fileName: string; fileSize: number; fileContentType: string } | null = null;
+			if (file) {
+				fileFields = await this.api.uploadFile(this.idToken, file);
+			}
+
+			await this.api.sendMessage(this.idToken, this.selectedChannelId, body, imageUrl, replyToMessageId, fileFields);
 			this.messageBody = '';
 			this.pendingMentions = new Map();
 			this.clearPendingImage();
+			this.clearPendingFile();
 			this.replyingTo = null;
 
 			if (this.me) {
@@ -1610,6 +1621,54 @@ export class AppState {
 		this.pendingDmImagePreview = null;
 	}
 
+	/* ═══════════════════ File Attachments ═══════════════════ */
+
+	private static readonly ALLOWED_FILE_EXTENSIONS = new Set([
+		'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+		'.txt', '.csv', '.md', '.rtf',
+		'.zip', '.tar', '.gz', '.7z', '.rar',
+		'.json', '.xml', '.html', '.css', '.js', '.ts',
+		'.mp3', '.ogg', '.wav', '.webm', '.mp4'
+	]);
+
+	/** Attach a non-image file to the channel message composer. */
+	attachFile(file: File): void {
+		const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+		if (!ext || !AppState.ALLOWED_FILE_EXTENSIONS.has(ext)) {
+			this.error = 'Unsupported file type.';
+			return;
+		}
+		if (file.size > 25 * 1024 * 1024) {
+			this.error = 'File must be under 25 MB.';
+			return;
+		}
+		this.pendingFile = file;
+	}
+
+	/** Remove the pending file attachment from the channel message composer. */
+	clearPendingFile(): void {
+		this.pendingFile = null;
+	}
+
+	/** Attach a non-image file to the DM message composer. */
+	attachDmFile(file: File): void {
+		const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+		if (!ext || !AppState.ALLOWED_FILE_EXTENSIONS.has(ext)) {
+			this.error = 'Unsupported file type.';
+			return;
+		}
+		if (file.size > 25 * 1024 * 1024) {
+			this.error = 'File must be under 25 MB.';
+			return;
+		}
+		this.pendingDmFile = file;
+	}
+
+	/** Remove the pending file attachment from the DM message composer. */
+	clearPendingDmFile(): void {
+		this.pendingDmFile = null;
+	}
+
 	/* ═══════════════════ Image Lightbox ═══════════════════ */
 
 	/** Open the full-screen image lightbox for a given URL. */
@@ -2105,10 +2164,11 @@ export class AppState {
 
 		const body = this.dmMessageBody.trim();
 		const imageFile = this.pendingDmImage;
+		const file = this.pendingDmFile;
 		const replyToDirectMessageId = this.replyingTo?.context === 'dm' ? this.replyingTo.messageId : null;
 
-		if (!body && !imageFile) {
-			this.error = 'Message body or image is required.';
+		if (!body && !imageFile && !file) {
+			this.error = 'Message body, image, or file is required.';
 			return;
 		}
 
@@ -2120,9 +2180,15 @@ export class AppState {
 				imageUrl = result.imageUrl;
 			}
 
-			await this.api.sendDm(this.idToken, this.activeDmChannelId, body, imageUrl, replyToDirectMessageId);
+			let fileFields: { fileUrl: string; fileName: string; fileSize: number; fileContentType: string } | null = null;
+			if (file) {
+				fileFields = await this.api.uploadFile(this.idToken, file);
+			}
+
+			await this.api.sendDm(this.idToken, this.activeDmChannelId, body, imageUrl, replyToDirectMessageId, fileFields);
 			this.dmMessageBody = '';
 			this.clearPendingDmImage();
+			this.clearPendingDmFile();
 			this.replyingTo = null;
 
 			if (this.me) {
