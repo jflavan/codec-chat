@@ -388,14 +388,16 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
 
-        if (targetMembership?.Role is { IsSystemRole: true, Name: "Owner" })
+        if (targetMembership?.Role?.Name is "Owner")
         {
             return BadRequest(new { error = "Cannot ban the server owner." });
         }
 
+        // Cannot ban someone with a higher or equal role position (lower number = higher rank)
         if (targetMembership is not null
-            && callerMembership.Role is { IsSystemRole: true, Name: "Admin" }
-            && targetMembership.Role is { IsSystemRole: true, Name: "Admin" })
+            && callerMembership.Role is not null
+            && targetMembership.Role is not null
+            && targetMembership.Role.Position <= callerMembership.Role.Position)
         {
             return Forbid();
         }
