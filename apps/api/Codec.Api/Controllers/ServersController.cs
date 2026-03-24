@@ -385,16 +385,17 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var targetMembership = await db.ServerMembers
+            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
 
-        if (targetMembership is not null && targetMembership.Role is ServerRole.Owner)
+        if (targetMembership?.Role is { IsSystemRole: true, Name: "Owner" })
         {
             return BadRequest(new { error = "Cannot ban the server owner." });
         }
 
         if (targetMembership is not null
-            && callerMembership.Role is ServerRole.Admin
-            && targetMembership.Role is ServerRole.Admin)
+            && callerMembership.Role is { IsSystemRole: true, Name: "Admin" }
+            && targetMembership.Role is { IsSystemRole: true, Name: "Admin" })
         {
             return Forbid();
         }
