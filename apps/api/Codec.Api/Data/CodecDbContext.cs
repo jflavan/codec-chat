@@ -488,6 +488,8 @@ public class CodecDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(l => new { l.WebhookId, l.CreatedAt })
                 .IsDescending(false, true);
+        });
+
         modelBuilder.Entity<PushSubscription>(e =>
         {
             e.HasOne(ps => ps.User)
