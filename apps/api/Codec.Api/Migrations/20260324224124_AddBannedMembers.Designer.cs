@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260324224124_AddBannedMembers")]
+    partial class AddBannedMembers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -512,43 +515,6 @@ namespace Codec.Api.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("PresenceStates");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.PushSubscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Auth")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Endpoint")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("P256dh")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Endpoint")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("PushSubscriptions");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.Reaction", b =>
@@ -1291,17 +1257,6 @@ namespace Codec.Api.Migrations
                 });
 
             modelBuilder.Entity("Codec.Api.Models.PresenceState", b =>
-                {
-                    b.HasOne("Codec.Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.PushSubscription", b =>
                 {
                     b.HasOne("Codec.Api.Models.User", "User")
                         .WithMany()

@@ -27,7 +27,9 @@ public enum AuditAction
     MessageUnpinned,
     WebhookCreated,
     WebhookUpdated,
-    WebhookDeleted
+    WebhookDeleted,
+    MemberBanned,
+    MemberUnbanned
 }
 
 public class AuditLogEntry
