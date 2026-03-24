@@ -42,5 +42,20 @@ public class VoiceState
     /// </summary>
     public string? ProducerId { get; set; }
 
+    /// <summary>
+    /// mediasoup producer ID for the participant's video track.
+    /// Null when the camera is off.
+    /// </summary>
+    public string? VideoProducerId { get; set; }
+
+    /// <summary>
+    /// mediasoup producer ID for the participant's screen share track.
+    /// Null when not screen sharing.
+    /// </summary>
+    public string? ScreenProducerId { get; set; }
+
+    public bool IsVideoEnabled { get; set; }
+    public bool IsScreenSharing { get; set; }
+
     public DateTimeOffset JoinedAt { get; set; }
 }

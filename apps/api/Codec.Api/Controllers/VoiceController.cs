@@ -56,6 +56,8 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
                 AvatarUrl = vs.User.CustomAvatarPath ?? vs.User.AvatarUrl,
                 vs.IsMuted,
                 vs.IsDeafened,
+                vs.IsVideoEnabled,
+                vs.IsScreenSharing,
                 vs.JoinedAt
             })
             .ToListAsync();

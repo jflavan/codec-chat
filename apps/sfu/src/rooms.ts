@@ -8,7 +8,8 @@ const tracer = trace.getTracer('codec-sfu');
 interface Participant {
   sendTransport?: WebRtcTransport;
   recvTransport?: WebRtcTransport;
-  producer?: Producer;
+  /** Producers keyed by label: 'audio', 'video', or 'screen'. */
+  producers: Map<string, Producer>;
   consumers: Map<string, Consumer>;
 }
 
@@ -23,7 +24,7 @@ const rooms = new Map<string, Room>();
 function getOrCreateParticipant(room: Room, participantId: string): Participant {
   let p = room.participants.get(participantId);
   if (!p) {
-    p = { consumers: new Map() };
+    p = { producers: new Map(), consumers: new Map() };
     room.participants.set(participantId, p);
   }
   return p;
@@ -155,14 +156,22 @@ export function createRoomRouter(worker: Worker): Router {
   /* ── POST /rooms/:roomId/transports/:transportId/produce ── */
   router.post('/rooms/:roomId/transports/:transportId/produce', async (req, res) => {
     const { roomId, transportId } = req.params;
-    const { participantId, kind, rtpParameters } = req.body as { participantId: string; kind: MediaKind; rtpParameters: RtpParameters };
+    const { participantId, kind, rtpParameters, label } = req.body as {
+      participantId: string;
+      kind: MediaKind;
+      rtpParameters: RtpParameters;
+      /** Producer label: 'audio', 'video', or 'screen'. Defaults to kind. */
+      label?: string;
+    };
 
     if (!participantId || !kind || !rtpParameters) {
       return res.status(400).json({ error: 'participantId, kind, and rtpParameters are required' });
     }
-    if (kind !== 'audio') {
-      return res.status(400).json({ error: 'Only audio producers are supported' });
+    if (kind !== 'audio' && kind !== 'video') {
+      return res.status(400).json({ error: 'kind must be "audio" or "video"' });
     }
+
+    const producerLabel = label ?? kind;
 
     const room = rooms.get(roomId);
     if (!room) return res.status(404).json({ error: 'Room not found' });
@@ -178,14 +187,21 @@ export function createRoomRouter(worker: Worker): Router {
         span.setAttribute('room.id', roomId);
         span.setAttribute('participant.id', participantId);
         span.setAttribute('media.kind', kind);
+        span.setAttribute('producer.label', producerLabel);
 
-        participant.producer?.close();
+        // Close existing producer with the same label
+        const existingProducer = participant.producers.get(producerLabel);
+        if (existingProducer) {
+          existingProducer.close();
+          participant.producers.delete(producerLabel);
+        }
+
         const producer = await participant.sendTransport!.produce({ kind, rtpParameters });
-        participant.producer = producer;
+        participant.producers.set(producerLabel, producer);
 
         producer.on('transportclose', () => {
           producer.close();
-          participant.producer = undefined;
+          participant.producers.delete(producerLabel);
         });
 
         span.setAttribute('producer.id', producer.id);
@@ -198,6 +214,23 @@ export function createRoomRouter(worker: Worker): Router {
         span.end();
       }
     });
+  });
+
+  /* ── DELETE /rooms/:roomId/participants/:participantId/producers/:label ── close a specific producer ── */
+  router.delete('/rooms/:roomId/participants/:participantId/producers/:label', (req, res) => {
+    const { roomId, participantId, label } = req.params;
+    const room = rooms.get(roomId);
+    if (!room) return res.status(204).send();
+
+    const participant = room.participants.get(participantId);
+    if (participant) {
+      const producer = participant.producers.get(label);
+      if (producer) {
+        producer.close();
+        participant.producers.delete(label);
+      }
+    }
+    res.status(204).send();
   });
 
   /* ── POST /rooms/:roomId/consumers ── create a consumer for a producer ── */
@@ -216,10 +249,13 @@ export function createRoomRouter(worker: Worker): Router {
     // This prevents cross-room consumption even if router.canConsume() were to allow it.
     let producerInRoom = false;
     for (const participant of room.participants.values()) {
-      if (participant.producer?.id === producerId) {
-        producerInRoom = true;
-        break;
+      for (const producer of participant.producers.values()) {
+        if (producer.id === producerId) {
+          producerInRoom = true;
+          break;
+        }
       }
+      if (producerInRoom) break;
     }
     if (!producerInRoom) return res.status(404).json({ error: 'Producer not found in this room' });
 
@@ -280,7 +316,8 @@ export function createRoomRouter(worker: Worker): Router {
 
     const participant = room.participants.get(participantId);
     if (participant) {
-      participant.producer?.close();
+      for (const producer of participant.producers.values()) producer.close();
+      participant.producers.clear();
       participant.sendTransport?.close();
       participant.recvTransport?.close();
       for (const consumer of participant.consumers.values()) consumer.close();

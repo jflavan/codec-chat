@@ -249,6 +249,16 @@ export class AppState {
 	pttKey = $state('KeyV');
 	/** True while the PTT key is held down. */
 	isPttActive = $state(false);
+	/** Whether the local camera is enabled. */
+	isVideoEnabled = $state(false);
+	/** Whether the local screen share is enabled. */
+	isScreenSharing = $state(false);
+	/** Local video track for self-preview (camera). */
+	localVideoTrack = $state<MediaStreamTrack | null>(null);
+	/** Local screen share track for self-preview. */
+	localScreenTrack = $state<MediaStreamTrack | null>(null);
+	/** Remote video tracks: participantId → { track, label } */
+	remoteVideoTracks = $state<Map<string, { track: MediaStreamTrack; label: string }>>(new Map());
 
 	/* ───── calls ───── */
 	activeCall = $state<{
@@ -736,6 +746,11 @@ export class AppState {
 		this.isMuted = false;
 		this.isDeafened = false;
 		this.isJoiningVoice = false;
+		this.isVideoEnabled = false;
+		this.isScreenSharing = false;
+		this.localVideoTrack = null;
+		this.localScreenTrack = null;
+		this.remoteVideoTracks = new Map();
 		this._cleanupRemoteAudio();
 
 		await tick();
@@ -2379,11 +2394,21 @@ export class AppState {
 		this.isJoiningVoice = true;
 		try {
 			const members = await this.voice.join(channelId, this.hub, {
-				onNewTrack: (pid, track) => {
-					const userId = this._findUserIdByParticipant(pid);
-					this._attachRemoteAudio(pid, userId, track);
+				onNewTrack: (pid, track, label) => {
+					if (label === 'audio') {
+						const userId = this._findUserIdByParticipant(pid);
+						this._attachRemoteAudio(pid, userId, track);
+					} else {
+						this._attachRemoteVideo(pid, track, label);
+					}
 				},
-				onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+				onTrackEnded: (pid, label) => {
+					if (label === 'audio') {
+						this._detachRemoteAudio(pid);
+					} else {
+						this._detachRemoteVideo(pid, label);
+					}
+				},
 			});
 
 			this.activeVoiceChannelId = channelId;
@@ -2430,8 +2455,13 @@ export class AppState {
 			try { await this.hub.leaveVoiceChannel(); } catch { /* ignore */ }
 			await this.voice.leave();
 			this._cleanupRemoteAudio();
+			this._cleanupRemoteVideo();
 			this._removePttListeners();
 			this.isPttActive = false;
+			this.isVideoEnabled = false;
+			this.isScreenSharing = false;
+			this.localVideoTrack = null;
+			this.localScreenTrack = null;
 			this.activeVoiceChannelId = null;
 
 			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
@@ -2462,10 +2492,15 @@ export class AppState {
 
 		await this.voice.leave();
 		this._cleanupRemoteAudio();
+		this._cleanupRemoteVideo();
 		this.activeVoiceChannelId = null;
 		this.isMuted = false;
 		this.isDeafened = false;
 		this.isPttActive = false;
+		this.isVideoEnabled = false;
+		this.isScreenSharing = false;
+		this.localVideoTrack = null;
+		this.localScreenTrack = null;
 		this._removePttListeners();
 
 		// Remove self from the local members map
@@ -2720,6 +2755,78 @@ export class AppState {
 		this._saveVoicePreferences();
 	}
 
+	/* ═══════════════════ Video & Screen Share ═══════════════════ */
+
+	async toggleVideo(): Promise<void> {
+		if (!this.activeVoiceChannelId && !this.activeCall) return;
+
+		if (this.isVideoEnabled) {
+			await this.voice.stopVideo();
+			this.isVideoEnabled = false;
+			this.localVideoTrack = null;
+		} else {
+			try {
+				const track = await this.voice.startVideo();
+				this.isVideoEnabled = true;
+				this.localVideoTrack = track;
+			} catch (e) {
+				console.error('[Video] Failed to start camera:', e);
+				if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+					this.setError(new Error('Camera access is required. Please allow camera access in your browser and try again.'));
+				} else if (e instanceof DOMException && e.name === 'NotFoundError') {
+					this.setError(new Error('No camera found. Please connect a camera to enable video.'));
+				} else {
+					this.setError(e);
+				}
+			}
+		}
+	}
+
+	async toggleScreenShare(): Promise<void> {
+		if (!this.activeVoiceChannelId && !this.activeCall) return;
+
+		if (this.isScreenSharing) {
+			await this.voice.stopScreenShare();
+			this.isScreenSharing = false;
+			this.localScreenTrack = null;
+		} else {
+			try {
+				const track = await this.voice.startScreenShare();
+				this.isScreenSharing = true;
+				this.localScreenTrack = track;
+
+				// When user stops via browser "Stop sharing" button
+				track.addEventListener('ended', () => {
+					this.isScreenSharing = false;
+					this.localScreenTrack = null;
+				});
+			} catch (e) {
+				// User cancelled the picker — not an error
+				if (e instanceof DOMException && e.name === 'NotAllowedError') return;
+				console.error('[Video] Failed to start screen share:', e);
+				this.setError(e);
+			}
+		}
+	}
+
+	private _attachRemoteVideo(participantId: string, track: MediaStreamTrack, label: string): void {
+		const key = `${participantId}:${label}`;
+		const updated = new Map(this.remoteVideoTracks);
+		updated.set(key, { track, label });
+		this.remoteVideoTracks = updated;
+	}
+
+	private _detachRemoteVideo(participantId: string, label: string): void {
+		const key = `${participantId}:${label}`;
+		const updated = new Map(this.remoteVideoTracks);
+		updated.delete(key);
+		this.remoteVideoTracks = updated;
+	}
+
+	private _cleanupRemoteVideo(): void {
+		this.remoteVideoTracks = new Map();
+	}
+
 	/* ═══════════════════ DM Voice Calls ═══════════════════ */
 
 	async startCall(dmChannelId: string): Promise<void> {
@@ -2783,10 +2890,20 @@ export class AppState {
 				},
 				this.hub,
 				{
-					onNewTrack: (pid, track) => {
-						this._attachRemoteAudio(pid, caller.callerUserId, track);
+					onNewTrack: (pid, track, label) => {
+						if (label === 'audio') {
+							this._attachRemoteAudio(pid, caller.callerUserId, track);
+						} else {
+							this._attachRemoteVideo(pid, track, label);
+						}
 					},
-					onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+					onTrackEnded: (pid, label) => {
+						if (label === 'audio') {
+							this._detachRemoteAudio(pid);
+						} else {
+							this._detachRemoteVideo(pid, label);
+						}
+					},
 				}
 			);
 
@@ -2831,9 +2948,14 @@ export class AppState {
 
 		await this.voice.leave();
 		this._cleanupRemoteAudio();
+		this._cleanupRemoteVideo();
 		this.isMuted = false;
 		this.isDeafened = false;
 		this.isPttActive = false;
+		this.isVideoEnabled = false;
+		this.isScreenSharing = false;
+		this.localVideoTrack = null;
+		this.localScreenTrack = null;
 		this._removePttListeners();
 	}
 
@@ -2889,6 +3011,7 @@ export class AppState {
 				if (this.activeVoiceChannelId || this.activeCall) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._cleanupRemoteVideo();
 					this._removePttListeners();
 					this.activeVoiceChannelId = null;
 					this.activeCall = null;
@@ -2896,6 +3019,10 @@ export class AppState {
 					this.isMuted = false;
 					this.isDeafened = false;
 					this.isPttActive = false;
+					this.isVideoEnabled = false;
+					this.isScreenSharing = false;
+					this.localVideoTrack = null;
+					this.localScreenTrack = null;
 					this.setTransientError('Voice disconnected due to network interruption.');
 				}
 				if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -2932,11 +3059,16 @@ export class AppState {
 				if (this.activeVoiceChannelId) {
 					this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._cleanupRemoteVideo();
 					this._removePttListeners();
 					this.activeVoiceChannelId = null;
 					this.isMuted = false;
 					this.isDeafened = false;
 					this.isPttActive = false;
+					this.isVideoEnabled = false;
+					this.isScreenSharing = false;
+					this.localVideoTrack = null;
+					this.localScreenTrack = null;
 				}
 				if (error) window.location.reload();
 			},
@@ -3228,10 +3360,65 @@ export class AppState {
 				const inVoiceChannel = this.activeVoiceChannelId === event.channelId;
 				const inDmCall = this.activeCall?.status === 'active';
 				if (inVoiceChannel || inDmCall) {
+					const label = event.label ?? 'audio';
 					await this.voice.consumeProducer(event.producerId, event.participantId, this.hub, {
-						onNewTrack: (pid, track) => this._attachRemoteAudio(pid, event.userId, track),
-						onTrackEnded: (pid) => this._detachRemoteAudio(pid),
-					});
+						onNewTrack: (pid, track, lbl) => {
+							if (lbl === 'audio') {
+								this._attachRemoteAudio(pid, event.userId, track);
+							} else {
+								this._attachRemoteVideo(pid, track, lbl);
+							}
+						},
+						onTrackEnded: (pid, lbl) => {
+							if (lbl === 'audio') {
+								this._detachRemoteAudio(pid);
+							} else {
+								this._detachRemoteVideo(pid, lbl);
+							}
+						},
+					}, label);
+
+					// Update member state for video/screen visibility
+					if (label === 'video' || label === 'screen') {
+						const channelId = event.channelId ?? this.activeVoiceChannelId;
+						if (channelId) {
+							const memberMap = new Map(this.voiceChannelMembers);
+							const members = (memberMap.get(channelId) ?? []).map((m) =>
+								m.userId === event.userId
+									? {
+										...m,
+										isVideoEnabled: label === 'video' ? true : m.isVideoEnabled,
+										isScreenSharing: label === 'screen' ? true : m.isScreenSharing,
+									  }
+									: m
+							);
+							memberMap.set(channelId, members);
+							this.voiceChannelMembers = memberMap;
+						}
+					}
+				}
+			},
+			onProducerClosed: (event) => {
+				const label = event.label;
+				// Close the local consumer for this producer
+				this.voice.closeConsumerByProducerId(event.producerId);
+				this._detachRemoteVideo(event.participantId, label);
+
+				// Update member state
+				const channelId = event.channelId ?? this.activeVoiceChannelId;
+				if (channelId) {
+					const memberMap = new Map(this.voiceChannelMembers);
+					const members = (memberMap.get(channelId) ?? []).map((m) =>
+						m.userId === event.userId
+							? {
+								...m,
+								isVideoEnabled: label === 'video' ? false : m.isVideoEnabled,
+								isScreenSharing: label === 'screen' ? false : m.isScreenSharing,
+							  }
+							: m
+					);
+					memberMap.set(channelId, members);
+					this.voiceChannelMembers = memberMap;
 				}
 			},
 			onIncomingCall: (event) => {
@@ -3258,10 +3445,20 @@ export class AppState {
 						},
 						this.hub,
 						{
-							onNewTrack: (pid, track) => {
-								this._attachRemoteAudio(pid, this.activeCall!.otherUserId, track);
+							onNewTrack: (pid, track, label) => {
+								if (label === 'audio') {
+									this._attachRemoteAudio(pid, this.activeCall!.otherUserId, track);
+								} else {
+									this._attachRemoteVideo(pid, track, label);
+								}
 							},
-							onTrackEnded: (pid) => this._detachRemoteAudio(pid),
+							onTrackEnded: (pid, label) => {
+								if (label === 'audio') {
+									this._detachRemoteAudio(pid);
+								} else {
+									this._detachRemoteVideo(pid, label);
+								}
+							},
 						}
 					);
 
@@ -3278,6 +3475,7 @@ export class AppState {
 					this.activeCall = null;
 					await this.voice.leave();
 					this._cleanupRemoteAudio();
+					this._cleanupRemoteVideo();
 					this.setError(e);
 				}
 			},
