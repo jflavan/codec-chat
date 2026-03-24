@@ -73,15 +73,26 @@ jobs:
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      - name: Build and push API image
+      - name: Build API image
         run: |
           docker build -t ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }} \
                         -t ${{ env.ACR_NAME }}.azurecr.io/codec-api:latest \
                         ./apps/api
+
+      - name: Scan API image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+      - name: Push API image
+        run: |
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-api:${{ github.sha }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-api:latest
 
-      - name: Build and push Web image
+      - name: Build Web image
         run: |
           docker build \
             --build-arg PUBLIC_API_BASE_URL=${{ secrets.PUBLIC_API_BASE_URL }} \
@@ -90,14 +101,36 @@ jobs:
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-web:latest \
             ./apps/web
+
+      - name: Scan Web image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+      - name: Push Web image
+        run: |
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-web:latest
 
-      - name: Build and push SFU image
+      - name: Build SFU image
         run: |
           docker build -t ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:${{ github.sha }} \
                         -t ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:latest \
                         ./apps/sfu
+
+      - name: Scan SFU image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+
+      - name: Push SFU image
+        run: |
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:${{ github.sha }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-sfu:latest
 
