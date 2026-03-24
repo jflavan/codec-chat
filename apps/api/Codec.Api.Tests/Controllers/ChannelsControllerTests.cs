@@ -43,7 +43,9 @@ public class ChannelsControllerTests : IDisposable
         _db.Users.Add(_testUser);
         _db.Servers.Add(_testServer);
         _db.Channels.Add(_testChannel);
-        _db.ServerMembers.Add(new ServerMember { Server = _testServer, UserId = _testUser.Id, Role = ServerRole.Member });
+        var memberRole = new ServerRoleEntity { ServerId = _testServer.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
+        _db.ServerRoles.Add(memberRole);
+        _db.ServerMembers.Add(new ServerMember { Server = _testServer, UserId = _testUser.Id, RoleId = memberRole.Id });
         _db.SaveChanges();
 
         _messageCache = new MessageCacheService(new Mock<ILogger<MessageCacheService>>().Object);
@@ -249,14 +251,14 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task ToggleReaction_ChannelNotFound_Returns404()
     {
-        var result = await _controller.ToggleReaction(Guid.NewGuid(), Guid.NewGuid(), new ToggleReactionRequest("👍"));
+        var result = await _controller.ToggleReaction(Guid.NewGuid(), Guid.NewGuid(), new ToggleReactionRequest("\U0001f44d"));
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
     public async Task ToggleReaction_MessageNotFound_Returns404()
     {
-        var result = await _controller.ToggleReaction(_testChannel.Id, Guid.NewGuid(), new ToggleReactionRequest("👍"));
+        var result = await _controller.ToggleReaction(_testChannel.Id, Guid.NewGuid(), new ToggleReactionRequest("\U0001f44d"));
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -267,9 +269,9 @@ public class ChannelsControllerTests : IDisposable
         _db.Messages.Add(msg);
         await _db.SaveChangesAsync();
 
-        var result = await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("👍"));
+        var result = await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("\U0001f44d"));
         result.Should().BeOfType<OkObjectResult>();
-        _db.Reactions.Should().ContainSingle(r => r.MessageId == msg.Id && r.Emoji == "👍");
+        _db.Reactions.Should().ContainSingle(r => r.MessageId == msg.Id && r.Emoji == "\U0001f44d");
     }
 
     [Fact]
@@ -277,10 +279,10 @@ public class ChannelsControllerTests : IDisposable
     {
         var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "React" };
         _db.Messages.Add(msg);
-        _db.Reactions.Add(new Reaction { MessageId = msg.Id, UserId = _testUser.Id, Emoji = "👍" });
+        _db.Reactions.Add(new Reaction { MessageId = msg.Id, UserId = _testUser.Id, Emoji = "\U0001f44d" });
         await _db.SaveChangesAsync();
 
-        var result = await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("👍"));
+        var result = await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("\U0001f44d"));
         result.Should().BeOfType<OkObjectResult>();
         _db.Reactions.Should().BeEmpty();
     }
@@ -326,7 +328,7 @@ public class ChannelsControllerTests : IDisposable
     private void SetupAdminUser()
     {
         _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id, Role = ServerRole.Admin });
+            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id, Role = new ServerRoleEntity { Name = "Admin", Position = 1, Permissions = PermissionExtensions.AdminDefaults, IsSystemRole = true } });
     }
 
     [Fact]

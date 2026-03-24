@@ -29,7 +29,10 @@ public enum AuditAction
     WebhookUpdated,
     WebhookDeleted,
     MemberBanned,
-    MemberUnbanned
+    MemberUnbanned,
+    RoleCreated,
+    RoleUpdated,
+    RoleDeleted
 }
 
 public class AuditLogEntry

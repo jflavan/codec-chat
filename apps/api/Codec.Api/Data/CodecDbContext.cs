@@ -35,6 +35,7 @@ public class CodecDbContext : DbContext
     public DbSet<WebhookDeliveryLog> WebhookDeliveryLogs => Set<WebhookDeliveryLog>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<BannedMember> BannedMembers => Set<BannedMember>();
+    public DbSet<ServerRoleEntity> ServerRoles => Set<ServerRoleEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -127,6 +128,23 @@ public class CodecDbContext : DbContext
             .HasOne(member => member.User)
             .WithMany(user => user.ServerMemberships)
             .HasForeignKey(member => member.UserId);
+
+        modelBuilder.Entity<ServerMember>()
+            .HasOne(member => member.Role)
+            .WithMany(role => role.Members)
+            .HasForeignKey(member => member.RoleId);
+
+        modelBuilder.Entity<ServerRoleEntity>(e =>
+        {
+            e.HasOne(r => r.Server)
+                .WithMany(s => s.Roles)
+                .HasForeignKey(r => r.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Property(r => r.Name).HasMaxLength(100);
+            e.Property(r => r.Color).HasMaxLength(7);
+            e.HasIndex(r => new { r.ServerId, r.Position });
+            e.HasIndex(r => new { r.ServerId, r.Name }).IsUnique();
+        });
 
         modelBuilder.Entity<Reaction>(entity =>
         {

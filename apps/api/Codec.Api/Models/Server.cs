@@ -23,4 +23,5 @@ public class Server
     public List<ChannelCategory> Categories { get; set; } = [];
     public List<AuditLogEntry> AuditLogEntries { get; set; } = [];
     public List<Webhook> Webhooks { get; set; } = [];
+    public List<ServerRoleEntity> Roles { get; set; } = [];
 }
