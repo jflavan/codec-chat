@@ -105,7 +105,9 @@ public class AvatarsControllerTests : IDisposable
     {
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, Role = ServerRole.Member });
+        var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
+        _db.ServerRoles.Add(memberRole);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         var file = new Mock<IFormFile>();

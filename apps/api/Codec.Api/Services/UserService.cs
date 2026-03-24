@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Codec.Api.Data;
 using Codec.Api.Models;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -75,17 +74,18 @@ public class UserService(CodecDbContext db) : IUserService
         db.Users.Add(appUser);
 
         // Auto-join the new user to the default "Codec HQ" server.
-        var defaultServerExists = await db.Servers
+        var defaultMemberRole = await db.ServerRoles
             .AsNoTracking()
-            .AnyAsync(s => s.Id == Server.DefaultServerId);
+            .Where(r => r.ServerId == Server.DefaultServerId && r.IsSystemRole && r.Name == "Member")
+            .FirstOrDefaultAsync();
 
-        if (defaultServerExists)
+        if (defaultMemberRole is not null)
         {
             db.ServerMembers.Add(new ServerMember
             {
                 ServerId = Server.DefaultServerId,
                 User = appUser,
-                Role = ServerRole.Member,
+                RoleId = defaultMemberRole.Id,
                 JoinedAt = DateTimeOffset.UtcNow
             });
         }
@@ -146,6 +146,7 @@ public class UserService(CodecDbContext db) : IUserService
         {
             var member = await db.ServerMembers
                 .AsNoTracking()
+                .Include(m => m.Role)
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
             if (member is not null) return member;
 
@@ -157,6 +158,7 @@ public class UserService(CodecDbContext db) : IUserService
 
         var membership = await db.ServerMembers
             .AsNoTracking()
+            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
 
         if (membership is null)
@@ -170,7 +172,7 @@ public class UserService(CodecDbContext db) : IUserService
     }
 
     /// <inheritdoc />
-    public async Task<ServerMember> EnsureAdminAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false)
+    public async Task<ServerMember> EnsurePermissionAsync(Guid serverId, Guid userId, Permission permission, bool isGlobalAdmin = false)
     {
         if (isGlobalAdmin)
         {
@@ -179,12 +181,14 @@ public class UserService(CodecDbContext db) : IUserService
 
             var member = await db.ServerMembers
                 .AsNoTracking()
+                .Include(m => m.Role)
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
             return member ?? new ServerMember { ServerId = serverId, UserId = userId };
         }
 
         var membership = await db.ServerMembers
             .AsNoTracking()
+            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
 
         if (membership is null)
@@ -194,10 +198,19 @@ public class UserService(CodecDbContext db) : IUserService
             throw new Exceptions.ForbiddenException();
         }
 
-        if (membership.Role is not (ServerRole.Owner or ServerRole.Admin))
+        if (membership.Role is null)
+            throw new Exceptions.ForbiddenException();
+
+        if (!membership.Role.Permissions.Has(permission))
             throw new Exceptions.ForbiddenException();
 
         return membership;
+    }
+
+    /// <inheritdoc />
+    public async Task<ServerMember> EnsureAdminAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false)
+    {
+        return await EnsurePermissionAsync(serverId, userId, Permission.Administrator, isGlobalAdmin);
     }
 
     /// <inheritdoc />
@@ -210,12 +223,14 @@ public class UserService(CodecDbContext db) : IUserService
 
             var member = await db.ServerMembers
                 .AsNoTracking()
+                .Include(m => m.Role)
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
             return member ?? new ServerMember { ServerId = serverId, UserId = userId };
         }
 
         var membership = await db.ServerMembers
             .AsNoTracking()
+            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
 
         if (membership is null)
@@ -225,7 +240,7 @@ public class UserService(CodecDbContext db) : IUserService
             throw new Exceptions.ForbiddenException();
         }
 
-        if (membership.Role is not ServerRole.Owner)
+        if (membership.Role is null || !membership.Role.IsSystemRole || membership.Role.Position != 0)
             throw new Exceptions.ForbiddenException();
 
         return membership;
@@ -243,5 +258,69 @@ public class UserService(CodecDbContext db) : IUserService
             if (!channelExists) throw new Exceptions.NotFoundException("DM channel not found.");
             throw new Exceptions.ForbiddenException("You are not a participant in this conversation.");
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<Permission> GetPermissionsAsync(Guid serverId, Guid userId)
+    {
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .Include(m => m.Role)
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+        return membership?.Role?.Permissions ?? Permission.None;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsOwnerAsync(Guid serverId, Guid userId)
+    {
+        var membership = await db.ServerMembers
+            .AsNoTracking()
+            .Include(m => m.Role)
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+        return membership?.Role is { IsSystemRole: true, Position: 0 };
+    }
+
+    /// <inheritdoc />
+    public async Task<(ServerRoleEntity owner, ServerRoleEntity admin, ServerRoleEntity member)> CreateDefaultRolesAsync(Guid serverId)
+    {
+        var ownerRole = new ServerRoleEntity
+        {
+            ServerId = serverId,
+            Name = "Owner",
+            Color = null,
+            Position = 0,
+            Permissions = Permission.Administrator,
+            IsSystemRole = true,
+            IsHoisted = true,
+        };
+
+        var adminRole = new ServerRoleEntity
+        {
+            ServerId = serverId,
+            Name = "Admin",
+            Color = "#f0b232",
+            Position = 1,
+            Permissions = PermissionExtensions.AdminDefaults,
+            IsSystemRole = true,
+            IsHoisted = true,
+        };
+
+        var memberRole = new ServerRoleEntity
+        {
+            ServerId = serverId,
+            Name = "Member",
+            Color = null,
+            Position = 2,
+            Permissions = PermissionExtensions.MemberDefaults,
+            IsSystemRole = true,
+            IsHoisted = false,
+        };
+
+        db.ServerRoles.AddRange(ownerRole, adminRole, memberRole);
+        await db.SaveChangesAsync();
+
+        return (ownerRole, adminRole, memberRole);
     }
 }

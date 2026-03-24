@@ -33,22 +33,28 @@ public interface IUserService
     string GetEffectiveDisplayName(User user);
 
     /// <summary>
-    /// Returns the <see cref="ServerMember"/> for the given user in the given server,
+    /// Returns the <see cref="ServerMember"/> (with Role loaded) for the given user in the given server,
     /// or throws <see cref="Exceptions.NotFoundException"/> / <see cref="Exceptions.ForbiddenException"/>.
     /// Global admins bypass the membership requirement.
     /// </summary>
     Task<ServerMember> EnsureMemberAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false);
 
     /// <summary>
+    /// Ensures the member has the specified <see cref="Permission"/> in the server.
+    /// Global admins bypass all permission checks.
+    /// Throws <see cref="Exceptions.ForbiddenException"/> if the member lacks the permission.
+    /// </summary>
+    Task<ServerMember> EnsurePermissionAsync(Guid serverId, Guid userId, Permission permission, bool isGlobalAdmin = false);
+
+    /// <summary>
     /// Like <see cref="EnsureMemberAsync"/> but also requires the member to hold
-    /// <see cref="ServerRole.Owner"/> or <see cref="ServerRole.Admin"/>.
+    /// <see cref="Permission.Administrator"/> or be in a role with admin-equivalent permissions.
     /// Global admins bypass the role check.
     /// </summary>
     Task<ServerMember> EnsureAdminAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false);
 
     /// <summary>
-    /// Like <see cref="EnsureMemberAsync"/> but also requires the member to hold
-    /// <see cref="ServerRole.Owner"/>.
+    /// Ensures the member is the server owner (position-0 system role).
     /// Global admins bypass the role check.
     /// </summary>
     Task<ServerMember> EnsureOwnerAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false);
@@ -58,4 +64,20 @@ public interface IUserService
     /// or throws <see cref="Exceptions.NotFoundException"/> / <see cref="Exceptions.ForbiddenException"/>.
     /// </summary>
     Task EnsureDmParticipantAsync(Guid dmChannelId, Guid userId);
+
+    /// <summary>
+    /// Returns the computed permissions for a member based on their assigned role.
+    /// </summary>
+    Task<Permission> GetPermissionsAsync(Guid serverId, Guid userId);
+
+    /// <summary>
+    /// Returns true if the member's role is the Owner system role (position 0).
+    /// </summary>
+    Task<bool> IsOwnerAsync(Guid serverId, Guid userId);
+
+    /// <summary>
+    /// Creates the default system roles (Owner, Admin, Member) for a new server.
+    /// Returns the three roles.
+    /// </summary>
+    Task<(ServerRoleEntity owner, ServerRoleEntity admin, ServerRoleEntity member)> CreateDefaultRolesAsync(Guid serverId);
 }

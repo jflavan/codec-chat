@@ -1,4 +1,5 @@
 using Codec.Api.Models;
+using Codec.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Data;
@@ -6,7 +7,7 @@ namespace Codec.Api.Data;
 public static class SeedData
 {
     /// <summary>
-    /// Ensures the default "Codec HQ" server exists with its standard channels.
+    /// Ensures the default "Codec HQ" server exists with its standard channels and default roles.
     /// Safe to call in any environment; creates the server only if it is missing.
     /// </summary>
     public static async Task EnsureDefaultServerAsync(CodecDbContext db)
@@ -14,6 +15,13 @@ public static class SeedData
         var exists = await db.Servers.AnyAsync(s => s.Id == Server.DefaultServerId);
         if (exists)
         {
+            // Ensure default roles exist (idempotent for existing servers)
+            var hasRoles = await db.ServerRoles.AnyAsync(r => r.ServerId == Server.DefaultServerId);
+            if (!hasRoles)
+            {
+                var userService = new UserService(db);
+                await userService.CreateDefaultRolesAsync(Server.DefaultServerId);
+            }
             return;
         }
 
@@ -24,6 +32,10 @@ public static class SeedData
         db.Servers.Add(server);
         db.Channels.AddRange(general, announcements);
         await db.SaveChangesAsync();
+
+        // Create default roles for the server
+        var svc = new UserService(db);
+        await svc.CreateDefaultRolesAsync(Server.DefaultServerId);
     }
 
     /// <summary>
@@ -58,6 +70,11 @@ public static class SeedData
 
         var server = await db.Servers.FirstAsync(s => s.Id == Server.DefaultServerId);
 
+        // Get the system roles
+        var ownerRole = await db.ServerRoles.FirstAsync(r => r.ServerId == server.Id && r.IsSystemRole && r.Name == "Owner");
+        var adminRole = await db.ServerRoles.FirstAsync(r => r.ServerId == server.Id && r.IsSystemRole && r.Name == "Admin");
+        var memberRole = await db.ServerRoles.FirstAsync(r => r.ServerId == server.Id && r.IsSystemRole && r.Name == "Member");
+
         var avery = new User { GoogleSubject = "seed-avery", DisplayName = "Avery" };
         var morgan = new User { GoogleSubject = "seed-morgan", DisplayName = "Morgan" };
         var rae = new User { GoogleSubject = "seed-rae", DisplayName = "Rae" };
@@ -66,9 +83,9 @@ public static class SeedData
 
         var memberships = new List<ServerMember>
         {
-            new() { Server = server, User = avery, Role = ServerRole.Owner },
-            new() { Server = server, User = morgan, Role = ServerRole.Admin },
-            new() { Server = server, User = rae, Role = ServerRole.Member }
+            new() { Server = server, User = avery, RoleId = ownerRole.Id },
+            new() { Server = server, User = morgan, RoleId = adminRole.Id },
+            new() { Server = server, User = rae, RoleId = memberRole.Id }
         };
 
         var channels = await db.Channels
