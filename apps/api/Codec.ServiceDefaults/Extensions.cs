@@ -4,10 +4,12 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Polly;
 
 namespace Codec.ServiceDefaults;
 
@@ -20,6 +22,21 @@ public static class Extensions
         builder.Services.AddServiceDiscovery();
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
+            http.AddStandardResilienceHandler(options =>
+            {
+                // Only retry idempotent HTTP methods to avoid duplicating
+                // side-effects from POST calls (SFU room creation, GitHub issues, etc.).
+                options.Retry.ShouldHandle = args =>
+                {
+                    if (args.Outcome.Result is HttpResponseMessage response
+                        && response.RequestMessage?.Method == HttpMethod.Post)
+                    {
+                        return ValueTask.FromResult(false);
+                    }
+                    return ValueTask.FromResult(
+                        HttpClientResiliencePredicates.IsTransient(args.Outcome));
+                };
+            });
             http.AddServiceDiscovery();
         });
 

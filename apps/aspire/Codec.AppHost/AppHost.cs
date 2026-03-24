@@ -2,9 +2,11 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume()
+    .WithLifetime(ContainerLifetime.Persistent)
     .AddDatabase("Default");
 
-var redis = builder.AddRedis("redis");
+var redis = builder.AddRedis("redis")
+    .WithLifetime(ContainerLifetime.Persistent);
 
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator();
@@ -23,6 +25,7 @@ var api = builder.AddProject<Projects.Codec_Api>("api")
     .WithReference(blobs)
     .WaitFor(postgres)
     .WaitFor(redis)
+    .WaitFor(storage)
     .WaitFor(sfu)
     .WithHttpHealthCheck("/health/ready");
 
