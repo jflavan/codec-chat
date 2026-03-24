@@ -226,6 +226,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                     m.AuthorName,
                     m.Body,
                     m.ImageUrl,
+                    m.FileUrl,
+                    m.FileName,
+                    m.FileSize,
+                    m.FileContentType,
                     m.CreatedAt,
                     m.EditedAt,
                     m.ReplyToDirectMessageId,
@@ -255,6 +259,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                     m.AuthorName,
                     m.Body,
                     m.ImageUrl,
+                    m.FileUrl,
+                    m.FileName,
+                    m.FileSize,
+                    m.FileContentType,
                     m.CreatedAt,
                     m.EditedAt,
                     m.ReplyToDirectMessageId,
@@ -279,6 +287,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                     m.AuthorName,
                     m.Body,
                     m.ImageUrl,
+                    m.FileUrl,
+                    m.FileName,
+                    m.FileSize,
+                    m.FileContentType,
                     m.CreatedAt,
                     m.EditedAt,
                     m.ReplyToDirectMessageId,
@@ -382,6 +394,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.AuthorName,
                 m.Body,
                 m.ImageUrl,
+                m.FileUrl,
+                m.FileName,
+                m.FileSize,
+                m.FileContentType,
                 m.CreatedAt,
                 m.EditedAt,
                 AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl,
@@ -422,6 +438,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.AuthorName,
                 m.Body,
                 m.ImageUrl,
+                m.FileUrl,
+                m.FileName,
+                m.FileSize,
+                m.FileContentType,
                 m.CreatedAt,
                 m.EditedAt,
                 m.ReplyToDirectMessageId,
@@ -525,6 +545,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             m.AuthorName,
             m.Body,
             m.ImageUrl,
+            m.FileUrl,
+            m.FileName,
+            m.FileSize,
+            m.FileContentType,
             m.CreatedAt,
             m.EditedAt,
             AuthorAvatarUrl = avatarService.ResolveUrl(m.AuthorCustomAvatarPath) ?? m.AuthorGoogleAvatarUrl,
@@ -552,9 +576,9 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     [HttpPost("channels/{channelId:guid}/messages")]
     public async Task<IActionResult> SendMessage(Guid channelId, [FromBody] CreateMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Body) && string.IsNullOrWhiteSpace(request.ImageUrl))
+        if (string.IsNullOrWhiteSpace(request.Body) && string.IsNullOrWhiteSpace(request.ImageUrl) && string.IsNullOrWhiteSpace(request.FileUrl))
         {
-            return BadRequest(new { error = "Message body or image is required." });
+            return BadRequest(new { error = "Message body, image, or file is required." });
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
@@ -618,6 +642,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             AuthorName = authorName,
             Body = request.Body?.Trim() ?? string.Empty,
             ImageUrl = request.ImageUrl,
+            FileUrl = request.FileUrl,
+            FileName = request.FileName,
+            FileSize = request.FileSize,
+            FileContentType = request.FileContentType,
             ReplyToDirectMessageId = request.ReplyToDirectMessageId
         };
 
@@ -644,6 +672,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             message.AuthorName,
             message.Body,
             message.ImageUrl,
+            message.FileUrl,
+            message.FileName,
+            message.FileSize,
+            message.FileContentType,
             message.CreatedAt,
             message.EditedAt,
             AuthorAvatarUrl = authorAvatarUrl,
@@ -1015,7 +1047,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         {
             if (string.Equals(request.Has, "image", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(m => m.ImageUrl != null);
+                query = query.Where(m => m.ImageUrl != null || m.FileUrl != null);
             }
             else if (string.Equals(request.Has, "link", StringComparison.OrdinalIgnoreCase))
             {
@@ -1039,6 +1071,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
                 m.AuthorUserId,
                 m.Body,
                 m.ImageUrl,
+                m.FileUrl,
+                m.FileName,
+                m.FileSize,
+                m.FileContentType,
                 m.CreatedAt,
                 m.EditedAt,
                 m.ReplyToDirectMessageId,
@@ -1158,6 +1194,10 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
             AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
             message.Body,
             message.ImageUrl,
+            message.FileUrl,
+            message.FileName,
+            message.FileSize,
+            message.FileContentType,
             message.CreatedAt,
             message.EditedAt,
             MessageType = (int)message.MessageType,

@@ -1391,7 +1391,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             if (string.Equals(request.Has, "image", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(m => m.ImageUrl != null);
+                query = query.Where(m => m.ImageUrl != null || m.FileUrl != null);
             }
             else if (string.Equals(request.Has, "link", StringComparison.OrdinalIgnoreCase))
             {
@@ -1414,6 +1414,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 m.AuthorUserId,
                 m.Body,
                 m.ImageUrl,
+                m.FileUrl,
+                m.FileName,
+                m.FileSize,
+                m.FileContentType,
                 m.CreatedAt,
                 m.EditedAt,
                 m.ChannelId,
@@ -1545,6 +1549,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
                 message.Body,
                 message.ImageUrl,
+                message.FileUrl,
+                message.FileName,
+                message.FileSize,
+                message.FileContentType,
                 message.CreatedAt,
                 message.EditedAt,
                 Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)

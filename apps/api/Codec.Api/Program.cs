@@ -325,6 +325,7 @@ builder.Services.AddHostedService<PresenceBackgroundService>();
 
 builder.Services.AddSingleton<IAvatarService, AvatarService>();
 builder.Services.AddSingleton<IImageUploadService, ImageUploadService>();
+builder.Services.AddSingleton<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<ICustomEmojiService, CustomEmojiService>();
 
 // Link preview HttpClient with DNS rebinding protection, redirect limits, and no cookies.
