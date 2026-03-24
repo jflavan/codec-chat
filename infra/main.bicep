@@ -88,6 +88,9 @@ param recaptchaSiteKey string = ''
 @description('Google Cloud project ID for reCAPTCHA Enterprise.')
 param recaptchaProjectId string = ''
 
+@description('Email address for Azure Monitor alert notifications. Leave empty to skip email alerts.')
+param alertEmailAddress string = ''
+
 // --- Naming Convention ---
 // {abbreviation}-codec-{env} (hyphens removed for resources that don't allow them)
 
@@ -105,6 +108,7 @@ var redisCacheName = 'redis-${baseName}'
 var voiceVmName = 'vm-${baseName}-voice'
 var appInsightsName = 'appi-${baseName}'
 var communicationServicesName = 'acs-${baseName}'
+var actionGroupName = 'ag-${baseName}'
 
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
 var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
@@ -384,6 +388,28 @@ module webApp 'modules/container-app-web.bicep' = {
     publicRecaptchaSiteKey: recaptchaSiteKey
     customDomainName: webCustomDomain
     managedCertificateId: webCertId
+  }
+}
+
+// ── Azure Monitor alerts ────────────────────────────────────────────────────────
+
+module monitorActionGroup 'modules/monitor-action-group.bicep' = {
+  name: 'monitor-action-group'
+  params: {
+    name: actionGroupName
+    alertEmailAddress: alertEmailAddress
+  }
+}
+
+module monitorAlerts 'modules/monitor-alerts.bicep' = {
+  name: 'monitor-alerts'
+  params: {
+    location: location
+    actionGroupId: monitorActionGroup.outputs.id
+    apiContainerAppName: apiAppName
+    logAnalyticsWorkspaceId: logAnalytics.outputs.id
+    postgresqlServerId: postgresql.outputs.id
+    environmentName: environmentName
   }
 }
 
