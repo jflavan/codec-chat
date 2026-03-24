@@ -868,6 +868,10 @@ export class ApiClient {
 	getBans(token: string, serverId: string): Promise<BannedMember[]> {
 		return this.request<BannedMember[]>(
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/bans`,
+			{ headers: this.headers(token) }
+		);
+	}
+
 	/* ───── Server Roles ───── */
 
 	/** List all roles for a server. */
