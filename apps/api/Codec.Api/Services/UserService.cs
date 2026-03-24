@@ -210,7 +210,8 @@ public class UserService(CodecDbContext db) : IUserService
     /// <inheritdoc />
     public async Task<ServerMember> EnsureAdminAsync(Guid serverId, Guid userId, bool isGlobalAdmin = false)
     {
-        return await EnsurePermissionAsync(serverId, userId, Permission.Administrator, isGlobalAdmin);
+        // Admin-level access requires either Administrator or ManageServer permission
+        return await EnsurePermissionAsync(serverId, userId, Permission.ManageServer, isGlobalAdmin);
     }
 
     /// <inheritdoc />
