@@ -38,6 +38,8 @@ export type VoiceChannelMember = {
 	avatarUrl?: string | null;
 	isMuted: boolean;
 	isDeafened: boolean;
+	isVideoEnabled?: boolean;
+	isScreenSharing?: boolean;
 	participantId: string;
 };
 

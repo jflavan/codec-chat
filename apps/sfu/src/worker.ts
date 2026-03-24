@@ -1,13 +1,18 @@
 import * as mediasoup from 'mediasoup';
 import type { Worker } from 'mediasoup/types';
 
-/** Codec capabilities for the router: Opus audio only. */
+/** Codec capabilities for the router: Opus audio + VP8 video. */
 export const MEDIA_CODECS = [
   {
     kind: 'audio' as const,
     mimeType: 'audio/opus',
     clockRate: 48000,
     channels: 2,
+  },
+  {
+    kind: 'video' as const,
+    mimeType: 'video/VP8',
+    clockRate: 90000,
   },
 ];
 

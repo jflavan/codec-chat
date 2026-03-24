@@ -68,6 +68,39 @@
 		</button>
 
 		<button
+			class="voice-btn"
+			class:active={app.isVideoEnabled}
+			onclick={() => app.toggleVideo()}
+			aria-label={app.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+			title={app.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+		>
+			{#if app.isVideoEnabled}
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+				</svg>
+			{:else}
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z"/>
+				</svg>
+			{/if}
+		</button>
+
+		<button
+			class="voice-btn"
+			class:active={app.isScreenSharing}
+			onclick={() => app.toggleScreenShare()}
+			aria-label={app.isScreenSharing ? 'Stop sharing' : 'Share screen'}
+			title={app.isScreenSharing ? 'Stop sharing' : 'Share screen'}
+		>
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
+				{#if app.isScreenSharing}
+					<rect x="8" y="9" width="8" height="4" rx="1"/>
+				{/if}
+			</svg>
+		</button>
+
+		<button
 			class="voice-btn leave-btn"
 			onclick={() => isInCall ? app.endCall() : app.leaveVoiceChannel()}
 			aria-label={isInCall ? 'End call' : 'Leave voice'}
