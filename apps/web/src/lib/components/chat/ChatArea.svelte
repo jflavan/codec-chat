@@ -5,6 +5,7 @@
 	import Composer from './Composer.svelte';
 	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
 	import PinnedMessagesPanel from './PinnedMessagesPanel.svelte';
+	import VideoGrid from '$lib/components/voice/VideoGrid.svelte';
 
 	const app = getAppState();
 
@@ -177,6 +178,10 @@
 	<div class="chat-body">
 		{#if app.error}
 			<div class="error-banner" role="alert">{app.error}</div>
+		{/if}
+
+		{#if app.activeVoiceChannelId || app.activeCall}
+			<VideoGrid />
 		{/if}
 
 		<div class="feed-container">

@@ -4,8 +4,14 @@ import type { ChatHubService } from './chat-hub.js';
 import type { VoiceChannelMember } from '$lib/types/index.js';
 
 export type VoiceServiceCallbacks = {
-	onNewTrack: (participantId: string, track: MediaStreamTrack) => void;
-	onTrackEnded: (participantId: string) => void;
+	onNewTrack: (participantId: string, track: MediaStreamTrack, label: string) => void;
+	onTrackEnded: (participantId: string, label: string) => void;
+};
+
+type MemberWithProducers = VoiceChannelMember & {
+	producerId?: string;
+	videoProducerId?: string;
+	screenProducerId?: string;
 };
 
 /**
@@ -19,17 +25,28 @@ export class VoiceService {
 	private sendTransport: Transport | null = null;
 	private recvTransport: Transport | null = null;
 	private producer: Producer | null = null;
+	private videoProducer: Producer | null = null;
+	private screenProducer: Producer | null = null;
 	private consumers = new Map<string, Consumer>();
 	private localStream: MediaStream | null = null;
+	private videoStream: MediaStream | null = null;
+	private screenStream: MediaStream | null = null;
 	/** Tracks producerIds already consumed to prevent duplicates from the
 	 *  group-join / member-snapshot race window. */
 	private consumedProducerIds = new Set<string>();
+	/** Maps consumerId → label for track type identification. */
+	private consumerLabels = new Map<string, string>();
+	/** Stored hub and callbacks for producing after join. */
+	private _hub: ChatHubService | null = null;
+	/** The label to use for the next produce call. Set before transport.produce(). */
+	private _pendingProduceLabel: string | null = null;
 
 	async join(
 		channelId: string,
 		hub: ChatHubService,
 		callbacks: VoiceServiceCallbacks
 	): Promise<VoiceChannelMember[]> {
+		this._hub = hub;
 		// Request microphone access first — if denied or unavailable this throws
 		// immediately before doing any network work (SignalR, mediasoup).
 		this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -41,7 +58,7 @@ export class VoiceService {
 		const routerRtpCapabilities = result.routerRtpCapabilities as RtpCapabilities;
 		const sendTransportOptions = result.sendTransportOptions as TransportOptions;
 		const recvTransportOptions = result.recvTransportOptions as TransportOptions;
-		const members = result.members as (VoiceChannelMember & { producerId?: string })[];
+		const members = result.members as MemberWithProducers[];
 		const iceServers = (result as Record<string, unknown>).iceServers as
 			| { urls: string[]; username: string; credential: string }[]
 			| undefined;
@@ -62,7 +79,9 @@ export class VoiceService {
 				.catch(errback);
 		});
 		sendTransport.on('produce', ({ kind, rtpParameters }, callback, errback) => {
-			hub.produce(sendTransport.id, rtpParameters)
+			const label = this._pendingProduceLabel ?? kind;
+			this._pendingProduceLabel = null;
+			hub.produce(sendTransport.id, rtpParameters, label)
 				.then((producerId) => callback({ id: producerId }))
 				.catch(errback);
 		});
@@ -84,7 +103,13 @@ export class VoiceService {
 		// Consume any already-connected participants
 		for (const member of members) {
 			if (member.producerId) {
-				await this.consumeProducer(member.producerId, member.participantId, hub, callbacks);
+				await this.consumeProducer(member.producerId, member.participantId, hub, callbacks, 'audio');
+			}
+			if (member.videoProducerId) {
+				await this.consumeProducer(member.videoProducerId, member.participantId, hub, callbacks, 'video');
+			}
+			if (member.screenProducerId) {
+				await this.consumeProducer(member.screenProducerId, member.participantId, hub, callbacks, 'screen');
 			}
 		}
 
@@ -100,12 +125,13 @@ export class VoiceService {
 			routerRtpCapabilities: object;
 			sendTransportOptions: object;
 			recvTransportOptions: object;
-			members?: (VoiceChannelMember & { producerId?: string })[];
+			members?: MemberWithProducers[];
 			iceServers?: { urls: string[]; username: string; credential: string }[];
 		},
 		hub: ChatHubService,
 		callbacks: VoiceServiceCallbacks
 	): Promise<VoiceChannelMember[]> {
+		this._hub = hub;
 		this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 		const audioTrack = this.localStream.getAudioTracks()[0];
 
@@ -113,7 +139,7 @@ export class VoiceService {
 		const routerRtpCapabilities = options.routerRtpCapabilities as RtpCapabilities;
 		const sendTransportOptions = options.sendTransportOptions as TransportOptions;
 		const recvTransportOptions = options.recvTransportOptions as TransportOptions;
-		const members = (options.members ?? []) as (VoiceChannelMember & { producerId?: string })[];
+		const members = (options.members ?? []) as MemberWithProducers[];
 		const iceServers = options.iceServers;
 
 		await this.device.load({ routerRtpCapabilities });
@@ -127,7 +153,9 @@ export class VoiceService {
 			hub.connectTransport(sendTransport.id, dtlsParameters).then(callback).catch(errback);
 		});
 		sendTransport.on('produce', ({ kind, rtpParameters }, callback, errback) => {
-			hub.produce(sendTransport.id, rtpParameters)
+			const label = this._pendingProduceLabel ?? kind;
+			this._pendingProduceLabel = null;
+			hub.produce(sendTransport.id, rtpParameters, label)
 				.then((producerId) => callback({ id: producerId }))
 				.catch(errback);
 		});
@@ -145,7 +173,13 @@ export class VoiceService {
 
 		for (const member of members) {
 			if (member.producerId) {
-				await this.consumeProducer(member.producerId, member.participantId, hub, callbacks);
+				await this.consumeProducer(member.producerId, member.participantId, hub, callbacks, 'audio');
+			}
+			if (member.videoProducerId) {
+				await this.consumeProducer(member.videoProducerId, member.participantId, hub, callbacks, 'video');
+			}
+			if (member.screenProducerId) {
+				await this.consumeProducer(member.screenProducerId, member.participantId, hub, callbacks, 'screen');
 			}
 		}
 
@@ -156,7 +190,8 @@ export class VoiceService {
 		producerId: string,
 		participantId: string,
 		hub: ChatHubService,
-		callbacks: VoiceServiceCallbacks
+		callbacks: VoiceServiceCallbacks,
+		label: string = 'audio'
 	): Promise<void> {
 		if (!this.device || !this.recvTransport) return;
 		// Guard against the double-consume race: group join happens before the member snapshot
@@ -170,22 +205,38 @@ export class VoiceService {
 		const consumer = await this.recvTransport.consume({
 			id: raw.id,
 			producerId: raw.producerId,
-			kind: raw.kind as 'audio',
+			kind: raw.kind as 'audio' | 'video',
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			rtpParameters: raw.rtpParameters as any,
 		});
 
 		await consumer.resume();
 		this.consumers.set(consumer.id, consumer);
-		callbacks.onNewTrack(participantId, consumer.track);
+		this.consumerLabels.set(consumer.id, label);
+		callbacks.onNewTrack(participantId, consumer.track, label);
 
 		const cleanupConsumer = () => {
-			callbacks.onTrackEnded(participantId);
+			const consumerLabel = this.consumerLabels.get(consumer.id) ?? 'audio';
+			callbacks.onTrackEnded(participantId, consumerLabel);
 			this.consumers.delete(consumer.id);
+			this.consumerLabels.delete(consumer.id);
 			this.consumedProducerIds.delete(consumer.producerId);
 		};
 		consumer.on('transportclose', cleanupConsumer);
 		consumer.on('trackended', cleanupConsumer);
+	}
+
+	/** Close consumers for a specific producer (when it's stopped remotely). */
+	closeConsumerByProducerId(producerId: string): void {
+		for (const [consumerId, consumer] of this.consumers) {
+			if (consumer.producerId === producerId) {
+				consumer.close();
+				this.consumers.delete(consumerId);
+				this.consumerLabels.delete(consumerId);
+				this.consumedProducerIds.delete(producerId);
+				break;
+			}
+		}
 	}
 
 	setMuted(muted: boolean): void {
@@ -195,10 +246,94 @@ export class VoiceService {
 		}
 	}
 
+	/** Start camera video producer. Returns the local video track for preview. */
+	async startVideo(): Promise<MediaStreamTrack> {
+		if (!this.sendTransport || !this._hub) throw new Error('Not in a voice session');
+
+		this.videoStream = await navigator.mediaDevices.getUserMedia({
+			video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+		});
+		const videoTrack = this.videoStream.getVideoTracks()[0];
+
+		this._pendingProduceLabel = 'video';
+		this.videoProducer = await this.sendTransport.produce({ track: videoTrack });
+
+		// Auto-stop when the user stops the track via browser UI
+		videoTrack.addEventListener('ended', () => {
+			this.stopVideo();
+		});
+
+		return videoTrack;
+	}
+
+	/** Stop camera video producer. */
+	async stopVideo(): Promise<void> {
+		if (this.videoProducer) {
+			this.videoProducer.close();
+			this.videoProducer = null;
+		}
+		if (this.videoStream) {
+			for (const track of this.videoStream.getTracks()) track.stop();
+			this.videoStream = null;
+		}
+		if (this._hub) {
+			await this._hub.stopProducing('video');
+		}
+	}
+
+	/** Start screen share producer. Returns the local screen track for preview. */
+	async startScreenShare(): Promise<MediaStreamTrack> {
+		if (!this.sendTransport || !this._hub) throw new Error('Not in a voice session');
+
+		this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+			video: { frameRate: { ideal: 30 } },
+			audio: false,
+		});
+		const screenTrack = this.screenStream.getVideoTracks()[0];
+
+		this._pendingProduceLabel = 'screen';
+		this.screenProducer = await this.sendTransport.produce({ track: screenTrack });
+
+		// Auto-stop when the user clicks "Stop sharing" in the browser UI
+		screenTrack.addEventListener('ended', () => {
+			this.stopScreenShare();
+		});
+
+		return screenTrack;
+	}
+
+	/** Stop screen share producer. */
+	async stopScreenShare(): Promise<void> {
+		if (this.screenProducer) {
+			this.screenProducer.close();
+			this.screenProducer = null;
+		}
+		if (this.screenStream) {
+			for (const track of this.screenStream.getTracks()) track.stop();
+			this.screenStream = null;
+		}
+		if (this._hub) {
+			await this._hub.stopProducing('screen');
+		}
+	}
+
+	get isVideoActive(): boolean {
+		return this.videoProducer !== null && !this.videoProducer.closed;
+	}
+
+	get isScreenShareActive(): boolean {
+		return this.screenProducer !== null && !this.screenProducer.closed;
+	}
+
 	async leave(): Promise<void> {
 		this.consumedProducerIds.clear();
+		this.consumerLabels.clear();
 		this.producer?.close();
 		this.producer = null;
+		this.videoProducer?.close();
+		this.videoProducer = null;
+		this.screenProducer?.close();
+		this.screenProducer = null;
 
 		for (const consumer of this.consumers.values()) {
 			consumer.close();
@@ -216,8 +351,17 @@ export class VoiceService {
 			}
 			this.localStream = null;
 		}
+		if (this.videoStream) {
+			for (const track of this.videoStream.getTracks()) track.stop();
+			this.videoStream = null;
+		}
+		if (this.screenStream) {
+			for (const track of this.screenStream.getTracks()) track.stop();
+			this.screenStream = null;
+		}
 
 		this.device = null;
+		this._hub = null;
 	}
 
 	/** Synchronous cleanup for beforeunload — stops mic tracks immediately. */
@@ -228,13 +372,25 @@ export class VoiceService {
 			}
 			this.localStream = null;
 		}
+		if (this.videoStream) {
+			for (const track of this.videoStream.getTracks()) track.stop();
+			this.videoStream = null;
+		}
+		if (this.screenStream) {
+			for (const track of this.screenStream.getTracks()) track.stop();
+			this.screenStream = null;
+		}
 		this.sendTransport?.close();
 		this.sendTransport = null;
 		this.recvTransport?.close();
 		this.recvTransport = null;
 		this.producer = null;
+		this.videoProducer = null;
+		this.screenProducer = null;
 		this.consumers.clear();
 		this.consumedProducerIds.clear();
+		this.consumerLabels.clear();
 		this.device = null;
+		this._hub = null;
 	}
 }

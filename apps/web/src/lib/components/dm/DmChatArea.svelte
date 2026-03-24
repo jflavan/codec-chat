@@ -13,6 +13,7 @@
 	import ReactionBar from '$lib/components/chat/ReactionBar.svelte';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 	import DmCallHeader from '$lib/components/voice/DmCallHeader.svelte';
+	import VideoGrid from '$lib/components/voice/VideoGrid.svelte';
 	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
 
 	const app = getAppState();
@@ -352,6 +353,7 @@
 
 	{#if app.activeCall && app.activeCall.dmChannelId === app.activeDmChannelId}
 		<DmCallHeader />
+		<VideoGrid />
 	{/if}
 
 	<div class="dm-body">

@@ -453,7 +453,11 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 vs.IsMuted,
                 vs.IsDeafened,
                 participantId = vs.ParticipantId,
-                producerId = vs.ProducerId
+                producerId = vs.ProducerId,
+                videoProducerId = vs.VideoProducerId,
+                screenProducerId = vs.ScreenProducerId,
+                vs.IsVideoEnabled,
+                vs.IsScreenSharing
             })
             .ToListAsync();
 
@@ -735,7 +739,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
 
         await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{channelId}");
 
-        // Include producerId so the new participant can immediately consume existing audio.
+        // Include producerIds so the new participant can immediately consume existing media.
         var members = await db.VoiceStates
             .AsNoTracking()
             .Where(vs => vs.ChannelId == channelGuid && vs.UserId != appUser.Id)
@@ -747,7 +751,11 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 vs.IsMuted,
                 vs.IsDeafened,
                 participantId = vs.ParticipantId,
-                producerId = vs.ProducerId
+                producerId = vs.ProducerId,
+                videoProducerId = vs.VideoProducerId,
+                screenProducerId = vs.ScreenProducerId,
+                vs.IsVideoEnabled,
+                vs.IsScreenSharing
             })
             .ToListAsync();
 
@@ -822,8 +830,17 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// Creates a mediasoup Producer, persists the producerId so late joiners can consume
     /// this participant, and notifies other participants to create a Consumer.
     /// </summary>
-    public async Task<object> Produce(string transportId, JsonElement rtpParameters)
+    /// <param name="transportId">The send transport ID.</param>
+    /// <param name="rtpParameters">RTP parameters for the new producer.</param>
+    /// <param name="label">Producer label: "audio" (default), "video", or "screen".</param>
+    public async Task<object> Produce(string transportId, JsonElement rtpParameters, string? label = null)
     {
+        label ??= "audio";
+        if (label is not ("audio" or "video" or "screen"))
+            throw new HubException("Invalid producer label. Must be 'audio', 'video', or 'screen'.");
+
+        var kind = label == "audio" ? "audio" : "video";
+
         var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         var voiceState = await db.VoiceStates
             .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
@@ -834,7 +851,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         var roomId = await GetSfuRoomIdAsync(voiceState);
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
         using var client = httpClientFactory.CreateClient("sfu");
-        var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, kind = "audio", rtpParameters });
+        var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, kind, rtpParameters, label });
         var content = new StringContent(body, Encoding.UTF8, "application/json");
         var resp = await client.PostAsync(
             $"{sfuApiUrl}/rooms/{roomId}/transports/{transportId}/produce", content);
@@ -843,7 +860,20 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         var result = await resp.Content.ReadFromJsonAsync<JsonElement>();
         var producerId = result.GetProperty("producerId").GetString()!;
 
-        voiceState.ProducerId = producerId;
+        switch (label)
+        {
+            case "audio":
+                voiceState.ProducerId = producerId;
+                break;
+            case "video":
+                voiceState.VideoProducerId = producerId;
+                voiceState.IsVideoEnabled = true;
+                break;
+            case "screen":
+                voiceState.ScreenProducerId = producerId;
+                voiceState.IsScreenSharing = true;
+                break;
+        }
         await db.SaveChangesAsync();
 
         await Clients.OthersInGroup($"voice-{roomId}").SendAsync("NewProducer", new
@@ -851,10 +881,64 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             channelId = voiceState.ChannelId?.ToString(),
             userId = appUser.Id,
             participantId = Context.ConnectionId,
-            producerId
+            producerId,
+            label
         });
 
         return new { producerId };
+    }
+
+    /// <summary>
+    /// Stops a video or screen share producer. Closes the SFU producer, clears the
+    /// persisted ID, and notifies other participants.
+    /// </summary>
+    public async Task StopProducing(string label)
+    {
+        if (label is not ("video" or "screen"))
+            throw new HubException("Can only stop 'video' or 'screen' producers.");
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
+        var voiceState = await db.VoiceStates
+            .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
+
+        if (voiceState is null) return;
+
+        var roomId = await GetSfuRoomIdAsync(voiceState);
+        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
+
+        // Close the producer in the SFU
+        try
+        {
+            using var client = httpClientFactory.CreateClient("sfu");
+            await client.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{voiceState.ParticipantId}/producers/{label}");
+        }
+        catch { /* best-effort */ }
+
+        var producerId = label == "video" ? voiceState.VideoProducerId : voiceState.ScreenProducerId;
+
+        if (label == "video")
+        {
+            voiceState.VideoProducerId = null;
+            voiceState.IsVideoEnabled = false;
+        }
+        else
+        {
+            voiceState.ScreenProducerId = null;
+            voiceState.IsScreenSharing = false;
+        }
+        await db.SaveChangesAsync();
+
+        if (producerId is not null)
+        {
+            await Clients.OthersInGroup($"voice-{roomId}").SendAsync("ProducerClosed", new
+            {
+                channelId = voiceState.ChannelId?.ToString(),
+                userId = appUser.Id,
+                participantId = Context.ConnectionId,
+                producerId,
+                label
+            });
+        }
     }
 
     /// <summary>

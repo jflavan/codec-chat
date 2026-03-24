@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260324222913_AddVideoScreenSharingToVoiceState")]
+    partial class AddVideoScreenSharingToVoiceState
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -58,33 +61,6 @@ namespace Codec.Api.Migrations
                         .IsDescending(false, true);
 
                     b.ToTable("AuditLogEntries");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.BannedMember", b =>
-                {
-                    b.Property<Guid>("ServerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("BannedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("BannedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.HasKey("ServerId", "UserId");
-
-                    b.HasIndex("BannedByUserId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("BannedMembers");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.Channel", b =>
@@ -230,18 +206,6 @@ namespace Codec.Api.Migrations
 
                     b.Property<DateTimeOffset?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FileContentType")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .HasColumnType("text");
-
-                    b.Property<long?>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("FileUrl")
-                        .HasColumnType("text");
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
@@ -414,18 +378,6 @@ namespace Codec.Api.Migrations
                     b.Property<DateTimeOffset?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FileContentType")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .HasColumnType("text");
-
-                    b.Property<long?>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("FileUrl")
-                        .HasColumnType("text");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
@@ -514,43 +466,6 @@ namespace Codec.Api.Migrations
                     b.ToTable("PresenceStates");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.PushSubscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Auth")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Endpoint")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("P256dh")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Endpoint")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("PushSubscriptions");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.Reaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -627,51 +542,6 @@ namespace Codec.Api.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.SamlIdentityProvider", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("AllowJitProvisioning")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("CertificatePem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SingleSignOnUrl")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EntityId")
-                        .IsUnique();
-
-                    b.ToTable("SamlIdentityProviders");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.Server", b =>
@@ -781,9 +651,6 @@ namespace Codec.Api.Migrations
                     b.Property<string>("CustomAvatarPath")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiscordSubject")
-                        .HasColumnType("text");
-
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -806,9 +673,6 @@ namespace Codec.Api.Migrations
                     b.Property<int>("FailedLoginAttempts")
                         .HasColumnType("integer");
 
-                    b.Property<string>("GitHubSubject")
-                        .HasColumnType("text");
-
                     b.Property<string>("GoogleSubject")
                         .HasColumnType("text");
 
@@ -825,28 +689,10 @@ namespace Codec.Api.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("SamlIdentityProviderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SamlNameId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StatusEmoji")
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)");
-
-                    b.Property<string>("StatusText")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DiscordSubject")
-                        .IsUnique()
-                        .HasFilter("\"DiscordSubject\" IS NOT NULL");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -856,19 +702,9 @@ namespace Codec.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"EmailVerificationToken\" IS NOT NULL");
 
-                    b.HasIndex("GitHubSubject")
-                        .IsUnique()
-                        .HasFilter("\"GitHubSubject\" IS NOT NULL");
-
                     b.HasIndex("GoogleSubject")
                         .IsUnique()
                         .HasFilter("\"GoogleSubject\" IS NOT NULL");
-
-                    b.HasIndex("SamlIdentityProviderId");
-
-                    b.HasIndex("SamlNameId", "SamlIdentityProviderId")
-                        .IsUnique()
-                        .HasFilter("\"SamlNameId\" IS NOT NULL");
 
                     b.ToTable("Users");
                 });
@@ -978,91 +814,6 @@ namespace Codec.Api.Migrations
                     b.ToTable("VoiceStates");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.Webhook", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EventTypes")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Secret")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid>("ServerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("ServerId");
-
-                    b.ToTable("Webhooks");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.WebhookDeliveryLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Attempt")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Payload")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int?>("StatusCode")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("WebhookId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WebhookId", "CreatedAt")
-                        .IsDescending(false, true);
-
-                    b.ToTable("WebhookDeliveryLogs");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.AuditLogEntry", b =>
                 {
                     b.HasOne("Codec.Api.Models.User", "ActorUser")
@@ -1079,33 +830,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("ActorUser");
 
                     b.Navigation("Server");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.BannedMember", b =>
-                {
-                    b.HasOne("Codec.Api.Models.User", "BannedByUser")
-                        .WithMany()
-                        .HasForeignKey("BannedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Codec.Api.Models.Server", "Server")
-                        .WithMany()
-                        .HasForeignKey("ServerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Codec.Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("BannedByUser");
-
-                    b.Navigation("Server");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.Channel", b =>
@@ -1313,17 +1037,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.PushSubscription", b =>
-                {
-                    b.HasOne("Codec.Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.Reaction", b =>
                 {
                     b.HasOne("Codec.Api.Models.DirectMessage", "DirectMessage")
@@ -1398,16 +1111,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.User", b =>
-                {
-                    b.HasOne("Codec.Api.Models.SamlIdentityProvider", "SamlIdentityProvider")
-                        .WithMany()
-                        .HasForeignKey("SamlIdentityProviderId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("SamlIdentityProvider");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.VoiceCall", b =>
                 {
                     b.HasOne("Codec.Api.Models.User", "CallerUser")
@@ -1460,36 +1163,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.Webhook", b =>
-                {
-                    b.HasOne("Codec.Api.Models.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Codec.Api.Models.Server", "Server")
-                        .WithMany("Webhooks")
-                        .HasForeignKey("ServerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Server");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.WebhookDeliveryLog", b =>
-                {
-                    b.HasOne("Codec.Api.Models.Webhook", "Webhook")
-                        .WithMany("DeliveryLogs")
-                        .HasForeignKey("WebhookId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Webhook");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.Channel", b =>
                 {
                     b.Navigation("Messages");
@@ -1534,8 +1207,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("Invites");
 
                     b.Navigation("Members");
-
-                    b.Navigation("Webhooks");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.User", b =>
@@ -1555,11 +1226,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("SentFriendRequests");
 
                     b.Navigation("ServerMemberships");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.Webhook", b =>
-                {
-                    b.Navigation("DeliveryLogs");
                 });
 #pragma warning restore 612, 618
         }
