@@ -93,8 +93,10 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         await PostMessageAsync(target, channelId, "Message from target 2");
 
         // Verify messages exist
-        var msgsBefore = await owner.GetFromJsonAsync<JsonElement>($"/channels/{channelId}/messages");
-        var beforeCount = msgsBefore.GetArrayLength();
+        var msgsBeforeResponse = await owner.GetFromJsonAsync<JsonElement>($"/channels/{channelId}/messages");
+        var beforeCount = msgsBeforeResponse.TryGetProperty("messages", out var msgsBefore)
+            ? msgsBefore.GetArrayLength()
+            : msgsBeforeResponse.GetArrayLength();
         Assert.True(beforeCount >= 2);
 
         // Ban with deleteMessages
@@ -107,8 +109,10 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         Assert.Equal(HttpStatusCode.NoContent, banResponse.StatusCode);
 
         // Verify messages are deleted
-        var msgsAfter = await owner.GetFromJsonAsync<JsonElement>($"/channels/{channelId}/messages");
-        var afterCount = msgsAfter.GetArrayLength();
+        var msgsAfterResponse = await owner.GetFromJsonAsync<JsonElement>($"/channels/{channelId}/messages");
+        var afterCount = msgsAfterResponse.TryGetProperty("messages", out var msgsAfter)
+            ? msgsAfter.GetArrayLength()
+            : msgsAfterResponse.GetArrayLength();
         Assert.True(afterCount < beforeCount);
     }
 
