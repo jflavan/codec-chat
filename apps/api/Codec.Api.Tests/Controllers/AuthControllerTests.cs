@@ -17,6 +17,7 @@ public class AuthControllerTests : IDisposable
     private readonly TokenService _tokenService;
     private readonly Mock<IAvatarService> _avatarService = new();
     private readonly Mock<IEmailSender> _emailSender = new();
+    private readonly Mock<OAuthProviderService> _oauthProviderService;
     private readonly IConfiguration _config;
     private readonly EmailVerificationService _emailVerificationService;
     private readonly AuthController _controller;
@@ -43,8 +44,9 @@ public class AuthControllerTests : IDisposable
         _avatarService.Setup(a => a.ResolveUrl(It.IsAny<string?>())).Returns((string?)null);
         _emailVerificationService = new EmailVerificationService(_db, _emailSender.Object, _config);
 
-        var oauthProviderService = new OAuthProviderService(Mock.Of<IHttpClientFactory>(), _config, Mock.Of<ILogger<OAuthProviderService>>());
-        _controller = new AuthController(_db, _tokenService, _avatarService.Object, _config, _emailVerificationService, oauthProviderService, Mock.Of<ILogger<AuthController>>());
+        _oauthProviderService = new Mock<OAuthProviderService>(
+            Mock.Of<IHttpClientFactory>(), _config, Mock.Of<ILogger<OAuthProviderService>>());
+        _controller = new AuthController(_db, _tokenService, _avatarService.Object, _config, _emailVerificationService, _oauthProviderService.Object, Mock.Of<ILogger<AuthController>>());
     }
 
     public void Dispose() => _db.Dispose();
@@ -394,5 +396,194 @@ public class AuthControllerTests : IDisposable
     {
         var result = await _controller.VerifyEmail(new VerifyEmailRequest { Token = "bad-token" });
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // --- OAuth: GitHub Callback ---
+
+    [Fact]
+    public async Task GitHubCallback_ReturnsBadRequest_WhenExchangeFails()
+    {
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync(It.IsAny<string>()))
+            .ReturnsAsync((OAuthUserInfo?)null);
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "bad" });
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GitHubCallback_CreatesNewUser_ReturnsTokens()
+    {
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync("gh-code"))
+            .ReturnsAsync(new OAuthUserInfo("gh-123", "GitHub User", "gh@test.com", "https://avatar.url/gh"));
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "gh-code" });
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.GitHubSubject == "gh-123");
+        user.Should().NotBeNull();
+        user!.DisplayName.Should().Be("GitHub User");
+        user.Email.Should().Be("gh@test.com");
+        user.AvatarUrl.Should().Be("https://avatar.url/gh");
+        user.EmailVerified.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GitHubCallback_LinksToExistingAccount_ByEmail()
+    {
+        var existing = await CreateUserWithPassword("link@test.com", "Pass123!", "Existing");
+
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync("gh-code"))
+            .ReturnsAsync(new OAuthUserInfo("gh-456", "GH Name", "link@test.com", null));
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "gh-code" });
+        result.Should().BeOfType<OkObjectResult>();
+
+        await _db.Entry(existing).ReloadAsync();
+        existing.GitHubSubject.Should().Be("gh-456");
+        // Should NOT create a new user
+        var count = await _db.Users.CountAsync(u => u.Email == "link@test.com");
+        count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GitHubCallback_ReturnsExistingUser_BySubject()
+    {
+        var existing = new User
+        {
+            Email = "existing-gh@test.com",
+            GitHubSubject = "gh-existing",
+            DisplayName = "Existing GH User"
+        };
+        _db.Users.Add(existing);
+        await _db.SaveChangesAsync();
+
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync("code"))
+            .ReturnsAsync(new OAuthUserInfo("gh-existing", "Updated Name", "existing-gh@test.com", null));
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "code" });
+        result.Should().BeOfType<OkObjectResult>();
+
+        // Should not create a duplicate
+        var count = await _db.Users.CountAsync(u => u.GitHubSubject == "gh-existing");
+        count.Should().Be(1);
+    }
+
+    // --- OAuth: Discord Callback ---
+
+    [Fact]
+    public async Task DiscordCallback_ReturnsBadRequest_WhenExchangeFails()
+    {
+        _oauthProviderService
+            .Setup(s => s.ExchangeDiscordCodeAsync(It.IsAny<string>()))
+            .ReturnsAsync((OAuthUserInfo?)null);
+
+        var result = await _controller.DiscordCallback(new OAuthCallbackRequest { Code = "bad" });
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task DiscordCallback_CreatesNewUser_ReturnsTokens()
+    {
+        _oauthProviderService
+            .Setup(s => s.ExchangeDiscordCodeAsync("dc-code"))
+            .ReturnsAsync(new OAuthUserInfo("dc-789", "Discord User", "dc@test.com", "https://cdn.discordapp.com/avatar.png"));
+
+        var result = await _controller.DiscordCallback(new OAuthCallbackRequest { Code = "dc-code" });
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.DiscordSubject == "dc-789");
+        user.Should().NotBeNull();
+        user!.DisplayName.Should().Be("Discord User");
+        user.Email.Should().Be("dc@test.com");
+    }
+
+    [Fact]
+    public async Task DiscordCallback_LinksToExistingAccount_ByEmail()
+    {
+        var existing = await CreateUserWithPassword("dclink@test.com", "Pass123!", "Existing");
+
+        _oauthProviderService
+            .Setup(s => s.ExchangeDiscordCodeAsync("dc-code"))
+            .ReturnsAsync(new OAuthUserInfo("dc-link", "DC Name", "dclink@test.com", null));
+
+        var result = await _controller.DiscordCallback(new OAuthCallbackRequest { Code = "dc-code" });
+        result.Should().BeOfType<OkObjectResult>();
+
+        await _db.Entry(existing).ReloadAsync();
+        existing.DiscordSubject.Should().Be("dc-link");
+    }
+
+    // --- OAuth: Config ---
+
+    [Fact]
+    public void GetOAuthConfig_ReturnsProviderStatus()
+    {
+        var result = _controller.GetOAuthConfig();
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // --- OAuth: New user with no email ---
+
+    [Fact]
+    public async Task GitHubCallback_CreatesUser_WithNullEmail()
+    {
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync("code"))
+            .ReturnsAsync(new OAuthUserInfo("gh-no-email", "No Email User", null, null));
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "code" });
+        result.Should().BeOfType<OkObjectResult>();
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.GitHubSubject == "gh-no-email");
+        user.Should().NotBeNull();
+        user!.Email.Should().BeNull();
+        user.EmailVerified.Should().BeFalse();
+    }
+
+    // --- OAuth: isNewUser flag ---
+
+    [Fact]
+    public async Task GitHubCallback_SetsIsNewUser_ForNewAccounts()
+    {
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync("code"))
+            .ReturnsAsync(new OAuthUserInfo("gh-new", "New User", "new@test.com", null));
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "code" });
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        json.Should().Contain("\"isNewUser\":true");
+    }
+
+    [Fact]
+    public async Task GitHubCallback_IsNewUserFalse_ForExistingAccounts()
+    {
+        var existing = new User
+        {
+            Email = "returning@test.com",
+            GitHubSubject = "gh-returning",
+            DisplayName = "Returning"
+        };
+        _db.Users.Add(existing);
+        await _db.SaveChangesAsync();
+
+        _oauthProviderService
+            .Setup(s => s.ExchangeGitHubCodeAsync("code"))
+            .ReturnsAsync(new OAuthUserInfo("gh-returning", "Returning", "returning@test.com", null));
+
+        var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "code" });
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        json.Should().Contain("\"isNewUser\":false");
     }
 }

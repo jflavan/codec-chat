@@ -7,7 +7,7 @@ public record OAuthUserInfo(string Subject, string DisplayName, string? Email, s
 
 public class OAuthProviderService(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<OAuthProviderService> logger)
 {
-    public async Task<OAuthUserInfo?> ExchangeGitHubCodeAsync(string code)
+    public virtual async Task<OAuthUserInfo?> ExchangeGitHubCodeAsync(string code)
     {
         var clientId = configuration["OAuth:GitHub:ClientId"];
         var clientSecret = configuration["OAuth:GitHub:ClientSecret"];
@@ -89,7 +89,7 @@ public class OAuthProviderService(IHttpClientFactory httpClientFactory, IConfigu
         return new OAuthUserInfo(id, name ?? login, email, avatarUrl);
     }
 
-    public async Task<OAuthUserInfo?> ExchangeDiscordCodeAsync(string code)
+    public virtual async Task<OAuthUserInfo?> ExchangeDiscordCodeAsync(string code)
     {
         var clientId = configuration["OAuth:Discord:ClientId"];
         var clientSecret = configuration["OAuth:Discord:ClientSecret"];
