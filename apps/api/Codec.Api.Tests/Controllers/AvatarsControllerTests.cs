@@ -120,4 +120,141 @@ public class AvatarsControllerTests : IDisposable
         var result = await _controller.UploadServerAvatar(server.Id, file.Object);
         result.Should().BeOfType<OkObjectResult>();
     }
+
+    [Fact]
+    public async Task UploadServerAvatar_InvalidFile_ReturnsBadRequest()
+    {
+        var serverId = Guid.NewGuid();
+        var file = new Mock<IFormFile>();
+        _avatarService.Setup(a => a.Validate(file.Object)).Returns("File too large.");
+
+        var result = await _controller.UploadServerAvatar(serverId, file.Object);
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task UploadUserAvatar_WithExistingCustomAvatar_DeletesOldFirst()
+    {
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.CustomAvatarPath = "https://storage/old-avatar.png";
+        await _db.SaveChangesAsync();
+
+        var file = new Mock<IFormFile>();
+        _avatarService.Setup(a => a.Validate(file.Object)).Returns((string?)null);
+        _avatarService.Setup(a => a.DeleteUserAvatarAsync(_testUser.Id)).Returns(Task.CompletedTask);
+        _avatarService.Setup(a => a.SaveUserAvatarAsync(_testUser.Id, file.Object))
+            .ReturnsAsync("https://storage/new-avatar.png");
+
+        var result = await _controller.UploadUserAvatar(file.Object);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _avatarService.Verify(a => a.DeleteUserAvatarAsync(_testUser.Id), Times.Once);
+        _avatarService.Verify(a => a.SaveUserAvatarAsync(_testUser.Id, file.Object), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadUserAvatar_WithoutExistingCustomAvatar_DoesNotDelete()
+    {
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.CustomAvatarPath = null;
+        await _db.SaveChangesAsync();
+
+        var file = new Mock<IFormFile>();
+        _avatarService.Setup(a => a.Validate(file.Object)).Returns((string?)null);
+        _avatarService.Setup(a => a.SaveUserAvatarAsync(_testUser.Id, file.Object))
+            .ReturnsAsync("https://storage/new-avatar.png");
+
+        await _controller.UploadUserAvatar(file.Object);
+
+        _avatarService.Verify(a => a.DeleteUserAvatarAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadUserAvatar_UpdatesCustomAvatarPath()
+    {
+        var file = new Mock<IFormFile>();
+        _avatarService.Setup(a => a.Validate(file.Object)).Returns((string?)null);
+        _avatarService.Setup(a => a.SaveUserAvatarAsync(_testUser.Id, file.Object))
+            .ReturnsAsync("https://storage/new-avatar.png");
+
+        await _controller.UploadUserAvatar(file.Object);
+
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.CustomAvatarPath.Should().Be("https://storage/new-avatar.png");
+    }
+
+    [Fact]
+    public async Task DeleteUserAvatar_WithCustomAvatar_SetsPathToNull()
+    {
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.CustomAvatarPath = "https://storage/avatar.png";
+        await _db.SaveChangesAsync();
+
+        _avatarService.Setup(a => a.DeleteUserAvatarAsync(_testUser.Id)).Returns(Task.CompletedTask);
+
+        await _controller.DeleteUserAvatar();
+
+        user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.CustomAvatarPath.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteServerAvatar_NoServerAvatar_ReturnsFallbackUrl()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
+        _db.ServerRoles.Add(memberRole);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, CustomAvatarPath = null });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+
+        var result = await _controller.DeleteServerAvatar(server.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task DeleteServerAvatar_WithServerAvatar_DeletesAndReturnsFallback()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
+        _db.ServerRoles.Add(memberRole);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, CustomAvatarPath = "https://storage/server-avatar.png" });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _avatarService.Setup(a => a.DeleteServerAvatarAsync(_testUser.Id, server.Id)).Returns(Task.CompletedTask);
+
+        var result = await _controller.DeleteServerAvatar(server.Id);
+        result.Should().BeOfType<OkObjectResult>();
+        _avatarService.Verify(a => a.DeleteServerAvatarAsync(_testUser.Id, server.Id), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadServerAvatar_WithExistingServerAvatar_DeletesOldFirst()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
+        _db.ServerRoles.Add(memberRole);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, CustomAvatarPath = "https://storage/old-server-avatar.png" });
+        await _db.SaveChangesAsync();
+
+        var file = new Mock<IFormFile>();
+        _avatarService.Setup(a => a.Validate(file.Object)).Returns((string?)null);
+        _avatarService.Setup(a => a.DeleteServerAvatarAsync(_testUser.Id, server.Id)).Returns(Task.CompletedTask);
+        _avatarService.Setup(a => a.SaveServerAvatarAsync(_testUser.Id, server.Id, file.Object))
+            .ReturnsAsync("https://storage/new-server-avatar.png");
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+
+        var result = await _controller.UploadServerAvatar(server.Id, file.Object);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _avatarService.Verify(a => a.DeleteServerAvatarAsync(_testUser.Id, server.Id), Times.Once);
+    }
 }

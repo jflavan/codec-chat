@@ -391,4 +391,408 @@ public class UserServiceTests : IDisposable
         await _svc.Invoking(s => s.EnsureDmParticipantAsync(Guid.NewGuid(), Guid.NewGuid()))
             .Should().ThrowAsync<NotFoundException>();
     }
+
+    // --- GetPermissionsAsync ---
+
+    [Fact]
+    public async Task GetPermissionsAsync_MemberExists_ReturnsPermissions()
+    {
+        var server = new Server { Name = "PermServer" };
+        _db.Servers.Add(server);
+        var (_, _, memberRole) = CreateDefaultRoles(server.Id);
+        var user = new User { GoogleSubject = "perm-user", DisplayName = "Perm" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = memberRole.Id });
+        await _db.SaveChangesAsync();
+
+        var permissions = await _svc.GetPermissionsAsync(server.Id, user.Id);
+
+        permissions.Should().NotBe(Permission.None);
+    }
+
+    [Fact]
+    public async Task GetPermissionsAsync_NotMember_ReturnsNone()
+    {
+        var server = new Server { Name = "NoPermServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var permissions = await _svc.GetPermissionsAsync(server.Id, Guid.NewGuid());
+
+        permissions.Should().Be(Permission.None);
+    }
+
+    // --- IsOwnerAsync ---
+
+    [Fact]
+    public async Task IsOwnerAsync_OwnerRole_ReturnsTrue()
+    {
+        var server = new Server { Name = "OwnerTestServer" };
+        _db.Servers.Add(server);
+        var (ownerRole, _, _) = CreateDefaultRoles(server.Id);
+        var user = new User { GoogleSubject = "owner-check", DisplayName = "Owner" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = ownerRole.Id });
+        await _db.SaveChangesAsync();
+
+        var isOwner = await _svc.IsOwnerAsync(server.Id, user.Id);
+
+        isOwner.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task IsOwnerAsync_AdminRole_ReturnsFalse()
+    {
+        var server = new Server { Name = "AdminNotOwnerServer" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        var user = new User { GoogleSubject = "admin-check", DisplayName = "Admin" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        var isOwner = await _svc.IsOwnerAsync(server.Id, user.Id);
+
+        isOwner.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IsOwnerAsync_NotMember_ReturnsFalse()
+    {
+        var server = new Server { Name = "NotMemberServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var isOwner = await _svc.IsOwnerAsync(server.Id, Guid.NewGuid());
+
+        isOwner.Should().BeFalse();
+    }
+
+    // --- CreateDefaultRolesAsync ---
+
+    [Fact]
+    public async Task CreateDefaultRolesAsync_CreatesThreeRoles()
+    {
+        var server = new Server { Name = "DefaultRolesServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var (owner, admin, member) = await _svc.CreateDefaultRolesAsync(server.Id);
+
+        owner.Name.Should().Be("Owner");
+        owner.Position.Should().Be(0);
+        owner.IsSystemRole.Should().BeTrue();
+        owner.Permissions.Should().Be(Permission.Administrator);
+
+        admin.Name.Should().Be("Admin");
+        admin.Position.Should().Be(1);
+
+        member.Name.Should().Be("Member");
+        member.Position.Should().Be(2);
+
+        var roles = await _db.ServerRoles.Where(r => r.ServerId == server.Id).ToListAsync();
+        roles.Should().HaveCount(3);
+    }
+
+    // --- EnsurePermissionAsync ---
+
+    [Fact]
+    public async Task EnsurePermissionAsync_HasPermission_ReturnsMember()
+    {
+        var server = new Server { Name = "PermCheckServer" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        var user = new User { GoogleSubject = "perm-check", DisplayName = "PermUser" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.EnsurePermissionAsync(server.Id, user.Id, Permission.ManageServer);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task EnsurePermissionAsync_LacksPermission_ThrowsForbidden()
+    {
+        var server = new Server { Name = "NoPermServer2" };
+        _db.Servers.Add(server);
+        var (_, _, memberRole) = CreateDefaultRoles(server.Id);
+        var user = new User { GoogleSubject = "no-perm", DisplayName = "NoPerm" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = memberRole.Id });
+        await _db.SaveChangesAsync();
+
+        await _svc.Invoking(s => s.EnsurePermissionAsync(server.Id, user.Id, Permission.ManageServer))
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    [Fact]
+    public async Task EnsurePermissionAsync_ServerNotFound_ThrowsNotFound()
+    {
+        await _svc.Invoking(s => s.EnsurePermissionAsync(Guid.NewGuid(), Guid.NewGuid(), Permission.ManageServer))
+            .Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task EnsurePermissionAsync_GlobalAdmin_Bypasses()
+    {
+        var server = new Server { Name = "GlobalAdminPermServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.EnsurePermissionAsync(server.Id, Guid.NewGuid(), Permission.ManageServer, isGlobalAdmin: true);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task EnsurePermissionAsync_NullRole_ThrowsForbidden()
+    {
+        var server = new Server { Name = "NullRoleServer" };
+        _db.Servers.Add(server);
+        var user = new User { GoogleSubject = "null-role", DisplayName = "NullRole" };
+        _db.Users.Add(user);
+        // Member with no role assigned
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+
+        await _svc.Invoking(s => s.EnsurePermissionAsync(server.Id, user.Id, Permission.ManageServer))
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    // --- EnsureOwnerAsync ---
+
+    [Fact]
+    public async Task EnsureOwnerAsync_Owner_Succeeds()
+    {
+        var server = new Server { Name = "OwnerTestServer2" };
+        _db.Servers.Add(server);
+        var (ownerRole, _, _) = CreateDefaultRoles(server.Id);
+        var user = new User { GoogleSubject = "owner-test2", DisplayName = "Owner2" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = ownerRole.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.EnsureOwnerAsync(server.Id, user.Id);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task EnsureOwnerAsync_NotMember_ThrowsForbidden()
+    {
+        var server = new Server { Name = "NotMemberOwner" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        await _svc.Invoking(s => s.EnsureOwnerAsync(server.Id, Guid.NewGuid()))
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    [Fact]
+    public async Task EnsureOwnerAsync_ServerNotFound_ThrowsNotFound()
+    {
+        await _svc.Invoking(s => s.EnsureOwnerAsync(Guid.NewGuid(), Guid.NewGuid()))
+            .Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task EnsureOwnerAsync_GlobalAdmin_Bypasses()
+    {
+        var server = new Server { Name = "GlobalAdminOwnerServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.EnsureOwnerAsync(server.Id, Guid.NewGuid(), isGlobalAdmin: true);
+
+        result.Should().NotBeNull();
+    }
+
+    // --- GetOrCreateUserAsync (edge cases) ---
+
+    [Fact]
+    public async Task GetOrCreateUserAsync_NoProfileChanges_DoesNotSave()
+    {
+        // Create user first
+        var principal = CreatePrincipal("no-change", "Test", "test@test.com", "https://pic.example.com");
+        var (user, isNew) = await _svc.GetOrCreateUserAsync(principal);
+        isNew.Should().BeTrue();
+
+        // Call again with same data
+        var (user2, isNew2) = await _svc.GetOrCreateUserAsync(principal);
+        isNew2.Should().BeFalse();
+        user2.Id.Should().Be(user.Id);
+    }
+
+    [Fact]
+    public async Task GetOrCreateUserAsync_ProfileChanged_Updates()
+    {
+        var principal = CreatePrincipal("change-test", "OldName", "old@test.com");
+        var (user, _) = await _svc.GetOrCreateUserAsync(principal);
+
+        // Call with changed profile
+        var newPrincipal = CreatePrincipal("change-test", "NewName", "new@test.com");
+        var (updated, isNew) = await _svc.GetOrCreateUserAsync(newPrincipal);
+
+        isNew.Should().BeFalse();
+        updated.DisplayName.Should().Be("NewName");
+        updated.Email.Should().Be("new@test.com");
+    }
+
+    // --- ResolveUserAsync edge cases ---
+
+    [Fact]
+    public async Task ResolveUserAsync_LocalJwt_InvalidGuid_ReturnsNull()
+    {
+        var principal = CreatePrincipal("not-a-guid", issuer: "codec-api");
+        var result = await _svc.ResolveUserAsync(principal);
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveUserAsync_LocalJwt_MissingSub_ReturnsNull()
+    {
+        var claims = new List<Claim> { new("iss", "codec-api") };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer"));
+
+        var result = await _svc.ResolveUserAsync(principal);
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResolveUserAsync_EmptyGoogleSubject_ReturnsNull()
+    {
+        var principal = CreatePrincipal("  ");
+        var result = await _svc.ResolveUserAsync(principal);
+        result.Should().BeNull();
+    }
+
+    // ═══════════════════ EnsureMemberAsync — global admin non-member ═══════════════════
+
+    [Fact]
+    public async Task EnsureMemberAsync_GlobalAdmin_NonMember_ReturnsStub()
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "TestServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+
+        var result = await _svc.EnsureMemberAsync(server.Id, userId, isGlobalAdmin: true);
+
+        result.Should().NotBeNull();
+        result.ServerId.Should().Be(server.Id);
+        result.UserId.Should().Be(userId);
+    }
+
+    // ═══════════════════ EnsurePermissionAsync — role has no permission ═══════════════════
+
+    [Fact]
+    public async Task EnsurePermissionAsync_NoPermission_ThrowsForbidden()
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "TestServer" };
+        _db.Servers.Add(server);
+        var (_, _, memberRole) = CreateDefaultRoles(server.Id);
+        await _db.SaveChangesAsync();
+
+        var user = new User { Id = Guid.NewGuid(), GoogleSubject = "perm-test", DisplayName = "Test" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = memberRole.Id });
+        await _db.SaveChangesAsync();
+
+        // Member role does not have ManageServer permission
+        await _svc.Invoking(s => s.EnsurePermissionAsync(server.Id, user.Id, Permission.ManageServer))
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    // ═══════════════════ EnsureOwnerAsync — non-owner position ═══════════════════
+
+    [Fact]
+    public async Task EnsureOwnerAsync_NonOwnerRole_ThrowsForbidden()
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "TestServer" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        await _db.SaveChangesAsync();
+
+        var user = new User { Id = Guid.NewGuid(), GoogleSubject = "admin-test", DisplayName = "Admin" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        await _svc.Invoking(s => s.EnsureOwnerAsync(server.Id, user.Id))
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    // ═══════════════════ EnsureAdminAsync — delegates to EnsurePermissionAsync ═══════════════════
+
+    [Fact]
+    public async Task EnsureAdminAsync_WithAdminPermission_Succeeds()
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "TestServer" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server.Id);
+        await _db.SaveChangesAsync();
+
+        var user = new User { Id = Guid.NewGuid(), GoogleSubject = "admin-perm", DisplayName = "Admin" };
+        _db.Users.Add(user);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.EnsureAdminAsync(server.Id, user.Id);
+
+        result.Should().NotBeNull();
+    }
+
+    // ═══════════════════ EnsureDmParticipantAsync — channel not found ═══════════════════
+
+    [Fact]
+    public async Task EnsureDmParticipantAsync_NonexistentChannel_ThrowsNotFound()
+    {
+        var userId = Guid.NewGuid();
+
+        await _svc.Invoking(s => s.EnsureDmParticipantAsync(Guid.NewGuid(), userId))
+            .Should().ThrowAsync<NotFoundException>();
+    }
+
+    // ═══════════════════ GetOrCreateUserAsync — picture claim ═══════════════════
+
+    [Fact]
+    public async Task GetOrCreateUserAsync_WithPicture_SetsAvatarUrl()
+    {
+        var principal = CreatePrincipal("google-pic", "Alice", "alice@test.com", picture: "https://photo.url/pic.jpg");
+        var (user, isNew) = await _svc.GetOrCreateUserAsync(principal);
+
+        user.AvatarUrl.Should().Be("https://photo.url/pic.jpg");
+        isNew.Should().BeTrue();
+    }
+
+    // ═══════════════════ GetPermissionsAsync — various states ═══════════════════
+
+    [Fact]
+    public async Task GetPermissionsAsync_NonMember_ReturnsNone()
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "TestServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.GetPermissionsAsync(server.Id, Guid.NewGuid());
+
+        result.Should().Be(Permission.None);
+    }
+
+    // ═══════════════════ IsOwnerAsync — non-member ═══════════════════
+
+    [Fact]
+    public async Task IsOwnerAsync_NonMember_ReturnsFalse()
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "TestServer" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var result = await _svc.IsOwnerAsync(server.Id, Guid.NewGuid());
+
+        result.Should().BeFalse();
+    }
 }

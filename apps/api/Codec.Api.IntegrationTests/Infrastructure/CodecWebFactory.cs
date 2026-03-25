@@ -77,10 +77,11 @@ public class CodecWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public HttpClient CreateAuthenticatedClient(
         string googleSubject = "google-test-1",
         string name = "Test User",
-        string email = "test@test.com")
+        string email = "test@test.com",
+        string? issuer = null)
     {
         var client = CreateClient();
-        var token = FakeAuthHandler.CreateToken(googleSubject, name, email);
+        var token = FakeAuthHandler.CreateToken(googleSubject, name, email, issuer: issuer);
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return client;

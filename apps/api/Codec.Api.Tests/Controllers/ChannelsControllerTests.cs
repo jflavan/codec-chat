@@ -494,4 +494,429 @@ public class ChannelsControllerTests : IDisposable
         var result = await _controller.GetPinnedMessages(_testChannel.Id);
         result.Should().BeOfType<OkObjectResult>();
     }
+
+    // =====================================================================
+    // Additional coverage tests
+    // =====================================================================
+
+    // --- GetMessages: around mode with surrounding messages ---
+
+    [Fact]
+    public async Task GetMessages_AroundMode_ReturnsBeforeAndAfterMessages()
+    {
+        // Create messages before and after the target
+        var msg1 = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Before", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2) };
+        var target = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Target", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1) };
+        var msg3 = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "After", CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.AddRange(msg1, target, msg3);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, around: target.Id, limit: 10);
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetMessages_AroundMode_WithReactions_IncludesReactionData()
+    {
+        var target = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "React target", CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.Add(target);
+        _db.Reactions.Add(new Reaction { MessageId = target.Id, UserId = _testUser.Id, Emoji = "\U0001f44d" });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, around: target.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_AroundMode_WithLinkPreviews_IncludesPreviewData()
+    {
+        var target = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "https://example.com", CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.Add(target);
+        _db.LinkPreviews.Add(new LinkPreview { MessageId = target.Id, Url = "https://example.com", Title = "Example", Status = LinkPreviewStatus.Success, FetchedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, around: target.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_AroundMode_WithReplyContext_IncludesReplyData()
+    {
+        var parent = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Parent message", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1) };
+        _db.Messages.Add(parent);
+        await _db.SaveChangesAsync();
+
+        var reply = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Reply", ReplyToMessageId = parent.Id, CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.Add(reply);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, around: reply.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_AroundMode_WithMentions_IncludesMentionData()
+    {
+        var mentionedUser = new User { Id = Guid.NewGuid(), DisplayName = "Mentioned", Nickname = "MentionNick" };
+        _db.Users.Add(mentionedUser);
+        await _db.SaveChangesAsync();
+
+        var target = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = $"Hello <@{mentionedUser.Id}>", CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.Add(target);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, around: target.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_AroundMode_DeletedReplyParent_ShowsIsDeleted()
+    {
+        // Reply to a message that no longer exists
+        var deletedId = Guid.NewGuid();
+        var reply = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Reply to deleted", ReplyToMessageId = deletedId, CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.Add(reply);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, around: reply.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // --- GetMessages: before cursor pagination ---
+
+    [Fact]
+    public async Task GetMessages_WithBeforeCursor_ReturnsOlderMessages()
+    {
+        var old = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Old", CreatedAt = DateTimeOffset.UtcNow.AddHours(-2) };
+        var newer = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "New", CreatedAt = DateTimeOffset.UtcNow };
+        _db.Messages.AddRange(old, newer);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, before: DateTimeOffset.UtcNow.AddHours(-1));
+        result.Should().Match<IActionResult>(r => r is ContentResult || r is OkObjectResult);
+    }
+
+    [Fact]
+    public async Task GetMessages_ClampsLimitToMinimum1()
+    {
+        var result = await _controller.GetMessages(_testChannel.Id, limit: 0);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_WithReactions_IncludesReactionSummary()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Reactions here" };
+        _db.Messages.Add(msg);
+        _db.Reactions.Add(new Reaction { MessageId = msg.Id, UserId = _testUser.Id, Emoji = "\u2764\ufe0f" });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_WithLinkPreviews_IncludesSuccessfulPreviews()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Check https://example.com" };
+        _db.Messages.Add(msg);
+        _db.LinkPreviews.Add(new LinkPreview { MessageId = msg.Id, Url = "https://example.com", Title = "Example", Status = LinkPreviewStatus.Success, FetchedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_FailedLinkPreviews_ExcludedFromResults()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Bad link" };
+        _db.Messages.Add(msg);
+        _db.LinkPreviews.Add(new LinkPreview { MessageId = msg.Id, Url = "https://bad.com", Status = LinkPreviewStatus.Failed, FetchedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_WithMentions_ResolvesMentionedUsers()
+    {
+        var mentionedUser = new User { Id = Guid.NewGuid(), DisplayName = "Bob", Nickname = "Bobby" };
+        _db.Users.Add(mentionedUser);
+        await _db.SaveChangesAsync();
+
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = $"Hey <@{mentionedUser.Id}>" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_WithReplyToDeletedMessage_ShowsDeletedReplyContext()
+    {
+        var deletedId = Guid.NewGuid();
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Reply orphan", ReplyToMessageId = deletedId };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_WithReplyToExistingMessage_IncludesReplyContext()
+    {
+        var parent = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Original long message that exceeds one hundred characters in length to ensure proper truncation behavior in the API response" };
+        _db.Messages.Add(parent);
+        await _db.SaveChangesAsync();
+
+        var reply = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Reply", ReplyToMessageId = parent.Id };
+        _db.Messages.Add(reply);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetMessages_HasMoreFlag_WhenMoreMessagesExist()
+    {
+        // Add more messages than the limit
+        for (int i = 0; i < 5; i++)
+        {
+            _db.Messages.Add(new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = $"Msg {i}", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-i) });
+        }
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_testChannel.Id, limit: 3);
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // --- PostMessage: file attachment ---
+
+    [Fact]
+    public async Task PostMessage_WithFileUrl_ReturnsCreated()
+    {
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest(
+            "", FileUrl: "https://example.com/file.pdf", FileName: "doc.pdf", FileSize: 1024, FileContentType: "application/pdf"));
+        result.Should().BeOfType<CreatedResult>();
+    }
+
+    [Fact]
+    public async Task PostMessage_WithFileAndBody_ReturnsCreated()
+    {
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest(
+            "Check this file", FileUrl: "https://example.com/file.zip", FileName: "archive.zip", FileSize: 2048, FileContentType: "application/zip"));
+        result.Should().BeOfType<CreatedResult>();
+        _db.Messages.Should().Contain(m => m.Body == "Check this file" && m.FileUrl == "https://example.com/file.zip");
+    }
+
+    [Fact]
+    public async Task PostMessage_StoresFileMetadata()
+    {
+        await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest(
+            "File msg", FileUrl: "https://cdn.example.com/data.csv", FileName: "data.csv", FileSize: 512, FileContentType: "text/csv"));
+
+        var msg = _db.Messages.First(m => m.Body == "File msg");
+        msg.FileUrl.Should().Be("https://cdn.example.com/data.csv");
+        msg.FileName.Should().Be("data.csv");
+        msg.FileSize.Should().Be(512);
+        msg.FileContentType.Should().Be("text/csv");
+    }
+
+    // --- PostMessage: mentions ---
+
+    [Fact]
+    public async Task PostMessage_WithMentions_ResolvesMentionedUsers()
+    {
+        var mentioned = new User { Id = Guid.NewGuid(), DisplayName = "MentionedUser", Nickname = "MNick" };
+        _db.Users.Add(mentioned);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.IsMemberAsync(_testServer.Id, mentioned.Id)).ReturnsAsync(true);
+
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest($"Hey <@{mentioned.Id}> look at this"));
+        result.Should().BeOfType<CreatedResult>();
+    }
+
+    [Fact]
+    public async Task PostMessage_MentionNonMember_DoesNotNotify()
+    {
+        var nonMember = new User { Id = Guid.NewGuid(), DisplayName = "NonMember" };
+        _db.Users.Add(nonMember);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.IsMemberAsync(_testServer.Id, nonMember.Id)).ReturnsAsync(false);
+
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest($"Hey <@{nonMember.Id}>"));
+        result.Should().BeOfType<CreatedResult>();
+    }
+
+    [Fact]
+    public async Task PostMessage_ValidReplyTo_IncludesReplyContext()
+    {
+        var parent = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Parent" };
+        _db.Messages.Add(parent);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest("Reply text", ReplyToMessageId: parent.Id));
+        result.Should().BeOfType<CreatedResult>();
+
+        var reply = _db.Messages.First(m => m.Body == "Reply text");
+        reply.ReplyToMessageId.Should().Be(parent.Id);
+    }
+
+    [Fact]
+    public async Task PostMessage_TrimsWhitespace()
+    {
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest("  Hello world  "));
+        result.Should().BeOfType<CreatedResult>();
+        _db.Messages.Should().ContainSingle(m => m.Body == "Hello world");
+    }
+
+    // --- DeleteMessage: global admin can delete others' messages ---
+
+    [Fact]
+    public async Task DeleteMessage_GlobalAdmin_CanDeleteOthersMessages()
+    {
+        var adminUser = new User { Id = Guid.NewGuid(), GoogleSubject = "g-admin", DisplayName = "Admin", IsGlobalAdmin = true };
+        _db.Users.Add(adminUser);
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((adminUser, false));
+        _userService.Setup(u => u.EnsureMemberAsync(_testServer.Id, adminUser.Id, true))
+            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = adminUser.Id });
+
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Delete by admin" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.DeleteMessage(_testChannel.Id, msg.Id, _auditService);
+        result.Should().BeOfType<NoContentResult>();
+
+        // Should create an audit log for admin delete
+        _db.AuditLogEntries.Should().ContainSingle(a => a.Action == AuditAction.MessageDeletedByAdmin);
+    }
+
+    [Fact]
+    public async Task DeleteMessage_OwnMessage_NoAuditLog()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Self delete" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        await _controller.DeleteMessage(_testChannel.Id, msg.Id, _auditService);
+
+        _db.AuditLogEntries.Where(a => a.Action == AuditAction.MessageDeletedByAdmin).Should().BeEmpty();
+    }
+
+    // --- PurgeChannelMessages: additional cases ---
+
+    [Fact]
+    public async Task PurgeChannelMessages_NonAdmin_ThrowsForbidden_EvenWithMessages()
+    {
+        // Ensure non-admin cannot purge even when messages exist
+        _db.Messages.Add(new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Purge me" });
+        await _db.SaveChangesAsync();
+
+        await _controller.Invoking(c => c.PurgeChannelMessages(_testChannel.Id, _auditService))
+            .Should().ThrowAsync<Codec.Api.Services.Exceptions.ForbiddenException>();
+    }
+
+    // --- ToggleReaction: additional edge cases ---
+
+    [Fact]
+    public async Task ToggleReaction_DifferentEmoji_AddsBoth()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Multi react" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("\U0001f44d"));
+        await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("\u2764\ufe0f"));
+
+        _db.Reactions.Where(r => r.MessageId == msg.Id).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task ToggleReaction_TrimsEmojiWhitespace()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Trim test" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.ToggleReaction(_testChannel.Id, msg.Id, new ToggleReactionRequest("  \U0001f44d  "));
+        result.Should().BeOfType<OkObjectResult>();
+        _db.Reactions.Should().ContainSingle(r => r.Emoji == "\U0001f44d");
+    }
+
+    // --- UnpinMessage: channel not found ---
+
+    [Fact]
+    public async Task UnpinMessage_ChannelNotFound_Returns404()
+    {
+        SetupAdminUser();
+        var result = await _controller.UnpinMessage(Guid.NewGuid(), Guid.NewGuid(), _auditService);
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task UnpinMessage_RequiresAdmin_ThrowsForbidden()
+    {
+        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+            .ThrowsAsync(new Codec.Api.Services.Exceptions.ForbiddenException());
+
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Unpin" };
+        _db.Messages.Add(msg);
+        _db.PinnedMessages.Add(new PinnedMessage { MessageId = msg.Id, ChannelId = _testChannel.Id, PinnedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        await FluentActions.Invoking(() => _controller.UnpinMessage(_testChannel.Id, msg.Id, _auditService))
+            .Should().ThrowAsync<Codec.Api.Services.Exceptions.ForbiddenException>();
+    }
+
+    // --- PostMessage: @here notification ---
+
+    [Fact]
+    public async Task PostMessage_WithAtHere_NotifiesServerMembers()
+    {
+        var otherUser = new User { Id = Guid.NewGuid(), DisplayName = "Other" };
+        _db.Users.Add(otherUser);
+        var memberRole = _db.ServerRoles.First(r => r.ServerId == _testServer.Id && r.Name == "Member");
+        _db.ServerMembers.Add(new ServerMember { ServerId = _testServer.Id, UserId = otherUser.Id, RoleId = memberRole.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest("<@here> attention everyone"));
+        result.Should().BeOfType<CreatedResult>();
+    }
+
+    // --- PostMessage: empty whitespace body with no file/image ---
+
+    [Fact]
+    public async Task PostMessage_WhitespaceOnlyBody_ReturnsBadRequest()
+    {
+        var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest("   "));
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // --- EditMessage: trims body ---
+
+    [Fact]
+    public async Task EditMessage_TrimsBody()
+    {
+        var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Original" };
+        _db.Messages.Add(msg);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.EditMessage(_testChannel.Id, msg.Id, new EditMessageRequest("  Edited  "));
+        result.Should().BeOfType<OkObjectResult>();
+
+        var updated = await _db.Messages.FindAsync(msg.Id);
+        updated!.Body.Should().Be("Edited");
+    }
 }

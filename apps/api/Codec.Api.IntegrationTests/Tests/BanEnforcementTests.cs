@@ -29,7 +29,7 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         var code = await CreateInviteCodeAsync(owner, serverId);
 
         // Target joins the server
-        var joinResponse = await target.PostAsync($"/invites/{code}/join", null);
+        var joinResponse = await target.PostAsync($"/invites/{code}", null);
         joinResponse.EnsureSuccessStatusCode();
 
         // Get target user ID
@@ -43,7 +43,7 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         Assert.Equal(HttpStatusCode.NoContent, banResponse.StatusCode);
 
         // Target tries to rejoin via the same invite
-        var rejoinResponse = await target.PostAsync($"/invites/{code}/join", null);
+        var rejoinResponse = await target.PostAsync($"/invites/{code}", null);
         Assert.Equal(HttpStatusCode.Forbidden, rejoinResponse.StatusCode);
 
         var rejoinBody = await rejoinResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -60,12 +60,12 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         var code = await CreateInviteCodeAsync(owner, serverId);
 
         // Join, get banned
-        await target.PostAsync($"/invites/{code}/join", null);
+        await target.PostAsync($"/invites/{code}", null);
         var targetId = await GetUserIdAsync(target);
         await owner.PostAsJsonAsync($"/servers/{serverId}/bans/{targetId}", new { reason = "temp ban" });
 
         // Verify banned
-        var bannedJoin = await target.PostAsync($"/invites/{code}/join", null);
+        var bannedJoin = await target.PostAsync($"/invites/{code}", null);
         Assert.Equal(HttpStatusCode.Forbidden, bannedJoin.StatusCode);
 
         // Unban
@@ -73,7 +73,7 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         Assert.Equal(HttpStatusCode.NoContent, unbanResponse.StatusCode);
 
         // Now can rejoin
-        var rejoinResponse = await target.PostAsync($"/invites/{code}/join", null);
+        var rejoinResponse = await target.PostAsync($"/invites/{code}", null);
         rejoinResponse.EnsureSuccessStatusCode();
     }
 
@@ -88,7 +88,7 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         var code = await CreateInviteCodeAsync(owner, serverId);
 
         // Target joins and posts messages
-        await target.PostAsync($"/invites/{code}/join", null);
+        await target.PostAsync($"/invites/{code}", null);
         await PostMessageAsync(target, channelId, "Message from target 1");
         await PostMessageAsync(target, channelId, "Message from target 2");
 
@@ -137,7 +137,7 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
         var code = await CreateInviteCodeAsync(owner, serverId);
 
         // Admin joins
-        await admin.PostAsync($"/invites/{code}/join", null);
+        await admin.PostAsync($"/invites/{code}", null);
         var adminId = await GetUserIdAsync(admin);
 
         // Promote admin (update their role to Admin)
@@ -162,7 +162,7 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
 
         var (serverId, _) = await CreateServerAsync(owner, "DupBan Server");
         var code = await CreateInviteCodeAsync(owner, serverId);
-        await target.PostAsync($"/invites/{code}/join", null);
+        await target.PostAsync($"/invites/{code}", null);
         var targetId = await GetUserIdAsync(target);
 
         // First ban
@@ -182,8 +182,8 @@ public class BanEnforcementTests(CodecWebFactory factory) : IntegrationTestBase(
 
         var (serverId, _) = await CreateServerAsync(owner, "ListBan Server");
         var code = await CreateInviteCodeAsync(owner, serverId);
-        await target1.PostAsync($"/invites/{code}/join", null);
-        await target2.PostAsync($"/invites/{code}/join", null);
+        await target1.PostAsync($"/invites/{code}", null);
+        await target2.PostAsync($"/invites/{code}", null);
 
         var t1Id = await GetUserIdAsync(target1);
         var t2Id = await GetUserIdAsync(target2);

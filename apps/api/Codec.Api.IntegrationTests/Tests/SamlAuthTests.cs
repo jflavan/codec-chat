@@ -37,14 +37,19 @@ public class SamlAuthTests(CodecWebFactory factory) : IntegrationTestBase(factor
         var client = CreateClient(sub, "SAML Admin");
         // Trigger user creation
         await client.GetAsync("/me");
-        // Make global admin
+        // Make global admin and get the user's actual GUID
+        Guid userId = Guid.Empty;
         await WithDbAsync(async db =>
         {
             var user = db.Users.First(u => u.GoogleSubject == sub);
             user.IsGlobalAdmin = true;
             await db.SaveChangesAsync();
+            userId = user.Id;
         });
-        return client;
+        // Return a new client whose sub claim is the user's GUID with codec-api issuer,
+        // because SamlController.EnsureGlobalAdminAsync parses sub as a GUID user ID.
+        return Factory.CreateAuthenticatedClient(
+            userId.ToString(), "SAML Admin", $"{sub}@test.com", issuer: "codec-api");
     }
 
     [Fact]

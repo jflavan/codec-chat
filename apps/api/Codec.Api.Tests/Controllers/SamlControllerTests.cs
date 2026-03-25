@@ -5,6 +5,7 @@ using Codec.Api.Controllers;
 using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
+using Codec.Api.Services.Exceptions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -246,7 +247,7 @@ public class SamlControllerTests : IDisposable
 
         var act = () => _controller.ListIdps();
 
-        await act.Should().ThrowAsync<Codec.Api.Services.Exceptions.ForbiddenException>();
+        await act.Should().ThrowAsync<ForbiddenException>();
     }
 
     // ---- Admin: GetIdp ----
@@ -472,5 +473,501 @@ public class SamlControllerTests : IDisposable
         var result = await _controller.ImportFromMetadata(request);
 
         result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    // ---- ExchangeCode ----
+
+    [Fact]
+    public void ExchangeCode_ValidCode_ReturnsTokens()
+    {
+        var code = "test-code-123";
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        cache.Set($"saml_code:{code}", new SamlAuthCode
+        {
+            AccessToken = "access-token",
+            RefreshToken = "refresh-token",
+            IsNewUser = false
+        }, TimeSpan.FromSeconds(60));
+
+        var controller = new SamlController(
+            _db, _samlService, _tokenService,
+            Options.Create(new SamlSettings { Enabled = true }),
+            _config, cache, Mock.Of<ILogger<SamlController>>());
+        controller.ControllerContext = _controller.ControllerContext;
+
+        var result = controller.ExchangeCode(new SamlExchangeRequest { Code = code });
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public void ExchangeCode_InvalidCode_ReturnsBadRequest()
+    {
+        var result = _controller.ExchangeCode(new SamlExchangeRequest { Code = "nonexistent" });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void ExchangeCode_EmptyCode_ReturnsBadRequest()
+    {
+        var result = _controller.ExchangeCode(new SamlExchangeRequest { Code = "" });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void ExchangeCode_NullCode_ReturnsBadRequest()
+    {
+        var result = _controller.ExchangeCode(new SamlExchangeRequest { Code = null! });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void ExchangeCode_SamlDisabled_ReturnsBadRequest()
+    {
+        var disabledController = new SamlController(
+            _db, _samlService, _tokenService,
+            Options.Create(new SamlSettings { Enabled = false }),
+            _config, new MemoryCache(new MemoryCacheOptions()),
+            Mock.Of<ILogger<SamlController>>());
+        disabledController.ControllerContext = _controller.ControllerContext;
+
+        var result = disabledController.ExchangeCode(new SamlExchangeRequest { Code = "code" });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void ExchangeCode_SingleUse_SecondCallFails()
+    {
+        var code = "one-time-code";
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        cache.Set($"saml_code:{code}", new SamlAuthCode
+        {
+            AccessToken = "at",
+            RefreshToken = "rt",
+            IsNewUser = true
+        }, TimeSpan.FromSeconds(60));
+
+        var controller = new SamlController(
+            _db, _samlService, _tokenService,
+            Options.Create(new SamlSettings { Enabled = true }),
+            _config, cache, Mock.Of<ILogger<SamlController>>());
+        controller.ControllerContext = _controller.ControllerContext;
+
+        var firstResult = controller.ExchangeCode(new SamlExchangeRequest { Code = code });
+        firstResult.Should().BeOfType<OkObjectResult>();
+
+        var secondResult = controller.ExchangeCode(new SamlExchangeRequest { Code = code });
+        secondResult.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // ---- Metadata ----
+
+    [Fact]
+    public void Metadata_ContainsAcsUrl()
+    {
+        var result = _controller.Metadata();
+
+        var content = result as ContentResult;
+        content!.Content.Should().Contain("AssertionConsumerService");
+    }
+
+    // ---- Admin endpoints additional coverage ----
+
+    [Fact]
+    public async Task ListIdps_Empty_ReturnsEmptyList()
+    {
+        var result = await _controller.ListIdps();
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetIdp_ReturnsAllFields()
+    {
+        var idp = await CreateTestIdpInDb();
+
+        var result = await _controller.GetIdp(idp.Id);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task CreateIdp_SetsTimestamps()
+    {
+        var certPem = GenerateSelfSignedCertPem();
+        var request = new CreateSamlIdpRequest
+        {
+            EntityId = "https://new-idp.example.com",
+            DisplayName = "New IdP",
+            SingleSignOnUrl = "https://new-idp.example.com/sso",
+            CertificatePem = certPem,
+            IsEnabled = true,
+            AllowJitProvisioning = true
+        };
+
+        var result = await _controller.CreateIdp(request);
+
+        result.Should().BeOfType<CreatedResult>();
+        var idp = await _db.SamlIdentityProviders.FirstAsync(p => p.EntityId == "https://new-idp.example.com");
+        idp.CreatedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task UpdateIdp_UpdatesFields()
+    {
+        var idp = await CreateTestIdpInDb();
+
+        var result = await _controller.UpdateIdp(idp.Id, new UpdateSamlIdpRequest
+        {
+            DisplayName = "Updated Name",
+            SingleSignOnUrl = "https://updated.example.com/sso",
+            IsEnabled = false,
+            AllowJitProvisioning = false
+        });
+
+        result.Should().BeOfType<OkObjectResult>();
+        var updated = await _db.SamlIdentityProviders.FirstAsync(p => p.Id == idp.Id);
+        updated.DisplayName.Should().Be("Updated Name");
+        updated.IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteIdp_RemovesFromDb()
+    {
+        var idp = await CreateTestIdpInDb();
+
+        var result = await _controller.DeleteIdp(idp.Id);
+
+        result.Should().BeOfType<NoContentResult>();
+        var exists = await _db.SamlIdentityProviders.AnyAsync(p => p.Id == idp.Id);
+        exists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ListIdps_WithMultipleIdps_ReturnsAll()
+    {
+        await CreateTestIdpInDb();
+        await CreateTestIdpInDb();
+        await CreateTestIdpInDb();
+
+        var result = await _controller.ListIdps();
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // ---- EnsureGlobalAdmin ----
+
+    [Fact]
+    public async Task ListIdps_NonAdminUser_ThrowsForbidden()
+    {
+        var nonAdmin = new User
+        {
+            DisplayName = "NonAdmin",
+            Email = "nonadmin@test.com",
+            IsGlobalAdmin = false
+        };
+        _db.Users.Add(nonAdmin);
+        await _db.SaveChangesAsync();
+
+        SetUser(nonAdmin);
+
+        await _controller.Invoking(c => c.ListIdps())
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    [Fact]
+    public async Task ListIdps_AnonymousUser_ThrowsForbidden()
+    {
+        SetAnonymousUser();
+
+        await _controller.Invoking(c => c.ListIdps())
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    // ---- ACS endpoint error paths ----
+
+    private SamlController CreateControllerWithHttpContext(SamlSettings? settings = null)
+    {
+        var samlOpts = Options.Create(settings ?? new SamlSettings { Enabled = true });
+        var controller = new SamlController(
+            _db, _samlService, _tokenService, samlOpts, _config,
+            new MemoryCache(new MemoryCacheOptions()),
+            Mock.Of<ILogger<SamlController>>());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = _controller.ControllerContext.HttpContext.User
+            }
+        };
+        return controller;
+    }
+
+    [Fact]
+    public async Task ACS_SamlDisabled_ReturnsBadRequest()
+    {
+        var controller = CreateControllerWithHttpContext(new SamlSettings { Enabled = false });
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_MissingSamlResponse_ReturnsBadRequest()
+    {
+        var controller = CreateControllerWithHttpContext();
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_MissingIdpCookie_ReturnsBadRequest()
+    {
+        var controller = CreateControllerWithHttpContext();
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = "dGVzdA==" // base64 of "test"
+            });
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_MissingRequestIdCookie_ReturnsBadRequest()
+    {
+        var idp = await CreateTestIdpInDb();
+        var controller = CreateControllerWithHttpContext();
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = "dGVzdA==" // base64 of "test"
+            });
+        // Set IdP cookie but not request ID cookie
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = $"saml_idp_id={idp.Id}";
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_InvalidBase64_ReturnsBadRequest()
+    {
+        var idp = await CreateTestIdpInDb();
+        var controller = CreateControllerWithHttpContext();
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = "not-valid-base64!!!"
+            });
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = $"saml_idp_id={idp.Id}; saml_request_id=test-request-123";
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_InResponseToMismatch_ReturnsBadRequest()
+    {
+        var idp = await CreateTestIdpInDb();
+        var controller = CreateControllerWithHttpContext();
+
+        // Build a minimal valid SAML response XML with a mismatched InResponseTo
+        var samlXml = """
+            <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                            InResponseTo="wrong-request-id">
+            </samlp:Response>
+            """;
+        var samlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(samlXml));
+
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = samlBase64
+            });
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = $"saml_idp_id={idp.Id}; saml_request_id=expected-request-id";
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_IdpNotFound_ReturnsBadRequest()
+    {
+        var controller = CreateControllerWithHttpContext();
+        var nonExistentIdpId = Guid.NewGuid();
+
+        // Build a minimal SAML response with matching InResponseTo
+        var samlXml = """
+            <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                            InResponseTo="test-request-123">
+            </samlp:Response>
+            """;
+        var samlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(samlXml));
+
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = samlBase64
+            });
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = $"saml_idp_id={nonExistentIdpId}; saml_request_id=test-request-123";
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_DisabledIdp_ReturnsBadRequest()
+    {
+        var idp = await CreateTestIdpInDb(isEnabled: false);
+        var controller = CreateControllerWithHttpContext();
+
+        var samlXml = """
+            <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                            InResponseTo="test-request-123">
+            </samlp:Response>
+            """;
+        var samlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(samlXml));
+
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = samlBase64
+            });
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = $"saml_idp_id={idp.Id}; saml_request_id=test-request-123";
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ACS_InvalidAssertion_ReturnsUnauthorized()
+    {
+        var idp = await CreateTestIdpInDb();
+        var controller = CreateControllerWithHttpContext();
+
+        // Build a SAML response with matching InResponseTo but invalid assertion (no valid signature)
+        var samlXml = $"""
+            <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                            InResponseTo="test-request-123">
+              <samlp:Status>
+                <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+              </samlp:Status>
+            </samlp:Response>
+            """;
+        var samlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(samlXml));
+
+        controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        controller.ControllerContext.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                ["SAMLResponse"] = samlBase64
+            });
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = $"saml_idp_id={idp.Id}; saml_request_id=test-request-123";
+
+        var result = await controller.AssertionConsumerService();
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    // ---- UpdateIdp with valid new certificate ----
+
+    [Fact]
+    public async Task UpdateIdp_WithValidNewCertificate_UpdatesCert()
+    {
+        var idp = await CreateTestIdpInDb();
+        var newCert = GenerateSelfSignedCertPem();
+        var request = new UpdateSamlIdpRequest
+        {
+            CertificatePem = newCert
+        };
+
+        var result = await _controller.UpdateIdp(idp.Id, request);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var updated = await _db.SamlIdentityProviders.FindAsync(idp.Id);
+        updated!.CertificatePem.Should().Be(newCert);
+        updated.UpdatedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(10));
+    }
+
+    // ---- ImportFromMetadata without DisplayName (defaults to EntityId) ----
+
+    [Fact]
+    public async Task ImportFromMetadata_NoDisplayName_DefaultsToEntityId()
+    {
+        var certPem = GenerateSelfSignedCertPem();
+        var certBase64 = certPem
+            .Replace("-----BEGIN CERTIFICATE-----", "")
+            .Replace("-----END CERTIFICATE-----", "")
+            .Replace("\n", "").Replace("\r", "").Trim();
+
+        var entityId = $"https://no-name-idp-{Guid.NewGuid():N}.example.com";
+        var metadataXml = $"""
+            <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                                 xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                                 entityID="{entityId}">
+              <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+                <md:KeyDescriptor use="signing">
+                  <ds:KeyInfo>
+                    <ds:X509Data><ds:X509Certificate>{certBase64}</ds:X509Certificate></ds:X509Data>
+                  </ds:KeyInfo>
+                </md:KeyDescriptor>
+                <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                                        Location="https://no-name-idp.example.com/sso"/>
+              </md:IDPSSODescriptor>
+            </md:EntityDescriptor>
+            """;
+
+        var request = new ImportSamlIdpMetadataRequest
+        {
+            MetadataXml = metadataXml,
+            DisplayName = null // Should default to entityId
+        };
+
+        var result = await _controller.ImportFromMetadata(request);
+
+        result.Should().BeOfType<CreatedResult>();
+        var imported = await _db.SamlIdentityProviders.FirstAsync(p => p.EntityId == entityId);
+        imported.DisplayName.Should().Be(entityId);
+    }
+
+    // ---- UpdateIdp with all null fields (no-op update) ----
+
+    [Fact]
+    public async Task UpdateIdp_AllNullFields_StillReturnsOk()
+    {
+        var idp = await CreateTestIdpInDb();
+        var originalName = idp.DisplayName;
+        var request = new UpdateSamlIdpRequest();
+
+        var result = await _controller.UpdateIdp(idp.Id, request);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var updated = await _db.SamlIdentityProviders.FindAsync(idp.Id);
+        updated!.DisplayName.Should().Be(originalName);
     }
 }

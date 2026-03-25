@@ -73,7 +73,7 @@ public class FakeAuthHandler(
     /// <summary>
     /// Creates a base64-encoded token from the given claims for use in test requests.
     /// </summary>
-    public static string CreateToken(string googleSubject, string name, string? email = null, string? picture = null)
+    public static string CreateToken(string googleSubject, string name, string? email = null, string? picture = null, string? issuer = null)
     {
         var payload = new Dictionary<string, string>
         {
@@ -82,6 +82,7 @@ public class FakeAuthHandler(
             ["email"] = email ?? $"{googleSubject}@test.com"
         };
         if (picture is not null) payload["picture"] = picture;
+        if (issuer is not null) payload["iss"] = issuer;
 
         var json = JsonSerializer.Serialize(payload);
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
