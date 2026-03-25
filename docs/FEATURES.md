@@ -64,9 +64,11 @@ This document tracks implemented and planned features for Codec.
 - Close/reopen DM conversations
 - DMs support all messaging features (replies, reactions, images, formatting, search)
 
-### Voice
+### Voice & Video
 - **Voice channels** — persistent voice channel type in servers; join/leave freely; real-time audio via mediasoup v3 SFU (Opus/WebRTC); mute/unmute with broadcast; participant list with avatars and mute indicators; per-user volume control; push-to-talk with configurable keybind
 - **DM voice calls** — 1:1 calls from DM chat header; incoming call overlay with ring tone; 30-second ringing timeout; system messages for call events (missed, duration); call state recovery on reconnect; collision detection prevents concurrent calls
+- **Video chat** — webcam video via mediasoup video producers; `VideoTile` and `VideoGrid` components; `IsVideoEnabled` state tracked per participant; toggle on/off during voice sessions
+- **Screen sharing** — `getDisplayMedia()` screen capture; separate screen producer track; `IsScreenSharing` state broadcast via SignalR; viewers consume screen track alongside audio
 
 ### User Settings
 - Full-screen modal with category sidebar
@@ -129,8 +131,24 @@ This document tracks implemented and planned features for Codec.
 - OpenTelemetry observability — distributed traces, metrics, and structured logs exported to Azure Monitor (Application Insights) in production and OTLP (Aspire dashboard) locally
 - SFU telemetry — custom spans on room/transport/producer/consumer operations with Azure Monitor export
 
+### Moderation
+- **User banning** — ban members with optional message purge; `BannedMember` entity with reason and actor tracking; ban check on invite join (prevents re-entry); real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management UI in server settings (list, ban, unban)
+- **Custom roles** — `ServerRoleEntity` with 21 granular permission flags (bitmask); role hierarchy with position-based ordering; system roles (Owner, Admin, Member, @everyone) plus custom roles; full CRUD via `RolesController`; role management UI with permission editor and drag-and-drop reordering; role badges with custom colors on member avatars; `IsMentionable` and `IsHoisted` options
+- **Granular permissions** — `Permission` flags enum covering channel management, server management, roles, emojis, audit log, invites, kick/ban, messaging, voice, and a special `Administrator` flag that bypasses all checks
+
+### Integrations
+- **Outgoing webhooks** — per-server webhook configuration with name, URL, and optional HMAC-SHA256 signing secret; subscribable event types (MessageCreated, MessageUpdated, MessageDeleted, MemberJoined, MemberLeft, MemberRoleChanged, ChannelCreated, ChannelUpdated, ChannelDeleted); background dispatch (non-blocking); retry with exponential backoff (5s, 30s, 5m); per-attempt delivery logging via `WebhookDeliveryLog`; `X-Webhook-Signature`, `X-Webhook-Event`, and `X-Webhook-Id` headers
+- **Web push notifications** — `PushSubscription` entity with Web Push API endpoint and VAPID keys; `PushSubscriptionsController` for subscribe/unsubscribe; VAPID public key endpoint (anonymous); notifications for DMs, @mentions, and friend requests; auto-deactivation on 410 Gone responses
+- **Status messages** — per-user `StatusText` (128 char max) and `StatusEmoji` (8 char max, supports multi-codepoint emoji); displayed in member lists and user profiles
+
+### Authentication Providers
+- **SAML 2.0 SSO** — `SamlIdentityProvider` entity with EntityId, SSO URL, and PEM X.509 certificate; SP-initiated login flow with HTTP-Redirect binding; Assertion Consumer Service (`POST /auth/saml/acs`) with XML signature verification; SP metadata endpoint; IdP metadata import; just-in-time (JIT) user provisioning; cookie-based SAML request correlation; admin CRUD for IdP management
+- **GitHub OAuth** — `POST /auth/oauth/github` callback; authorization code exchange; user profile and private email fetching; `GitHubSubject` field on User entity; account linking to existing email/password accounts
+- **Discord OAuth** — `POST /auth/oauth/discord` callback; authorization code exchange; user profile and avatar URL fetching; `DiscordSubject` field on User entity; account linking to existing email/password accounts
+- **OAuth configuration** — `GET /auth/oauth/config` returns enabled provider status (public endpoint)
+
 ### Testing
-- 561 automated tests across 3 test suites (278 API unit, 109 API integration, 174 web)
+- 582 automated tests across 3 test suites (296 API unit, 109 API integration, 177 web)
 - API unit tests: xUnit + FluentAssertions + Moq; InMemory EF Core for database tests
 - API integration tests: WebApplicationFactory + Testcontainers (disposable PostgreSQL + Redis); full HTTP pipeline with real migrations; FakeAuthHandler bypasses Google JWT; SignalR hub tests via SignalR client
 - Web unit tests: Vitest + jsdom; localStorage polyfill; mocked fetch for API client
@@ -140,28 +158,12 @@ This document tracks implemented and planned features for Codec.
 ## Planned
 
 ### Near-Term
-- ~~Email/password registration and sign-in~~ (implemented)
-- ~~Nickname selection during sign-up~~ (implemented)
-- ~~Presence indicators~~ (implemented)
-- ~~Server settings/configuration~~ (implemented)
-- ~~Channel categories/organization~~ (implemented)
-- ~~Link preview caching~~ (implemented: 1-hour Redis cache by URL SHA-256 hash; caches failures too; graceful degradation when Redis unavailable)
 - Image proxying
 - File uploads (documents, other media)
 
-### Future
-- Video chat and screen sharing
-- Push notifications
-- User banning and message moderation
-- ~~Custom roles and granular permissions~~ (implemented)
-- Status messages
-- Additional OAuth providers (GitHub, Discord) — same nickname-on-signup flow
-- SAML/SSO support
-- Webhooks
-
 ## Technical Debt
-- [ ] Unit and integration tests
 - [ ] API documentation (Swagger/OpenAPI)
+- [x] Unit and integration tests (582 tests across 3 suites)
 - [x] Structured logging (Serilog)
 - [x] Production database migration strategy (EF Core bundles in CD)
 - [x] Container deployment (Docker multi-stage builds, Azure Container Apps)

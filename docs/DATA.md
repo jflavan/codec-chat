@@ -163,6 +163,12 @@ Represents an authenticated user in the system.
 | `AvatarUrl` | string? | Google profile picture URL |
 | `CustomAvatarPath` | string? | Relative path to a user-uploaded avatar file |
 | `IsGlobalAdmin` | bool | Platform-wide admin flag (default: `false`). Grants ability to delete any server, channel, or message |
+| `StatusText` | string? (max 128) | Custom status message displayed in member lists |
+| `StatusEmoji` | string? (max 8) | Optional emoji displayed alongside status text (supports multi-codepoint emoji) |
+| `GitHubSubject` | string? (unique) | GitHub user ID for OAuth authentication |
+| `DiscordSubject` | string? (unique) | Discord user ID for OAuth authentication |
+| `SamlNameId` | string? | Persistent NameID from SAML identity provider |
+| `SamlIdentityProviderId` | Guid? (FK) | Reference to SAML identity provider used for this user |
 | `CreatedAt` | DateTimeOffset | Account creation timestamp |
 | `UpdatedAt` | DateTimeOffset | Last profile update timestamp |
 
@@ -174,9 +180,11 @@ Represents an authenticated user in the system.
 - One-to-many with `DmChannelMember` (DM conversations the user participates in)
 - One-to-many with `DirectMessage` (DM messages authored by the user)
 - One-to-many with `ServerInvite` (invites created by the user, via `CreatedInvites`)
+- One-to-many with `PushSubscription` (push notification subscriptions)
+- Many-to-one with `SamlIdentityProvider` (optional SAML IdP link)
 
 **Notes:**
-- `GoogleSubject` is the primary link to Google identity
+- Identity linked via `GoogleSubject`, `GitHubSubject`, `DiscordSubject`, or `SamlNameId` depending on auth method
 - Auto-created on first sign-in
 - Profile fields (DisplayName, Email, AvatarUrl) updated on each sign-in
 - `Nickname` is user-chosen and persists across sign-ins; effective display name resolves as `Nickname ?? DisplayName`
@@ -442,6 +450,183 @@ public enum LinkPreviewStatus
 - Only previews with `Status = Success` are returned to clients
 - SSRF-safe: URL validation + DNS rebinding check via `SocketsHttpHandler.ConnectCallback`
 
+#### BannedMember
+Record of a user banned from a server.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `ServerId` | Guid (PK, FK) | Reference to Server |
+| `UserId` | Guid (PK, FK) | Reference to banned User |
+| `BannedByUserId` | Guid (FK) | Reference to User who performed the ban |
+| `Reason` | string? | Optional ban reason |
+| `BannedAt` | DateTimeOffset | When the ban was issued (default: UtcNow) |
+
+**Composite Primary Key:** (`ServerId`, `UserId`)
+
+**Relationships:**
+- Many-to-one with `Server`
+- Many-to-one with `User` (as banned user)
+- Many-to-one with `User` (as banning actor)
+
+**Notes:**
+- Banned users are checked when attempting to join via invite codes (returns 403)
+- Unbanning deletes the record entirely
+
+#### ServerRoleEntity
+Custom role with granular permissions for a server.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique role identifier |
+| `ServerId` | Guid (FK) | Reference to Server |
+| `Name` | string | Role display name (e.g., "Moderator") |
+| `Color` | string? | Hex color for role badge (e.g., "#f0b232") |
+| `Position` | int | Hierarchy position (lower = higher rank; Owner=0, @everyone=last) |
+| `Permissions` | Permission (bigint) | Bitmask of granted permissions |
+| `IsSystemRole` | bool | `true` for Owner/Admin/Member/@everyone (immutable) |
+| `IsHoisted` | bool | Display role members separately in sidebar |
+| `IsMentionable` | bool | Can be @mentioned by other members |
+| `CreatedAt` | DateTimeOffset | Role creation timestamp |
+
+**Relationships:**
+- Many-to-one with `Server`
+- Many-to-many with `ServerMember`
+
+**Notes:**
+- System roles are created automatically when a server is created
+- Position determines hierarchy: users can only manage roles below their highest role position
+- The `@everyone` role is the default for all members and is always the lowest position
+
+#### Permission (Flags Enum)
+Granular permission flags stored as a bitmask (`bigint` in PostgreSQL).
+
+```csharp
+[Flags]
+public enum Permission : long
+{
+    None = 0,
+    // General (bits 0-7)
+    ViewChannels     = 1L << 0,
+    ManageChannels   = 1L << 1,
+    ManageServer     = 1L << 2,
+    ManageRoles      = 1L << 3,
+    ManageEmojis     = 1L << 4,
+    ViewAuditLog     = 1L << 5,
+    CreateInvites    = 1L << 6,
+    ManageInvites    = 1L << 7,
+    // Membership (bits 10-11)
+    KickMembers      = 1L << 10,
+    BanMembers       = 1L << 11,
+    // Messages (bits 20-26)
+    SendMessages     = 1L << 20,
+    EmbedLinks       = 1L << 21,
+    AttachFiles      = 1L << 22,
+    AddReactions     = 1L << 23,
+    MentionEveryone  = 1L << 24,
+    ManageMessages   = 1L << 25,
+    PinMessages      = 1L << 26,
+    // Voice (bits 30-33)
+    Connect          = 1L << 30,
+    Speak            = 1L << 31,
+    MuteMembers      = 1L << 32,
+    DeafenMembers    = 1L << 33,
+    // Special
+    Administrator    = 1L << 40   // Grants every permission, bypasses all checks
+}
+```
+
+**Defaults:**
+- `AdminDefaults` — 19 permissions (all except BanMembers, plus Administrator)
+- `MemberDefaults` — 8 permissions (ViewChannels, SendMessages, EmbedLinks, AttachFiles, AddReactions, CreateInvites, Connect, Speak)
+
+#### Webhook
+Outgoing webhook configuration scoped to a server.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique webhook identifier |
+| `ServerId` | Guid (FK) | Reference to Server |
+| `Name` | string | Human-readable webhook name |
+| `Url` | string | HTTP POST endpoint URL |
+| `Secret` | string? | Optional HMAC-SHA256 signing secret |
+| `EventTypes` | string | Comma-separated subscribed event types |
+| `IsActive` | bool | Whether the webhook is currently receiving events |
+| `CreatedByUserId` | Guid (FK) | Reference to User who created the webhook |
+| `CreatedAt` | DateTimeOffset | Webhook creation timestamp |
+
+**Relationships:**
+- Many-to-one with `Server`
+- Many-to-one with `User` (as creator)
+- One-to-many with `WebhookDeliveryLog`
+
+**WebhookEventType Enum:**
+```csharp
+public enum WebhookEventType
+{
+    MessageCreated, MessageUpdated, MessageDeleted,
+    MemberJoined, MemberLeft, MemberRoleChanged,
+    ChannelCreated, ChannelUpdated, ChannelDeleted
+}
+```
+
+#### WebhookDeliveryLog
+Record of each webhook delivery attempt.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique log entry identifier |
+| `WebhookId` | Guid (FK) | Reference to Webhook |
+| `EventType` | string | Event that triggered delivery |
+| `Payload` | string | JSON payload sent |
+| `StatusCode` | int? | HTTP response code (`null` if request failed) |
+| `ErrorMessage` | string? | Error description if delivery failed |
+| `Success` | bool | `true` if 2xx status code received |
+| `Attempt` | int | Retry attempt number (1 = first try) |
+| `CreatedAt` | DateTimeOffset | Delivery attempt timestamp |
+
+**Relationships:**
+- Many-to-one with `Webhook` (cascade delete)
+
+#### PushSubscription
+Web Push API subscription for browser push notifications.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique subscription identifier |
+| `UserId` | Guid (FK) | Reference to User |
+| `Endpoint` | string | Push service URL |
+| `P256dh` | string | Client public key (Base64-URL encoded) |
+| `Auth` | string | Shared auth secret (Base64-URL encoded) |
+| `IsActive` | bool | `false` when push service returns 410 Gone |
+| `CreatedAt` | DateTime | Subscription creation timestamp |
+
+**Relationships:**
+- Many-to-one with `User`
+
+**Notes:**
+- Duplicate endpoint detection: re-activates existing subscription if endpoint matches
+- Notifications sent for DMs, @mentions, and friend requests
+
+#### SamlIdentityProvider
+SAML 2.0 identity provider configuration for SSO.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | Guid (PK) | Unique IdP identifier |
+| `EntityId` | string | IdP entity ID (e.g., `https://idp.example.com/saml/metadata`) |
+| `DisplayName` | string | Shown on the login page |
+| `SingleSignOnUrl` | string | IdP SSO URL for HTTP-Redirect binding |
+| `CertificatePem` | string | PEM-encoded X.509 certificate for verifying SAML response signatures |
+| `IsEnabled` | bool | Whether this IdP is active and usable for sign-in |
+| `AllowJitProvisioning` | bool | Auto-create user accounts on first SAML sign-in |
+| `CreatedAt` | DateTimeOffset | Configuration creation timestamp |
+| `UpdatedAt` | DateTimeOffset | Last update timestamp |
+
+**Notes:**
+- Users are matched by `SamlNameId` + `SamlIdentityProviderId` on the `User` entity
+- When `AllowJitProvisioning` is `false`, unrecognized users are rejected (admin must pre-create accounts)
+- IdP configuration can be imported from metadata XML via a dedicated admin endpoint
+
 ## Database Context
 
 ```csharp
@@ -459,6 +644,21 @@ public class CodecDbContext : DbContext
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
     public DbSet<ServerInvite> ServerInvites => Set<ServerInvite>();
     public DbSet<LinkPreview> LinkPreviews => Set<LinkPreview>();
+    public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
+    public DbSet<VoiceCall> VoiceCalls => Set<VoiceCall>();
+    public DbSet<CustomEmoji> CustomEmojis => Set<CustomEmoji>();
+    public DbSet<PresenceState> PresenceStates => Set<PresenceState>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ChannelCategory> ChannelCategories => Set<ChannelCategory>();
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+    public DbSet<ChannelNotificationOverride> ChannelNotificationOverrides => Set<ChannelNotificationOverride>();
+    public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
+    public DbSet<SamlIdentityProvider> SamlIdentityProviders => Set<SamlIdentityProvider>();
+    public DbSet<Webhook> Webhooks => Set<Webhook>();
+    public DbSet<WebhookDeliveryLog> WebhookDeliveryLogs => Set<WebhookDeliveryLog>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+    public DbSet<BannedMember> BannedMembers => Set<BannedMember>();
+    public DbSet<ServerRoleEntity> ServerRoles => Set<ServerRoleEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -705,15 +905,22 @@ var messages = await db.Messages
 ## Future Schema Changes
 
 ### Near-term Additions
-- ~~Link preview metadata~~ → ✅ implemented (`LinkPreview` entity)
 - File attachments metadata (non-image files)
-- User preferences/settings
+
+### Recently Implemented
+- ~~Link preview metadata~~ → ✅ `LinkPreview` entity
+- ~~Voice channel metadata~~ → ✅ `VoiceState`, `VoiceCall` entities
+- ~~Custom roles and permissions~~ → ✅ `ServerRoleEntity`, `Permission` flags enum
+- ~~Audit logs~~ → ✅ `AuditLogEntry` entity (21 action types, 90-day retention)
+- ~~Message search indexes~~ → ✅ PostgreSQL trigram indexes (`pg_trgm`)
+- ~~User preferences/settings~~ → ✅ `ChannelNotificationOverride`, `StatusText`, `StatusEmoji`
+- Banning → ✅ `BannedMember` entity
+- Webhooks → ✅ `Webhook`, `WebhookDeliveryLog` entities
+- Push notifications → ✅ `PushSubscription` entity
+- SAML SSO → ✅ `SamlIdentityProvider` entity
+- OAuth providers → ✅ `GitHubSubject`, `DiscordSubject` on User
 
 ### Long-term Additions
-- Voice channel metadata
-- Custom roles and permissions
-- Audit logs
-- Message search indexes (full-text)
 - Analytics and metrics tables
 
 ## Backup and Recovery

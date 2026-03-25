@@ -74,20 +74,22 @@ For full setup details, see [Development Setup](docs/DEV_SETUP.md).
 
 ## Features
 
-- **Servers & channels** — create servers, invite members, manage roles (Owner/Admin/Member), organize conversations into channels
-- **Real-time messaging** — instant delivery via SignalR WebSockets with typing indicators, @mentions, message replies, editing, deletion, and text formatting
+- **Servers & channels** — create servers, invite members, custom roles with granular permissions, organize conversations into channels with categories
+- **Real-time messaging** — instant delivery via SignalR WebSockets with typing indicators, @mentions, message replies, editing, deletion, text formatting, and message search
 - **Direct messages** — 1:1 private conversations with unread badges
-- **Voice** — voice channels in servers (mediasoup SFU) and 1:1 DM calls with ringing/accept/decline flow
-- **Rich media** — image uploads, emoji reactions, link previews with Open Graph metadata, inline YouTube embeds
-- **User profiles** — nicknames, custom avatars with server-specific overrides, friends system with real-time notifications
+- **Voice & video** — voice channels in servers (mediasoup SFU), 1:1 DM calls with ringing/accept/decline flow, video chat, and screen sharing
+- **Rich media** — image uploads, emoji reactions, custom server emojis, link previews with Open Graph metadata, inline YouTube embeds
+- **User profiles** — nicknames, custom status messages, custom avatars with server-specific overrides, friends system with real-time notifications
+- **Moderation** — user banning with message purge, custom roles with 21 granular permissions, audit log with 90-day retention
+- **Integrations** — outgoing webhooks with HMAC-SHA256 signing, web push notifications
 - **PWA** — installable on desktop and mobile with offline fallback, app shortcuts, and share target
-- **Google Sign-In** — stateless JWT authentication with automatic silent token refresh
+- **Authentication** — Google Sign-In, email/password, GitHub OAuth, Discord OAuth, and SAML 2.0 SSO
 
 For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and system design, see [Architecture](docs/ARCHITECTURE.md).
 
 ## Testing
 
-Codec has 561 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
+Codec has 582 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
 
 ```bash
 # Web tests (Vitest)

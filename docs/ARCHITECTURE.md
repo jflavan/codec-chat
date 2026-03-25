@@ -401,6 +401,42 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 #### Bug Reports
 - `POST /issues` - Submit a bug report (requires auth; proxied to GitHub Issues API with `user-report` label; returns `{ issueUrl }`; 501 if GitHub token not configured; 502 on upstream failure)
 
+#### Bans
+- `POST /servers/{serverId}/bans/{targetUserId}` - Ban a member from the server (requires Owner, Admin, or custom role with BanMembers permission; optional `deleteMessageDays` to purge recent messages; broadcasts `BannedFromServer` and `MemberBanned` via SignalR; audit logged)
+- `DELETE /servers/{serverId}/bans/{targetUserId}` - Unban a member (requires Owner, Admin, or custom role with BanMembers permission)
+- `GET /servers/{serverId}/bans` - List banned members (requires Owner, Admin, or Global Admin; returns user info, reason, banned-by, and timestamp)
+
+#### Custom Roles
+- `GET /servers/{serverId}/roles` - List all roles for a server ordered by position (requires membership)
+- `POST /servers/{serverId}/roles` - Create a custom role (requires Owner, Admin, or ManageRoles permission; returns new role with default permissions)
+- `PATCH /servers/{serverId}/roles/{roleId}` - Update role name, color, permissions, hoisted/mentionable flags (requires ManageRoles permission; cannot edit roles above your own position)
+- `DELETE /servers/{serverId}/roles/{roleId}` - Delete a custom role (requires ManageRoles permission; system roles cannot be deleted)
+- `PUT /servers/{serverId}/roles/order` - Bulk update role positions (requires ManageRoles permission)
+- `PUT /servers/{serverId}/members/{userId}/roles` - Assign roles to a member (requires ManageRoles permission)
+
+#### Webhooks
+- `GET /servers/{serverId}/webhooks` - List webhooks for a server (requires Owner, Admin, or ManageServer permission)
+- `POST /servers/{serverId}/webhooks` - Create a webhook (requires ManageServer permission; body includes name, url, optional secret, and event types)
+- `PATCH /servers/{serverId}/webhooks/{webhookId}` - Update a webhook configuration
+- `DELETE /servers/{serverId}/webhooks/{webhookId}` - Delete a webhook and its delivery logs
+
+#### Push Notifications
+- `GET /push-subscriptions/vapid-key` - Get VAPID public key for Web Push API (public, no auth)
+- `POST /push-subscriptions` - Register or re-activate a push subscription (endpoint, p256dh, auth keys)
+- `DELETE /push-subscriptions` - Unsubscribe from push notifications
+
+#### SAML SSO
+- `GET /auth/saml/providers` - List enabled SAML IdPs (public)
+- `GET /auth/saml/login/{idpId}` - SP-initiated SSO redirect to IdP
+- `POST /auth/saml/acs` - Assertion Consumer Service callback
+- `GET /auth/saml/metadata` - SP metadata XML
+- Admin CRUD for IdP configuration (global admin only)
+
+#### OAuth
+- `POST /auth/oauth/github` - GitHub OAuth callback (exchange authorization code)
+- `POST /auth/oauth/discord` - Discord OAuth callback (exchange authorization code)
+- `GET /auth/oauth/config` - Get enabled OAuth providers and client IDs (public)
+
 #### Image Uploads
 - `POST /uploads/images` - Upload an image file (multipart/form-data; JPEG, PNG, WebP, GIF; 10 MB max; returns `{ imageUrl }`)
 
@@ -474,6 +510,8 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `CallDeclined` | `{ callId }` | Call was declined by the recipient (sent to caller's user group) |
 | `CallEnded` | `{ callId }` | Call was ended by either party (sent to both participants' user groups) |
 | `CallMissed` | `{ callId }` | Call timed out without being answered (sent to caller's user group) |
+| `BannedFromServer` | `{ serverId, serverName, reason }` | User was banned from a server (sent to banned user's user group) |
+| `MemberBanned` | `{ serverId, userId }` | A member was banned (sent to server group; triggers member list refresh) |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -582,10 +620,12 @@ Content-Type: application/json
 User ────┬──── ServerMember ──── Server ──── ChannelCategory
          │                         │              │
          │                    CustomEmoji     Channel ──────┐
-         │                                        │         │
-         ├──── Message ──────── Channel           │    AuditLogEntry
-         │        │
-         ├──── Reaction ────────┘
+         │                         │                  │         │
+         │                    ServerRoleEntity    │    AuditLogEntry
+         │                         │                  │
+         ├──── Message ──────── Channel           │    BannedMember
+         │        │                                    │
+         ├──── Reaction ────────┘                 Webhook ──── WebhookDeliveryLog
          │        └──── DirectMessage
          │
          ├──── Friendship ──── User
@@ -603,6 +643,10 @@ User ────┬──── ServerMember ──── Server ──── C
          │
          ├──── ChannelNotificationOverride ──── Channel
          │
+         ├──── PushSubscription (Web Push API subscription)
+         │
+         ├──── SamlIdentityProvider (SAML IdP link)
+         │
          └──── PresenceState (transient; one per connection)
 
 Message ───────┐
@@ -614,8 +658,8 @@ DirectMessage ─┘
 
 #### User
 - Internal representation of authenticated users
-- Linked to Google identity via `GoogleSubject`
-- Fields: Id, GoogleSubject, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath, IsGlobalAdmin
+- Linked to identity providers via `GoogleSubject`, `GitHubSubject`, `DiscordSubject`, or `SamlNameId`
+- Fields: Id, GoogleSubject, GitHubSubject, DiscordSubject, SamlNameId, SamlIdentityProviderId, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath, IsGlobalAdmin, StatusText (nullable, max 128), StatusEmoji (nullable, max 8)
 - Effective display name: `Nickname ?? DisplayName`
 - `IsGlobalAdmin` grants platform-wide privileges (full access to all servers — read, post, react, manage channels/invites, delete any server/channel/message, kick any member)
 
@@ -724,6 +768,48 @@ DirectMessage ─┘
 - Fetched asynchronously by `LinkPreviewService` after message posting; delivered to clients via `LinkPreviewsReady` SignalR event
 - Metadata cached in Redis by URL hash (`linkpreview:{SHA256}`) with 1-hour TTL; failed fetches cached too to avoid re-hitting broken URLs
 - SSRF protection: private IP blocking, DNS rebinding prevention via `SocketsHttpHandler.ConnectCallback`, redirect limiting
+
+#### BannedMember
+- Record of a user banned from a server
+- Composite primary key: (ServerId, UserId)
+- Fields: ServerId (FK → Server), UserId (FK → User), BannedByUserId (FK → User), Reason (nullable string), BannedAt
+- Banned users are prevented from re-joining via invite codes
+
+#### ServerRoleEntity
+- Custom role with granular permissions for a server
+- Fields: Id, ServerId (FK → Server), Name, Color (nullable hex string), Position (hierarchy ordering), Permissions (Permission bitmask), IsSystemRole, IsHoisted, IsMentionable, CreatedAt
+- System roles (Owner, Admin, Member, @everyone) are created automatically and cannot be deleted
+- Lower position = higher rank in the hierarchy
+
+#### Permission (Flags Enum)
+- 21 granular permission flags stored as a bitmask (bigint):
+  - General: ViewChannels, ManageChannels, ManageServer, ManageRoles, ManageEmojis, ViewAuditLog, CreateInvites, ManageInvites
+  - Membership: KickMembers, BanMembers
+  - Messages: SendMessages, EmbedLinks, AttachFiles, AddReactions, MentionEveryone, ManageMessages, PinMessages
+  - Voice: Connect, Speak, MuteMembers, DeafenMembers
+  - Special: Administrator (bypasses all permission checks)
+
+#### Webhook
+- Outgoing webhook configuration scoped to a server
+- Fields: Id, ServerId (FK → Server), Name, Url, Secret (nullable, HMAC-SHA256 signing), EventTypes (comma-separated), IsActive, CreatedByUserId (FK → User), CreatedAt
+- Event types: MessageCreated, MessageUpdated, MessageDeleted, MemberJoined, MemberLeft, MemberRoleChanged, ChannelCreated, ChannelUpdated, ChannelDeleted
+- Background dispatch with retry (exponential backoff: 5s, 30s, 5m); delivery logged via `WebhookDeliveryLog`
+
+#### WebhookDeliveryLog
+- Record of each webhook delivery attempt
+- Fields: Id, WebhookId (FK → Webhook), EventType, Payload (JSON), StatusCode (nullable), ErrorMessage (nullable), Success, Attempt, CreatedAt
+- One row per attempt; up to 3 attempts per event
+
+#### PushSubscription
+- Web Push API subscription for browser push notifications
+- Fields: Id, UserId (FK → User), Endpoint (push service URL), P256dh (client public key), Auth (shared secret), IsActive, CreatedAt
+- Notifications sent for: DMs, @mentions, friend requests
+- Auto-deactivated when push service returns 410 Gone
+
+#### SamlIdentityProvider
+- SAML 2.0 identity provider configuration
+- Fields: Id, EntityId, DisplayName, SingleSignOnUrl, CertificatePem (X.509 cert for signature verification), IsEnabled, AllowJitProvisioning, CreatedAt, UpdatedAt
+- User entity extended with `SamlNameId` and `SamlIdentityProviderId` for SAML user matching
 
 ## Configuration
 

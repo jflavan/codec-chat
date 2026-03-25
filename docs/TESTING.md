@@ -6,11 +6,11 @@ Codec uses a multi-layer testing strategy combining unit tests and integration t
 
 | Suite | Framework | Tests | Coverage Target |
 |-------|-----------|-------|----------------|
-| API Unit Tests | xUnit + FluentAssertions + Moq | 278 | Services: 95%+ |
+| API Unit Tests | xUnit + FluentAssertions + Moq | 296 | Services: 95%+ |
 | API Integration Tests | xUnit + WebApplicationFactory + Testcontainers | 109 | Controllers + Hub: 72%+ |
-| Web Unit Tests | Vitest + jsdom | 174 | Utilities + API client: 98%+ |
+| Web Unit Tests | Vitest + jsdom | 177 | Utilities + API client: 98%+ |
 
-**Total: 561 tests**
+**Total: 582 tests**
 
 ## Running Tests
 

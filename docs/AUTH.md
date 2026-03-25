@@ -1,15 +1,18 @@
 # Authentication
 
-This document explains how authentication works in Codec, which supports both Google Sign-In and email/password registration.
+This document explains how authentication works in Codec, which supports Google Sign-In, email/password registration, GitHub and Discord OAuth, and SAML 2.0 SSO.
 
 ## Overview
 
-Codec supports **two authentication methods** with equivalent security guarantees:
+Codec supports **five authentication methods** with equivalent security guarantees:
 
 1. **Google Sign-In** — Stateless authentication using Google-issued ID tokens validated on every API request.
 2. **Email/Password** — Registration and login with bcrypt password hashing; the API issues its own signed JWTs (access tokens + refresh tokens).
+3. **GitHub OAuth** — Authorization code flow; API exchanges code for GitHub access token, fetches user profile and email.
+4. **Discord OAuth** — Authorization code flow; API exchanges code for Discord access token, fetches user profile and avatar.
+5. **SAML 2.0 SSO** — SP-initiated login with HTTP-Redirect binding; IdP-signed SAML assertions validated by the API.
 
-Both methods use the same JWT-based authorization middleware in the API and produce access tokens with identical claims shapes. All authenticated API requests use `Authorization: Bearer <token>`, regardless of how the token was obtained.
+All methods use the same JWT-based authorization middleware in the API and produce access tokens with identical claims shapes. All authenticated API requests use `Authorization: Bearer <token>`, regardless of how the token was obtained.
 
 The web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week** (Google session limit or refresh-token lifetime).
 
@@ -377,6 +380,146 @@ Email verification is required for all email/password registrations (hard gate):
 - Exempt endpoints: `/auth/*`, `/me`, `/auth/refresh`, `/auth/logout`
 - In development, verification emails are logged to the console via `ConsoleEmailSender`
 - In production, emails are sent via Azure Communication Services (`AzureEmailSender`)
+
+## GitHub OAuth
+
+### Flow (`POST /auth/oauth/github`)
+
+1. Frontend redirects user to GitHub's authorization URL with the configured client ID.
+2. GitHub redirects back with an authorization code.
+3. Frontend sends the code to `POST /auth/oauth/github`.
+4. API exchanges the code for an access token via GitHub's token endpoint.
+5. API fetches the user's profile (`GET https://api.github.com/user`) and primary email (`GET https://api.github.com/user/emails`, includes private emails).
+6. User is matched by `GitHubSubject` (GitHub user ID). If no match, a new user is created or linked to an existing email/password account.
+7. API issues access + refresh token pair (same as email/password flow).
+
+### Configuration
+
+```json
+{
+  "OAuth": {
+    "GitHub": {
+      "ClientId": "<github-oauth-app-client-id>",
+      "ClientSecret": "<github-oauth-app-client-secret>",
+      "Enabled": true
+    }
+  }
+}
+```
+
+---
+
+## Discord OAuth
+
+### Flow (`POST /auth/oauth/discord`)
+
+1. Frontend redirects user to Discord's authorization URL with the configured client ID.
+2. Discord redirects back with an authorization code.
+3. Frontend sends the code to `POST /auth/oauth/discord`.
+4. API exchanges the code for an access token via Discord's token endpoint.
+5. API fetches the user's profile (`GET https://discord.com/api/users/@me`), including email and avatar.
+6. User is matched by `DiscordSubject` (Discord user ID). If no match, a new user is created or linked to an existing email/password account.
+7. API issues access + refresh token pair.
+
+### Configuration
+
+```json
+{
+  "OAuth": {
+    "Discord": {
+      "ClientId": "<discord-application-client-id>",
+      "ClientSecret": "<discord-application-client-secret>",
+      "Enabled": true
+    }
+  }
+}
+```
+
+---
+
+## OAuth Provider Discovery
+
+`GET /auth/oauth/config` (public, no auth) returns which OAuth providers are enabled:
+
+```json
+{
+  "github": { "enabled": true, "clientId": "..." },
+  "discord": { "enabled": true, "clientId": "..." }
+}
+```
+
+The frontend uses this to show/hide OAuth buttons on the login page.
+
+---
+
+## SAML 2.0 SSO
+
+### Overview
+
+Codec supports SP-initiated SAML 2.0 single sign-on for enterprise identity providers (Okta, Microsoft Entra ID, etc.). SAML IdPs are configured per-instance (not per-server) by global admins.
+
+### Flow
+
+1. User clicks an IdP button on the login page (IdPs listed via `GET /auth/saml/providers`).
+2. Frontend navigates to `GET /auth/saml/login/{idpId}`.
+3. API generates an `AuthnRequest` with Deflate compression and redirects to the IdP's SSO URL (HTTP-Redirect binding).
+4. A correlation cookie stores the SAML request ID for response validation.
+5. User authenticates at the IdP.
+6. IdP POSTs a SAML Response to `POST /auth/saml/acs` (Assertion Consumer Service).
+7. API validates the response:
+   - XML signature verification using the IdP's X.509 certificate (PEM-encoded in `SamlIdentityProvider.CertificatePem`).
+   - `InResponseTo` matches the stored request ID from the correlation cookie.
+   - Assertion `Conditions` (NotBefore, NotOnOrAfter) are checked.
+   - `Audience` matches the SP entity ID.
+8. User is matched by `SamlNameId` + `SamlIdentityProviderId`. If no match and `AllowJitProvisioning` is enabled, a new user is created (JIT provisioning).
+9. API issues access + refresh token pair and redirects to the frontend with tokens.
+
+### Data Model
+
+```csharp
+public class SamlIdentityProvider
+{
+    public Guid Id { get; set; }
+    public string EntityId { get; set; }           // IdP entity ID
+    public string DisplayName { get; set; }         // Shown on login page
+    public string SingleSignOnUrl { get; set; }     // IdP SSO URL
+    public string CertificatePem { get; set; }      // X.509 cert for signature verification
+    public bool IsEnabled { get; set; }             // Active and usable
+    public bool AllowJitProvisioning { get; set; }  // Auto-create accounts
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+```
+
+User entity extended with:
+- `SamlNameId` (string?) — persistent NameID from the IdP
+- `SamlIdentityProviderId` (Guid?) — FK to `SamlIdentityProvider`
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/auth/saml/providers` | Public | List enabled IdPs (display name + ID) |
+| `GET` | `/auth/saml/login/{idpId}` | Public | SP-initiated SSO redirect |
+| `POST` | `/auth/saml/acs` | Public | Assertion Consumer Service (callback) |
+| `GET` | `/auth/saml/metadata` | Public | SP metadata XML |
+| `POST` | `/auth/saml/idps` | Global Admin | Create IdP configuration |
+| `PUT` | `/auth/saml/idps/{id}` | Global Admin | Update IdP configuration |
+| `DELETE` | `/auth/saml/idps/{id}` | Global Admin | Delete IdP configuration |
+| `POST` | `/auth/saml/idps/import-metadata` | Global Admin | Import IdP from metadata XML |
+
+### Configuration
+
+```json
+{
+  "Saml": {
+    "SpEntityId": "https://codec-chat.com",
+    "SpAcsUrl": "https://api.codec-chat.com/auth/saml/acs"
+  }
+}
+```
+
+---
 
 ## Production Recommendations
 

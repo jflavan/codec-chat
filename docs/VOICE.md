@@ -10,7 +10,7 @@ This document describes the **Voice Channels** feature for Codec — real-time a
 | Phase 2 | Deafen, per-user volume, push-to-talk | ✅ Complete |
 | Phase 3 | Direct voice calls from DMs | ✅ Complete |
 | Phase 4 | Voice infrastructure (Azure VM, Docker Compose, CI/CD) | ✅ Complete |
-| Phase 5 | Video chat and screen sharing | 🔮 Future |
+| Phase 5 | Video chat and screen sharing | ✅ Complete |
 
 ---
 
@@ -279,7 +279,6 @@ Required GitHub Actions secrets: `VOICE_VM_HOST`, `VOICE_VM_SSH_KEY`, `VOICE_SFU
 
 ### Known Limitations
 
-- Audio only (no video, no screen sharing)
 - Single worker per SFU process (scales to ~500 concurrent participants before needing horizontal scaling)
 - No TURN credential rotation (TURN secret is static)
 
@@ -445,3 +444,45 @@ Added to `DirectMessage` entity. System messages with `MessageType = VoiceCallEv
 Voice call events are persisted as `DirectMessage` records with `MessageType = VoiceCallEvent`:
 - **Missed call** (body: `"missed"`): shown as "Missed voice call" with phone icon
 - **Completed call** (body: `"call:{seconds}"`): shown as "Voice call — {formatted duration}"
+
+---
+
+## Phase 5: Video Chat and Screen Sharing
+
+### Overview
+
+Video and screen sharing extend the existing mediasoup SFU architecture with additional producer/consumer tracks for video and screen capture streams.
+
+### Data Model Changes
+
+`VoiceState` entity extended with:
+- `IsVideoEnabled` (bool) — whether the user's webcam is active
+- `IsScreenSharing` (bool) — whether the user is sharing their screen
+- `VideoProducerId` (string?) — mediasoup producer ID for the video track
+- `ScreenProducerId` (string?) — mediasoup producer ID for the screen track
+
+### Frontend Components
+
+| File | Description |
+|------|-------------|
+| `src/lib/components/voice/VideoTile.svelte` | Individual video tile rendering (camera or screen share) |
+| `src/lib/components/voice/VideoGrid.svelte` | Responsive grid layout for multiple video tiles |
+| `src/lib/services/voice-service.ts` | `videoProducer` and `screenProducer` management; `getDisplayMedia()` for screen capture |
+
+### How It Works
+
+**Video:**
+1. User enables camera — `VoiceService` creates a video producer via mediasoup
+2. `IsVideoEnabled` state is broadcast via SignalR to other participants
+3. Other participants consume the video track and render it in `VideoTile`
+4. Disabling camera pauses the producer and updates state
+
+**Screen Sharing:**
+1. User clicks screen share — `navigator.mediaDevices.getDisplayMedia()` prompts for screen/window selection
+2. A separate screen producer is created (distinct from the video producer)
+3. `IsScreenSharing` state is broadcast; other participants consume and display the screen track
+4. When the user stops sharing (or the browser's sharing indicator is dismissed), the producer is closed
+
+### TURN Credentials
+
+Voice connections use time-limited TURN credentials generated via HMAC-SHA256 with a 1-hour validity window, enabling WebRTC connectivity through firewalls and NAT.

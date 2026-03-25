@@ -82,11 +82,19 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **DM reactions** — Reaction entity extended with nullable DirectMessageId (mutual exclusivity constraint with MessageId) to support emoji reactions on direct messages
 - **.NET Aspire AppHost** — single-command local dev orchestration (Postgres, Redis, Azurite, API, Web) with dashboard at `https://localhost:17222`
 - **OpenTelemetry observability** — `Codec.ServiceDefaults` shared project with distributed traces, metrics, and structured logs; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard; SFU instrumented with custom spans on room/transport/producer/consumer operations; Application Insights Bicep module wired to API container app; CD pipeline passes connection string to voice VM
-- **Testing** — 448 automated tests (205 API unit, 109 API integration, 134 web); API core services at 95%+ coverage; web unit-testable code at 98%+ coverage; integration tests use Testcontainers for disposable Postgres/Redis; see [TESTING.md](docs/TESTING.md)
+- **Testing** — 582 automated tests (296 API unit, 109 API integration, 177 web); API core services at 95%+ coverage; web unit-testable code at 98%+ coverage; integration tests use Testcontainers for disposable Postgres/Redis; see [TESTING.md](docs/TESTING.md)
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
 - **Message pinning** — `PinnedMessage` entity with unique `(ChannelId, MessageId)` index; pin/unpin/list endpoints in `ChannelsController` (Owner/Admin/GlobalAdmin, 50-pin limit); `PinNotification` system messages; `MessagePinned`/`MessageUnpinned` SignalR events; audit logging (`MessagePinned`/`MessageUnpinned` actions); frontend pin button in action bar, pin indicator on messages, slide-in pinned messages panel with unpin controls, reactive pin state in `AppState`
+- **Custom roles and granular permissions** — `ServerRoleEntity` with 21 `Permission` flags (bitmask); role hierarchy with position ordering; system roles (Owner, Admin, Member, @everyone) + custom roles; full CRUD via `RolesController`; role management UI with permission editor; role badges with custom colors; `IsMentionable` and `IsHoisted` options
+- **User banning** — `BannedMember` entity with reason and actor tracking; ban/unban/list endpoints; ban check on invite join; optional message purge on ban; real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management tab in server settings
+- **Video chat and screen sharing** — Voice Phase 5 complete; webcam video and screen sharing via mediasoup video/screen producers; `IsVideoEnabled` and `IsScreenSharing` state per participant; `VideoTile` and `VideoGrid` components; `getDisplayMedia()` for screen capture
+- **Outgoing webhooks** — `Webhook` entity with per-server config (name, URL, secret, event types); `WebhookDeliveryLog` for delivery tracking; background dispatch with exponential backoff retry (5s, 30s, 5m); HMAC-SHA256 payload signing; 9 event types
+- **Web push notifications** — `PushSubscription` entity with VAPID keys; subscribe/unsubscribe endpoints; notifications for DMs, @mentions, and friend requests; auto-deactivation on 410 Gone
+- **SAML 2.0 SSO** — `SamlIdentityProvider` entity; SP-initiated login with HTTP-Redirect binding; XML signature verification; JIT user provisioning; admin CRUD for IdP management; metadata import
+- **GitHub and Discord OAuth** — authorization code exchange; user profile fetching; `GitHubSubject`/`DiscordSubject` on User entity; account linking to existing accounts; `GET /auth/oauth/config` for provider discovery
+- **Status messages** — per-user `StatusText` (128 char) and `StatusEmoji` (8 char) fields; displayed in member lists and profiles
 
 ## Task breakdown: Session Persistence
 
@@ -1211,25 +1219,27 @@ Add email/password registration as a second auth method alongside Google Sign-In
 ## Next steps
 - Update Google OAuth console: add `https://codec-chat.com` as authorized JavaScript origin
 - Azure Monitor alerts (container restarts, 5xx rate, DB CPU)
+- Container image vulnerability scanning (Trivy or Microsoft Defender)
+- Image proxying (rewrite external image URLs through API to prevent IP leakage)
+- File uploads for non-image documents
+- API documentation (Swagger/OpenAPI)
+
+## Completed (previously planned)
 - ~~Add richer validation and error surfaces in UI~~ (implemented: authorization helpers, global ProblemDetails exception handler, DataAnnotations on request DTOs, frontend ProblemDetails parsing, character counters on form inputs)
 - ~~Presence indicators (online/offline/away)~~ (implemented: hybrid client+server heartbeat detection; PresenceTracker in-memory singleton with ConcurrentDictionary; PresenceBackgroundService for idle/offline scanning; PresenceState DB table; multi-tab support; push-based UserPresenceChanged SignalR events; PresenceDot component on member sidebar and DM list; online-first member sorting)
 - ~~Light mode theme toggle~~ (implemented: 4-theme system — Phosphor Green, Midnight, Ember, Light — with Appearance settings, localStorage persistence, flash prevention)
 - ~~Mobile slide-out navigation for server/channel sidebars~~ (implemented: left drawer for servers/channels, right drawer for members, hamburger buttons in chat headers, slide animations with backdrop dismiss)
-- ~~Comprehensive unit and integration tests~~ (implemented: 448 tests across 3 suites; CI pipeline runs all tests on every PR)
-- Container image vulnerability scanning (Trivy or Microsoft Defender)
-- Voice Phase 2: deafen, per-user volume, push-to-talk
-- Voice mobile controls: tap/click + responsive UserActionSheet (desktop popup / mobile bottom sheet) for per-user volume controls (completed)
-- Voice Phase 3: 1:1 DM voice calls (completed)
-  - VoiceCall entity with lifecycle management (Ringing → Active → Ended)
-  - SignalR call signaling (StartCall, AcceptCall, DeclineCall, EndCall)
-  - 30-second ringing timeout with automatic missed-call handling
-  - WebRTC transport setup via mediasoup SFU with call-specific room IDs
-  - Incoming call overlay with ring tone, DM call header with elapsed time
-  - System messages for voice call events (missed calls, call duration)
+- ~~Comprehensive unit and integration tests~~ (implemented: 582 tests across 3 suites; CI pipeline runs all tests on every PR)
+- ~~Voice Phase 2~~ (completed: deafen, per-user volume, push-to-talk, responsive UserActionSheet)
+- ~~Voice Phase 3~~ (completed: 1:1 DM voice calls with ringing, timeout, system messages)
+- ~~Voice Phase 5~~ (completed: video chat and screen sharing via mediasoup)
 - ~~Server settings/configuration~~ (implemented: descriptions, channel categories, invite management tab, audit log, notification preferences)
-- Message search (completed)
-  - PostgreSQL trigram indexes (`pg_trgm` extension) on `Messages.Body` and `DirectMessages.Body` for fast ILIKE search
-  - Server search endpoint (`GET /servers/{serverId}/search`) and DM search endpoint (`GET /dm/search`) with filters (channel, author, date range, content type)
-  - Around-message endpoints for jump-to-message navigation
-  - Search panel UI with debounced input, filter bar, paginated results with highlighted matches
-  - Jump-to-message with 2-second highlight animation and smooth scroll
+- ~~Message search~~ (completed: PostgreSQL trigram indexes, server/DM search endpoints, jump-to-message)
+- ~~Custom roles and granular permissions~~ (implemented: ServerRoleEntity with 21 Permission flags, role hierarchy, CRUD endpoints, management UI)
+- ~~User banning~~ (implemented: BannedMember entity, ban/unban endpoints, ban check on join, SignalR events)
+- ~~Outgoing webhooks~~ (implemented: Webhook + WebhookDeliveryLog entities, background dispatch with retry, HMAC-SHA256 signing)
+- ~~Web push notifications~~ (implemented: PushSubscription entity, VAPID keys, notifications for DMs/mentions/friend requests)
+- ~~SAML 2.0 SSO~~ (implemented: SamlIdentityProvider entity, SP-initiated login, assertion validation, JIT provisioning)
+- ~~GitHub OAuth~~ (implemented: authorization code flow, profile/email fetching, account linking)
+- ~~Discord OAuth~~ (implemented: authorization code flow, profile fetching, account linking)
+- ~~Status messages~~ (implemented: StatusText and StatusEmoji fields on User entity)
