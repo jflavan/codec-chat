@@ -9,6 +9,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -53,6 +54,7 @@ public class SamlControllerTests : IDisposable
 
         _controller = new SamlController(
             _db, _samlService, _tokenService, samlSettings, _config,
+            new MemoryCache(new MemoryCacheOptions()),
             Mock.Of<ILogger<SamlController>>());
 
         // Create admin user
@@ -139,6 +141,7 @@ public class SamlControllerTests : IDisposable
         var disabledSettings = Options.Create(new SamlSettings { Enabled = false });
         var controller = new SamlController(
             _db, _samlService, _tokenService, disabledSettings, _config,
+            new MemoryCache(new MemoryCacheOptions()),
             Mock.Of<ILogger<SamlController>>());
 
         var result = await controller.ListProviders();
@@ -190,6 +193,7 @@ public class SamlControllerTests : IDisposable
         var disabledSettings = Options.Create(new SamlSettings { Enabled = false });
         var controller = new SamlController(
             _db, _samlService, _tokenService, disabledSettings, _config,
+            new MemoryCache(new MemoryCacheOptions()),
             Mock.Of<ILogger<SamlController>>());
         controller.ControllerContext = new ControllerContext
         {

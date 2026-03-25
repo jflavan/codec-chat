@@ -228,6 +228,7 @@ builder.Services.AddScoped<OAuthProviderService>();
 
 builder.Services.Configure<Codec.Api.Models.SamlSettings>(builder.Configuration.GetSection("Saml"));
 builder.Services.AddScoped<SamlService>();
+builder.Services.AddMemoryCache();
 
 // Named HTTP client for SFU internal API calls.
 // Attaches the shared internal key header when configured.

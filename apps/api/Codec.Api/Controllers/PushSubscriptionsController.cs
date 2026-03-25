@@ -24,7 +24,11 @@ public class PushSubscriptionsController(CodecDbContext db, IUserService userSer
 
         if (existing is not null)
         {
-            existing.UserId = user.Id;
+            if (existing.UserId != user.Id)
+            {
+                return Conflict(new { error = "This push subscription endpoint is already registered to another user." });
+            }
+
             existing.P256dh = request.P256dh;
             existing.Auth = request.Auth;
             existing.IsActive = true;

@@ -102,15 +102,25 @@ namespace Codec.Api.Migrations
                 name: "Role",
                 table: "ServerMembers");
 
-            // 6. Make RoleId non-nullable now that data is migrated
+            // 6. Safety net: assign any remaining NULL RoleId rows to the Member role
+            migrationBuilder.Sql(@"
+                UPDATE ""ServerMembers"" sm
+                SET ""RoleId"" = sr.""Id""
+                FROM ""ServerRoles"" sr
+                WHERE sm.""RoleId"" IS NULL
+                  AND sr.""ServerId"" = sm.""ServerId""
+                  AND sr.""IsSystemRole"" = true
+                  AND sr.""Name"" = 'Member';
+            ");
+
+            // 7. Make RoleId non-nullable now that data is migrated
             migrationBuilder.AlterColumn<Guid>(
                 name: "RoleId",
                 table: "ServerMembers",
                 type: "uuid",
-                nullable: false,
-                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
+                nullable: false);
 
-            // 7. Add indexes and FK constraint
+            // 8. Add indexes and FK constraint
             migrationBuilder.CreateIndex(
                 name: "IX_ServerMembers_RoleId",
                 table: "ServerMembers",

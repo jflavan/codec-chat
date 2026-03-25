@@ -1,4 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
+using System.Xml;
 using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace Codec.Api.Controllers;
@@ -19,6 +21,7 @@ public class SamlController(
     TokenService tokenService,
     IOptions<SamlSettings> samlSettings,
     IConfiguration configuration,
+    IMemoryCache memoryCache,
     ILogger<SamlController> logger) : ControllerBase
 {
     /// <summary>
@@ -82,7 +85,7 @@ public class SamlController(
 
     /// <summary>
     /// Assertion Consumer Service — receives and validates the SAML response from the IdP.
-    /// On success, redirects to the frontend with access/refresh tokens.
+    /// On success, redirects to the frontend with a short-lived authorization code.
     /// </summary>
     [HttpPost("acs")]
     public async Task<IActionResult> AssertionConsumerService()
@@ -99,6 +102,38 @@ public class SamlController(
             || !Guid.TryParse(idpIdStr, out var idpId))
         {
             return BadRequest(new { error = "Missing SAML session context." });
+        }
+
+        // Validate InResponseTo against the stored request ID
+        if (!Request.Cookies.TryGetValue("saml_request_id", out var expectedRequestId)
+            || string.IsNullOrWhiteSpace(expectedRequestId))
+        {
+            return BadRequest(new { error = "Missing SAML request ID cookie." });
+        }
+
+        // Parse the SAML response to extract InResponseTo
+        string? inResponseTo;
+        try
+        {
+            var responseBytes = Convert.FromBase64String(samlResponse);
+            var doc = new XmlDocument { PreserveWhitespace = true };
+            using var reader = XmlReader.Create(
+                new MemoryStream(responseBytes),
+                new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 1_000_000 });
+            doc.Load(reader);
+            var nsmgr = new XmlNamespaceManager(doc.NameTable);
+            nsmgr.AddNamespace("samlp", "urn:oasis:names:tc:SAML:2.0:protocol");
+            inResponseTo = doc.SelectSingleNode("//samlp:Response", nsmgr)?.Attributes?["InResponseTo"]?.Value;
+        }
+        catch
+        {
+            return BadRequest(new { error = "Failed to parse SAML response." });
+        }
+
+        if (inResponseTo != expectedRequestId)
+        {
+            logger.LogWarning("SAML InResponseTo mismatch: expected {Expected}, got {Got}", expectedRequestId, inResponseTo);
+            return BadRequest(new { error = "SAML response does not match the original request." });
         }
 
         var idp = await db.SamlIdentityProviders
@@ -128,11 +163,50 @@ public class SamlController(
         Response.Cookies.Delete("saml_request_id", new CookieOptions { Path = "/auth/saml" });
         Response.Cookies.Delete("saml_idp_id", new CookieOptions { Path = "/auth/saml" });
 
-        // Redirect to frontend with tokens
+        // Store tokens behind a single-use authorization code (never expose tokens in URL)
+        var code = Guid.NewGuid().ToString("N");
+        var cacheKey = $"saml_code:{code}";
+        memoryCache.Set(cacheKey, new SamlAuthCode
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
+            IsNewUser = isNewUser
+        }, TimeSpan.FromSeconds(60));
+
+        // Redirect to frontend with only the opaque code
         var frontendBaseUrl = configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:5174";
-        var redirectUrl = $"{frontendBaseUrl}/auth/saml/callback?accessToken={Uri.EscapeDataString(accessToken)}&refreshToken={Uri.EscapeDataString(refreshToken)}&isNewUser={isNewUser}";
+        var redirectUrl = $"{frontendBaseUrl}/auth/saml/callback?code={Uri.EscapeDataString(code)}";
 
         return Redirect(redirectUrl);
+    }
+
+    /// <summary>
+    /// Exchanges a single-use SAML authorization code for access and refresh tokens.
+    /// </summary>
+    [HttpPost("exchange")]
+    public IActionResult ExchangeCode([FromBody] SamlExchangeRequest request)
+    {
+        if (!samlSettings.Value.Enabled)
+            return BadRequest(new { error = "SAML SSO is not enabled." });
+
+        if (string.IsNullOrWhiteSpace(request.Code))
+            return BadRequest(new { error = "Missing authorization code." });
+
+        var cacheKey = $"saml_code:{request.Code}";
+        if (!memoryCache.TryGetValue<SamlAuthCode>(cacheKey, out var authCode) || authCode is null)
+        {
+            return BadRequest(new { error = "Invalid or expired authorization code." });
+        }
+
+        // Remove code immediately — single use
+        memoryCache.Remove(cacheKey);
+
+        return Ok(new
+        {
+            accessToken = authCode.AccessToken,
+            refreshToken = authCode.RefreshToken,
+            isNewUser = authCode.IsNewUser
+        });
     }
 
     /// <summary>

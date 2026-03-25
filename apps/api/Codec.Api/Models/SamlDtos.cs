@@ -44,6 +44,22 @@ public record ImportSamlIdpMetadataRequest
     public bool AllowJitProvisioning { get; init; } = true;
 }
 
+public record SamlExchangeRequest
+{
+    [Required]
+    public string Code { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Internal cache entry for the single-use SAML authorization code pattern.
+/// </summary>
+public record SamlAuthCode
+{
+    public required string AccessToken { get; init; }
+    public required string RefreshToken { get; init; }
+    public bool IsNewUser { get; init; }
+}
+
 public record SamlSettings
 {
     /// <summary>

@@ -390,7 +390,7 @@ public class SamlServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetOrCreateSamlUserAsync_EmailMatch_LinksSamlIdentity()
+    public async Task GetOrCreateSamlUserAsync_EmailMatch_ThrowsRequiresExplicitLink()
     {
         var idp = CreateTestIdp();
         _db.SamlIdentityProviders.Add(idp);
@@ -410,13 +410,10 @@ public class SamlServiceTests : IDisposable
             Email = "match@test.com"
         };
 
-        var result = await _service.GetOrCreateSamlUserAsync(assertion, idp);
+        var act = async () => await _service.GetOrCreateSamlUserAsync(assertion, idp);
 
-        result.Should().NotBeNull();
-        result!.Value.isNewUser.Should().BeFalse();
-        result.Value.user.Id.Should().Be(emailUser.Id);
-        result.Value.user.SamlNameId.Should().Be("saml-linked");
-        result.Value.user.SamlIdentityProviderId.Should().Be(idp.Id);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*link*");
     }
 
     [Fact]

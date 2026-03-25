@@ -110,7 +110,7 @@ public class PushSubscriptionsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task Subscribe_ExistingEndpointDifferentUser_ReassignsToCurrentUser()
+    public async Task Subscribe_ExistingEndpointDifferentUser_ReturnsConflict()
     {
         var otherUserId = Guid.NewGuid();
         _db.PushSubscriptions.Add(new Models.PushSubscription
@@ -132,9 +132,9 @@ public class PushSubscriptionsControllerTests : IDisposable
 
         var result = await _controller.Subscribe(request);
 
-        result.Should().BeOfType<OkResult>();
+        result.Should().BeOfType<ConflictObjectResult>();
         var sub = await _db.PushSubscriptions.SingleAsync();
-        sub.UserId.Should().Be(_testUser.Id);
+        sub.UserId.Should().Be(otherUserId); // Should NOT be reassigned
     }
 
     // --- Unsubscribe ---

@@ -265,14 +265,25 @@ public class AuthController(
     }
 
     [HttpPost("link-google")]
+    [Authorize]
     public async Task<IActionResult> LinkGoogle([FromBody] LinkGoogleRequest request)
     {
+        var sub = User.FindFirst("sub")?.Value;
+        if (sub is null || !Guid.TryParse(sub, out var authenticatedUserId))
+            return Unauthorized();
+
         var email = request.Email.Trim().ToLowerInvariant();
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (user is null || user.PasswordHash is null)
         {
             return Unauthorized(new { error = "Invalid email or password." });
+        }
+
+        // Ensure the authenticated user is linking their own account
+        if (user.Id != authenticatedUserId)
+        {
+            return Forbid();
         }
 
         // Check account lockout
@@ -432,18 +443,16 @@ public class AuthController(
 
             if (existingByEmail is not null)
             {
-                // Link the OAuth provider to the existing account
-                if (provider == "github")
-                    existingByEmail.GitHubSubject = userInfo.Subject;
-                else
-                    existingByEmail.DiscordSubject = userInfo.Subject;
-
-                if (existingByEmail.AvatarUrl is null && existingByEmail.CustomAvatarPath is null && userInfo.AvatarUrl is not null)
-                    existingByEmail.AvatarUrl = userInfo.AvatarUrl;
-
-                existingByEmail.UpdatedAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync();
-                user = existingByEmail;
+                // Do NOT auto-link OAuth identity by email match alone — this is an
+                // account-takeover vector if the OAuth provider's email is unverified.
+                // The user must sign in to their existing account first, then link the
+                // OAuth provider through the authenticated link-google / link-oauth endpoint.
+                return Conflict(new
+                {
+                    error = "An account with this email already exists. Please sign in to that account and link your " + provider + " account from settings.",
+                    code = "OAUTH_LINK_REQUIRED",
+                    provider
+                });
             }
         }
 

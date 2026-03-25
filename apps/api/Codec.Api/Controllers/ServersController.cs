@@ -388,7 +388,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
 
-        if (targetMembership?.Role?.Name is "Owner")
+        if (targetMembership?.Role is { IsSystemRole: true, Position: 0 })
         {
             return BadRequest(new { error = "Cannot ban the server owner." });
         }
@@ -452,7 +452,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             var messagesToDelete = await db.Messages
                 .Where(m => channelIds.Contains(m.ChannelId) && m.AuthorUserId == targetUserId)
                 .ToListAsync();
-
             deletedMessageCount = messagesToDelete.Count;
             db.Messages.RemoveRange(messagesToDelete);
         }
@@ -2106,6 +2105,11 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
+        if (!ImageProxyService.IsAllowedUrl(request.Url.Trim()))
+        {
+            return BadRequest(new { error = "Webhook URL is not allowed. URLs must not point to private IPs, localhost, or cloud metadata endpoints." });
+        }
+
         var invalidTypes = request.EventTypes.Where(t => !ValidEventTypes.Contains(t)).ToList();
         if (invalidTypes.Count > 0)
         {
@@ -2210,7 +2214,14 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         if (request.Name is not null) webhook.Name = request.Name.Trim();
-        if (request.Url is not null) webhook.Url = request.Url.Trim();
+        if (request.Url is not null)
+        {
+            if (!ImageProxyService.IsAllowedUrl(request.Url.Trim()))
+            {
+                return BadRequest(new { error = "Webhook URL is not allowed. URLs must not point to private IPs, localhost, or cloud metadata endpoints." });
+            }
+            webhook.Url = request.Url.Trim();
+        }
         if (request.Secret is not null) webhook.Secret = request.Secret;
         if (request.IsActive.HasValue) webhook.IsActive = request.IsActive.Value;
 

@@ -432,7 +432,7 @@ public class AuthControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GitHubCallback_LinksToExistingAccount_ByEmail()
+    public async Task GitHubCallback_ExistingEmail_ReturnsConflict_RequiresExplicitLink()
     {
         var existing = await CreateUserWithPassword("link@test.com", "Pass123!", "Existing");
 
@@ -441,13 +441,10 @@ public class AuthControllerTests : IDisposable
             .ReturnsAsync(new OAuthUserInfo("gh-456", "GH Name", "link@test.com", null));
 
         var result = await _controller.GitHubCallback(new OAuthCallbackRequest { Code = "gh-code" });
-        result.Should().BeOfType<OkObjectResult>();
+        result.Should().BeOfType<ConflictObjectResult>();
 
         await _db.Entry(existing).ReloadAsync();
-        existing.GitHubSubject.Should().Be("gh-456");
-        // Should NOT create a new user
-        var count = await _db.Users.CountAsync(u => u.Email == "link@test.com");
-        count.Should().Be(1);
+        existing.GitHubSubject.Should().BeNull();
     }
 
     [Fact]
@@ -506,7 +503,7 @@ public class AuthControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task DiscordCallback_LinksToExistingAccount_ByEmail()
+    public async Task DiscordCallback_ExistingEmail_ReturnsConflict_RequiresExplicitLink()
     {
         var existing = await CreateUserWithPassword("dclink@test.com", "Pass123!", "Existing");
 
@@ -515,10 +512,10 @@ public class AuthControllerTests : IDisposable
             .ReturnsAsync(new OAuthUserInfo("dc-link", "DC Name", "dclink@test.com", null));
 
         var result = await _controller.DiscordCallback(new OAuthCallbackRequest { Code = "dc-code" });
-        result.Should().BeOfType<OkObjectResult>();
+        result.Should().BeOfType<ConflictObjectResult>();
 
         await _db.Entry(existing).ReloadAsync();
-        existing.DiscordSubject.Should().Be("dc-link");
+        existing.DiscordSubject.Should().BeNull();
     }
 
     // --- OAuth: Config ---

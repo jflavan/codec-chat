@@ -1,11 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Codec.Api.Models;
 
 public record CreateMessageRequest(
-    string Body,
+    [property: StringLength(8000)] string Body,
     string? ImageUrl = null,
-    string? FileUrl = null,
-    string? FileName = null,
+    [property: StringLength(2048)] string? FileUrl = null,
+    [property: StringLength(255)] string? FileName = null,
     long? FileSize = null,
-    string? FileContentType = null,
+    [property: StringLength(255)] string? FileContentType = null,
     Guid? ReplyToMessageId = null,
     Guid? ReplyToDirectMessageId = null);

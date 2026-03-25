@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Codec.Api.Models;
 
 /// <summary>
@@ -8,6 +10,7 @@ public class BanMemberRequest
     /// <summary>
     /// Optional reason for the ban.
     /// </summary>
+    [StringLength(512)]
     public string? Reason { get; set; }
 
     /// <summary>

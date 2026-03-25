@@ -87,6 +87,11 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
         }
 
+        if (trimmed.Length > 32)
+        {
+            return BadRequest(new { error = "Nickname must be between 1 and 32 characters." });
+        }
+
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         appUser.Nickname = trimmed;
         appUser.UpdatedAt = DateTimeOffset.UtcNow;

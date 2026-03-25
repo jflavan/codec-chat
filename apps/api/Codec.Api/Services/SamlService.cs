@@ -110,25 +110,45 @@ public class SamlService(
             return null;
         }
 
-        // Validate XML signature
-        if (!ValidateSignature(doc, idp))
+        // Validate XML signature and get the signed element's Reference URI
+        var signedReferenceUri = ValidateSignature(doc, idp);
+        if (signedReferenceUri is null)
         {
             logger.LogWarning("SAML response signature validation failed for IdP {IdpId}", idp.Id);
             return null;
         }
 
-        // Extract assertion
-        var assertion = doc.SelectSingleNode("//saml:Assertion", nsmgr);
+        // Extract assertion by the ID that was actually signed (prevents XML signature wrapping attacks)
+        XmlNode? assertion;
+        if (signedReferenceUri == "")
+        {
+            // Empty URI means the entire document is signed; select the assertion within it
+            assertion = doc.SelectSingleNode("//saml:Assertion", nsmgr);
+        }
+        else
+        {
+            // The Reference URI is "#<ID>" — select the element with that specific ID attribute
+            var signedId = signedReferenceUri.TrimStart('#');
+            assertion = doc.SelectSingleNode($"//*[@ID='{signedId}']", nsmgr);
+            // If the signed element is the Response, get the Assertion within it
+            if (assertion is not null && assertion.LocalName == "Response")
+                assertion = assertion.SelectSingleNode("saml:Assertion", nsmgr);
+        }
         if (assertion is null)
         {
-            logger.LogWarning("SAML response contains no assertion");
+            logger.LogWarning("SAML response contains no signed assertion");
             return null;
         }
 
-        // Validate audience restriction
+        // Validate audience restriction (required — reject if absent)
         var audience = assertion.SelectSingleNode(
             "saml:Conditions/saml:AudienceRestriction/saml:Audience", nsmgr)?.InnerText;
-        if (audience is not null && audience != SpEntityId)
+        if (audience is null)
+        {
+            logger.LogWarning("SAML assertion is missing required AudienceRestriction element");
+            return null;
+        }
+        if (audience != SpEntityId)
         {
             logger.LogWarning("SAML audience mismatch: expected {Expected}, got {Got}", SpEntityId, audience);
             return null;
@@ -234,19 +254,19 @@ public class SamlService(
             return (existing, false);
         }
 
-        // Try matching by email if the user was created via another auth method
+        // Check for existing account with same email — do NOT auto-link for security.
+        // Users must link their SAML identity through their existing account settings.
         if (assertion.Email is not null)
         {
             var emailNorm = assertion.Email.Trim().ToLowerInvariant();
             var emailUser = await db.Users.FirstOrDefaultAsync(u => u.Email == emailNorm);
             if (emailUser is not null)
             {
-                // Link SAML identity to existing account
-                emailUser.SamlNameId = assertion.NameId;
-                emailUser.SamlIdentityProviderId = idp.Id;
-                emailUser.UpdatedAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync();
-                return (emailUser, false);
+                logger.LogWarning(
+                    "SAML user {NameId} has email {Email} matching existing user {UserId}, but auto-linking is disabled. User must link SAML identity through account settings.",
+                    assertion.NameId, emailNorm, emailUser.Id);
+                throw new InvalidOperationException(
+                    "An account with this email already exists. Please sign in with your existing credentials and link your SAML identity through account settings.");
             }
         }
 
@@ -398,7 +418,12 @@ public class SamlService(
             """;
     }
 
-    private bool ValidateSignature(XmlDocument doc, SamlIdentityProvider idp)
+    /// <summary>
+    /// Validates the XML signature and returns the Reference URI of the signed element,
+    /// or null if validation fails. This URI is used to select only the signed assertion,
+    /// preventing XML signature wrapping attacks.
+    /// </summary>
+    private string? ValidateSignature(XmlDocument doc, SamlIdentityProvider idp)
     {
         X509Certificate2 cert;
         try
@@ -408,7 +433,7 @@ public class SamlService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load IdP certificate for {IdpId}", idp.Id);
-            return false;
+            return null;
         }
 
         var signedXml = new SignedXml(doc);
@@ -416,25 +441,40 @@ public class SamlService(
         if (signatureNode.Count == 0)
         {
             logger.LogWarning("No XML signature found in SAML response");
-            return false;
+            return null;
         }
 
         signedXml.LoadXml((XmlElement)signatureNode[0]!);
 
+        bool valid;
         using var rsaKey = cert.GetRSAPublicKey();
         if (rsaKey is not null)
         {
-            return signedXml.CheckSignature(rsaKey);
+            valid = signedXml.CheckSignature(rsaKey);
         }
-
-        using var ecdsaKey = cert.GetECDsaPublicKey();
-        if (ecdsaKey is not null)
+        else
         {
-            return signedXml.CheckSignature(ecdsaKey);
+            using var ecdsaKey = cert.GetECDsaPublicKey();
+            if (ecdsaKey is not null)
+            {
+                valid = signedXml.CheckSignature(ecdsaKey);
+            }
+            else
+            {
+                logger.LogWarning("IdP certificate has no supported public key algorithm");
+                return null;
+            }
         }
 
-        logger.LogWarning("IdP certificate has no supported public key algorithm");
-        return false;
+        if (!valid)
+            return null;
+
+        // Extract the Reference URI from the signature to identify what was actually signed
+        var reference = signedXml.SignedInfo?.References?.Count > 0
+            ? (Reference)signedXml.SignedInfo.References[0]!
+            : null;
+
+        return reference?.Uri ?? "";
     }
 
     private static byte[] DeflateCompress(byte[] data)
