@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "4271958382575238088"
+      "templateHash": "5818580017163555095"
     }
   },
   "parameters": {
@@ -159,6 +159,48 @@
       "metadata": {
         "description": "Sender email address for transactional emails (e.g., noreply@codec.app). Requires a verified Azure Communication Services Email domain."
       }
+    },
+    "recaptchaSecretKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "reCAPTCHA Enterprise API key for bot verification."
+      }
+    },
+    "recaptchaSiteKey": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "reCAPTCHA v3 site key (public, used in frontend and API)."
+      }
+    },
+    "recaptchaProjectId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Google Cloud project ID for reCAPTCHA Enterprise."
+      }
+    },
+    "vapidPublicKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "VAPID public key for Web Push notifications."
+      }
+    },
+    "vapidPrivateKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "VAPID private key for Web Push notifications."
+      }
+    },
+    "alertEmailAddress": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Email address for Azure Monitor alert notifications. Leave empty to skip email alerts."
+      }
     }
   },
   "variables": {
@@ -175,6 +217,7 @@
     "voiceVmName": "[format('vm-{0}-voice', variables('baseName'))]",
     "appInsightsName": "[format('appi-{0}', variables('baseName'))]",
     "communicationServicesName": "[format('acs-{0}', variables('baseName'))]",
+    "actionGroupName": "[format('ag-{0}', variables('baseName'))]",
     "sfuDomainParts": "[split(if(not(equals(parameters('sfuDomainName'), '')), parameters('sfuDomainName'), 'placeholder.invalid'), '.')]",
     "sfuDnsZoneName": "[format('{0}.{1}', variables('sfuDomainParts')[1], variables('sfuDomainParts')[2])]",
     "sfuDnsRecordName": "[variables('sfuDomainParts')[0]]"
@@ -1087,6 +1130,197 @@
           },
           "secretValue": {
             "value": "[parameters('gitHubToken')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "vapidPublicKeyKv": {
+      "condition": "[not(equals(parameters('vapidPublicKey'), ''))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "vapid-public-key",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "Vapid--PublicKey"
+          },
+          "secretValue": {
+            "value": "[parameters('vapidPublicKey')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "vapidPrivateKeyKv": {
+      "condition": "[not(equals(parameters('vapidPrivateKey'), ''))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "vapid-private-key",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "Vapid--PrivateKey"
+          },
+          "secretValue": {
+            "value": "[parameters('vapidPrivateKey')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "17427752039621998580"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "secretValue": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('secretName'))]",
+              "properties": {
+                "value": "[parameters('secretValue')]"
+              }
+            }
+          ],
+          "outputs": {
+            "secretUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), parameters('secretName')), '2023-07-01').secretUri]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "recaptchaSecretKv": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "recaptcha-secret-key",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[reference('keyVault').outputs.name.value]"
+          },
+          "secretName": {
+            "value": "Recaptcha--SecretKey"
+          },
+          "secretValue": {
+            "value": "[parameters('recaptchaSecretKey')]"
           }
         },
         "template": {
@@ -2132,7 +2366,15 @@
           },
           "emailConnectionStringKvUrl": "[if(parameters('emailEnabled'), createObject('value', coalesce(tryGet(if(parameters('emailEnabled'), reference('communicationServices'), null()), 'outputs', 'connectionStringSecretUri', 'value'), '')), createObject('value', ''))]",
           "emailSenderAddress": "[if(parameters('emailEnabled'), createObject('value', coalesce(tryGet(if(parameters('emailEnabled'), reference('communicationServices'), null()), 'outputs', 'senderAddress', 'value'), parameters('emailSenderAddress'))), createObject('value', parameters('emailSenderAddress')))]",
-          "frontendBaseUrl": "[if(not(equals(parameters('webCustomDomain'), '')), createObject('value', format('https://{0}', parameters('webCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('webAppName'), reference('containerAppsEnv').outputs.defaultDomain.value)))]"
+          "frontendBaseUrl": "[if(not(equals(parameters('webCustomDomain'), '')), createObject('value', format('https://{0}', parameters('webCustomDomain'))), createObject('value', format('https://{0}.{1}', variables('webAppName'), reference('containerAppsEnv').outputs.defaultDomain.value)))]",
+          "recaptchaSiteKey": {
+            "value": "[parameters('recaptchaSiteKey')]"
+          },
+          "recaptchaProjectId": {
+            "value": "[parameters('recaptchaProjectId')]"
+          },
+          "vapidPublicKeyKvUrl": "[if(not(equals(parameters('vapidPublicKey'), '')), createObject('value', format('{0}secrets/Vapid--PublicKey', reference('keyVault').outputs.uri.value)), createObject('value', ''))]",
+          "vapidPrivateKeyKvUrl": "[if(not(equals(parameters('vapidPrivateKey'), '')), createObject('value', format('{0}secrets/Vapid--PrivateKey', reference('keyVault').outputs.uri.value)), createObject('value', ''))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -2141,7 +2383,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "1781565495030484288"
+              "templateHash": "6695261217884553748"
             }
           },
           "parameters": {
@@ -2258,6 +2500,34 @@
                 "description": "Frontend base URL for email verification links."
               }
             },
+            "recaptchaSiteKey": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "reCAPTCHA v3 site key"
+              }
+            },
+            "recaptchaProjectId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Google Cloud project ID for reCAPTCHA Enterprise"
+              }
+            },
+            "vapidPublicKeyKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the VAPID public key (Web Push). Leave empty to disable push notifications."
+              }
+            },
+            "vapidPrivateKeyKvUrl": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Key Vault secret URL for the VAPID private key (Web Push). Leave empty to disable push notifications."
+              }
+            },
             "customDomainName": {
               "type": "string",
               "defaultValue": "",
@@ -2309,7 +2579,7 @@
                       "allowCredentials": true
                     }
                   },
-                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'jwt-secret', 'keyVaultUrl', parameters('jwtSecretKvUrl'), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('emailConnectionStringKvUrl'), '')), createArray(createObject('name', 'email-connection-string', 'keyVaultUrl', parameters('emailConnectionStringKvUrl'), 'identity', 'system')), createArray()))]",
+                  "secrets": "[concat(createArray(createObject('name', 'connection-string', 'keyVaultUrl', format('{0}secrets/ConnectionStrings--Default', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'google-client-id', 'keyVaultUrl', format('{0}secrets/Google--ClientId', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'global-admin-email', 'keyVaultUrl', format('{0}secrets/GlobalAdmin--Email', parameters('keyVaultUri')), 'identity', 'system'), createObject('name', 'jwt-secret', 'keyVaultUrl', parameters('jwtSecretKvUrl'), 'identity', 'system')), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'voice-turn-secret', 'keyVaultUrl', parameters('voiceTurnKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'voice-sfu-internal-key', 'keyVaultUrl', parameters('voiceSfuInternalKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'github-token', 'keyVaultUrl', parameters('gitHubTokenKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'redis-connection-string', 'keyVaultUrl', parameters('redisConnectionStringKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('emailConnectionStringKvUrl'), '')), createArray(createObject('name', 'email-connection-string', 'keyVaultUrl', parameters('emailConnectionStringKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('vapidPublicKeyKvUrl'), '')), createArray(createObject('name', 'vapid-public-key', 'keyVaultUrl', parameters('vapidPublicKeyKvUrl'), 'identity', 'system')), createArray()), if(not(equals(parameters('vapidPrivateKeyKvUrl'), '')), createArray(createObject('name', 'vapid-private-key', 'keyVaultUrl', parameters('vapidPrivateKeyKvUrl'), 'identity', 'system')), createArray()), createArray(createObject('name', 'recaptcha-secret-key', 'keyVaultUrl', format('{0}secrets/Recaptcha--SecretKey', parameters('keyVaultUri')), 'identity', 'system')))]",
                   "registries": [
                     {
                       "server": "[parameters('containerRegistryLoginServer')]",
@@ -2326,7 +2596,7 @@
                         "cpu": "[json('0.5')]",
                         "memory": "1Gi"
                       },
-                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'Jwt__Secret', 'secretRef', 'jwt-secret'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()), if(not(equals(parameters('emailConnectionStringKvUrl'), '')), createArray(createObject('name', 'Email__ConnectionString', 'secretRef', 'email-connection-string')), createArray()), if(not(equals(parameters('emailSenderAddress'), '')), createArray(createObject('name', 'Email__SenderAddress', 'value', parameters('emailSenderAddress'))), createArray()), if(not(equals(parameters('frontendBaseUrl'), '')), createArray(createObject('name', 'Frontend__BaseUrl', 'value', parameters('frontendBaseUrl'))), createArray()))]",
+                      "env": "[concat(createArray(createObject('name', 'ASPNETCORE_ENVIRONMENT', 'value', 'Production'), createObject('name', 'ConnectionStrings__Default', 'secretRef', 'connection-string'), createObject('name', 'Google__ClientId', 'secretRef', 'google-client-id'), createObject('name', 'Api__BaseUrl', 'value', parameters('apiBaseUrl')), createObject('name', 'Cors__AllowedOrigins', 'value', parameters('corsAllowedOrigins')), createObject('name', 'Storage__Provider', 'value', 'AzureBlob'), createObject('name', 'Storage__AzureBlob__ServiceUri', 'value', parameters('storageBlobEndpoint')), createObject('name', 'GlobalAdmin__Email', 'secretRef', 'global-admin-email'), createObject('name', 'Jwt__Secret', 'secretRef', 'jwt-secret'), createObject('name', 'OTEL_SERVICE_NAME', 'value', 'codec-api')), if(not(equals(parameters('sfuApiUrl'), '')), createArray(createObject('name', 'Voice__MediasoupApiUrl', 'value', parameters('sfuApiUrl')), createObject('name', 'Voice__TurnServerUrl', 'value', parameters('turnServerUrl'))), createArray()), if(not(equals(parameters('voiceTurnKvUrl'), '')), createArray(createObject('name', 'Voice__TurnSecret', 'secretRef', 'voice-turn-secret')), createArray()), if(not(equals(parameters('voiceSfuInternalKeyKvUrl'), '')), createArray(createObject('name', 'Voice__SfuInternalKey', 'secretRef', 'voice-sfu-internal-key')), createArray()), if(not(equals(parameters('gitHubTokenKvUrl'), '')), createArray(createObject('name', 'GitHub__Token', 'secretRef', 'github-token')), createArray()), if(not(equals(parameters('redisConnectionStringKvUrl'), '')), createArray(createObject('name', 'Redis__ConnectionString', 'secretRef', 'redis-connection-string')), createArray()), if(not(equals(parameters('appInsightsConnectionString'), '')), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('appInsightsConnectionString'))), createArray()), if(not(equals(parameters('emailConnectionStringKvUrl'), '')), createArray(createObject('name', 'Email__ConnectionString', 'secretRef', 'email-connection-string')), createArray()), if(not(equals(parameters('emailSenderAddress'), '')), createArray(createObject('name', 'Email__SenderAddress', 'value', parameters('emailSenderAddress'))), createArray()), if(not(equals(parameters('frontendBaseUrl'), '')), createArray(createObject('name', 'Frontend__BaseUrl', 'value', parameters('frontendBaseUrl'))), createArray()), if(not(equals(parameters('vapidPublicKeyKvUrl'), '')), createArray(createObject('name', 'Vapid__PublicKey', 'secretRef', 'vapid-public-key')), createArray()), if(not(equals(parameters('vapidPrivateKeyKvUrl'), '')), createArray(createObject('name', 'Vapid__PrivateKey', 'secretRef', 'vapid-private-key'), createObject('name', 'Vapid__Subject', 'value', 'mailto:noreply@codec.chat')), createArray()), createArray(createObject('name', 'Recaptcha__SecretKey', 'secretRef', 'recaptcha-secret-key'), createObject('name', 'Recaptcha__SiteKey', 'value', parameters('recaptchaSiteKey')), createObject('name', 'Recaptcha__ProjectId', 'value', parameters('recaptchaProjectId')), createObject('name', 'Recaptcha__Enabled', 'value', if(not(equals(parameters('recaptchaSiteKey'), '')), 'true', 'false'))))]",
                       "probes": [
                         {
                           "type": "Liveness",
@@ -2463,6 +2733,9 @@
           "publicGoogleClientId": {
             "value": "[parameters('googleClientId')]"
           },
+          "publicRecaptchaSiteKey": {
+            "value": "[parameters('recaptchaSiteKey')]"
+          },
           "customDomainName": {
             "value": "[parameters('webCustomDomain')]"
           },
@@ -2475,7 +2748,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "7331663258780236917"
+              "templateHash": "9234407112113379704"
             }
           },
           "parameters": {
@@ -2503,6 +2776,13 @@
             },
             "publicGoogleClientId": {
               "type": "string"
+            },
+            "publicRecaptchaSiteKey": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "reCAPTCHA v3 site key for frontend"
+              }
             },
             "customDomainName": {
               "type": "string",
@@ -2566,6 +2846,10 @@
                         {
                           "name": "PUBLIC_GOOGLE_CLIENT_ID",
                           "value": "[parameters('publicGoogleClientId')]"
+                        },
+                        {
+                          "name": "PUBLIC_RECAPTCHA_SITE_KEY",
+                          "value": "[parameters('publicRecaptchaSiteKey')]"
                         }
                       ],
                       "probes": [
@@ -2626,6 +2910,278 @@
       "dependsOn": [
         "containerAppsEnv",
         "containerRegistry"
+      ]
+    },
+    "monitorActionGroup": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "monitor-action-group",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('actionGroupName')]"
+          },
+          "alertEmailAddress": {
+            "value": "[parameters('alertEmailAddress')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "16565129178938668374"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "global"
+            },
+            "shortName": {
+              "type": "string",
+              "defaultValue": "CodecAlerts",
+              "maxLength": 12,
+              "metadata": {
+                "description": "Short name for the action group (max 12 characters, shown in SMS/email)."
+              }
+            },
+            "alertEmailAddress": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Email address to receive alert notifications. Leave empty to skip email receiver."
+              }
+            },
+            "alertEmailName": {
+              "type": "string",
+              "defaultValue": "Codec Admin",
+              "metadata": {
+                "description": "Name label for the email receiver."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/actionGroups",
+              "apiVersion": "2023-09-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "groupShortName": "[parameters('shortName')]",
+                "enabled": true,
+                "emailReceivers": "[if(not(equals(parameters('alertEmailAddress'), '')), createArray(createObject('name', parameters('alertEmailName'), 'emailAddress', parameters('alertEmailAddress'), 'useCommonAlertSchema', true())), createArray())]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/actionGroups', parameters('name'))]"
+            }
+          }
+        }
+      }
+    },
+    "monitorAlerts": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "monitor-alerts",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "actionGroupId": {
+            "value": "[reference('monitorActionGroup').outputs.id.value]"
+          },
+          "apiContainerAppName": {
+            "value": "[variables('apiAppName')]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference('logAnalytics').outputs.id.value]"
+          },
+          "postgresqlServerId": {
+            "value": "[reference('postgresql').outputs.id.value]"
+          },
+          "environmentName": {
+            "value": "[parameters('environmentName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "13105201240210685215"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "actionGroupId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the action group to notify when alerts fire."
+              }
+            },
+            "apiContainerAppName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the API container app (used in log queries)."
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the Log Analytics workspace (for log-based alerts)."
+              }
+            },
+            "postgresqlServerId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the PostgreSQL Flexible Server (for DB CPU alerts)."
+              }
+            },
+            "environmentName": {
+              "type": "string",
+              "defaultValue": "prod",
+              "metadata": {
+                "description": "Environment name used in alert naming."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/scheduledQueryRules",
+              "apiVersion": "2023-03-15-preview",
+              "name": "[format('alert-container-restarts-{0}', parameters('environmentName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "displayName": "[format('Container Restarts — {0}', parameters('apiContainerAppName'))]",
+                "description": "Fires when the API container app restarts 3 or more times in 15 minutes.",
+                "severity": 1,
+                "enabled": true,
+                "evaluationFrequency": "PT5M",
+                "windowSize": "PT15M",
+                "scopes": [
+                  "[parameters('logAnalyticsWorkspaceId')]"
+                ],
+                "criteria": {
+                  "allOf": [
+                    {
+                      "query": "            ContainerAppSystemLogs_CL\n            | where ContainerAppName_s == '${apiContainerAppName}'\n            | where Reason_s == 'BackOff' or Reason_s == 'CrashLoopBackOff' or Log_s has 'restarted'\n            | summarize RestartCount = count() by bin(TimeGenerated, 15m)\n          ",
+                      "timeAggregation": "Count",
+                      "operator": "GreaterThanOrEqual",
+                      "threshold": 3,
+                      "failingPeriods": {
+                        "numberOfEvaluationPeriods": 1,
+                        "minFailingPeriodsToAlert": 1
+                      }
+                    }
+                  ]
+                },
+                "actions": {
+                  "actionGroups": [
+                    "[parameters('actionGroupId')]"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/scheduledQueryRules",
+              "apiVersion": "2023-03-15-preview",
+              "name": "[format('alert-5xx-rate-{0}', parameters('environmentName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "displayName": "[format('5xx Error Rate — {0}', parameters('apiContainerAppName'))]",
+                "description": "Fires when the API returns 10 or more 5xx responses in 5 minutes.",
+                "severity": 2,
+                "enabled": true,
+                "evaluationFrequency": "PT5M",
+                "windowSize": "PT5M",
+                "scopes": [
+                  "[parameters('logAnalyticsWorkspaceId')]"
+                ],
+                "criteria": {
+                  "allOf": [
+                    {
+                      "query": "            ContainerAppConsoleLogs_CL\n            | where ContainerAppName_s == '${apiContainerAppName}'\n            | where Log_s has 'HTTP' and Log_s has_any ('500', '501', '502', '503', '504')\n            | summarize ErrorCount = count() by bin(TimeGenerated, 5m)\n          ",
+                      "timeAggregation": "Count",
+                      "operator": "GreaterThanOrEqual",
+                      "threshold": 10,
+                      "failingPeriods": {
+                        "numberOfEvaluationPeriods": 1,
+                        "minFailingPeriodsToAlert": 1
+                      }
+                    }
+                  ]
+                },
+                "actions": {
+                  "actionGroups": [
+                    "[parameters('actionGroupId')]"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/metricAlerts",
+              "apiVersion": "2018-03-01",
+              "name": "[format('alert-db-cpu-{0}', parameters('environmentName'))]",
+              "location": "global",
+              "properties": {
+                "description": "Fires when PostgreSQL average CPU exceeds 80% over 10 minutes.",
+                "severity": 2,
+                "enabled": true,
+                "evaluationFrequency": "PT5M",
+                "windowSize": "PT10M",
+                "scopes": [
+                  "[parameters('postgresqlServerId')]"
+                ],
+                "criteria": {
+                  "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria",
+                  "allOf": [
+                    {
+                      "name": "HighCpu",
+                      "metricName": "cpu_percent",
+                      "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+                      "operator": "GreaterThan",
+                      "threshold": 80,
+                      "timeAggregation": "Average",
+                      "criterionType": "StaticThresholdCriterion"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "actionGroupId": "[parameters('actionGroupId')]"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "logAnalytics",
+        "monitorActionGroup",
+        "postgresql"
       ]
     }
   },

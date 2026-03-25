@@ -54,6 +54,12 @@ param recaptchaSiteKey string = ''
 @description('Google Cloud project ID for reCAPTCHA Enterprise')
 param recaptchaProjectId string = ''
 
+@description('Key Vault secret URL for the VAPID public key (Web Push). Leave empty to disable push notifications.')
+param vapidPublicKeyKvUrl string = ''
+
+@description('Key Vault secret URL for the VAPID private key (Web Push). Leave empty to disable push notifications.')
+param vapidPrivateKeyKvUrl string = ''
+
 @description('Custom domain name for the API (e.g., api.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -154,6 +160,18 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: 'email-connection-string'
           keyVaultUrl: emailConnectionStringKvUrl
+          identity: 'system'
+        }
+      ] : [], vapidPublicKeyKvUrl != '' ? [
+        {
+          name: 'vapid-public-key'
+          keyVaultUrl: vapidPublicKeyKvUrl
+          identity: 'system'
+        }
+      ] : [], vapidPrivateKeyKvUrl != '' ? [
+        {
+          name: 'vapid-private-key'
+          keyVaultUrl: vapidPrivateKeyKvUrl
           identity: 'system'
         }
       ] : [], [
@@ -268,6 +286,20 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Frontend__BaseUrl'
               value: frontendBaseUrl
+            }
+          ] : [], vapidPublicKeyKvUrl != '' ? [
+            {
+              name: 'Vapid__PublicKey'
+              secretRef: 'vapid-public-key'
+            }
+          ] : [], vapidPrivateKeyKvUrl != '' ? [
+            {
+              name: 'Vapid__PrivateKey'
+              secretRef: 'vapid-private-key'
+            }
+            {
+              name: 'Vapid__Subject'
+              value: 'mailto:noreply@codec.chat'
             }
           ] : [], [
             {

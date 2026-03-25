@@ -88,6 +88,14 @@ param recaptchaSiteKey string = ''
 @description('Google Cloud project ID for reCAPTCHA Enterprise.')
 param recaptchaProjectId string = ''
 
+@description('VAPID public key for Web Push notifications.')
+@secure()
+param vapidPublicKey string = ''
+
+@description('VAPID private key for Web Push notifications.')
+@secure()
+param vapidPrivateKey string = ''
+
 @description('Email address for Azure Monitor alert notifications. Leave empty to skip email alerts.')
 param alertEmailAddress string = ''
 
@@ -227,6 +235,26 @@ module gitHubTokenSecret 'modules/key-vault-secret.bicep' = if (gitHubToken != '
     keyVaultName: keyVault.outputs.name
     secretName: 'GitHub--Token'
     secretValue: gitHubToken
+  }
+}
+
+// ── VAPID keys for Web Push notifications ─────────────────────────────────────
+
+module vapidPublicKeyKv 'modules/key-vault-secret.bicep' = if (vapidPublicKey != '') {
+  name: 'vapid-public-key'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Vapid--PublicKey'
+    secretValue: vapidPublicKey
+  }
+}
+
+module vapidPrivateKeyKv 'modules/key-vault-secret.bicep' = if (vapidPrivateKey != '') {
+  name: 'vapid-private-key'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Vapid--PrivateKey'
+    secretValue: vapidPrivateKey
   }
 }
 
@@ -371,6 +399,8 @@ module apiApp 'modules/container-app-api.bicep' = {
     frontendBaseUrl: effectiveWebUrl
     recaptchaSiteKey: recaptchaSiteKey
     recaptchaProjectId: recaptchaProjectId
+    vapidPublicKeyKvUrl: vapidPublicKey != '' ? '${keyVault.outputs.uri}secrets/Vapid--PublicKey' : ''
+    vapidPrivateKeyKvUrl: vapidPrivateKey != '' ? '${keyVault.outputs.uri}secrets/Vapid--PrivateKey' : ''
   }
 }
 
