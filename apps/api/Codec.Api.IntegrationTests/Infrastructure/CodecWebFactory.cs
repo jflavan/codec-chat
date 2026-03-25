@@ -52,6 +52,10 @@ public class CodecWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Voice:TurnSecret", "test-turn-secret");
         builder.UseSetting("Voice:TurnServerUrl", "turn:localhost:3478");
         builder.UseSetting("Recaptcha:Enabled", "false");
+        builder.UseSetting("Saml:Enabled", "true");
+        builder.UseSetting("Saml:EntityId", "https://test-sp.example.com/saml/metadata");
+        builder.UseSetting("RateLimit:Fixed", "10000");
+        builder.UseSetting("RateLimit:Auth", "10000");
 
         // Point Redis at the test container
         builder.UseSetting("Redis:ConnectionString", _redis.GetConnectionString());
@@ -68,6 +72,7 @@ public class CodecWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(FakeAuthHandler.SchemeName)
                     .RequireAuthenticatedUser()
                     .Build());
+
         });
     }
 

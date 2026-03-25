@@ -274,15 +274,17 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    var fixedLimit = builder.Configuration.GetValue("RateLimit:Fixed", 100);
+    var authLimit = builder.Configuration.GetValue("RateLimit:Auth", 10);
     options.AddFixedWindowLimiter("fixed", limiter =>
     {
-        limiter.PermitLimit = 100;
+        limiter.PermitLimit = fixedLimit;
         limiter.Window = TimeSpan.FromMinutes(1);
         limiter.QueueLimit = 0;
     });
     options.AddFixedWindowLimiter("auth", limiter =>
     {
-        limiter.PermitLimit = 10;
+        limiter.PermitLimit = authLimit;
         limiter.Window = TimeSpan.FromMinutes(1);
         limiter.QueueLimit = 0;
     });
