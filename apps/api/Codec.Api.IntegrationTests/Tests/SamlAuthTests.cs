@@ -56,13 +56,11 @@ public class SamlAuthTests(CodecWebFactory factory) : IntegrationTestBase(factor
     }
 
     [Fact]
-    public async Task ListProviders_WhenSamlDisabled_ReturnsNotFound()
+    public async Task ListProviders_WhenSamlEnabled_ReturnsOk()
     {
         var client = CreateClient("saml-list-1", "SamlUser1");
-        // SAML is not enabled in test config by default
         var response = await client.GetAsync("/auth/saml/providers");
-        // Should return 404 since SAML is disabled
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
