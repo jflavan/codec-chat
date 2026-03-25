@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Codec.Api.Services;
 
 public class PushNotificationService(
-    PushServiceClient pushClient,
+    IPushClient pushClient,
     IServiceScopeFactory scopeFactory,
     ILogger<PushNotificationService> logger)
 {
@@ -70,9 +70,14 @@ public class PushNotificationService(
 
         if (deactivateIds.Count > 0)
         {
-            await db.PushSubscriptions
+            var toDeactivate = await db.PushSubscriptions
                 .Where(s => deactivateIds.Contains(s.Id))
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false), ct);
+                .ToListAsync(ct);
+
+            foreach (var s in toDeactivate)
+                s.IsActive = false;
+
+            await db.SaveChangesAsync(ct);
         }
     }
 

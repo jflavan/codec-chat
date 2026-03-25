@@ -338,6 +338,7 @@ if (!string.IsNullOrWhiteSpace(vapidPublicKey) && !string.IsNullOrWhiteSpace(vap
             Subject = vapidSubject
         }
     });
+    builder.Services.AddSingleton<IPushClient, PushClientAdapter>();
     builder.Services.AddSingleton<PushNotificationService>();
 }
 

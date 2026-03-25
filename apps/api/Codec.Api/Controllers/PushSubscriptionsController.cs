@@ -52,11 +52,14 @@ public class PushSubscriptionsController(CodecDbContext db, IUserService userSer
     {
         var (user, _) = await userService.GetOrCreateUserAsync(User);
 
-        var count = await db.PushSubscriptions
-            .Where(s => s.UserId == user.Id && s.Endpoint == request.Endpoint)
-            .ExecuteDeleteAsync();
+        var subscription = await db.PushSubscriptions
+            .FirstOrDefaultAsync(s => s.UserId == user.Id && s.Endpoint == request.Endpoint);
 
-        return count > 0 ? NoContent() : NotFound();
+        if (subscription is null) return NotFound();
+
+        db.PushSubscriptions.Remove(subscription);
+        await db.SaveChangesAsync();
+        return NoContent();
     }
 
     /// <summary>Get the VAPID public key so the client can subscribe.</summary>
