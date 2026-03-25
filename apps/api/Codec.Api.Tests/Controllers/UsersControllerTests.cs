@@ -128,4 +128,133 @@ public class UsersControllerTests : IDisposable
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         ok.Value.Should().BeAssignableTo<Array>();
     }
+
+    // --- SetStatus ---
+
+    [Fact]
+    public async Task SetStatus_WithTextAndEmoji_ReturnsOk()
+    {
+        _db.Users.Add(_testUser);
+        await _db.SaveChangesAsync();
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
+
+        var result = await _controller.SetStatus(new SetStatusRequest { StatusText = "Working", StatusEmoji = "💻" });
+
+        result.Should().BeOfType<OkObjectResult>();
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.StatusText.Should().Be("Working");
+        user.StatusEmoji.Should().Be("💻");
+    }
+
+    [Fact]
+    public async Task SetStatus_TextOnly_ReturnsOk()
+    {
+        _db.Users.Add(_testUser);
+        await _db.SaveChangesAsync();
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
+
+        var result = await _controller.SetStatus(new SetStatusRequest { StatusText = "Away" });
+
+        result.Should().BeOfType<OkObjectResult>();
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.StatusText.Should().Be("Away");
+        user.StatusEmoji.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SetStatus_EmojiOnly_ReturnsOk()
+    {
+        _db.Users.Add(_testUser);
+        await _db.SaveChangesAsync();
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
+
+        var result = await _controller.SetStatus(new SetStatusRequest { StatusEmoji = "🎉" });
+
+        result.Should().BeOfType<OkObjectResult>();
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.StatusText.Should().BeNull();
+        user.StatusEmoji.Should().Be("🎉");
+    }
+
+    [Fact]
+    public async Task SetStatus_BothEmpty_ReturnsBadRequest()
+    {
+        var result = await _controller.SetStatus(new SetStatusRequest { StatusText = "", StatusEmoji = "" });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SetStatus_BothNull_ReturnsBadRequest()
+    {
+        var result = await _controller.SetStatus(new SetStatusRequest());
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SetStatus_TrimsWhitespace()
+    {
+        _db.Users.Add(_testUser);
+        await _db.SaveChangesAsync();
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
+
+        var result = await _controller.SetStatus(new SetStatusRequest { StatusText = "  Busy  " });
+
+        result.Should().BeOfType<OkObjectResult>();
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.StatusText.Should().Be("Busy");
+    }
+
+    // --- ClearStatus ---
+
+    [Fact]
+    public async Task ClearStatus_WithExistingStatus_ReturnsOk()
+    {
+        _testUser.StatusText = "Working";
+        _testUser.StatusEmoji = "💻";
+        _db.Users.Add(_testUser);
+        await _db.SaveChangesAsync();
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
+
+        var result = await _controller.ClearStatus();
+
+        result.Should().BeOfType<OkObjectResult>();
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.StatusText.Should().BeNull();
+        user.StatusEmoji.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ClearStatus_NoExistingStatus_ReturnsNotFound()
+    {
+        _testUser.StatusText = null;
+        _testUser.StatusEmoji = null;
+
+        var result = await _controller.ClearStatus();
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task ClearStatus_OnlyEmoji_ReturnsOk()
+    {
+        _testUser.StatusEmoji = "🎉";
+        _testUser.StatusText = null;
+        _db.Users.Add(_testUser);
+        await _db.SaveChangesAsync();
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
+
+        var result = await _controller.ClearStatus();
+
+        result.Should().BeOfType<OkObjectResult>();
+        var user = _db.Users.First(u => u.Id == _testUser.Id);
+        user.StatusEmoji.Should().BeNull();
+    }
 }

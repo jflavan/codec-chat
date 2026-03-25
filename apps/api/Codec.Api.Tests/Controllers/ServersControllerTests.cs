@@ -848,4 +848,271 @@ public class ServersControllerTests : IDisposable
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
+
+    // --- BanMember ---
+
+    [Fact]
+    public async Task BanMember_Self_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, _testUser.Id, new BanMemberRequest(), _auditService);
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task BanMember_CannotBanOwner_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        var owner = new User { GoogleSubject = "g-owner", DisplayName = "Owner" };
+        _db.Users.Add(owner);
+        _db.Servers.Add(server);
+        var (ownerRole, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = owner.Id, RoleId = ownerRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, owner.Id, new BanMemberRequest(), _auditService);
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task BanMember_CannotBanHigherRole_ReturnsForbid()
+    {
+        var server = new Server { Name = "S" };
+        var target = new User { GoogleSubject = "g-target", DisplayName = "Target" };
+        _db.Users.Add(target);
+        _db.Servers.Add(server);
+        var (_, adminRole, memberRole) = CreateDefaultRoles(server);
+        // Caller has member role (position 2), target has admin role (position 1)
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeMemberRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task BanMember_AlreadyBanned_ReturnsConflict()
+    {
+        var server = new Server { Name = "S" };
+        var target = new User { GoogleSubject = "g-target", DisplayName = "Target" };
+        _db.Users.Add(target);
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.BannedMembers.Add(new BannedMember { ServerId = server.Id, UserId = target.Id, BannedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
+        result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
+    public async Task BanMember_TargetNotFound_Returns404()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, Guid.NewGuid(), new BanMemberRequest(), _auditService);
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task BanMember_ValidBan_ReturnsNoContent()
+    {
+        var server = new Server { Name = "S" };
+        var target = new User { GoogleSubject = "g-target", DisplayName = "Target" };
+        _db.Users.Add(target);
+        _db.Servers.Add(server);
+        var (_, adminRole, memberRole) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest { Reason = "Spam" }, _auditService);
+
+        result.Should().BeOfType<NoContentResult>();
+        _db.BannedMembers.Should().Contain(b => b.ServerId == server.Id && b.UserId == target.Id);
+        _db.ServerMembers.Any(m => m.ServerId == server.Id && m.UserId == target.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BanMember_WithDeleteMessages_DeletesMessages()
+    {
+        var server = new Server { Name = "S" };
+        var target = new User { GoogleSubject = "g-target", DisplayName = "Target" };
+        _db.Users.Add(target);
+        _db.Servers.Add(server);
+        var (_, adminRole, memberRole) = CreateDefaultRoles(server);
+        var channel = new Channel { Server = server, Name = "general" };
+        _db.Channels.Add(channel);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
+        _db.Messages.Add(new Message { ChannelId = channel.Id, AuthorUserId = target.Id, Body = "spam" });
+        _db.Messages.Add(new Message { ChannelId = channel.Id, AuthorUserId = target.Id, Body = "more spam" });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest { DeleteMessages = true }, _auditService);
+
+        result.Should().BeOfType<NoContentResult>();
+        _db.Messages.Any(m => m.AuthorUserId == target.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BanMember_NonMemberUser_StillBans()
+    {
+        var server = new Server { Name = "S" };
+        var target = new User { GoogleSubject = "g-target", DisplayName = "Target" };
+        _db.Users.Add(target);
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
+
+        result.Should().BeOfType<NoContentResult>();
+        _db.BannedMembers.Should().Contain(b => b.ServerId == server.Id && b.UserId == target.Id);
+    }
+
+    // --- UnbanMember ---
+
+    [Fact]
+    public async Task UnbanMember_BannedUser_ReturnsNoContent()
+    {
+        var server = new Server { Name = "S" };
+        var target = new User { GoogleSubject = "g-target", DisplayName = "Target" };
+        _db.Users.Add(target);
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.BannedMembers.Add(new BannedMember { ServerId = server.Id, UserId = target.Id, BannedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.UnbanMember(server.Id, target.Id, _auditService);
+
+        result.Should().BeOfType<NoContentResult>();
+        _db.BannedMembers.Any(b => b.ServerId == server.Id && b.UserId == target.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UnbanMember_NotBanned_ReturnsNotFound()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.UnbanMember(server.Id, Guid.NewGuid(), _auditService);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    // --- GetBans ---
+
+    [Fact]
+    public async Task GetBans_ReturnsBanList()
+    {
+        var server = new Server { Name = "S" };
+        var banned1 = new User { GoogleSubject = "g-b1", DisplayName = "Banned1" };
+        var banned2 = new User { GoogleSubject = "g-b2", DisplayName = "Banned2" };
+        _db.Users.AddRange(banned1, banned2);
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.BannedMembers.AddRange(
+            new BannedMember { ServerId = server.Id, UserId = banned1.Id, BannedByUserId = _testUser.Id, Reason = "Spam", BannedAt = DateTimeOffset.UtcNow.AddMinutes(-2) },
+            new BannedMember { ServerId = server.Id, UserId = banned2.Id, BannedByUserId = _testUser.Id, Reason = "Trolling", BannedAt = DateTimeOffset.UtcNow.AddMinutes(-1) }
+        );
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.GetBans(server.Id);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _db.BannedMembers.Count(b => b.ServerId == server.Id).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetBans_NoBans_ReturnsEmptyList()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+
+        var result = await _controller.GetBans(server.Id);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    // --- JoinViaInvite Banned User ---
+
+    [Fact]
+    public async Task JoinViaInvite_BannedUser_ReturnsForbidden()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, _, memberRole) = CreateDefaultRoles(server);
+        _db.ServerInvites.Add(new ServerInvite { Server = server, Code = "banned-test", CreatedByUserId = _testUser.Id });
+
+        var bannedUser = new User { GoogleSubject = "g-banned", DisplayName = "Banned" };
+        _db.Users.Add(bannedUser);
+        _db.BannedMembers.Add(new BannedMember { ServerId = server.Id, UserId = bannedUser.Id, BannedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync((bannedUser, false));
+
+        var result = await _controller.JoinViaInvite("banned-test");
+
+        // Banned users get a 403 Forbidden when trying to join via invite
+        result.Should().BeAssignableTo<ObjectResult>()
+            .Which.StatusCode.Should().Be(403);
+    }
 }
