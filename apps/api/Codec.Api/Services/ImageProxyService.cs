@@ -30,7 +30,7 @@ public sealed class ImageProxyService : IImageProxyService
         "image/png",
         "image/gif",
         "image/webp",
-        "image/svg+xml",
+        // SVG excluded: can contain embedded JavaScript (stored XSS risk)
         "image/avif",
     };
 

@@ -34,13 +34,13 @@ public class OAuthProviderService(IHttpClientFactory httpClientFactory, IConfigu
         }
 
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var accessToken = tokenJson.GetProperty("access_token").GetString();
-        if (string.IsNullOrWhiteSpace(accessToken))
+        if (!tokenJson.TryGetProperty("access_token", out var atProp) || string.IsNullOrWhiteSpace(atProp.GetString()))
         {
             var error = tokenJson.TryGetProperty("error", out var errProp) ? errProp.GetString() : "unknown";
             logger.LogWarning("GitHub token exchange returned error: {Error}", error);
             return null;
         }
+        var accessToken = atProp.GetString();
 
         // Fetch user profile
         var userRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user");
@@ -123,12 +123,12 @@ public class OAuthProviderService(IHttpClientFactory httpClientFactory, IConfigu
         }
 
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var accessToken = tokenJson.GetProperty("access_token").GetString();
-        if (string.IsNullOrWhiteSpace(accessToken))
+        if (!tokenJson.TryGetProperty("access_token", out var atProp) || string.IsNullOrWhiteSpace(atProp.GetString()))
         {
             logger.LogWarning("Discord token exchange returned no access_token");
             return null;
         }
+        var accessToken = atProp.GetString();
 
         // Fetch user profile
         var userRequest = new HttpRequestMessage(HttpMethod.Get, "https://discord.com/api/users/@me");

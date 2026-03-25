@@ -6,11 +6,11 @@ Codec uses a multi-layer testing strategy combining unit tests and integration t
 
 | Suite | Framework | Tests | Coverage Target |
 |-------|-----------|-------|----------------|
-| API Unit Tests | xUnit + FluentAssertions + Moq | 296 | Services: 95%+ |
-| API Integration Tests | xUnit + WebApplicationFactory + Testcontainers | 109 | Controllers + Hub: 72%+ |
+| API Unit Tests | xUnit + FluentAssertions + Moq | 1,188 | Services: 95%+ |
+| API Integration Tests | xUnit + WebApplicationFactory + Testcontainers | 177 | Controllers + Hub: 80%+ |
 | Web Unit Tests | Vitest + jsdom | 177 | Utilities + API client: 98%+ |
 
-**Total: 582 tests**
+**Total: 1,542 tests**
 
 ## Running Tests
 
@@ -84,22 +84,35 @@ Pure unit tests using Vitest with jsdom environment. No browser or API server re
 Tests services and controllers in isolation using mocked dependencies.
 
 **Services tested** (95%+ line coverage):
-- `UserService` — user creation/lookup, dual-auth resolution (Google + local JWT), membership checks, role enforcement
+- `UserService` — user creation/lookup, dual-auth resolution (Google + local JWT), membership checks, role enforcement, permission checks
 - `TokenService` — JWT generation, refresh token creation/validation/revocation, bulk revocation
 - `AvatarService` — file validation, upload paths, hash-based filenames
 - `ImageUploadService` — image validation and storage
+- `FileUploadService` — file attachment validation, storage, content-type detection
+- `ImageProxyService` — external image proxying, SSRF protection, content-type validation
 - `CustomEmojiService` — emoji validation, storage, deletion
 - `LinkPreviewService` — URL extraction, SSRF protection, HTML metadata parsing
 - `PresenceTracker` — connection tracking, status aggregation, timeout scanning
+- `PresenceBackgroundService` — idle/offline transition scanning
 - `MessageCacheService` — Redis cache operations, graceful degradation
+- `OAuthProviderService` — GitHub/Discord OAuth code exchange, profile fetching, account linking
+- `SamlService` — AuthnRequest generation, SAML response validation, XML signature verification, JIT provisioning
+- `WebhookService` — event dispatch, HMAC-SHA256 signing, retry with exponential backoff
+- `PushNotificationService` — VAPID push delivery, subscription management, 410 Gone handling
+- `VoiceCallTimeoutService` — call timeout scanning, stale record cleanup
+- `LocalFileStorageService` — local file storage operations
 
 **Controllers tested:**
-- `AuthController` — register (201, 409 conflict), login (200, 401), refresh (token rotation, expiry), email normalization
-- `HealthController`, `UsersController`, `AvatarsController`, `ImageUploadsController`
-- `IssuesController`, `PresenceController`, `FriendsController`
-- `ServersController` — server CRUD, channels, invites, emojis, member management
-- `ChannelsController` — messages, pagination, reactions, around mode, purge
-- `DmController` — DM channels, messages, reactions, close/reopen
+- `AuthController` — register (201, 409 conflict), login (200, 401), refresh (token rotation, expiry), email normalization, OAuth callbacks (GitHub, Discord)
+- `HealthController`, `UsersController` (status messages, profile), `AvatarsController`, `ImageUploadsController`
+- `ImageProxyController` — URL proxying, SSRF rejection, content-type validation
+- `IssuesController`, `PresenceController`, `FriendsController`, `VoiceController`
+- `PushSubscriptionsController` — subscribe/unsubscribe, VAPID key endpoint
+- `SamlController` — SSO login redirect, ACS callback, IdP CRUD, metadata import/export
+- `RolesController` — role CRUD, permission management, position reordering
+- `ServersController` — server CRUD, channels, invites, emojis, member management, bans, webhooks
+- `ChannelsController` — messages, pagination, reactions, around mode, purge, file attachments
+- `DmController` — DM channels, messages, reactions, close/reopen, file attachments
 
 **Testing patterns:**
 - `Microsoft.EntityFrameworkCore.InMemory` for database operations
@@ -125,9 +138,15 @@ Full-pipeline tests using `WebApplicationFactory<Program>` with real PostgreSQL 
 - DM conversation flow (friend request → accept → DM → send → close)
 - Invite flow (create → join → already-member → expired → max-uses)
 - Member management (kick, role promotion/demotion)
-- File uploads (avatars, images, server icons, custom emojis)
+- Custom roles and permissions (create → assign → hierarchy enforcement)
+- User banning (ban → invite-blocked → unban)
+- File uploads (avatars, images, server icons, custom emojis, file attachments)
 - Search (server messages, DM messages, with filters)
 - Voice state (TURN credentials, voice channel states)
+- SAML SSO (AuthnRequest → ACS callback → JIT provisioning)
+- Webhook lifecycle (create → event dispatch → delivery log)
+- Push subscriptions (subscribe → notification → unsubscribe)
+- User status messages (set → broadcast → clear)
 - EF Core migrations against real PostgreSQL
 
 ## Coverage Summary
@@ -138,17 +157,14 @@ Full-pipeline tests using `WebApplicationFactory<Program>` with real PostgreSQL 
 - utils: 100%, auth/session: 100%, api/client: 97.7%
 
 ### API (combined unit + integration)
-- **72.52% line coverage**, 76.71% method coverage
-- 57.08% branch coverage
+- **80%+ line coverage**, 80%+ method coverage
 - Core services: 95%+ line coverage
-- Controllers + services: 72.52% combined line coverage
+- Controllers + services: 80%+ combined line coverage
 
 ### Untestable Code (requires external infrastructure)
 The following code is excluded from unit/integration test coverage targets because it requires infrastructure not available in the test environment:
 
 - **ChatHub voice signaling** (~500 lines) — `ConnectTransport`, `Produce`, `Consume` require a running mediasoup SFU server
-- **VoiceCallTimeoutService** — `BackgroundService` with timer-based cleanup loops
-- **PresenceBackgroundService** — `BackgroundService` for idle/offline scanning
 - **Program.cs** — DI container setup, middleware pipeline configuration
 - **AzureBlobStorageService** — requires Azure Blob Storage (tests use `LocalFileStorageService`)
 

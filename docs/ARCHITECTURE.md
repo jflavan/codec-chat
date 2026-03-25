@@ -9,7 +9,7 @@ Codec is a modern Discord-like chat application built as a monorepo. The archite
 - **Real-time:** SignalR (WebSockets with automatic fallback); Redis backplane for multi-instance scale-out
 - **Caching:** Redis 8 distributed cache (`IDistributedCache`) for message history with channel-level invalidation and link preview metadata with 1-hour TTL
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
-- **Authentication:** Google Identity Services (ID token validation)
+- **Authentication:** Google Sign-In, email/password, GitHub OAuth, Discord OAuth, SAML 2.0 SSO (all produce JWTs)
 - **Observability:** OpenTelemetry (traces, metrics, logs) via `Codec.ServiceDefaults`; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard
 - **Local Dev:** .NET Aspire AppHost for single-command orchestration (Postgres, Redis, Azurite, API, Web)
 - **Deployment:** Containerized on Azure Container Apps (Docker multi-stage builds)
@@ -46,9 +46,11 @@ src/
 │   │   └── client.ts       # Typed HTTP client (ApiClient class with ApiError)
 │   ├── auth/
 │   │   ├── session.ts      # Token persistence & session management (localStorage)
-│   │   └── google.ts       # Google Identity Services SDK initialization
+│   │   ├── google.ts       # Google Identity Services SDK initialization
+│   │   └── oauth.ts        # GitHub/Discord OAuth redirect helpers
 │   ├── services/
-│   │   └── chat-hub.ts     # SignalR hub connection lifecycle (ChatHubService)
+│   │   ├── chat-hub.ts     # SignalR hub connection lifecycle (ChatHubService)
+│   │   └── push-notifications.ts  # Web Push subscription management
 │   ├── state/
 │   │   └── app-state.svelte.ts  # Central reactive state (AppState class with $state/$derived)
 │   ├── styles/
@@ -77,6 +79,7 @@ src/
 │   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping
 │   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped)
 │   │   │   ├── ReactionBar.svelte        # Reaction pills (emoji + count)
+│   │   │   ├── FileCard.svelte           # File attachment card (icon, name, size, download)
 │   │   │   ├── ReplyComposerBar.svelte   # "Replying to" bar above composer
 │   │   │   ├── ReplyReference.svelte     # Inline reply context above message
 │   │   │   └── TypingIndicator.svelte    # Animated typing dots
@@ -93,23 +96,29 @@ src/
 │   │   │   ├── VoiceControls.svelte      # Mute/deafen controls in voice channel
 │   │   │   ├── UserActionSheet.svelte    # Per-user action sheet (desktop popup / mobile bottom sheet)
 │   │   │   ├── IncomingCallOverlay.svelte # Full-screen incoming call modal with ring tone
-│   │   │   └── DmCallHeader.svelte       # Active call header (timer, mute, end)
+│   │   │   ├── DmCallHeader.svelte       # Active call header (timer, mute, end)
+│   │   │   ├── VideoGrid.svelte          # Responsive grid layout for video tiles
+│   │   │   └── VideoTile.svelte          # Individual video tile (camera or screen share)
 │   │   ├── settings/
 │   │   │   ├── UserSettingsModal.svelte   # Full-screen modal overlay shell
 │   │   │   ├── SettingsSidebar.svelte     # Category navigation sidebar
 │   │   │   ├── BugReportModal.svelte     # In-app bug report submission dialog
-│   │   │   ├── ProfileSettings.svelte     # Nickname + avatar management
+│   │   │   ├── ProfileSettings.svelte     # Nickname + avatar + status management
 │   │   │   ├── AccountSettings.svelte     # Read-only info + sign out
-│   │   │   └── AppearanceSettings.svelte  # Theme picker (4 presets with preview cards)
+│   │   │   ├── AppearanceSettings.svelte  # Theme picker (4 presets with preview cards)
+│   │   │   └── NotificationSettings.svelte # Push notification enable/disable
 │   │   ├── server-settings/
 │   │   │   ├── ServerSettingsModal.svelte  # Modal shell with sidebar + content area
-│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Channels, Invites, Emojis, Members, Audit Log)
+│   │   │   ├── ServerSettingsSidebar.svelte # Category navigation (General, Channels, Roles, Invites, Emojis, Members, Bans, Webhooks, Audit Log)
 │   │   │   ├── ServerSettings.svelte      # General tab — server name, description, icon, danger zone
 │   │   │   ├── ServerChannels.svelte      # Channels tab — category and channel management with drag-and-drop reordering
+│   │   │   ├── ServerRoles.svelte         # Roles tab — custom role CRUD with permission editor
 │   │   │   ├── ServerInvites.svelte       # Invites tab — invite CRUD (create, list, revoke)
 │   │   │   ├── ServerAuditLog.svelte      # Audit Log tab — paginated action history
 │   │   │   ├── ServerEmojis.svelte        # Emojis tab — custom emoji upload, rename, delete (Owner/Admin)
-│   │   │   └── ServerMembers.svelte       # Members tab — member role management (promote/demote, Owner/Admin)
+│   │   │   ├── ServerMembers.svelte       # Members tab — member role management (promote/demote, Owner/Admin)
+│   │   │   ├── ServerBans.svelte          # Bans tab — ban/unban members with reason
+│   │   │   └── ServerWebhooks.svelte      # Webhooks tab — webhook CRUD with event type selection
 │   │   ├── shared/
 │   │   │   └── PresenceDot.svelte        # Online/idle/offline indicator dot
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
@@ -119,7 +128,10 @@ src/
 │   └── index.ts            # Public barrel exports
 └── routes/
     ├── +layout.svelte      # Root layout (global CSS, font preconnect)
-    └── +page.svelte        # Thin composition shell (~75 lines)
+    ├── +page.svelte        # Thin composition shell (~75 lines)
+    └── auth/callback/
+        ├── github/+page.svelte   # GitHub OAuth callback handler
+        └── discord/+page.svelte  # Discord OAuth callback handler
 ```
 
 **State Management Pattern:**
@@ -439,6 +451,17 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 
 #### Image Uploads
 - `POST /uploads/images` - Upload an image file (multipart/form-data; JPEG, PNG, WebP, GIF; 10 MB max; returns `{ imageUrl }`)
+- `POST /uploads/files` - Upload a file attachment (multipart/form-data; 25 MB max; returns `{ fileUrl, fileName, fileSize, fileMimeType }`)
+
+#### Image Proxy
+- `GET /images/proxy?url={encodedUrl}` - Proxy an external image URL through the API (SSRF protection, content-type validation, 10 MB max; returns proxied image bytes with original content type)
+
+#### User Status
+- `PUT /me/status` - Set status message and emoji (`{ statusText, statusEmoji }`; max 128 chars text, 8 chars emoji; broadcasts `UserStatusChanged` via SignalR)
+- `DELETE /me/status` - Clear status message and emoji
+
+#### API Documentation
+- `GET /scalar/v1` - Swagger/OpenAPI documentation UI (Scalar)
 
 ### SignalR Hub (`/hubs/chat`)
 

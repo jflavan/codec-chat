@@ -86,8 +86,9 @@ public class PushNotificationService(
     /// </summary>
     public async Task SendToUsersAsync(IEnumerable<Guid> userIds, PushPayload payload, CancellationToken ct = default)
     {
-        var tasks = userIds.Select(id => SendToUserAsync(id, payload, ct));
-        await Task.WhenAll(tasks);
+        // Limit concurrency to avoid exhausting DB connections and HTTP sockets.
+        await Parallel.ForEachAsync(userIds, new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            async (id, token) => await SendToUserAsync(id, payload, token));
     }
 }
 

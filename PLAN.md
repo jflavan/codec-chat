@@ -82,7 +82,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **DM reactions** — Reaction entity extended with nullable DirectMessageId (mutual exclusivity constraint with MessageId) to support emoji reactions on direct messages
 - **.NET Aspire AppHost** — single-command local dev orchestration (Postgres, Redis, Azurite, API, Web) with dashboard at `https://localhost:17222`
 - **OpenTelemetry observability** — `Codec.ServiceDefaults` shared project with distributed traces, metrics, and structured logs; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard; SFU instrumented with custom spans on room/transport/producer/consumer operations; Application Insights Bicep module wired to API container app; CD pipeline passes connection string to voice VM
-- **Testing** — 582 automated tests (296 API unit, 109 API integration, 177 web); API core services at 95%+ coverage; web unit-testable code at 98%+ coverage; integration tests use Testcontainers for disposable Postgres/Redis; see [TESTING.md](docs/TESTING.md)
+- **Testing** — 1,542 automated tests (1,188 API unit, 177 API integration, 177 web); API core services at 95%+ coverage; web unit-testable code at 98%+ coverage; combined API coverage at 80%+; integration tests use Testcontainers for disposable Postgres/Redis; see [TESTING.md](docs/TESTING.md)
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
@@ -95,6 +95,13 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **SAML 2.0 SSO** — `SamlIdentityProvider` entity; SP-initiated login with HTTP-Redirect binding; XML signature verification; JIT user provisioning; admin CRUD for IdP management; metadata import
 - **GitHub and Discord OAuth** — authorization code exchange; user profile fetching; `GitHubSubject`/`DiscordSubject` on User entity; account linking to existing accounts; `GET /auth/oauth/config` for provider discovery
 - **Status messages** — per-user `StatusText` (128 char) and `StatusEmoji` (8 char) fields; displayed in member lists and profiles
+- **File attachments** — `FileUploadService` for document uploads (25 MB max); `FileName`, `FileSize`, `FileMimeType`, `FileUrl` fields on Message/DirectMessage; `FileCard` component; composer file picker and drag-and-drop
+- **Image proxy** — `GET /images/proxy?url=` endpoint for external image proxying with SSRF protection, content-type validation, and 10 MB limit
+- **Swagger/OpenAPI** — API documentation with Scalar UI at `/scalar/v1`
+- **Azure Monitor alerts** — container restart, 5xx error rate, and DB CPU alerts via Bicep modules
+- **Trivy container scanning** — Docker image vulnerability scanning in CI and CD pipelines (advisory mode)
+- **VAPID key rotation** — push notification keys rotated to Azure Key Vault secrets
+- **Security hardening** — SAML XML signature validation strengthened; OAuth redirect URI validation; webhook URL validation; input length validation on all request DTOs; `[param:]` target on record primary constructor validation attributes
 
 ## Task breakdown: Session Persistence
 
@@ -996,7 +1003,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Verify 134 tests pass successfully
 
 ### Coverage Reporting
-- [x] Generate and merge API unit + integration coverage reports (72.52% line coverage)
+- [x] Generate and merge API unit + integration coverage reports (80%+ line coverage)
 - [x] Generate web coverage report (98.59% line coverage)
 - [x] Document coverage metrics in TESTING.md
 - [x] Document untestable code sections (voice signaling, background services, Program.cs, external storage)
@@ -1229,7 +1236,7 @@ Add email/password registration as a second auth method alongside Google Sign-In
 - ~~Presence indicators (online/offline/away)~~ (implemented: hybrid client+server heartbeat detection; PresenceTracker in-memory singleton with ConcurrentDictionary; PresenceBackgroundService for idle/offline scanning; PresenceState DB table; multi-tab support; push-based UserPresenceChanged SignalR events; PresenceDot component on member sidebar and DM list; online-first member sorting)
 - ~~Light mode theme toggle~~ (implemented: 4-theme system — Phosphor Green, Midnight, Ember, Light — with Appearance settings, localStorage persistence, flash prevention)
 - ~~Mobile slide-out navigation for server/channel sidebars~~ (implemented: left drawer for servers/channels, right drawer for members, hamburger buttons in chat headers, slide animations with backdrop dismiss)
-- ~~Comprehensive unit and integration tests~~ (implemented: 582 tests across 3 suites; CI pipeline runs all tests on every PR)
+- ~~Comprehensive unit and integration tests~~ (implemented: 1,542 tests across 3 suites; CI pipeline runs all tests on every PR)
 - ~~Voice Phase 2~~ (completed: deafen, per-user volume, push-to-talk, responsive UserActionSheet)
 - ~~Voice Phase 3~~ (completed: 1:1 DM voice calls with ringing, timeout, system messages)
 - ~~Voice Phase 5~~ (completed: video chat and screen sharing via mediasoup)

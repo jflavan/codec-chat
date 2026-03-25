@@ -214,7 +214,6 @@ Join table linking users to servers with role information.
 |--------|------|-------------|
 | `ServerId` | Guid (PK, FK) | Reference to Server |
 | `UserId` | Guid (PK, FK) | Reference to User |
-| `Role` | ServerRole (enum) | User's role in the server |
 | `JoinedAt` | DateTimeOffset | When user joined |
 | `CustomAvatarPath` | string? | Relative path to a server-specific avatar file |
 
@@ -223,16 +222,9 @@ Join table linking users to servers with role information.
 **Relationships:**
 - Many-to-one with `Server`
 - Many-to-one with `User`
+- Many-to-many with `ServerRoleEntity` (roles assigned to the member)
 
-**ServerRole Enum:**
-```csharp
-public enum ServerRole
-{
-    Member = 0,  // Default role, basic permissions
-    Admin = 1,   // Administrative permissions
-    Owner = 2    // Full control, server creator
-}
-```
+**Note:** Roles are now managed via the `ServerRoleEntity` system with granular permissions. The legacy `ServerRole` enum has been replaced. See `ServerRoleEntity` and `Permission` below.
 
 #### Channel
 Text communication channel within a server.
@@ -259,6 +251,10 @@ Individual chat message in a channel.
 | `AuthorName` | string | Display name snapshot |
 | `Body` | string | Message content |
 | `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
+| `FileName` | string? | Original filename of an uploaded file attachment |
+| `FileSize` | long? | File size in bytes |
+| `FileMimeType` | string? | MIME type of the file attachment (e.g., `application/pdf`) |
+| `FileUrl` | string? | URL of the uploaded file attachment |
 | `ReplyToMessageId` | Guid? (FK) | Self-referencing FK to parent Message (nullable, ON DELETE SET NULL) |
 | `CreatedAt` | DateTimeOffset | Message timestamp |
 
@@ -272,7 +268,8 @@ Individual chat message in a channel.
 - `AuthorUserId` is nullable for system messages
 - `AuthorName` is a snapshot (denormalized) for performance
 - `Body` is plain text (future: rich text/markdown)
-- A message may have `ImageUrl` only (no body text), body only, or both
+- A message may have `ImageUrl` only (no body text), body only, both, or a file attachment
+- File attachments (non-image files) use the `FileName`, `FileSize`, `FileMimeType`, and `FileUrl` fields
 - `ReplyToMessageId` enables inline message replies; set to `null` via `ON DELETE SET NULL` when the parent message is deleted (orphaned reply)
 
 #### Reaction
@@ -397,6 +394,10 @@ Individual message within a DM conversation.
 | `AuthorName` | string | Display name snapshot (denormalized) |
 | `Body` | string | Message content (plain text) |
 | `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
+| `FileName` | string? | Original filename of an uploaded file attachment |
+| `FileSize` | long? | File size in bytes |
+| `FileMimeType` | string? | MIME type of the file attachment |
+| `FileUrl` | string? | URL of the uploaded file attachment |
 | `ReplyToDirectMessageId` | Guid? (FK) | Self-referencing FK to parent DirectMessage (nullable, ON DELETE SET NULL) |
 | `CreatedAt` | DateTimeOffset | Message timestamp |
 
@@ -408,7 +409,8 @@ Individual message within a DM conversation.
 **Notes:**
 - `AuthorName` is a snapshot (denormalized) for performance, matching the server `Message` entity pattern
 - Follows the same structure as server channel messages
-- A message may have `ImageUrl` only (no body text), body only, or both
+- A message may have `ImageUrl` only (no body text), body only, both, or a file attachment
+- File attachments (non-image files) use the `FileName`, `FileSize`, `FileMimeType`, and `FileUrl` fields
 - `ReplyToDirectMessageId` enables inline message replies in DMs; set to `null` via `ON DELETE SET NULL` when the parent message is deleted
 
 #### LinkPreview
@@ -905,9 +907,10 @@ var messages = await db.Messages
 ## Future Schema Changes
 
 ### Near-term Additions
-- File attachments metadata (non-image files)
+- Group DM channels (multi-party conversations)
 
 ### Recently Implemented
+- ~~File attachments metadata~~ → ✅ `FileName`, `FileSize`, `FileMimeType`, `FileUrl` fields on `Message` and `DirectMessage`
 - ~~Link preview metadata~~ → ✅ `LinkPreview` entity
 - ~~Voice channel metadata~~ → ✅ `VoiceState`, `VoiceCall` entities
 - ~~Custom roles and permissions~~ → ✅ `ServerRoleEntity`, `Permission` flags enum

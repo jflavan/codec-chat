@@ -81,8 +81,9 @@ public class SamlService(
         try
         {
             // Restrict XML parsing to prevent XXE attacks
+            using var responseStream = new MemoryStream(responseBytes);
             using var reader = XmlReader.Create(
-                new MemoryStream(responseBytes),
+                responseStream,
                 new XmlReaderSettings
                 {
                     DtdProcessing = DtdProcessing.Prohibit,
@@ -129,6 +130,12 @@ public class SamlService(
         {
             // The Reference URI is "#<ID>" — select the element with that specific ID attribute
             var signedId = signedReferenceUri.TrimStart('#');
+            // Validate signedId to prevent XPath injection (only safe XML ID chars)
+            if (!System.Text.RegularExpressions.Regex.IsMatch(signedId, @"^[\w\-:.]+$"))
+            {
+                logger.LogWarning("SAML signed reference ID contains invalid characters: {Id}", signedId);
+                return null;
+            }
             assertion = doc.SelectSingleNode($"//*[@ID='{signedId}']", nsmgr);
             // If the signed element is the Response, get the Assertion within it
             if (assertion is not null && assertion.LocalName == "Response")
@@ -164,12 +171,12 @@ public class SamlService(
 
             // Allow 5-minute clock skew
             var skew = TimeSpan.FromMinutes(5);
-            if (notBefore is not null && DateTime.Parse(notBefore).ToUniversalTime() > now.Add(skew))
+            if (notBefore is not null && DateTime.Parse(notBefore, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind).ToUniversalTime() > now.Add(skew))
             {
                 logger.LogWarning("SAML assertion not yet valid");
                 return null;
             }
-            if (notOnOrAfter is not null && DateTime.Parse(notOnOrAfter).ToUniversalTime().Add(skew) < now)
+            if (notOnOrAfter is not null && DateTime.Parse(notOnOrAfter, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind).ToUniversalTime().Add(skew) < now)
             {
                 logger.LogWarning("SAML assertion has expired");
                 return null;

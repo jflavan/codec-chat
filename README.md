@@ -78,7 +78,7 @@ For full setup details, see [Development Setup](docs/DEV_SETUP.md).
 - **Real-time messaging** — instant delivery via SignalR WebSockets with typing indicators, @mentions, message replies, editing, deletion, text formatting, and message search
 - **Direct messages** — 1:1 private conversations with unread badges
 - **Voice & video** — voice channels in servers (mediasoup SFU), 1:1 DM calls with ringing/accept/decline flow, video chat, and screen sharing
-- **Rich media** — image uploads, emoji reactions, custom server emojis, link previews with Open Graph metadata, inline YouTube embeds
+- **Rich media** — image uploads, file attachments, emoji reactions, custom server emojis, link previews with Open Graph metadata, inline YouTube embeds, image proxying
 - **User profiles** — nicknames, custom status messages, custom avatars with server-specific overrides, friends system with real-time notifications
 - **Moderation** — user banning with message purge, custom roles with 21 granular permissions, audit log with 90-day retention
 - **Integrations** — outgoing webhooks with HMAC-SHA256 signing, web push notifications
@@ -89,7 +89,7 @@ For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and
 
 ## Testing
 
-Codec has 582 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
+Codec has 1,542 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
 
 ```bash
 # Web tests (Vitest)
@@ -101,9 +101,9 @@ dotnet test Codec.sln
 
 | Suite | Tests | Coverage |
 |-------|-------|----------|
-| Web (Vitest) | 174 | 98% line (unit-testable code) |
-| API Unit (xUnit) | 278 | 95% line (core services) |
-| API Integration (Testcontainers) | 109 | 72% line (full pipeline) |
+| Web (Vitest) | 177 | 98% line (unit-testable code) |
+| API Unit (xUnit) | 1,188 | 95% line (core services) |
+| API Integration (Testcontainers) | 177 | 80% line (full pipeline) |
 
 ## Self-Hosting
 

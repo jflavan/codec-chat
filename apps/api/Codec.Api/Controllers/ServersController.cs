@@ -171,7 +171,8 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = (await db.Servers.FindAsync(serverId))!;
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
 
         bool nameChanged = false;
         bool descriptionChanged = false;
@@ -1417,7 +1418,8 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = (await db.Servers.FindAsync(serverId))!;
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
 
         // Remove the previous icon file if one exists.
         if (!string.IsNullOrEmpty(server.IconUrl))
@@ -1449,7 +1451,8 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
 
-        var server = (await db.Servers.FindAsync(serverId))!;
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
 
         if (!string.IsNullOrEmpty(server.IconUrl))
         {

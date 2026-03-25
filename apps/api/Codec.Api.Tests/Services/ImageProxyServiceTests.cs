@@ -235,7 +235,6 @@ public class ImageProxyServiceTests
     [InlineData("image/png")]
     [InlineData("image/gif")]
     [InlineData("image/webp")]
-    [InlineData("image/svg+xml")]
     [InlineData("image/avif")]
     public async Task FetchImageAsync_AllowedContentTypes_ReturnsData(string contentType)
     {
@@ -261,6 +260,7 @@ public class ImageProxyServiceTests
     [InlineData("application/json")]
     [InlineData("application/octet-stream")]
     [InlineData("video/mp4")]
+    [InlineData("image/svg+xml")]
     public async Task FetchImageAsync_DisallowedContentTypes_ReturnsNull(string contentType)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK)

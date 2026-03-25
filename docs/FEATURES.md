@@ -49,6 +49,7 @@ This document tracks implemented and planned features for Codec.
 - @mentions with autocomplete picker and @here; mention badges on server/channel icons
 - Emoji reactions (toggle, pills with counts, real-time sync)
 - Image uploads via file picker, clipboard paste, or drag-and-drop (10 MB max)
+- File attachments for documents and non-image media (25 MB max) with download cards
 - Image lightbox — full-size preview overlay with keyboard dismiss
 - Link previews — Open Graph metadata, clickable embed cards, SSRF protection
 - YouTube embeds — click-to-play inline video players via `svelte-youtube-embed`
@@ -124,12 +125,17 @@ This document tracks implemented and planned features for Codec.
 - Response compression (Brotli + Gzip)
 - Structured JSON logging via Serilog (Console → Container Apps → Log Analytics)
 - SignalR hub (`/hubs/chat`) with WebSocket JWT auth via query string
+- Swagger/OpenAPI documentation with Scalar UI at `/scalar/v1`
+- Image proxy endpoint (`GET /images/proxy?url=`) with SSRF protection
 - Global exception handler with RFC 7807 ProblemDetails responses
 - EF Core with automatic migrations (dev) and migration bundles (prod CD pipeline)
 - Azure deployment: Container Apps, Key Vault secrets, Bicep IaC, GitHub Actions CI/CD
 - .NET Aspire AppHost for single-command local dev orchestration (Postgres, Redis, Azurite, API, Web; dashboard at `https://localhost:17222`)
 - OpenTelemetry observability — distributed traces, metrics, and structured logs exported to Azure Monitor (Application Insights) in production and OTLP (Aspire dashboard) locally
 - SFU telemetry — custom spans on room/transport/producer/consumer operations with Azure Monitor export
+- Azure Monitor alerts — container restart, 5xx error rate, and database CPU monitoring via Bicep modules
+- Trivy container vulnerability scanning in CI and CD pipelines (advisory mode)
+- VAPID key rotation to Azure Key Vault secrets for push notification security
 
 ### Moderation
 - **User banning** — ban members with optional message purge; `BannedMember` entity with reason and actor tracking; ban check on invite join (prevents re-entry); real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management UI in server settings (list, ban, unban)
@@ -148,22 +154,46 @@ This document tracks implemented and planned features for Codec.
 - **OAuth configuration** — `GET /auth/oauth/config` returns enabled provider status (public endpoint)
 
 ### Testing
-- 582 automated tests across 3 test suites (296 API unit, 109 API integration, 177 web)
+- 1,542 automated tests across 3 test suites (1,188 API unit, 177 API integration, 177 web)
 - API unit tests: xUnit + FluentAssertions + Moq; InMemory EF Core for database tests
 - API integration tests: WebApplicationFactory + Testcontainers (disposable PostgreSQL + Redis); full HTTP pipeline with real migrations; FakeAuthHandler bypasses Google JWT; SignalR hub tests via SignalR client
 - Web unit tests: Vitest + jsdom; localStorage polyfill; mocked fetch for API client
-- Coverage: core services 95%+, web utilities 98%+, combined API 72%+
+- Coverage: core services 95%+, web utilities 98%+, combined API 80%+
 - See [TESTING.md](TESTING.md) for full details
+
+### File Attachments
+- File uploads for documents and non-image media (PDF, ZIP, etc.) via `FileUploadService`
+- Attachment fields on `Message` and `DirectMessage` entities (`FileName`, `FileSize`, `FileMimeType`, `FileUrl`)
+- `FileCard` component renders file attachments with icon, name, size, and download link
+- Composer supports file picker and drag-and-drop for file attachments
+- 25 MB max file size; content-type validation
+
+### Image Proxy
+- `GET /images/proxy?url=` endpoint proxies external images through the API
+- SSRF protection with DNS rebinding checks and private IP blocking
+- Content-type validation (only image/* allowed)
+- 10 MB max response size
+- Configurable allowlist/blocklist
+
+### API Documentation
+- Swagger/OpenAPI documentation with Scalar UI at `/scalar/v1`
+- Auto-generated from controller metadata and XML documentation comments
+
+### Security & Operations
+- **Trivy container scanning** — vulnerability scanning of Docker images in both CI and CD pipelines; advisory mode (non-blocking)
+- **Azure Monitor alerts** — container restart alerts, 5xx error rate alerts, database CPU alerts via Bicep modules (`monitor-alerts.bicep`, `monitor-action-group.bicep`)
+- **VAPID key rotation** — push notification VAPID keys rotated to Azure Key Vault secrets (no longer in appsettings)
+- **Security hardening** — SAML XML signature validation strengthened, OAuth redirect URI validation, webhook URL validation, input length validation on all DTOs
 
 ## Planned
 
 ### Near-Term
-- Image proxying
-- File uploads (documents, other media)
+- Group DMs (multi-party DM conversations)
+- Thread/forum channels
 
 ## Technical Debt
-- [ ] API documentation (Swagger/OpenAPI)
-- [x] Unit and integration tests (582 tests across 3 suites)
+- [x] API documentation (Swagger/OpenAPI with Scalar UI)
+- [x] Unit and integration tests (1,542 tests across 3 suites)
 - [x] Structured logging (Serilog)
 - [x] Production database migration strategy (EF Core bundles in CD)
 - [x] Container deployment (Docker multi-stage builds, Azure Container Apps)
