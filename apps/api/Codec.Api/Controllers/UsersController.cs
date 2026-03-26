@@ -229,8 +229,9 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
         var term = q.Trim();
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
-        // Use parameterized EF.Functions.Like to prevent injection.
-        var pattern = $"%{term}%";
+        // Escape LIKE metacharacters to prevent wildcard abuse (e.g. "%" matching all users).
+        var escaped = term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var pattern = $"%{escaped}%";
         var users = await db.Users
             .AsNoTracking()
             .Where(u => u.Id != appUser.Id &&

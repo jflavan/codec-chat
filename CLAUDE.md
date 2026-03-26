@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Codec is a Discord-like chat application — a monorepo with a SvelteKit frontend (`apps/web`) and an ASP.NET Core 10 Web API backend (`apps/api`). Authentication supports both Google Sign-In (ID tokens validated by the API) and email/password registration (API-issued JWTs with bcrypt hashing and rotating refresh tokens). Real-time features run over SignalR WebSockets.
+Codec is a Discord-like chat application — a monorepo with a SvelteKit frontend (`apps/web`) and an ASP.NET Core 10 Web API backend (`apps/api`). Authentication supports Google Sign-In, email/password registration (API-issued JWTs with bcrypt hashing and rotating refresh tokens), GitHub OAuth, Discord OAuth, and SAML 2.0 SSO. Real-time features run over SignalR WebSockets.
 
 ## Development Commands
 
@@ -74,7 +74,7 @@ apps/
       Models/        # EF Core entities + request DTOs
       Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
       Hubs/          # ChatHub (SignalR)
-      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, LinkPreviewService, file storage
+      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, file storage
       Filters/       # ValidateRecaptchaAttribute (action filter)
       Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
@@ -83,14 +83,14 @@ apps/
   web/src/
     lib/
       api/           # ApiClient class (typed HTTP client)
-      auth/          # Token persistence (localStorage) + Google SDK init
-      services/      # ChatHubService (SignalR lifecycle)
+      auth/          # Token persistence (localStorage) + Google SDK init + OAuth helpers
+      services/      # ChatHubService (SignalR lifecycle), push-notifications.ts
       state/         # AppState class — central $state/$derived reactive state
       types/         # Domain models (models.ts)
       styles/        # CSS design tokens (tokens.css) + global.css
       utils/         # Pure helpers (format.ts)
       components/    # Svelte 5 components grouped by feature area
-        server-settings/  # ServerSettings, ServerChannels, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerSettingsSidebar, ServerSettingsModal
+        server-settings/  # ServerSettings, ServerChannels, ServerRoles, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerBans, ServerWebhooks, ServerSettingsSidebar, ServerSettingsModal
     routes/
       +layout.svelte  # Root layout
       +page.svelte    # Thin shell (~75 lines); creates AppState, sets context

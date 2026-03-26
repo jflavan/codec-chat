@@ -52,14 +52,23 @@ export const Permission = {
 	ManageMessages: 1 << 25,
 	PinMessages: 1 << 26,
 	Connect: 1 << 30,
-	// Note: values > 2^31 need BigInt in JS but we use number for the commonly checked ones
+	// Administrator uses 2**40 which exceeds 32-bit bitwise range.
+	// We use a float constant and compare via isAdministrator() helper.
 	Administrator: 2 ** 40,
 } as const;
+
+/** Check whether a permission value includes the Administrator flag (2^40, beyond 32-bit range). */
+function isAdministrator(permissions: number): boolean {
+	// The API sends permissions as a JSON number. For values ≥ 2^40, bitwise & truncates to 32 bits.
+	// Instead, check via float division: if bit 40 is set, floor(p / 2^40) is odd.
+	return Math.floor(permissions / Permission.Administrator) % 2 === 1;
+}
 
 /** Check if a permission set includes the given flag. */
 export function hasPermission(permissions: number, flag: number): boolean {
 	// Administrator grants everything
-	if ((permissions & Permission.Administrator) !== 0) return true;
+	if (isAdministrator(permissions)) return true;
+	if (flag === Permission.Administrator) return false;
 	return (permissions & flag) === flag;
 }
 

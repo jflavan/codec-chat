@@ -989,7 +989,7 @@ export class ApiClient {
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks`,
 			{
 				method: 'POST',
-				headers: this.headers(token),
+				headers: this.headers(token, true),
 				body: JSON.stringify(data)
 			}
 		);
@@ -1006,7 +1006,7 @@ export class ApiClient {
 			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/webhooks/${encodeURIComponent(webhookId)}`,
 			{
 				method: 'PATCH',
-				headers: this.headers(token),
+				headers: this.headers(token, true),
 				body: JSON.stringify(data)
 			}
 		);

@@ -327,6 +327,14 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
             .OrderBy(r => r.Position)
             .ToListAsync();
 
+        // Validate: request must contain exactly all roles (no partial reorders to prevent privilege escalation)
+        var serverRoleIds = roles.Select(r => r.Id).ToHashSet();
+        var requestRoleIds = request.RoleIds.ToHashSet();
+        if (!serverRoleIds.SetEquals(requestRoleIds))
+        {
+            return BadRequest(new { error = "Role list must contain exactly all server roles." });
+        }
+
         // Validate: Owner role must remain at position 0
         var ownerRole = roles.FirstOrDefault(r => r.IsSystemRole && r.Position == 0);
         if (ownerRole is not null && request.RoleIds.Count > 0 && request.RoleIds[0] != ownerRole.Id)
@@ -337,11 +345,8 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         // Apply new positions
         for (var i = 0; i < request.RoleIds.Count; i++)
         {
-            var role = roles.FirstOrDefault(r => r.Id == request.RoleIds[i]);
-            if (role is not null)
-            {
-                role.Position = i;
-            }
+            var role = roles.First(r => r.Id == request.RoleIds[i]);
+            role.Position = i;
         }
 
         await db.SaveChangesAsync();

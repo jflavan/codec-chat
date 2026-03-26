@@ -266,11 +266,13 @@ export class VoiceService {
 		return videoTrack;
 	}
 
-	/** Stop camera video producer. */
+	/** Stop camera video producer. Guards against double invocation from track 'ended' events. */
 	async stopVideo(): Promise<void> {
-		if (this.videoProducer) {
-			this.videoProducer.close();
+		const producer = this.videoProducer;
+		if (!producer && !this.videoStream) return; // already stopped
+		if (producer) {
 			this.videoProducer = null;
+			producer.close();
 		}
 		if (this.videoStream) {
 			for (const track of this.videoStream.getTracks()) track.stop();
@@ -302,11 +304,13 @@ export class VoiceService {
 		return screenTrack;
 	}
 
-	/** Stop screen share producer. */
+	/** Stop screen share producer. Guards against double invocation from track 'ended' events. */
 	async stopScreenShare(): Promise<void> {
-		if (this.screenProducer) {
-			this.screenProducer.close();
+		const producer = this.screenProducer;
+		if (!producer && !this.screenStream) return; // already stopped
+		if (producer) {
 			this.screenProducer = null;
+			producer.close();
 		}
 		if (this.screenStream) {
 			for (const track of this.screenStream.getTracks()) track.stop();
