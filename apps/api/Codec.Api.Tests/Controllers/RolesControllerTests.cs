@@ -231,6 +231,7 @@ public class RolesControllerTests : IDisposable
         var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
         _db.ServerRoles.Add(customRole);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -250,6 +251,7 @@ public class RolesControllerTests : IDisposable
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -267,6 +269,7 @@ public class RolesControllerTests : IDisposable
         _db.Servers.Add(server);
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -286,6 +289,7 @@ public class RolesControllerTests : IDisposable
         var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
         _db.ServerRoles.Add(customRole);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -304,6 +308,7 @@ public class RolesControllerTests : IDisposable
         _db.Servers.Add(server);
         var (ownerRole, adminRole, _) = CreateDefaultRoles(server);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         // Caller is admin (position 1) trying to edit owner role (position 0)
@@ -325,6 +330,7 @@ public class RolesControllerTests : IDisposable
         var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
         _db.ServerRoles.Add(customRole);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -346,6 +352,7 @@ public class RolesControllerTests : IDisposable
         var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
         _db.ServerRoles.Add(customRole);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -368,6 +375,7 @@ public class RolesControllerTests : IDisposable
         var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
         _db.ServerRoles.Add(customRole);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -392,6 +400,7 @@ public class RolesControllerTests : IDisposable
         var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
         _db.ServerRoles.Add(customRole);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
@@ -472,6 +481,8 @@ public class RolesControllerTests : IDisposable
         _db.Users.Add(otherUser);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = otherUser.Id, RoleId = customRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = otherUser.Id, RoleId = customRole.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))

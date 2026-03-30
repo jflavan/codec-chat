@@ -462,7 +462,7 @@ public class ServersControllerWebhookTests : IDisposable
     [Fact]
     public async Task CreateWebhook_ThrowsWhenNotAdmin()
     {
-        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(_testServer.Id, _testUser.Id, Permission.ManageServer, false))
             .ThrowsAsync(new UnauthorizedAccessException("Not admin"));
 
         var request = new CreateWebhookRequest
@@ -479,7 +479,7 @@ public class ServersControllerWebhookTests : IDisposable
     [Fact]
     public async Task DeleteWebhook_ThrowsWhenNotAdmin()
     {
-        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(_testServer.Id, _testUser.Id, Permission.ManageServer, false))
             .ThrowsAsync(new UnauthorizedAccessException("Not admin"));
 
         var act = () => _controller.DeleteWebhook(_testServer.Id, Guid.NewGuid(), _auditService);

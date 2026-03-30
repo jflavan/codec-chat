@@ -374,7 +374,7 @@ public class ServersControllerTests : IDisposable
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.KickMembers, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
 
         var result = await _controller.KickMember(server.Id, target.Id, _auditService);
@@ -900,7 +900,7 @@ public class ServersControllerTests : IDisposable
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeMemberRole(server.Id) });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
@@ -954,7 +954,7 @@ public class ServersControllerTests : IDisposable
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest { Reason = "Spam" }, _auditService);
@@ -980,7 +980,7 @@ public class ServersControllerTests : IDisposable
         _db.Messages.Add(new Message { ChannelId = channel.Id, AuthorUserId = target.Id, Body = "more spam" });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest { DeleteMessages = true }, _auditService);
@@ -1798,7 +1798,7 @@ public class ServersControllerTests : IDisposable
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.KickMembers, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
 
         var result = await _controller.KickMember(server.Id, target.Id, _auditService);
@@ -2567,7 +2567,7 @@ public class ServersControllerTests : IDisposable
         _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
-        _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ownerRole });
 
         var result = await _controller.BanMember(server.Id, targetUser.Id,

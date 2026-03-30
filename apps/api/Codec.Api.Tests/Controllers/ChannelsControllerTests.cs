@@ -435,7 +435,7 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task PinMessage_RequiresAdmin_ThrowsForbidden()
     {
-        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(_testServer.Id, _testUser.Id, Permission.PinMessages, false))
             .ThrowsAsync(new Codec.Api.Services.Exceptions.ForbiddenException());
 
         var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
@@ -868,7 +868,7 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task UnpinMessage_RequiresAdmin_ThrowsForbidden()
     {
-        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(_testServer.Id, _testUser.Id, Permission.PinMessages, false))
             .ThrowsAsync(new Codec.Api.Services.Exceptions.ForbiddenException());
 
         var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Unpin" };

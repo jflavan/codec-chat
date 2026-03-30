@@ -308,6 +308,11 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
                     RoleId = memberRole.Id,
                     AssignedAt = DateTimeOffset.UtcNow
                 });
+                // Also update the legacy ServerMember.RoleId to prevent cascade delete
+                var serverMember = await db.ServerMembers
+                    .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+                if (serverMember is not null)
+                    serverMember.RoleId = memberRole.Id;
             }
         }
 
