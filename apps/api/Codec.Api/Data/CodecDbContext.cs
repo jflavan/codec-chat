@@ -36,6 +36,8 @@ public class CodecDbContext : DbContext
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<BannedMember> BannedMembers => Set<BannedMember>();
     public DbSet<ServerRoleEntity> ServerRoles => Set<ServerRoleEntity>();
+    public DbSet<ServerMemberRole> ServerMemberRoles => Set<ServerMemberRole>();
+    public DbSet<ChannelPermissionOverride> ChannelPermissionOverrides => Set<ChannelPermissionOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -144,6 +146,37 @@ public class CodecDbContext : DbContext
             e.Property(r => r.Color).HasMaxLength(7);
             e.HasIndex(r => new { r.ServerId, r.Position });
             e.HasIndex(r => new { r.ServerId, r.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ServerMemberRole>(e =>
+        {
+            e.HasKey(mr => new { mr.UserId, mr.RoleId });
+
+            e.HasOne(mr => mr.Member)
+                .WithMany(m => m.MemberRoles)
+                .HasForeignKey(mr => mr.UserId)
+                .HasPrincipalKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(mr => mr.Role)
+                .WithMany(r => r.MemberRoles)
+                .HasForeignKey(mr => mr.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChannelPermissionOverride>(e =>
+        {
+            e.HasOne(o => o.Channel)
+                .WithMany()
+                .HasForeignKey(o => o.ChannelId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(o => o.Role)
+                .WithMany()
+                .HasForeignKey(o => o.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(o => new { o.ChannelId, o.RoleId }).IsUnique();
         });
 
         modelBuilder.Entity<Reaction>(entity =>

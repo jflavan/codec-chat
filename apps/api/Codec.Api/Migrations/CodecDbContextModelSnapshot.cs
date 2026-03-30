@@ -768,6 +768,52 @@ namespace Codec.Api.Migrations
                     b.ToTable("ServerMembers");
                 });
 
+            modelBuilder.Entity("Codec.Api.Models.ChannelPermissionOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Allow")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Deny")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("ChannelId", "RoleId")
+                        .IsUnique();
+
+                    b.ToTable("ChannelPermissionOverrides");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.ServerMemberRole", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("ServerMemberRoles");
+                });
+
             modelBuilder.Entity("Codec.Api.Models.ServerRoleEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1427,6 +1473,45 @@ namespace Codec.Api.Migrations
                     b.Navigation("Server");
                 });
 
+            modelBuilder.Entity("Codec.Api.Models.ChannelPermissionOverride", b =>
+                {
+                    b.HasOne("Codec.Api.Models.Channel", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Codec.Api.Models.ServerRoleEntity", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.ServerMemberRole", b =>
+                {
+                    b.HasOne("Codec.Api.Models.ServerMember", "Member")
+                        .WithMany("MemberRoles")
+                        .HasForeignKey("UserId")
+                        .HasPrincipalKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Codec.Api.Models.ServerRoleEntity", "Role")
+                        .WithMany("MemberRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("Codec.Api.Models.ServerMember", b =>
                 {
                     b.HasOne("Codec.Api.Models.ServerRoleEntity", "Role")
@@ -1607,8 +1692,15 @@ namespace Codec.Api.Migrations
                     b.Navigation("Webhooks");
                 });
 
+            modelBuilder.Entity("Codec.Api.Models.ServerMember", b =>
+                {
+                    b.Navigation("MemberRoles");
+                });
+
             modelBuilder.Entity("Codec.Api.Models.ServerRoleEntity", b =>
                 {
+                    b.Navigation("MemberRoles");
+
                     b.Navigation("Members");
                 });
 
