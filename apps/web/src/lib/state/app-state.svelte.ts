@@ -293,8 +293,8 @@ export class AppState {
 
 	readonly isGlobalAdmin = $derived(Boolean(this.me?.user.isGlobalAdmin));
 
-	readonly currentServerRole = $derived(
-		this.servers.find((s) => s.serverId === this.selectedServerId)?.role ?? null
+	readonly isServerOwner = $derived(
+		this.servers.find((s) => s.serverId === this.selectedServerId)?.isOwner ?? false
 	);
 
 	readonly currentServerPermissions = $derived(
@@ -316,7 +316,7 @@ export class AppState {
 	);
 
 	readonly canBanMembers = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner' || this.currentServerRole === 'Admin'
+		this.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.BanMembers)
 	);
 
 	readonly canManageInvites = $derived(
@@ -324,7 +324,7 @@ export class AppState {
 	);
 
 	readonly canDeleteServer = $derived(
-		this.isGlobalAdmin || this.currentServerRole === 'Owner'
+		this.isGlobalAdmin || this.isServerOwner
 	);
 
 	readonly canDeleteChannel = $derived(
@@ -1216,11 +1216,33 @@ export class AppState {
 		}
 	}
 
-	/** Change a member's role in the currently selected server. */
-	async updateMemberRole(userId: string, role: string): Promise<void> {
+	/** Add a role to a member in the currently selected server. */
+	async addMemberRole(userId: string, roleId: string): Promise<void> {
 		if (!this.idToken || !this.selectedServerId) return;
 		try {
-			await this.api.updateMemberRole(this.idToken, this.selectedServerId, userId, role);
+			await this.api.addMemberRole(this.idToken, this.selectedServerId, userId, roleId);
+			await this.loadMembers(this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Remove a role from a member in the currently selected server. */
+	async removeMemberRole(userId: string, roleId: string): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.removeMemberRole(this.idToken, this.selectedServerId, userId, roleId);
+			await this.loadMembers(this.selectedServerId);
+		} catch (e) {
+			this.setError(e);
+		}
+	}
+
+	/** Replace all roles for a member in the currently selected server. */
+	async setMemberRoles(userId: string, roleIds: string[]): Promise<void> {
+		if (!this.idToken || !this.selectedServerId) return;
+		try {
+			await this.api.setMemberRoles(this.idToken, this.selectedServerId, userId, roleIds);
 			await this.loadMembers(this.selectedServerId);
 		} catch (e) {
 			this.setError(e);
@@ -3363,11 +3385,9 @@ export class AppState {
 				if (event.serverId === this.selectedServerId) {
 					this.loadMembers(event.serverId);
 				}
-				// Update the caller's own role in the servers list if they were promoted/demoted
+				// Refresh own server membership if own roles changed
 				if (event.userId === this.me?.user.id) {
-					this.servers = this.servers.map((s) =>
-						s.serverId === event.serverId ? { ...s, role: event.newRole } : s
-					);
+					this.loadServers();
 				}
 			},
 			onMessageDeleted: (event) => {
