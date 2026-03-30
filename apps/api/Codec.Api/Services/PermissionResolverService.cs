@@ -84,11 +84,13 @@ public class PermissionResolverService(CodecDbContext db) : IPermissionResolverS
 
     public async Task<bool> IsOwnerAsync(Guid serverId, Guid userId)
     {
-        var membership = await db.ServerMembers.AsNoTracking()
-            .Include(m => m.Role)
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-
-        return membership?.Role is { IsSystemRole: true, Position: 0 };
+        // Check if the user has the position-0 system role (Owner) via the multi-role join table
+        return await db.ServerMemberRoles.AsNoTracking()
+            .AnyAsync(mr =>
+                mr.UserId == userId &&
+                mr.Role!.ServerId == serverId &&
+                mr.Role.IsSystemRole &&
+                mr.Role.Position == 0);
     }
 
     private async Task<List<ServerRoleEntity>> GetRolesAsync(Guid serverId, Guid userId)
