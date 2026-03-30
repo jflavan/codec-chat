@@ -1340,6 +1340,26 @@ export class AppState {
 		}
 	}
 
+	/* ═══════════════════ Channel Permission Overrides ═══════════════════ */
+
+	/** Fetch all permission overrides for a channel. */
+	async getChannelOverrides(channelId: string): Promise<import('$lib/types/models.js').ChannelPermissionOverride[]> {
+		if (!this.idToken) return [];
+		return this.api.getChannelOverrides(this.idToken, channelId);
+	}
+
+	/** Set or update a permission override for a role in a channel. */
+	async setChannelOverride(channelId: string, roleId: string, allow: number, deny: number): Promise<void> {
+		if (!this.idToken) return;
+		await this.api.setChannelOverride(this.idToken, channelId, roleId, allow, deny);
+	}
+
+	/** Delete a permission override for a role in a channel. */
+	async deleteChannelOverride(channelId: string, roleId: string): Promise<void> {
+		if (!this.idToken) return;
+		await this.api.deleteChannelOverride(this.idToken, channelId, roleId);
+	}
+
 	/* ═══════════════════ Server Invites ═══════════════════ */
 
 	/** Load active invites for the currently selected server. */
@@ -3766,6 +3786,16 @@ export class AppState {
 			onCategoryOrderChanged: async (event) => {
 				if (event.serverId === this.selectedServerId) {
 					await this.loadCategories().catch(() => {});
+				}
+			},
+			onChannelOverrideUpdated: async (event) => {
+				// Refresh channels for the current server when a permission override changes,
+				// since the API filters channels based on ViewChannels permission.
+				if (this.selectedServerId) {
+					const channel = this.channels.find((c) => c.id === event.channelId);
+					if (channel?.serverId === this.selectedServerId || !channel) {
+						await this.loadChannels(this.selectedServerId).catch(() => {});
+					}
 				}
 			},
 		});
