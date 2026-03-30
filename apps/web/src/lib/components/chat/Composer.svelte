@@ -22,7 +22,7 @@
 	let selectedMentionIndex = $state(0);
 
 	/** Virtual entry representing the @here mention that notifies all channel members. */
-	const hereMember: Member = { userId: 'here', displayName: 'here', avatarUrl: '', role: 'Member', rolePosition: 999, roleIsHoisted: false, permissions: 0, joinedAt: '' };
+	const hereMember: Member = { userId: 'here', displayName: 'here', avatarUrl: '', roles: [], displayRole: null, highestPosition: 999, permissions: 0, joinedAt: '' };
 
 	const filteredMembers: Member[] = $derived.by(() => {
 		const q = mentionQuery.toLowerCase();

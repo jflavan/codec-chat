@@ -5,7 +5,8 @@
 
 	let { member, presence = 'offline' }: { member: Member; presence?: PresenceStatus } = $props();
 
-	const showBadge = $derived(member.role !== 'Member' && member.roleIsHoisted);
+	const hoistedRole = $derived(member.roles.find(r => !r.isSystemRole) ?? member.displayRole ?? null);
+	const showBadge = $derived(hoistedRole !== null && hoistedRole.name !== 'Member');
 </script>
 
 <li class="member-item" class:offline={presence === 'offline'}>
@@ -25,10 +26,10 @@
 			{#if showBadge}
 				<span
 					class="role-badge"
-					style:color={member.roleColor ?? 'var(--text-muted)'}
-					style:background={member.roleColor ? `${member.roleColor}26` : 'var(--bg-tertiary)'}
+					style:color={hoistedRole?.color ?? 'var(--text-muted)'}
+					style:background={hoistedRole?.color ? `${hoistedRole.color}26` : 'var(--bg-tertiary)'}
 				>
-					{member.role}
+					{hoistedRole?.name}
 				</span>
 			{/if}
 		</div>
