@@ -65,7 +65,7 @@ public static class PermissionExtensions
     public static readonly Permission AdminDefaults =
         Permission.ViewChannels | Permission.ManageChannels | Permission.ManageServer |
         Permission.ManageRoles | Permission.ManageEmojis | Permission.ViewAuditLog |
-        Permission.CreateInvites | Permission.ManageInvites | Permission.KickMembers |
+        Permission.CreateInvites | Permission.ManageInvites | Permission.KickMembers | Permission.BanMembers |
         Permission.SendMessages | Permission.EmbedLinks | Permission.AttachFiles |
         Permission.AddReactions | Permission.MentionEveryone | Permission.ManageMessages |
         Permission.PinMessages | Permission.Connect | Permission.Speak |
