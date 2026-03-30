@@ -15,7 +15,7 @@ namespace Codec.Api.Hubs;
 /// Clients join channel-scoped, user-scoped, server-scoped, and voice-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker, IPermissionResolverService permissionResolver) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
@@ -109,6 +109,12 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task JoinChannel(string channelId)
     {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
+        if (!Guid.TryParse(channelId, out var channelGuid))
+            throw new HubException("Invalid channel ID.");
+        var canView = await permissionResolver.HasChannelPermissionAsync(channelGuid, appUser.Id, Permission.ViewChannels);
+        if (!canView)
+            throw new HubException("Missing permission: ViewChannels");
         await Groups.AddToGroupAsync(Context.ConnectionId, channelId);
     }
 
@@ -666,6 +672,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         if (!isMember)
             throw new HubException("Not a member of this server.");
 
+        var canConnect = await permissionResolver.HasChannelPermissionAsync(channelGuid, appUser.Id, Permission.Connect);
+        if (!canConnect)
+            throw new HubException("Missing permission: Connect");
+
         // Clean up any existing voice session first (user switching channels).
         var existing = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
         if (existing is not null)
@@ -847,6 +857,14 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
 
         if (voiceState is null)
             throw new HubException("Not currently in a voice session.");
+
+        // Check Speak permission for audio producers on server voice channels.
+        if (label == "audio" && voiceState.ChannelId.HasValue)
+        {
+            var canSpeak = await permissionResolver.HasChannelPermissionAsync(voiceState.ChannelId.Value, appUser.Id, Permission.Speak);
+            if (!canSpeak)
+                throw new HubException("Missing permission: Speak");
+        }
 
         var roomId = await GetSfuRoomIdAsync(voiceState);
         var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";

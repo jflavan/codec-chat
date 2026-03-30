@@ -30,6 +30,7 @@ public class ChatHubTests : IDisposable
     private readonly Mock<HubCallerContext> _mockContext = new();
     private readonly Mock<IClientProxy> _mockClientProxy = new();
     private readonly Mock<IClientProxy> _mockOthersProxy = new();
+    private readonly Mock<IPermissionResolverService> _permissionResolver = new();
 
     private readonly User _testUser;
     private readonly User _testUser2;
@@ -134,6 +135,14 @@ public class ChatHubTests : IDisposable
 
         _config.Setup(c => c[It.IsAny<string>()]).Returns((string?)null);
 
+        // Default: all permission checks pass.
+        _permissionResolver
+            .Setup(p => p.HasChannelPermissionAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Permission>()))
+            .ReturnsAsync(true);
+        _permissionResolver
+            .Setup(p => p.HasServerPermissionAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Permission>()))
+            .ReturnsAsync(true);
+
         // Create a real VoiceCallTimeoutService mock. It is a BackgroundService
         // so we mock it with loose behavior. The methods StartTimeout/CancelTimeout
         // are virtual by inheritance but we just need to verify they're called.
@@ -162,7 +171,8 @@ public class ChatHubTests : IDisposable
             _httpClientFactory.Object,
             _logger.Object,
             _callTimeoutService.Object,
-            _presenceTracker
+            _presenceTracker,
+            _permissionResolver.Object
         );
         hub.Context = _mockContext.Object;
         hub.Clients = _mockClients.Object;
@@ -191,7 +201,8 @@ public class ChatHubTests : IDisposable
             _httpClientFactory.Object,
             _logger.Object,
             _callTimeoutService.Object,
-            _presenceTracker
+            _presenceTracker,
+            _permissionResolver.Object
         );
         hub.Context = mockContext2.Object;
         hub.Clients = _mockClients.Object;
@@ -1779,7 +1790,8 @@ public class ChatHubTests : IDisposable
             _httpClientFactory.Object,
             _logger.Object,
             _callTimeoutService.Object,
-            _presenceTracker
+            _presenceTracker,
+            _permissionResolver.Object
         );
         hub2.Context = mockContext2.Object;
         hub2.Clients = _mockClients.Object;
@@ -1796,13 +1808,15 @@ public class ChatHubTests : IDisposable
     [Fact]
     public async Task JoinChannel_MultipleChannels_JoinsBoth()
     {
+        var channelA = _textChannel.Id.ToString();
+        var channelB = _voiceChannel.Id.ToString();
         var hub = CreateHub();
 
-        await hub.JoinChannel("channel-a");
-        await hub.JoinChannel("channel-b");
+        await hub.JoinChannel(channelA);
+        await hub.JoinChannel(channelB);
 
-        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, "channel-a", default), Times.Once);
-        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, "channel-b", default), Times.Once);
+        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, channelA, default), Times.Once);
+        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, channelB, default), Times.Once);
     }
 
     [Fact]
