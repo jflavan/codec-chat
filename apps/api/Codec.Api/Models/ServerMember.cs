@@ -32,4 +32,5 @@ public class ServerMember
     public Server? Server { get; set; }
     public User? User { get; set; }
     public ServerRoleEntity? Role { get; set; }
+    public List<ServerMemberRole> MemberRoles { get; set; } = [];
 }

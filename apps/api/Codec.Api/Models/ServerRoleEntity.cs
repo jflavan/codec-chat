@@ -42,4 +42,5 @@ public class ServerRoleEntity
     // Navigation properties
     public Server? Server { get; set; }
     public List<ServerMember> Members { get; set; } = [];
+    public List<ServerMemberRole> MemberRoles { get; set; } = [];
 }
