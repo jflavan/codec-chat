@@ -18,12 +18,26 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("channels")]
-public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService, PushNotificationService? pushService = null) : ControllerBase
+public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService, IPermissionResolverService permissionResolver, PushNotificationService? pushService = null) : ControllerBase
 {
     private static readonly System.Text.Json.JsonSerializerOptions CamelCaseJsonOptions = new()
     {
         PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
     };
+
+    /// <summary>
+    /// Verifies the caller has a specific channel-level permission (applying overrides).
+    /// Returns null if allowed, or a Forbid result if denied.
+    /// Global admins bypass this check.
+    /// </summary>
+    private async Task<IActionResult?> EnsureChannelPermissionAsync(Guid channelId, Guid userId, Permission permission, bool isGlobalAdmin)
+    {
+        if (isGlobalAdmin) return null;
+        var hasPermission = await permissionResolver.HasChannelPermissionAsync(channelId, userId, permission);
+        if (!hasPermission) return Forbid();
+        return null;
+    }
+
     /// <summary>
     /// Returns messages for a channel, ordered by creation time (ascending).
     /// Supports cursor-based pagination via the <c>before</c> and <c>limit</c> query parameters.
@@ -45,6 +59,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        var denied = await EnsureChannelPermissionAsync(channelId, appUser.Id, Permission.ViewChannels, appUser.IsGlobalAdmin);
+        if (denied is not null) return denied;
 
         // Cache-first path for paginated history (not around-mode, not latest page).
         // Skip caching the latest page (before == null) since new messages invalidate it immediately.
@@ -501,6 +517,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        var denied = await EnsureChannelPermissionAsync(channelId, appUser.Id, Permission.SendMessages, appUser.IsGlobalAdmin);
+        if (denied is not null) return denied;
 
         var authorName = userService.GetEffectiveDisplayName(appUser);
         if (string.IsNullOrWhiteSpace(authorName))
@@ -757,6 +775,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        var denied = await EnsureChannelPermissionAsync(channelId, appUser.Id, Permission.ViewChannels, appUser.IsGlobalAdmin);
+        if (denied is not null) return denied;
 
         var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (message is null)
@@ -864,6 +884,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        var denied = await EnsureChannelPermissionAsync(channelId, appUser.Id, Permission.ViewChannels, appUser.IsGlobalAdmin);
+        if (denied is not null) return denied;
 
         var message = await db.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (message is null)
@@ -917,6 +939,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        var denied = await EnsureChannelPermissionAsync(channelId, appUser.Id, Permission.ViewChannels, appUser.IsGlobalAdmin);
+        if (denied is not null) return denied;
 
         var messageExists = await db.Messages.AnyAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (!messageExists)
@@ -983,6 +1007,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        var denied = await EnsureChannelPermissionAsync(channelId, appUser.Id, Permission.ViewChannels, appUser.IsGlobalAdmin);
+        if (denied is not null) return denied;
 
         var pins = await db.PinnedMessages
             .AsNoTracking()
@@ -1220,9 +1246,47 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
+        // Reject undefined/reserved permission bits
+        if (((Permission)request.Allow).HasUndefinedBits() || ((Permission)request.Deny).HasUndefinedBits())
+        {
+            return BadRequest(new { error = "Request contains undefined permission bits." });
+        }
+
+        // Administrator is a server-level concept and cannot be granted per-channel
+        if (((Permission)request.Allow & Permission.Administrator) != 0 ||
+            ((Permission)request.Deny & Permission.Administrator) != 0)
+        {
+            return BadRequest(new { error = "Cannot set Administrator permission in channel overrides." });
+        }
+
+        // Allow and Deny must be disjoint — a permission cannot be both allowed and denied
+        if ((request.Allow & request.Deny) != 0)
+        {
+            return BadRequest(new { error = "Allow and Deny must not overlap. A permission cannot be both allowed and denied." });
+        }
+
+        // Verify the caller holds every permission they are granting or denying
+        var requestedPerms = (Permission)request.Allow | (Permission)request.Deny;
+        if (requestedPerms != Permission.None)
+        {
+            var callerPerms = await permissionResolver.ResolveServerPermissionsAsync(channel.ServerId, appUser.Id);
+            if (!appUser.IsGlobalAdmin && (requestedPerms & ~callerPerms) != Permission.None)
+            {
+                return BadRequest(new { error = "Cannot set override for permissions you do not hold." });
+            }
+        }
+
         var role = await db.ServerRoles.AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == channel.ServerId);
         if (role is null) return NotFound();
+
+        // Enforce role hierarchy: cannot set overrides on roles at or above the caller's position
+        if (!appUser.IsGlobalAdmin)
+        {
+            var callerHighest = await permissionResolver.GetHighestRolePositionAsync(channel.ServerId, appUser.Id);
+            if (role.Position <= callerHighest)
+                return StatusCode(403, new { error = "Cannot modify overrides for a role ranked equal to or above yours." });
+        }
 
         var existing = await db.ChannelPermissionOverrides
             .FirstOrDefaultAsync(o => o.ChannelId == channelId && o.RoleId == roleId);
@@ -1259,9 +1323,31 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
+        // Enforce role hierarchy: cannot delete overrides on roles at or above the caller's position
+        if (!appUser.IsGlobalAdmin)
+        {
+            var role = await db.ServerRoles.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == channel.ServerId);
+            if (role is null) return NotFound();
+            var callerHighest = await permissionResolver.GetHighestRolePositionAsync(channel.ServerId, appUser.Id);
+            if (role.Position <= callerHighest)
+                return StatusCode(403, new { error = "Cannot modify overrides for a role ranked equal to or above yours." });
+        }
+
         var existing = await db.ChannelPermissionOverrides
             .FirstOrDefaultAsync(o => o.ChannelId == channelId && o.RoleId == roleId);
         if (existing is null) return NotFound();
+
+        // Verify the caller holds every permission present in the override being deleted
+        var affectedPerms = existing.Allow | existing.Deny;
+        if (affectedPerms != Permission.None && !appUser.IsGlobalAdmin)
+        {
+            var callerPerms = await permissionResolver.ResolveServerPermissionsAsync(channel.ServerId, appUser.Id);
+            if ((affectedPerms & ~callerPerms) != Permission.None)
+            {
+                return BadRequest(new { error = "Cannot delete override containing permissions you do not hold." });
+            }
+        }
 
         db.ChannelPermissionOverrides.Remove(existing);
         await db.SaveChangesAsync();

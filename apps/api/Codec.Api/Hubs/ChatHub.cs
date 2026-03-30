@@ -112,9 +112,22 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
         if (!Guid.TryParse(channelId, out var channelGuid))
             throw new HubException("Invalid channel ID.");
-        var canView = await permissionResolver.HasChannelPermissionAsync(channelGuid, appUser.Id, Permission.ViewChannels);
-        if (!canView)
-            throw new HubException("Missing permission: ViewChannels");
+
+        // Verify the user is actually a member of the server this channel belongs to
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelGuid);
+        if (channel is null)
+            throw new HubException("Channel not found.");
+        var isMember = appUser.IsGlobalAdmin || await db.ServerMembers.AsNoTracking()
+            .AnyAsync(m => m.ServerId == channel.ServerId && m.UserId == appUser.Id);
+        if (!isMember)
+            throw new HubException("Not a member of this server.");
+
+        if (!appUser.IsGlobalAdmin)
+        {
+            var canView = await permissionResolver.HasChannelPermissionAsync(channelGuid, appUser.Id, Permission.ViewChannels);
+            if (!canView)
+                throw new HubException("Missing permission: ViewChannels");
+        }
         await Groups.AddToGroupAsync(Context.ConnectionId, channelId);
     }
 
@@ -672,9 +685,12 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         if (!isMember)
             throw new HubException("Not a member of this server.");
 
-        var canConnect = await permissionResolver.HasChannelPermissionAsync(channelGuid, appUser.Id, Permission.Connect);
-        if (!canConnect)
-            throw new HubException("Missing permission: Connect");
+        if (!appUser.IsGlobalAdmin)
+        {
+            var canConnect = await permissionResolver.HasChannelPermissionAsync(channelGuid, appUser.Id, Permission.Connect);
+            if (!canConnect)
+                throw new HubException("Missing permission: Connect");
+        }
 
         // Clean up any existing voice session first (user switching channels).
         var existing = await db.VoiceStates.FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
@@ -859,7 +875,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             throw new HubException("Not currently in a voice session.");
 
         // Check Speak permission for audio producers on server voice channels.
-        if (label == "audio" && voiceState.ChannelId.HasValue)
+        if (label == "audio" && voiceState.ChannelId.HasValue && !appUser.IsGlobalAdmin)
         {
             var canSpeak = await permissionResolver.HasChannelPermissionAsync(voiceState.ChannelId.Value, appUser.Id, Permission.Speak);
             if (!canSpeak)

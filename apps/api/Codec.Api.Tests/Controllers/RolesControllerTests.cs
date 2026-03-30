@@ -523,6 +523,7 @@ public class RolesControllerTests : IDisposable
         _db.Servers.Add(server);
         var (ownerRole, adminRole, memberRole) = CreateDefaultRoles(server);
         _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))

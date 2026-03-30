@@ -50,12 +50,20 @@
 		deletingRoleId = null;
 	}
 
-	/** Toggle a permission bit, handling flags beyond 32-bit range via float arithmetic. */
+	/** Check if a single bit is actually set in the bitmask (ignores Administrator grant-all). */
+	function hasBit(mask: number, flag: number): boolean {
+		if (flag > (1 << 30) || mask > (1 << 30)) {
+			return Math.floor(mask / flag) % 2 === 1;
+		}
+		return (mask & flag) === flag;
+	}
+
+	/** Toggle a permission bit, handling values beyond 32-bit range via float arithmetic. */
 	function togglePermission(current: number, flag: number): number {
-		if (hasPermission(current, flag)) {
-			return flag > (1 << 30) ? current - flag : current & ~flag;
+		if (hasBit(current, flag)) {
+			return flag > (1 << 30) || current > (1 << 30) ? current - flag : current & ~flag;
 		} else {
-			return flag > (1 << 30) ? current + flag : current | flag;
+			return flag > (1 << 30) || current > (1 << 30) ? current + flag : current | flag;
 		}
 	}
 

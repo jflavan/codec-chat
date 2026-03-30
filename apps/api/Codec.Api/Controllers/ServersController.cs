@@ -75,7 +75,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                     s.IconUrl,
                     s.Description,
                     SortOrder = myMemberships.TryGetValue(s.Id, out var info) ? info.SortOrder : int.MaxValue,
-                    Roles = roles.Select(r2 => new { r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
+                    Roles = roles.Select(r2 => new { Id = r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
                     Permissions = (long)perms,
                     IsOwner = false // global admins viewing all servers — not necessarily owner
                 };
@@ -135,7 +135,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 m.IconUrl,
                 m.Description,
                 m.SortOrder,
-                Roles = roles.Select(r2 => new { r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
+                Roles = roles.Select(r2 => new { Id = r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
                 Permissions = permissions,
                 IsOwner = isOwner
             });
@@ -211,6 +211,14 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             JoinedAt = DateTimeOffset.UtcNow
         };
         db.ServerMembers.Add(membership);
+
+        // Assign the Owner role to the creator via the multi-role join table
+        db.ServerMemberRoles.Add(new ServerMemberRole
+        {
+            UserId = appUser.Id,
+            RoleId = ownerRole.Id,
+            AssignedAt = DateTimeOffset.UtcNow
+        });
 
         await db.SaveChangesAsync();
 
@@ -435,6 +443,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
             .FirstOrDefaultAsync() ?? "Unknown";
 
+        // Remove role assignments before removing membership
+        var targetRoleEntries = await db.ServerMemberRoles
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .ToListAsync();
+        db.ServerMemberRoles.RemoveRange(targetRoleEntries);
+
         db.ServerMembers.Remove(targetMembership);
         audit.Log(serverId, appUser.Id, AuditAction.MemberKicked,
             targetType: "User", targetId: targetUserId.ToString(),
@@ -536,9 +550,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         var bannedDisplayName = !string.IsNullOrWhiteSpace(targetUser.Nickname)
             ? targetUser.Nickname : targetUser.DisplayName;
 
-        // Remove membership if they're currently a member
+        // Remove role assignments and membership if they're currently a member
         if (targetMembership is not null)
         {
+            var targetRoleEntries = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+                .ToListAsync();
+            db.ServerMemberRoles.RemoveRange(targetRoleEntries);
             db.ServerMembers.Remove(targetMembership);
         }
 
@@ -750,10 +768,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             }
         }
 
-        // Check if the member already has exactly this role (idempotency)
+        // Check if the member already has exactly this one role and no others (idempotency)
+        var currentRoleCount = await db.ServerMemberRoles
+            .CountAsync(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId);
         var alreadyHasRole = await db.ServerMemberRoles
             .AnyAsync(mr => mr.UserId == targetUserId && mr.RoleId == newRoleEntity.Id);
-        if (alreadyHasRole)
+        if (alreadyHasRole && currentRoleCount == 1)
         {
             return Ok(new
             {
@@ -818,6 +838,11 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     [HttpPut("{serverId:guid}/members/{targetUserId:guid}/roles")]
     public async Task<IActionResult> SetMemberRoles(Guid serverId, Guid targetUserId, [FromBody] UpdateMemberRolesRequest request, [FromServices] AuditService audit)
     {
+        if (request.RoleIds.Count == 0)
+        {
+            return BadRequest(new { error = "At least one role is required." });
+        }
+
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         var hasPermission = await permissionResolver.HasServerPermissionAsync(serverId, appUser.Id, Permission.ManageRoles);
         if (!hasPermission && !appUser.IsGlobalAdmin)
@@ -866,10 +891,15 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return BadRequest(new { error = "Cannot assign the Owner role." });
         }
 
-        // Cannot assign roles at or above caller's highest position (unless global admin or owner)
+        // Cannot modify someone who outranks the caller, or assign roles at/above caller's position
         if (!appUser.IsGlobalAdmin && !isCallerOwner)
         {
             var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            var targetHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, targetUserId);
+            if (targetHighestPosition <= callerHighestPosition)
+            {
+                return Forbid();
+            }
             if (requestedRoles.Any(r => r.Position <= callerHighestPosition))
             {
                 return Forbid();
@@ -956,6 +986,11 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         if (!appUser.IsGlobalAdmin && !isCallerOwner)
         {
             var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            var targetHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, targetUserId);
+            if (targetHighestPosition <= callerHighestPosition)
+            {
+                return Forbid();
+            }
             if (role.Position <= callerHighestPosition)
             {
                 return Forbid();
@@ -1032,6 +1067,21 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         if (role.IsSystemRole && role.Position == 0)
         {
             return BadRequest(new { error = "Cannot remove the Owner role." });
+        }
+
+        // Cannot remove roles from someone who outranks the caller, or remove roles at/above caller's position
+        if (!appUser.IsGlobalAdmin)
+        {
+            var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            var targetHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, targetUserId);
+            if (targetHighestPosition <= callerHighestPosition)
+            {
+                return Forbid();
+            }
+            if (role.Position <= callerHighestPosition)
+            {
+                return Forbid();
+            }
         }
 
         var entry = await db.ServerMemberRoles
@@ -1660,6 +1710,15 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         };
 
         db.ServerMembers.Add(membership);
+
+        // Assign the Member role via the multi-role join table
+        db.ServerMemberRoles.Add(new ServerMemberRole
+        {
+            UserId = appUser.Id,
+            RoleId = memberRole.Id,
+            AssignedAt = DateTimeOffset.UtcNow
+        });
+
         invite.UseCount++;
         await db.SaveChangesAsync();
 

@@ -102,6 +102,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **Trivy container scanning** — Docker image vulnerability scanning in CI and CD pipelines (advisory mode)
 - **VAPID key rotation** — push notification keys rotated to Azure Key Vault secrets
 - **Security hardening** — SAML XML signature validation strengthened; OAuth redirect URI validation; webhook URL validation; input length validation on all request DTOs; `[param:]` target on record primary constructor validation attributes
+- **Multi-role support** — `ServerMemberRoles` join table replaces single `RoleId` on `ServerMember`; members can hold multiple roles simultaneously; permissions OR-merged across all roles; new add/remove/replace endpoints in `RolesController`; `PermissionResolverService` handles OR-merge and channel-level resolution; server Owners and Administrators bypass all checks
+- **Per-channel permission overrides** — `ChannelPermissionOverrides` table with `(ChannelId, RoleId, Allow, Deny)` rows; deny-wins model; `GET/PUT/DELETE /channels/{id}/overrides/{roleId}` endpoints in `ChannelsController`; `ChannelPermissions` Svelte component for three-state (allow/neutral/deny) override editing in server settings; `ChannelPermissionsChanged` SignalR event refreshes channel list on change
 
 ## Task breakdown: Session Persistence
 

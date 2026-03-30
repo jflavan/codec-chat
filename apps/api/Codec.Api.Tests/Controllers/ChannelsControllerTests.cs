@@ -57,7 +57,10 @@ public class ChannelsControllerTests : IDisposable
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxy.Object);
 
         var webhookService = new WebhookService(_scopeFactory.Object, new Mock<IHttpClientFactory>().Object, new Mock<ILogger<WebhookService>>().Object);
-        _controller = new ChannelsController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, _messageCache, webhookService);
+        var permissionResolver = new Mock<IPermissionResolverService>();
+        permissionResolver.Setup(p => p.HasChannelPermissionAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Permission>()))
+            .ReturnsAsync(true);
+        _controller = new ChannelsController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, _messageCache, webhookService, permissionResolver.Object);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

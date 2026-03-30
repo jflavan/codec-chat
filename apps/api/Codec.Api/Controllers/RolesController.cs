@@ -80,14 +80,20 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
             .Where(r => r.ServerId == serverId)
             .MaxAsync(r => r.Position);
 
+        // Reject undefined/reserved permission bits
+        if (request.Permissions is not null && ((Permission)request.Permissions.Value).HasUndefinedBits())
+        {
+            return BadRequest(new { error = "Request contains undefined permission bits." });
+        }
+
         // Ensure caller cannot grant permissions they don't have
         if (!appUser.IsGlobalAdmin)
         {
-            var callerEffectivePerms = await db.ServerMemberRoles
+            var callerPermsList = await db.ServerMemberRoles
                 .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == serverId)
                 .Select(mr => mr.Role!.Permissions)
-                .ToListAsync()
-                .ContinueWith(t => t.Result.Aggregate(Permission.None, (acc, p) => acc | p));
+                .ToListAsync();
+            var callerEffectivePerms = callerPermsList.Aggregate(Permission.None, (acc, p) => acc | p);
 
             if (!callerEffectivePerms.Has(Permission.Administrator))
             {
@@ -210,6 +216,10 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         if (request.Permissions is not null)
         {
             var newPerms = (Permission)request.Permissions.Value;
+            if (newPerms.HasUndefinedBits())
+            {
+                return BadRequest(new { error = "Request contains undefined permission bits." });
+            }
             // Cannot grant permissions you don't have (unless global admin)
             if (!appUser.IsGlobalAdmin)
             {
@@ -369,6 +379,27 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         if (ownerRole is not null && request.RoleIds.Count > 0 && request.RoleIds[0] != ownerRole.Id)
         {
             return BadRequest(new { error = "Owner role must remain at position 0." });
+        }
+
+        // Non-admin/non-owner callers cannot reorder roles at or above their own position
+        var isCallerOwner = await permissionResolver.IsOwnerAsync(serverId, appUser.Id);
+        if (!appUser.IsGlobalAdmin && !isCallerOwner)
+        {
+            var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            // Build a map of old positions
+            var oldPositionById = roles.ToDictionary(r => r.Id, r => r.Position);
+            for (var i = 0; i < request.RoleIds.Count; i++)
+            {
+                var roleId = request.RoleIds[i];
+                var oldPosition = oldPositionById[roleId];
+                var newPosition = i;
+                // If a role's position changed, both old and new positions must be below (higher number than) the caller's
+                if (oldPosition != newPosition &&
+                    (oldPosition <= callerHighestPosition || newPosition <= callerHighestPosition))
+                {
+                    return Forbid();
+                }
+            }
         }
 
         // Apply new positions

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getAppState } from '$lib/state/app-state.svelte.js';
-	import { Permission, type ChannelPermissionOverride } from '$lib/types/models.js';
+	import { Permission, hasPermission, type ChannelPermissionOverride } from '$lib/types/models.js';
 
 	const app = getAppState();
 
@@ -10,6 +10,7 @@
 	let selectedRoleId = $state<string | null>(null);
 	let isLoading = $state(false);
 	let isSaving = $state(false);
+	let errorMessage = $state<string | null>(null);
 
 	/** Load overrides whenever the channelId changes. */
 	$effect(() => {
@@ -20,11 +21,12 @@
 
 	async function loadOverrides(): Promise<void> {
 		isLoading = true;
+		errorMessage = null;
 		try {
 			overrides = await app.getChannelOverrides(channelId);
 		} catch {
-			// Silently fail — overrides may not exist yet
 			overrides = [];
+			errorMessage = 'Failed to load permission overrides. You may not have permission to manage this channel.';
 		} finally {
 			isLoading = false;
 		}
@@ -40,38 +42,44 @@
 	/** Current deny bitmask for the selected role (0 if none). */
 	const currentDeny = $derived(selectedOverride?.deny ?? 0);
 
+	/** Check if a single flag is set in a bitmask, handling values beyond 32-bit range. */
+	function hasBit(mask: number, flag: number): boolean {
+		if (flag > (1 << 30) || mask > (1 << 30)) {
+			return Math.floor(mask / flag) % 2 === 1;
+		}
+		return (mask & flag) === flag;
+	}
+
+	/** Set a flag in a bitmask, handling values beyond 32-bit range via float arithmetic. */
+	function setBit(mask: number, flag: number): number {
+		if (hasBit(mask, flag)) return mask;
+		return flag > (1 << 30) || mask > (1 << 30) ? mask + flag : mask | flag;
+	}
+
+	/** Clear a flag from a bitmask, handling values beyond 32-bit range via float arithmetic. */
+	function clearBit(mask: number, flag: number): number {
+		if (!hasBit(mask, flag)) return mask;
+		return flag > (1 << 30) || mask > (1 << 30) ? mask - flag : mask & ~flag;
+	}
+
 	/** Three-state for a permission: 'allow' | 'neutral' | 'deny'. */
 	function getState(flag: number): 'allow' | 'neutral' | 'deny' {
-		if ((currentAllow & flag) === flag) return 'allow';
-		if ((currentDeny & flag) === flag) return 'deny';
+		if (hasBit(currentAllow, flag)) return 'allow';
+		if (hasBit(currentDeny, flag)) return 'deny';
 		return 'neutral';
 	}
 
-	/** Cycle: neutral → allow → deny → neutral. */
-	function cycleState(current: 'allow' | 'neutral' | 'deny'): 'allow' | 'neutral' | 'deny' {
-		if (current === 'neutral') return 'allow';
-		if (current === 'allow') return 'deny';
-		return 'neutral';
-	}
-
-	async function togglePermission(flag: number): Promise<void> {
+	async function setPermissionState(flag: number, targetState: 'allow' | 'neutral' | 'deny'): Promise<void> {
 		if (!selectedRoleId || !app.idToken || isSaving) return;
 
-		const currentState = getState(flag);
-		const nextState = cycleState(currentState);
-
 		// Compute new allow/deny bitmasks
-		let newAllow = currentAllow;
-		let newDeny = currentDeny;
+		let newAllow = clearBit(currentAllow, flag);
+		let newDeny = clearBit(currentDeny, flag);
 
-		// Clear this flag from both
-		newAllow = newAllow & ~flag;
-		newDeny = newDeny & ~flag;
-
-		if (nextState === 'allow') {
-			newAllow = newAllow | flag;
-		} else if (nextState === 'deny') {
-			newDeny = newDeny | flag;
+		if (targetState === 'allow') {
+			newAllow = setBit(newAllow, flag);
+		} else if (targetState === 'deny') {
+			newDeny = setBit(newDeny, flag);
 		}
 
 		isSaving = true;
@@ -98,7 +106,7 @@
 				}
 			}
 		} catch {
-			// Silently fail; state is unchanged
+			errorMessage = 'Failed to save permission override. Check that you have the required permissions.';
 		} finally {
 			isSaving = false;
 		}
@@ -180,6 +188,9 @@
 
 		<!-- Permission grid -->
 		<div class="permission-editor">
+			{#if errorMessage}
+				<p class="error-text">{errorMessage}</p>
+			{/if}
 			{#if !selectedRoleId}
 				<p class="select-prompt">Select a role to edit its channel permissions.</p>
 			{:else if isLoading}
@@ -207,7 +218,7 @@
 										<button
 											class="perm-toggle perm-toggle--allow {state === 'allow' ? 'perm-toggle--active' : ''}"
 											onclick={() => {
-												if (state !== 'allow') togglePermission(perm.flag);
+												if (state !== 'allow') setPermissionState(perm.flag, 'allow');
 											}}
 											disabled={isSaving}
 											title="Allow"
@@ -216,7 +227,7 @@
 										<button
 											class="perm-toggle perm-toggle--neutral {state === 'neutral' ? 'perm-toggle--active' : ''}"
 											onclick={() => {
-												if (state !== 'neutral') togglePermission(perm.flag);
+												if (state !== 'neutral') setPermissionState(perm.flag, 'neutral');
 											}}
 											disabled={isSaving}
 											title="Neutral (inherit)"
@@ -225,7 +236,7 @@
 										<button
 											class="perm-toggle perm-toggle--deny {state === 'deny' ? 'perm-toggle--active' : ''}"
 											onclick={() => {
-												if (state !== 'deny') togglePermission(perm.flag);
+												if (state !== 'deny') setPermissionState(perm.flag, 'deny');
 											}}
 											disabled={isSaving}
 											title="Deny"
@@ -325,6 +336,12 @@
 	.permission-editor {
 		flex: 1;
 		min-width: 0;
+	}
+
+	.error-text {
+		font-size: 13px;
+		color: var(--danger);
+		margin: 0 0 12px;
 	}
 
 	.select-prompt,

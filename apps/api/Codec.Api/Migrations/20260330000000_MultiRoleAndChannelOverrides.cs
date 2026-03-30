@@ -24,6 +24,12 @@ namespace Codec.Api.Migrations
                 {
                     table.PrimaryKey("PK_ServerMemberRoles", x => new { x.UserId, x.RoleId });
                     table.ForeignKey(
+                        name: "FK_ServerMemberRoles_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
                         name: "FK_ServerMemberRoles_ServerRoles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "ServerRoles",
@@ -44,7 +50,20 @@ namespace Codec.Api.Migrations
                 WHERE ""RoleId"" IS NOT NULL;
             ");
 
-            // 3. Create ChannelPermissionOverrides table
+            // 3. Drop the old RoleId column from ServerMembers (now replaced by ServerMemberRoles join table)
+            migrationBuilder.DropForeignKey(
+                name: "FK_ServerMembers_ServerRoles_RoleId",
+                table: "ServerMembers");
+
+            migrationBuilder.DropIndex(
+                name: "IX_ServerMembers_RoleId",
+                table: "ServerMembers");
+
+            migrationBuilder.DropColumn(
+                name: "RoleId",
+                table: "ServerMembers");
+
+            // 4. Create ChannelPermissionOverrides table
             migrationBuilder.CreateTable(
                 name: "ChannelPermissionOverrides",
                 columns: table => new
@@ -89,6 +108,57 @@ namespace Codec.Api.Migrations
         {
             migrationBuilder.DropTable(
                 name: "ChannelPermissionOverrides");
+
+            // Restore the RoleId column on ServerMembers before dropping ServerMemberRoles
+            migrationBuilder.AddColumn<Guid>(
+                name: "RoleId",
+                table: "ServerMembers",
+                type: "uuid",
+                nullable: true);
+
+            // Migrate data back from ServerMemberRoles to ServerMembers.RoleId (pick highest-priority role)
+            migrationBuilder.Sql(@"
+                UPDATE ""ServerMembers"" sm
+                SET ""RoleId"" = (
+                    SELECT smr.""RoleId"" FROM ""ServerMemberRoles"" smr
+                    JOIN ""ServerRoles"" sr ON sr.""Id"" = smr.""RoleId""
+                    WHERE smr.""UserId"" = sm.""UserId""
+                    ORDER BY sr.""Position"" ASC
+                    LIMIT 1
+                );
+            ");
+
+            // For any members without roles, assign the server's Member system role
+            migrationBuilder.Sql(@"
+                UPDATE ""ServerMembers"" sm
+                SET ""RoleId"" = (
+                    SELECT sr.""Id"" FROM ""ServerRoles"" sr
+                    WHERE sr.""ServerId"" = sm.""ServerId"" AND sr.""IsSystemRole"" = true AND sr.""Name"" = 'Member'
+                    LIMIT 1
+                )
+                WHERE sm.""RoleId"" IS NULL;
+            ");
+
+            // Now make the column non-nullable
+            migrationBuilder.AlterColumn<Guid>(
+                name: "RoleId",
+                table: "ServerMembers",
+                type: "uuid",
+                nullable: false,
+                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ServerMembers_RoleId",
+                table: "ServerMembers",
+                column: "RoleId");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_ServerMembers_ServerRoles_RoleId",
+                table: "ServerMembers",
+                column: "RoleId",
+                principalTable: "ServerRoles",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
 
             migrationBuilder.DropTable(
                 name: "ServerMemberRoles");

@@ -147,6 +147,11 @@ public class CodecDbContext : DbContext
         {
             e.HasKey(mr => new { mr.UserId, mr.RoleId });
 
+            e.HasOne(mr => mr.User)
+                .WithMany()
+                .HasForeignKey(mr => mr.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             e.HasOne(mr => mr.Role)
                 .WithMany(r => r.MemberRoles)
                 .HasForeignKey(mr => mr.RoleId)

@@ -91,6 +91,10 @@ export function hasPermission(permissions: number, flag: number): boolean {
 	// Administrator grants everything
 	if (isAdministrator(permissions)) return true;
 	if (flag === Permission.Administrator) return false;
+	// Flags or masks beyond 2^30 exceed 32-bit signed range; use float arithmetic
+	if (flag > (1 << 30) || permissions > (1 << 30)) {
+		return Math.floor(permissions / flag) % 2 === 1;
+	}
 	return (permissions & flag) === flag;
 }
 
