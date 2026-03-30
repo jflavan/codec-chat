@@ -19,7 +19,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("servers")]
-public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config, MessageCacheService messageCache, WebhookService webhookService) : ControllerBase
+public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config, MessageCacheService messageCache, WebhookService webhookService, IPermissionResolverService permissionResolver) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -39,27 +39,53 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
             var myMemberships = await db.ServerMembers
                 .AsNoTracking()
-                .Include(m => m.Role)
                 .Where(m => m.UserId == appUser.Id)
-                .ToDictionaryAsync(m => m.ServerId, m => new { Role = m.Role!.Name, m.SortOrder, Permissions = (long)m.Role.Permissions });
+                .ToDictionaryAsync(m => m.ServerId, m => new { m.SortOrder });
 
-            var result = allServers.Select(s => new
+            var myServerIds = myMemberships.Keys.ToList();
+            var myRoles = await db.ServerMemberRoles
+                .AsNoTracking()
+                .Where(mr => mr.UserId == appUser.Id && myServerIds.Contains(mr.Role!.ServerId))
+                .Select(mr => new
+                {
+                    mr.Role!.ServerId,
+                    RoleId = mr.Role.Id,
+                    mr.Role.Name,
+                    mr.Role.Color,
+                    mr.Role.Position,
+                    mr.Role.IsSystemRole,
+                    mr.Role.Permissions
+                })
+                .ToListAsync();
+
+            var myRolesByServer = myRoles
+                .GroupBy(r => r.ServerId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(r => r.Position).ToList());
+
+            var result = allServers.Select(s =>
             {
-                ServerId = s.Id,
-                s.Name,
-                s.IconUrl,
-                s.Description,
-                Role = myMemberships.TryGetValue(s.Id, out var info) ? info.Role : (string?)null,
-                SortOrder = myMemberships.TryGetValue(s.Id, out var sortInfo) ? sortInfo.SortOrder : int.MaxValue,
-                Permissions = myMemberships.TryGetValue(s.Id, out var permInfo) ? permInfo.Permissions : 0L
+                var roles = myRolesByServer.TryGetValue(s.Id, out var r) ? r : [];
+                var perms = roles.Count > 0
+                    ? roles.Aggregate(Permission.None, (acc, role) => acc | role.Permissions)
+                    : Permission.None;
+                return new
+                {
+                    ServerId = s.Id,
+                    s.Name,
+                    s.IconUrl,
+                    s.Description,
+                    SortOrder = myMemberships.TryGetValue(s.Id, out var info) ? info.SortOrder : int.MaxValue,
+                    Roles = roles.Select(r2 => new { r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
+                    Permissions = (long)perms,
+                    IsOwner = false // global admins viewing all servers — not necessarily owner
+                };
             }).OrderBy(s => s.SortOrder);
 
             return Ok(result);
         }
 
-        var servers = await db.ServerMembers
+        var memberships = await db.ServerMembers
             .AsNoTracking()
-            .Include(member => member.Role)
             .Where(member => member.UserId == appUser.Id)
             .OrderBy(member => member.SortOrder)
             .Select(member => new
@@ -68,11 +94,52 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 Name = member.Server!.Name,
                 IconUrl = member.Server!.IconUrl,
                 Description = member.Server!.Description,
-                Role = member.Role!.Name,
-                member.SortOrder,
-                Permissions = (long)member.Role.Permissions
+                member.SortOrder
             })
             .ToListAsync();
+
+        var serverIds = memberships.Select(m => m.ServerId).ToList();
+
+        // Batch-load all role assignments for this user across their servers
+        var allMemberRoles = await db.ServerMemberRoles
+            .AsNoTracking()
+            .Where(mr => mr.UserId == appUser.Id && serverIds.Contains(mr.Role!.ServerId))
+            .Select(mr => new
+            {
+                mr.Role!.ServerId,
+                RoleId = mr.Role.Id,
+                mr.Role.Name,
+                mr.Role.Color,
+                mr.Role.Position,
+                mr.Role.IsSystemRole,
+                mr.Role.Permissions
+            })
+            .ToListAsync();
+
+        var rolesByServer = allMemberRoles
+            .GroupBy(r => r.ServerId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(r => r.Position).ToList());
+
+        var servers = new List<object>();
+        foreach (var m in memberships)
+        {
+            var roles = rolesByServer.TryGetValue(m.ServerId, out var r) ? r : [];
+            var permissions = (long)(roles.Count > 0
+                ? roles.Aggregate(Permission.None, (acc, role) => acc | role.Permissions)
+                : Permission.None);
+            var isOwner = await permissionResolver.IsOwnerAsync(m.ServerId, appUser.Id);
+            servers.Add(new
+            {
+                m.ServerId,
+                m.Name,
+                m.IconUrl,
+                m.Description,
+                m.SortOrder,
+                Roles = roles.Select(r2 => new { r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
+                Permissions = permissions,
+                IsOwner = isOwner
+            });
+        }
 
         return Ok(servers);
     }
@@ -240,16 +307,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         var members = await db.ServerMembers
             .AsNoTracking()
-            .Include(member => member.Role)
             .Where(member => member.ServerId == serverId)
             .Select(member => new
             {
                 member.UserId,
-                Role = member.Role!.Name,
-                RolePosition = member.Role.Position,
-                RoleColor = member.Role.Color,
-                RoleIsHoisted = member.Role.IsHoisted,
-                Permissions = (long)member.Role.Permissions,
                 member.JoinedAt,
                 member.User!.DisplayName,
                 Nickname = member.User.Nickname,
@@ -263,17 +324,47 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .OrderBy(member => member.DisplayName)
             .ToListAsync();
 
+        // Batch-load all role assignments for this server in one query
+        var allMemberRoles = await db.ServerMemberRoles
+            .AsNoTracking()
+            .Where(mr => mr.Role!.ServerId == serverId)
+            .Select(mr => new
+            {
+                mr.UserId,
+                Role = new
+                {
+                    Id = mr.Role!.Id,
+                    mr.Role.Name,
+                    mr.Role.Color,
+                    mr.Role.Position,
+                    mr.Role.IsSystemRole,
+                    mr.Role.IsHoisted,
+                    mr.Role.Permissions
+                }
+            })
+            .ToListAsync();
+
+        var memberRoleMap = allMemberRoles
+            .GroupBy(mr => mr.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(mr => mr.Role).OrderBy(r => r.Position).ToList());
+
         var result = members.Select(member =>
         {
             var effectiveName = string.IsNullOrWhiteSpace(member.Nickname) ? member.DisplayName : member.Nickname;
+            var roles = memberRoleMap.TryGetValue(member.UserId, out var r) ? r : [];
+            var permissions = roles.Count > 0
+                ? roles.Aggregate(Permission.None, (acc, role) => acc | role.Permissions)
+                : Permission.None;
+            var displayRole = roles.FirstOrDefault(r2 => r2.Color is not null && r2.Color != "");
+            var highestPosition = roles.Count > 0 ? roles.Min(r2 => r2.Position) : int.MaxValue;
+
             return new
             {
                 member.UserId,
-                member.Role,
-                member.RolePosition,
-                member.RoleColor,
-                member.RoleIsHoisted,
-                member.Permissions,
+                Roles = roles.Select(r2 => new { r2.Id, r2.Name, r2.Color, r2.Position, r2.IsSystemRole, r2.IsHoisted }).ToList(),
+                Permissions = (long)permissions,
+                DisplayRole = displayRole is null ? null : new { displayRole.Id, displayRole.Name, displayRole.Color, displayRole.Position },
+                HighestPosition = highestPosition,
                 member.JoinedAt,
                 DisplayName = effectiveName,
                 member.Email,
@@ -666,6 +757,285 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             Role = newRoleEntity.Name,
             targetMembership.JoinedAt
         });
+    }
+
+    /* ═══════════════════ Multi-Role Management ═══════════════════ */
+
+    /// <summary>
+    /// Replaces all roles for a member in one atomic operation.
+    /// Requires ManageRoles permission. Cannot assign the Owner role or roles above the caller's position.
+    /// </summary>
+    [HttpPut("{serverId:guid}/members/{targetUserId:guid}/roles")]
+    public async Task<IActionResult> SetMemberRoles(Guid serverId, Guid targetUserId, [FromBody] UpdateMemberRolesRequest request, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        var hasPermission = await permissionResolver.HasServerPermissionAsync(serverId, appUser.Id, Permission.ManageRoles);
+        if (!hasPermission && !appUser.IsGlobalAdmin)
+        {
+            return Forbid();
+        }
+
+        if (targetUserId == appUser.Id)
+        {
+            return BadRequest(new { error = "You cannot change your own roles." });
+        }
+
+        var targetMembership = await db.ServerMembers
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+        if (targetMembership is null)
+        {
+            return NotFound(new { error = "User is not a member of this server." });
+        }
+
+        // Ensure none of the target's current roles is the Owner role
+        var targetCurrentRoles = await db.ServerMemberRoles
+            .AsNoTracking()
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .Select(mr => new { mr.Role!.IsSystemRole, mr.Role.Position })
+            .ToListAsync();
+
+        if (targetCurrentRoles.Any(r => r.IsSystemRole && r.Position == 0))
+        {
+            return BadRequest(new { error = "Cannot change the server owner's roles." });
+        }
+
+        // Validate all requested role IDs exist in this server
+        var requestedRoles = await db.ServerRoles
+            .Where(r => r.ServerId == serverId && request.RoleIds.Contains(r.Id))
+            .ToListAsync();
+
+        if (requestedRoles.Count != request.RoleIds.Distinct().Count())
+        {
+            return BadRequest(new { error = "One or more role IDs are invalid for this server." });
+        }
+
+        // Cannot assign the Owner role unless caller is owner or global admin
+        var isCallerOwner = await permissionResolver.IsOwnerAsync(serverId, appUser.Id);
+        if (requestedRoles.Any(r => r.IsSystemRole && r.Position == 0) && !isCallerOwner && !appUser.IsGlobalAdmin)
+        {
+            return BadRequest(new { error = "Cannot assign the Owner role." });
+        }
+
+        // Cannot assign roles at or above caller's highest position (unless global admin or owner)
+        if (!appUser.IsGlobalAdmin && !isCallerOwner)
+        {
+            var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            if (requestedRoles.Any(r => r.Position <= callerHighestPosition))
+            {
+                return Forbid();
+            }
+        }
+
+        // Replace all existing ServerMemberRole entries for this user in this server
+        var existingEntries = await db.ServerMemberRoles
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .ToListAsync();
+        db.ServerMemberRoles.RemoveRange(existingEntries);
+
+        var newEntries = request.RoleIds.Distinct().Select(roleId => new ServerMemberRole
+        {
+            UserId = targetUserId,
+            RoleId = roleId,
+            AssignedAt = DateTimeOffset.UtcNow
+        }).ToList();
+        db.ServerMemberRoles.AddRange(newEntries);
+
+        var targetDisplayName = await db.Users.AsNoTracking()
+            .Where(u => u.Id == targetUserId)
+            .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
+        audit.Log(serverId, appUser.Id, AuditAction.MemberRoleChanged,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: $"Set roles for @{targetDisplayName}: [{string.Join(", ", requestedRoles.Select(r => r.Name))}]");
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRolesUpdated", new
+        {
+            serverId,
+            userId = targetUserId,
+            roleIds = request.RoleIds
+        });
+
+        return Ok(new
+        {
+            userId = targetUserId,
+            roleIds = request.RoleIds
+        });
+    }
+
+    /// <summary>
+    /// Adds a single role to a member. Idempotent.
+    /// Requires ManageRoles permission. Cannot assign the Owner role or roles above the caller's position.
+    /// </summary>
+    [HttpPost("{serverId:guid}/members/{targetUserId:guid}/roles/{roleId:guid}")]
+    public async Task<IActionResult> AddMemberRole(Guid serverId, Guid targetUserId, Guid roleId, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        var hasPermission = await permissionResolver.HasServerPermissionAsync(serverId, appUser.Id, Permission.ManageRoles);
+        if (!hasPermission && !appUser.IsGlobalAdmin)
+        {
+            return Forbid();
+        }
+
+        if (targetUserId == appUser.Id)
+        {
+            return BadRequest(new { error = "You cannot change your own roles." });
+        }
+
+        var targetMembership = await db.ServerMembers
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+        if (targetMembership is null)
+        {
+            return NotFound(new { error = "User is not a member of this server." });
+        }
+
+        var role = await db.ServerRoles.FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == serverId);
+        if (role is null)
+        {
+            return NotFound(new { error = "Role not found in this server." });
+        }
+
+        var isCallerOwner = await permissionResolver.IsOwnerAsync(serverId, appUser.Id);
+
+        if (role.IsSystemRole && role.Position == 0 && !isCallerOwner && !appUser.IsGlobalAdmin)
+        {
+            return BadRequest(new { error = "Cannot assign the Owner role." });
+        }
+
+        if (!appUser.IsGlobalAdmin && !isCallerOwner)
+        {
+            var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            if (role.Position <= callerHighestPosition)
+            {
+                return Forbid();
+            }
+        }
+
+        // Idempotent: check if already assigned
+        var existing = await db.ServerMemberRoles
+            .FirstOrDefaultAsync(mr => mr.UserId == targetUserId && mr.RoleId == roleId);
+        if (existing is not null)
+        {
+            return Ok(new { userId = targetUserId, roleId });
+        }
+
+        db.ServerMemberRoles.Add(new ServerMemberRole
+        {
+            UserId = targetUserId,
+            RoleId = roleId,
+            AssignedAt = DateTimeOffset.UtcNow
+        });
+
+        var targetDisplayName = await db.Users.AsNoTracking()
+            .Where(u => u.Id == targetUserId)
+            .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
+        audit.Log(serverId, appUser.Id, AuditAction.MemberRoleChanged,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: $"Added role '{role.Name}' to @{targetDisplayName}");
+        await db.SaveChangesAsync();
+
+        var currentRoleIds = await db.ServerMemberRoles
+            .AsNoTracking()
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .Select(mr => mr.RoleId)
+            .ToListAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRolesUpdated", new
+        {
+            serverId,
+            userId = targetUserId,
+            roleIds = currentRoleIds
+        });
+
+        return Ok(new { userId = targetUserId, roleId });
+    }
+
+    /// <summary>
+    /// Removes a single role from a member.
+    /// Requires ManageRoles permission. Cannot remove the Owner role.
+    /// If the member has no remaining roles after removal, auto-assigns the Member system role.
+    /// </summary>
+    [HttpDelete("{serverId:guid}/members/{targetUserId:guid}/roles/{roleId:guid}")]
+    public async Task<IActionResult> RemoveMemberRole(Guid serverId, Guid targetUserId, Guid roleId, [FromServices] AuditService audit)
+    {
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        var hasPermission = await permissionResolver.HasServerPermissionAsync(serverId, appUser.Id, Permission.ManageRoles);
+        if (!hasPermission && !appUser.IsGlobalAdmin)
+        {
+            return Forbid();
+        }
+
+        if (targetUserId == appUser.Id)
+        {
+            return BadRequest(new { error = "You cannot change your own roles." });
+        }
+
+        var role = await db.ServerRoles.FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == serverId);
+        if (role is null)
+        {
+            return NotFound(new { error = "Role not found in this server." });
+        }
+
+        if (role.IsSystemRole && role.Position == 0)
+        {
+            return BadRequest(new { error = "Cannot remove the Owner role." });
+        }
+
+        var entry = await db.ServerMemberRoles
+            .FirstOrDefaultAsync(mr => mr.UserId == targetUserId && mr.RoleId == roleId);
+        if (entry is null)
+        {
+            return NotFound(new { error = "Member does not have this role." });
+        }
+
+        db.ServerMemberRoles.Remove(entry);
+        await db.SaveChangesAsync();
+
+        // If the member has no remaining roles, auto-assign the Member system role
+        var remainingRoleIds = await db.ServerMemberRoles
+            .AsNoTracking()
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .Select(mr => mr.RoleId)
+            .ToListAsync();
+
+        if (remainingRoleIds.Count == 0)
+        {
+            var memberRole = await db.ServerRoles
+                .FirstOrDefaultAsync(r => r.ServerId == serverId && r.IsSystemRole && r.Name == "Member");
+            if (memberRole is not null)
+            {
+                db.ServerMemberRoles.Add(new ServerMemberRole
+                {
+                    UserId = targetUserId,
+                    RoleId = memberRole.Id,
+                    AssignedAt = DateTimeOffset.UtcNow
+                });
+                await db.SaveChangesAsync();
+                remainingRoleIds = [memberRole.Id];
+            }
+        }
+
+        var targetDisplayName = await db.Users.AsNoTracking()
+            .Where(u => u.Id == targetUserId)
+            .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
+            .FirstOrDefaultAsync() ?? "Unknown";
+
+        audit.Log(serverId, appUser.Id, AuditAction.MemberRoleChanged,
+            targetType: "User", targetId: targetUserId.ToString(),
+            details: $"Removed role '{role.Name}' from @{targetDisplayName}");
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRolesUpdated", new
+        {
+            serverId,
+            userId = targetUserId,
+            roleIds = remainingRoleIds
+        });
+
+        return NoContent();
     }
 
     /// <summary>
