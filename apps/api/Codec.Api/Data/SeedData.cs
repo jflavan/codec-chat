@@ -19,7 +19,8 @@ public static class SeedData
             var hasRoles = await db.ServerRoles.AnyAsync(r => r.ServerId == Server.DefaultServerId);
             if (!hasRoles)
             {
-                var userService = new UserService(db);
+                var permissionResolver = new PermissionResolverService(db);
+                var userService = new UserService(db, permissionResolver);
                 await userService.CreateDefaultRolesAsync(Server.DefaultServerId);
             }
             return;
@@ -34,7 +35,8 @@ public static class SeedData
         await db.SaveChangesAsync();
 
         // Create default roles for the server
-        var svc = new UserService(db);
+        var permResolver = new PermissionResolverService(db);
+        var svc = new UserService(db, permResolver);
         await svc.CreateDefaultRolesAsync(Server.DefaultServerId);
     }
 
@@ -83,9 +85,9 @@ public static class SeedData
 
         var memberships = new List<ServerMember>
         {
-            new() { Server = server, User = avery, RoleId = ownerRole.Id },
-            new() { Server = server, User = morgan, RoleId = adminRole.Id },
-            new() { Server = server, User = rae, RoleId = memberRole.Id }
+            new() { Server = server, User = avery },
+            new() { Server = server, User = morgan },
+            new() { Server = server, User = rae }
         };
 
         var channels = await db.Channels
@@ -103,6 +105,14 @@ public static class SeedData
         db.Channels.Add(buildLog);
         db.Messages.AddRange(messages);
         db.ServerMembers.AddRange(memberships);
+        await db.SaveChangesAsync();
+
+        // Assign roles via the multi-role join table
+        db.ServerMemberRoles.AddRange(
+            new ServerMemberRole { UserId = avery.Id, RoleId = ownerRole.Id },
+            new ServerMemberRole { UserId = morgan.Id, RoleId = adminRole.Id },
+            new ServerMemberRole { UserId = rae.Id, RoleId = memberRole.Id }
+        );
         await db.SaveChangesAsync();
     }
 }
