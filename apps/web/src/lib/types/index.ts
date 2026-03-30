@@ -1,5 +1,7 @@
 export type {
 	MemberServer,
+	MemberRole,
+	ChannelPermissionOverride,
 	ChannelType,
 	Channel,
 	VoiceChannelMember,

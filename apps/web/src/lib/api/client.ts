@@ -28,7 +28,8 @@ import type {
 	NotificationPreferences,
 	Webhook,
 	WebhookDelivery,
-	BannedMember
+	BannedMember,
+	ChannelPermissionOverride
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -1209,6 +1210,66 @@ export class ApiClient {
 		return this.request(
 			`${this.baseUrl}/dm/channels/${encodeURIComponent(dmChannelId)}/messages?around=${encodeURIComponent(messageId)}&limit=${limit}`,
 			{ headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Member Roles ───── */
+
+	/** Replace all roles assigned to a member. */
+	setMemberRoles(token: string, serverId: string, userId: string, roleIds: string[]): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/roles`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ roleIds })
+			}
+		);
+	}
+
+	/** Add a single role to a member. */
+	addMemberRole(token: string, serverId: string, userId: string, roleId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`,
+			{ method: 'POST', headers: this.headers(token) }
+		);
+	}
+
+	/** Remove a single role from a member. */
+	removeMemberRole(token: string, serverId: string, userId: string, roleId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/* ───── Channel Permission Overrides ───── */
+
+	/** Get all permission overrides for a channel. */
+	getChannelOverrides(token: string, channelId: string): Promise<ChannelPermissionOverride[]> {
+		return this.request(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/overrides`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Set or update a permission override for a role in a channel. */
+	setChannelOverride(token: string, channelId: string, roleId: string, allow: number, deny: number): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/overrides/${encodeURIComponent(roleId)}`,
+			{
+				method: 'PUT',
+				headers: this.headers(token, true),
+				body: JSON.stringify({ allow, deny })
+			}
+		);
+	}
+
+	/** Delete a permission override for a role in a channel. */
+	deleteChannelOverride(token: string, channelId: string, roleId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/overrides/${encodeURIComponent(roleId)}`,
+			{ method: 'DELETE', headers: this.headers(token) }
 		);
 	}
 }
