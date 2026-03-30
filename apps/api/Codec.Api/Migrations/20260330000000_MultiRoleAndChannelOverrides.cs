@@ -24,12 +24,6 @@ namespace Codec.Api.Migrations
                 {
                     table.PrimaryKey("PK_ServerMemberRoles", x => new { x.UserId, x.RoleId });
                     table.ForeignKey(
-                        name: "FK_ServerMemberRoles_ServerMembers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "ServerMembers",
-                        principalColumn: "UserId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
                         name: "FK_ServerMemberRoles_ServerRoles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "ServerRoles",

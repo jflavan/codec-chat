@@ -11,6 +11,5 @@ public class ServerMemberRole
     public DateTimeOffset AssignedAt { get; set; } = DateTimeOffset.UtcNow;
 
     // Navigation properties
-    public ServerMember? Member { get; set; }
     public ServerRoleEntity? Role { get; set; }
 }

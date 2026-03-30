@@ -1494,20 +1494,11 @@ namespace Codec.Api.Migrations
 
             modelBuilder.Entity("Codec.Api.Models.ServerMemberRole", b =>
                 {
-                    b.HasOne("Codec.Api.Models.ServerMember", "Member")
-                        .WithMany("MemberRoles")
-                        .HasForeignKey("UserId")
-                        .HasPrincipalKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Codec.Api.Models.ServerRoleEntity", "Role")
                         .WithMany("MemberRoles")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Member");
 
                     b.Navigation("Role");
                 });
@@ -1690,11 +1681,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("Roles");
 
                     b.Navigation("Webhooks");
-                });
-
-            modelBuilder.Entity("Codec.Api.Models.ServerMember", b =>
-                {
-                    b.Navigation("MemberRoles");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.ServerRoleEntity", b =>
