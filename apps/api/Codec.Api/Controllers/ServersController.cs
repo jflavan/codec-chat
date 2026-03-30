@@ -236,7 +236,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound();
@@ -388,7 +388,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> KickMember(Guid serverId, Guid targetUserId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.KickMembers, appUser.IsGlobalAdmin);
 
         if (targetUserId == appUser.Id)
         {
@@ -469,7 +469,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> BanMember(Guid serverId, Guid targetUserId, [FromBody] BanMemberRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.BanMembers, appUser.IsGlobalAdmin);
 
         if (targetUserId == appUser.Id)
         {
@@ -584,7 +584,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> UnbanMember(Guid serverId, Guid targetUserId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.BanMembers, appUser.IsGlobalAdmin);
 
         var ban = await db.BannedMembers.FindAsync(serverId, targetUserId);
 
@@ -621,7 +621,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> GetBans(Guid serverId)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.BanMembers, appUser.IsGlobalAdmin);
 
         var bans = await db.BannedMembers
             .AsNoTracking()
@@ -1072,7 +1072,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> CreateChannel(Guid serverId, [FromBody] CreateChannelRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         ChannelType channelType;
         if (string.IsNullOrEmpty(request.Type) || string.Equals(request.Type, "text", StringComparison.OrdinalIgnoreCase))
@@ -1130,7 +1130,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var channel = await db.Channels
             .FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
@@ -1240,7 +1240,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> CreateCategory(Guid serverId, [FromBody] CreateCategoryRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var maxPosition = await db.ChannelCategories
             .Where(c => c.ServerId == serverId)
@@ -1284,7 +1284,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> RenameCategory(Guid serverId, Guid categoryId, [FromBody] RenameCategoryRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var category = await db.ChannelCategories
             .FirstOrDefaultAsync(c => c.Id == categoryId && c.ServerId == serverId);
@@ -1318,7 +1318,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> DeleteCategory(Guid serverId, Guid categoryId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var category = await db.ChannelCategories
             .FirstOrDefaultAsync(c => c.Id == categoryId && c.ServerId == serverId);
@@ -1351,7 +1351,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> UpdateChannelOrder(Guid serverId, [FromBody] UpdateChannelOrderRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var channels = await db.Channels
             .Where(c => c.ServerId == serverId)
@@ -1405,7 +1405,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> UpdateCategoryOrder(Guid serverId, [FromBody] UpdateCategoryOrderRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var categories = await db.ChannelCategories
             .Where(c => c.ServerId == serverId)
@@ -1444,7 +1444,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> CreateInvite(Guid serverId, [FromBody] CreateInviteRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageInvites, appUser.IsGlobalAdmin);
 
         DateTimeOffset? expiresAt = request.ExpiresInHours switch
         {
@@ -1492,7 +1492,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> GetInvites(Guid serverId)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageInvites, appUser.IsGlobalAdmin);
 
         var now = DateTimeOffset.UtcNow;
         var invites = await db.ServerInvites
@@ -1523,7 +1523,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> RevokeInvite(Guid serverId, Guid inviteId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageInvites, appUser.IsGlobalAdmin);
 
         var invite = await db.ServerInvites
             .FirstOrDefaultAsync(i => i.Id == inviteId && i.ServerId == serverId);
@@ -1684,7 +1684,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> DeleteChannel(Guid serverId, Guid channelId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
 
         var channel = await db.Channels
             .FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
@@ -1786,7 +1786,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound();
@@ -1819,7 +1819,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> DeleteServerIcon(Guid serverId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound();
@@ -1871,7 +1871,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         Guid serverId, [FromForm] string name, IFormFile file, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageEmojis, appUser.IsGlobalAdmin);
 
         // Validate name format.
         if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[a-zA-Z0-9_]{2,32}$"))
@@ -1930,7 +1930,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         Guid serverId, Guid emojiId, [FromBody] RenameEmojiRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageEmojis, appUser.IsGlobalAdmin);
 
         var emoji = await db.CustomEmojis.FirstOrDefaultAsync(
             e => e.Id == emojiId && e.ServerId == serverId);
@@ -1960,7 +1960,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> DeleteEmoji(Guid serverId, Guid emojiId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageEmojis, appUser.IsGlobalAdmin);
 
         var emoji = await db.CustomEmojis.FirstOrDefaultAsync(
             e => e.Id == emojiId && e.ServerId == serverId);
@@ -2287,7 +2287,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         limit = Math.Clamp(limit, 1, 100);
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ViewAuditLog, appUser.IsGlobalAdmin);
 
         var query = db.AuditLogEntries
             .AsNoTracking()
@@ -2476,7 +2476,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         if (!ImageProxyService.IsAllowedUrl(request.Url.Trim()))
         {
@@ -2528,7 +2528,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     public async Task<IActionResult> GetWebhooks(Guid serverId)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var webhooks = await db.Webhooks
             .AsNoTracking()
@@ -2576,7 +2576,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var webhook = await db.Webhooks
             .FirstOrDefaultAsync(w => w.Id == webhookId && w.ServerId == serverId);
@@ -2637,7 +2637,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var webhook = await db.Webhooks
             .FirstOrDefaultAsync(w => w.Id == webhookId && w.ServerId == serverId);
@@ -2667,7 +2667,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         [FromQuery] int limit = 25)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageServer, appUser.IsGlobalAdmin);
 
         var webhookExists = await db.Webhooks
             .AnyAsync(w => w.Id == webhookId && w.ServerId == serverId);

@@ -1077,7 +1077,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         if (channel is null) return NotFound(new { error = "Channel not found." });
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.PinMessages, appUser.IsGlobalAdmin);
 
         var message = await db.Messages.AsNoTracking().FirstOrDefaultAsync(m => m.Id == messageId && m.ChannelId == channelId);
         if (message is null) return NotFound(new { error = "Message not found." });
@@ -1164,7 +1164,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         if (channel is null) return NotFound(new { error = "Channel not found." });
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        await userService.EnsureAdminAsync(channel.ServerId, appUser.Id, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.PinMessages, appUser.IsGlobalAdmin);
 
         var pin = await db.PinnedMessages.FirstOrDefaultAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
         if (pin is null) return NotFound(new { error = "Message is not pinned." });
