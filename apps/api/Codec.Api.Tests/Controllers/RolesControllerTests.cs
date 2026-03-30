@@ -40,7 +40,7 @@ public class RolesControllerTests : IDisposable
         _hub.Setup(h => h.Clients).Returns(clients.Object);
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxy.Object);
 
-        _controller = new RolesController(_db, _userService.Object, _hub.Object);
+        _controller = new RolesController(_db, _userService.Object, _hub.Object, new PermissionResolverService(_db));
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

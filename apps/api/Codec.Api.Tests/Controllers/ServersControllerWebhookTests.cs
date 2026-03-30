@@ -61,7 +61,8 @@ public class ServersControllerWebhookTests : IDisposable
             new Mock<IHttpClientFactory>().Object,
             new Mock<IConfiguration>().Object,
             messageCache,
-            webhookService);
+            webhookService,
+            new PermissionResolverService(_db));
 
         _controller.ControllerContext = new ControllerContext
         {

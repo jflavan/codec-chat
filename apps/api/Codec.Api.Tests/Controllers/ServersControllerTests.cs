@@ -51,7 +51,8 @@ public class ServersControllerTests : IDisposable
         clients.Setup(c => c.All).Returns(clientProxy.Object);
 
         var webhookService = new WebhookService(new Mock<IServiceScopeFactory>().Object, new Mock<IHttpClientFactory>().Object, new Mock<ILogger<WebhookService>>().Object);
-        _controller = new ServersController(_db, _userService.Object, _avatarService.Object, _emojiService.Object, _hub.Object, _httpFactory.Object, _config.Object, _messageCache, webhookService);
+        var permissionResolver = new PermissionResolverService(_db);
+        _controller = new ServersController(_db, _userService.Object, _avatarService.Object, _emojiService.Object, _hub.Object, _httpFactory.Object, _config.Object, _messageCache, webhookService, permissionResolver);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
