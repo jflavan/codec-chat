@@ -66,7 +66,7 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
 
         // Check for duplicate name
         var exists = await db.ServerRoles.AnyAsync(r => r.ServerId == serverId && r.Name == request.Name.Trim());
@@ -80,15 +80,22 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
             .Where(r => r.ServerId == serverId)
             .MaxAsync(r => r.Position);
 
-        // Ensure caller cannot create roles higher than their own
-        if (!appUser.IsGlobalAdmin && callerMembership.Role is not null)
+        // Ensure caller cannot grant permissions they don't have
+        if (!appUser.IsGlobalAdmin)
         {
-            var requestedPerms = (Permission)(request.Permissions ?? 0);
-            // Cannot grant permissions you don't have
-            if ((requestedPerms & ~callerMembership.Role.Permissions) != Permission.None
-                && !callerMembership.Role.Permissions.Has(Permission.Administrator))
+            var callerEffectivePerms = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == serverId)
+                .Select(mr => mr.Role!.Permissions)
+                .ToListAsync()
+                .ContinueWith(t => t.Result.Aggregate(Permission.None, (acc, p) => acc | p));
+
+            if (!callerEffectivePerms.Has(Permission.Administrator))
             {
-                return Forbid();
+                var requestedPerms = (Permission)(request.Permissions ?? 0);
+                if ((requestedPerms & ~callerEffectivePerms) != Permission.None)
+                {
+                    return Forbid();
+                }
             }
         }
 
@@ -308,11 +315,6 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
                     RoleId = memberRole.Id,
                     AssignedAt = DateTimeOffset.UtcNow
                 });
-                // Also update the legacy ServerMember.RoleId to prevent cascade delete
-                var serverMember = await db.ServerMembers
-                    .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-                if (serverMember is not null)
-                    serverMember.RoleId = memberRole.Id;
             }
         }
 

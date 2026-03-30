@@ -97,13 +97,11 @@ public class ChatHubTests : IDisposable
         {
             ServerId = _testServer.Id,
             UserId = _testUser.Id,
-            RoleId = memberRole.Id
         });
         _db.ServerMembers.Add(new ServerMember
         {
             ServerId = _testServer.Id,
             UserId = _testUser2.Id,
-            RoleId = memberRole.Id
         });
         _db.DmChannelMembers.Add(new DmChannelMember
         {
@@ -1719,7 +1717,6 @@ public class ChatHubTests : IDisposable
         {
             ServerId = server2.Id,
             UserId = _testUser.Id,
-            RoleId = role2.Id
         });
         await _db.SaveChangesAsync();
 
@@ -3452,7 +3449,6 @@ public class ChatHubTests : IDisposable
         {
             ServerId = server2.Id,
             UserId = _testUser.Id,
-            RoleId = role2.Id
         });
         await _db.SaveChangesAsync();
 

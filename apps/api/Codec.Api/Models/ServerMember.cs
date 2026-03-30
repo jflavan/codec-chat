@@ -8,11 +8,6 @@ public class ServerMember
     public Guid ServerId { get; set; }
     public Guid UserId { get; set; }
 
-    /// <summary>
-    /// Foreign key to the member's assigned <see cref="ServerRoleEntity"/>.
-    /// </summary>
-    public Guid RoleId { get; set; }
-
     public DateTimeOffset JoinedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
@@ -31,5 +26,4 @@ public class ServerMember
 
     public Server? Server { get; set; }
     public User? User { get; set; }
-    public ServerRoleEntity? Role { get; set; }
 }

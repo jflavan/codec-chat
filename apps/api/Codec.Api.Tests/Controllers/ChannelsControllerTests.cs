@@ -45,7 +45,7 @@ public class ChannelsControllerTests : IDisposable
         _db.Channels.Add(_testChannel);
         var memberRole = new ServerRoleEntity { ServerId = _testServer.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
         _db.ServerRoles.Add(memberRole);
-        _db.ServerMembers.Add(new ServerMember { Server = _testServer, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = _testServer, UserId = _testUser.Id });
         _db.SaveChanges();
 
         _messageCache = new MessageCacheService(new Mock<ILogger<MessageCacheService>>().Object);
@@ -328,7 +328,7 @@ public class ChannelsControllerTests : IDisposable
     private void SetupAdminUser()
     {
         _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id, Role = new ServerRoleEntity { Name = "Admin", Position = 1, Permissions = PermissionExtensions.AdminDefaults, IsSystemRole = true } });
+            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id });
     }
 
     [Fact]
@@ -888,7 +888,7 @@ public class ChannelsControllerTests : IDisposable
         var otherUser = new User { Id = Guid.NewGuid(), DisplayName = "Other" };
         _db.Users.Add(otherUser);
         var memberRole = _db.ServerRoles.First(r => r.ServerId == _testServer.Id && r.Name == "Member");
-        _db.ServerMembers.Add(new ServerMember { ServerId = _testServer.Id, UserId = otherUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = _testServer.Id, UserId = otherUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest("<@here> attention everyone"));

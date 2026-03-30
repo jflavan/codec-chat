@@ -208,7 +208,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             ServerId = server.Id,
             UserId = appUser.Id,
-            RoleId = ownerRole.Id,
             JoinedAt = DateTimeOffset.UtcNow
         };
         db.ServerMembers.Add(membership);
@@ -396,7 +395,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var targetMembership = await db.ServerMembers
-            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
 
         if (targetMembership is null)
@@ -404,18 +402,31 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return NotFound(new { error = "User is not a member of this server." });
         }
 
-        // Cannot kick the server owner
-        if (targetMembership.Role is { IsSystemRole: true, Position: 0 })
+        // Cannot kick the server owner (owner has the system role at position 0)
+        var targetTopRole = await db.ServerMemberRoles
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .OrderBy(mr => mr.Role!.Position)
+            .Select(mr => mr.Role)
+            .FirstOrDefaultAsync();
+
+        if (targetTopRole is { IsSystemRole: true, Position: 0 })
         {
             return BadRequest(new { error = "Cannot kick the server owner." });
         }
 
         // Cannot kick someone with an equal or higher role (lower position = higher rank)
-        if (callerMembership.Role is not null && targetMembership.Role is not null
-            && !appUser.IsGlobalAdmin
-            && callerMembership.Role.Position >= targetMembership.Role.Position)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
+            var callerTopRole = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == serverId)
+                .OrderBy(mr => mr.Role!.Position)
+                .Select(mr => mr.Role)
+                .FirstOrDefaultAsync();
+            if (callerTopRole is not null && targetTopRole is not null
+                && callerTopRole.Position >= targetTopRole.Position)
+            {
+                return Forbid();
+            }
         }
 
         var kickedUserDisplayName = await db.Users
@@ -477,21 +488,32 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var targetMembership = await db.ServerMembers
-            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
 
-        if (targetMembership?.Role is { IsSystemRole: true, Position: 0 })
+        var targetTopRole = await db.ServerMemberRoles
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .OrderBy(mr => mr.Role!.Position)
+            .Select(mr => mr.Role)
+            .FirstOrDefaultAsync();
+
+        if (targetTopRole is { IsSystemRole: true, Position: 0 })
         {
             return BadRequest(new { error = "Cannot ban the server owner." });
         }
 
         // Cannot ban someone with a higher or equal role position (lower number = higher rank)
-        if (targetMembership is not null
-            && callerMembership.Role is not null
-            && targetMembership.Role is not null
-            && targetMembership.Role.Position <= callerMembership.Role.Position)
+        if (targetMembership is not null && !appUser.IsGlobalAdmin)
         {
-            return Forbid();
+            var callerTopRole = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == serverId)
+                .OrderBy(mr => mr.Role!.Position)
+                .Select(mr => mr.Role)
+                .FirstOrDefaultAsync();
+            if (callerTopRole is not null && targetTopRole is not null
+                && targetTopRole.Position <= callerTopRole.Position)
+            {
+                return Forbid();
+            }
         }
 
         var existingBan = await db.BannedMembers
@@ -642,12 +664,13 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     }
 
     /// <summary>
-    /// Changes a member's role within a server.
+    /// Changes a member's primary (single) role within a server. Legacy endpoint — replaces all
+    /// current roles with the specified role (except the Member fallback behaviour is preserved).
     /// Requires ManageRoles permission. Cannot assign roles higher than your own.
     /// Nobody can change the Owner's role or their own role.
     /// </summary>
     [HttpPatch("{serverId:guid}/members/{targetUserId:guid}/role")]
-    public async Task<IActionResult> UpdateMemberRole(Guid serverId, Guid targetUserId, [FromBody] UpdateMemberRoleRequest request, [FromServices] AuditService audit)
+    public async Task<IActionResult> UpdateMemberRole(Guid serverId, Guid targetUserId, [FromBody] UpdateSingleMemberRoleRequest request, [FromServices] AuditService audit)
     {
         if (string.IsNullOrWhiteSpace(request.Role))
         {
@@ -655,7 +678,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
 
         if (targetUserId == appUser.Id)
         {
@@ -685,7 +708,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         var targetMembership = await db.ServerMembers
-            .Include(m => m.Role)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
 
         if (targetMembership is null)
@@ -693,28 +715,45 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return NotFound(new { error = "User is not a member of this server." });
         }
 
-        // Cannot change the owner's role
-        if (targetMembership.Role is { IsSystemRole: true, Position: 0 })
+        // Cannot change the owner's role — check via ServerMemberRoles
+        var targetTopRole = await db.ServerMemberRoles
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .OrderBy(mr => mr.Role!.Position)
+            .Select(mr => mr.Role)
+            .FirstOrDefaultAsync();
+
+        if (targetTopRole is { IsSystemRole: true, Position: 0 })
         {
             return BadRequest(new { error = "Cannot change the server owner's role." });
         }
 
         // Cannot assign a role equal to or higher than your own (unless global admin)
-        if (!appUser.IsGlobalAdmin && callerMembership.Role is not null)
+        if (!appUser.IsGlobalAdmin)
         {
-            if (newRoleEntity.Position <= callerMembership.Role.Position)
+            var callerTopRole = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == serverId)
+                .OrderBy(mr => mr.Role!.Position)
+                .Select(mr => mr.Role)
+                .FirstOrDefaultAsync();
+            if (callerTopRole is not null)
             {
-                return Forbid();
-            }
+                if (newRoleEntity.Position <= callerTopRole.Position)
+                {
+                    return Forbid();
+                }
 
-            // Cannot modify someone with an equal or higher role
-            if (targetMembership.Role is not null && targetMembership.Role.Position <= callerMembership.Role.Position)
-            {
-                return Forbid();
+                // Cannot modify someone with an equal or higher role
+                if (targetTopRole is not null && targetTopRole.Position <= callerTopRole.Position)
+                {
+                    return Forbid();
+                }
             }
         }
 
-        if (targetMembership.RoleId == newRoleEntity.Id)
+        // Check if the member already has exactly this role (idempotency)
+        var alreadyHasRole = await db.ServerMemberRoles
+            .AnyAsync(mr => mr.UserId == targetUserId && mr.RoleId == newRoleEntity.Id);
+        if (alreadyHasRole)
         {
             return Ok(new
             {
@@ -730,7 +769,18 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .Select(u => u.Nickname != null && u.Nickname != "" ? u.Nickname : u.DisplayName)
             .FirstOrDefaultAsync() ?? "Unknown";
 
-        targetMembership.RoleId = newRoleEntity.Id;
+        // Replace all current roles with the new role
+        var existingRoles = await db.ServerMemberRoles
+            .Where(mr => mr.UserId == targetUserId && mr.Role!.ServerId == serverId)
+            .ToListAsync();
+        db.ServerMemberRoles.RemoveRange(existingRoles);
+        db.ServerMemberRoles.Add(new ServerMemberRole
+        {
+            UserId = targetUserId,
+            RoleId = newRoleEntity.Id,
+            AssignedAt = DateTimeOffset.UtcNow
+        });
+
         audit.Log(serverId, appUser.Id, AuditAction.MemberRoleChanged,
             targetType: "User", targetId: targetUserId.ToString(),
             details: $"Changed @{targetDisplayName} role to {newRoleEntity.Name}");
@@ -1585,13 +1635,16 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
 
         if (existingMembership is not null)
         {
-            var existingRole = await db.ServerRoles.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.Id == existingMembership.RoleId);
+            var existingTopRole = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == invite.ServerId)
+                .OrderBy(mr => mr.Role!.Position)
+                .Select(mr => mr.Role!.Name)
+                .FirstOrDefaultAsync();
             return Ok(new
             {
                 serverId = invite.ServerId,
                 userId = appUser.Id,
-                role = existingRole?.Name ?? "Member"
+                role = existingTopRole ?? "Member"
             });
         }
 
@@ -1603,7 +1656,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         {
             ServerId = invite.ServerId,
             UserId = appUser.Id,
-            RoleId = memberRole.Id,
             JoinedAt = DateTimeOffset.UtcNow
         };
 

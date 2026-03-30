@@ -112,7 +112,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "Test Server" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.GetMyServers();
@@ -164,8 +164,8 @@ public class ServersControllerTests : IDisposable
         _db.Servers.AddRange(s1, s2);
         var (_, _, memberRole1) = CreateDefaultRoles(s1);
         var (_, _, memberRole2) = CreateDefaultRoles(s2);
-        _db.ServerMembers.Add(new ServerMember { Server = s1, UserId = _testUser.Id, RoleId = memberRole1.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = s2, UserId = _testUser.Id, RoleId = memberRole2.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = s1, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = s2, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.ReorderServers(new ReorderServersRequest { ServerIds = [s2.Id, s1.Id] });
@@ -180,7 +180,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest("New", null), _auditService);
         result.Should().BeOfType<OkObjectResult>();
@@ -192,7 +192,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (ownerRole, _, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
@@ -319,11 +319,11 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, _testUser.Id, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
@@ -337,7 +337,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, Guid.NewGuid(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
@@ -351,12 +351,14 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(owner);
         _db.Servers.Add(server);
         var (ownerRole, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = owner.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = owner.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = owner.Id, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, owner.Id, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
@@ -370,12 +372,12 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.KickMembers, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, target.Id, _auditService);
         result.Should().BeOfType<NoContentResult>();
@@ -386,14 +388,14 @@ public class ServersControllerTests : IDisposable
     [Fact]
     public async Task UpdateMemberRole_InvalidRole_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "Owner" }, _auditService);
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateSingleMemberRoleRequest { Role = "Owner" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
     public async Task UpdateMemberRole_InvalidRoleName_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "SuperAdmin" }, _auditService);
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateSingleMemberRoleRequest { Role = "SuperAdmin" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -492,7 +494,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         _db.ServerInvites.Add(new ServerInvite { Server = server, Code = "rejoiner", CreatedByUserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
@@ -510,7 +512,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateCategory(server.Id, new CreateCategoryRequest("General"), _auditService);
 
@@ -528,7 +530,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         await _controller.CreateCategory(server.Id, new CreateCategoryRequest("First"), _auditService);
         await _controller.CreateCategory(server.Id, new CreateCategoryRequest("Second"), _auditService);
@@ -580,7 +582,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RenameCategory(server.Id, category.Id, new RenameCategoryRequest("New Name"), _auditService);
 
@@ -597,7 +599,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RenameCategory(server.Id, Guid.NewGuid(), new RenameCategoryRequest("New Name"), _auditService);
 
@@ -614,7 +616,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteCategory(server.Id, category.Id, _auditService);
 
@@ -635,7 +637,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateChannelOrderRequest(
         [
@@ -663,7 +665,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         // Only send one channel when there are two
         var request = new UpdateChannelOrderRequest(
@@ -690,7 +692,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateChannelOrderRequest(
         [
@@ -710,7 +712,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (ownerRole, _, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _db.AuditLogEntries.AddRange(
@@ -720,7 +722,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeOwnerRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetAuditLog(server.Id, null, 50);
 
@@ -739,7 +741,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        var member = new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, IsMuted = false };
+        var member = new ServerMember { Server = server, UserId = _testUser.Id, IsMuted = false };
         _db.ServerMembers.Add(member);
         await _db.SaveChangesAsync();
 
@@ -756,7 +758,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         var channel = new Channel { Server = server, Name = "general" };
         _db.Channels.Add(channel);
         await _db.SaveChangesAsync();
@@ -776,7 +778,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         var channel = new Channel { Server = server, Name = "general" };
         _db.Channels.Add(channel);
         _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
@@ -801,7 +803,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, IsMuted = true });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, IsMuted = true });
         var channel = new Channel { Server = server, Name = "general" };
         _db.Channels.Add(channel);
         _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
@@ -833,7 +835,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateServer(server.Id, new UpdateServerRequest(null, "A new description"), _auditService);
 
@@ -858,11 +860,11 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, _testUser.Id, new BanMemberRequest(), _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
@@ -876,12 +878,14 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(owner);
         _db.Servers.Add(server);
         var (ownerRole, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = owner.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = owner.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = owner.Id, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, owner.Id, new BanMemberRequest(), _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
@@ -896,12 +900,15 @@ public class ServersControllerTests : IDisposable
         _db.Servers.Add(server);
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
         // Caller has member role (position 2), target has admin role (position 1)
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = target.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeMemberRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
         result.Should().BeOfType<ForbidResult>();
@@ -915,12 +922,12 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         _db.BannedMembers.Add(new BannedMember { ServerId = server.Id, UserId = target.Id, BannedByUserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
         result.Should().BeOfType<ConflictObjectResult>();
@@ -932,11 +939,11 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, Guid.NewGuid(), new BanMemberRequest(), _auditService);
         result.Should().BeOfType<NotFoundObjectResult>();
@@ -950,12 +957,12 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest { Reason = "Spam" }, _auditService);
 
@@ -974,14 +981,14 @@ public class ServersControllerTests : IDisposable
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
         var channel = new Channel { Server = server, Name = "general" };
         _db.Channels.Add(channel);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id });
         _db.Messages.Add(new Message { ChannelId = channel.Id, AuthorUserId = target.Id, Body = "spam" });
         _db.Messages.Add(new Message { ChannelId = channel.Id, AuthorUserId = target.Id, Body = "more spam" });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest { DeleteMessages = true }, _auditService);
 
@@ -997,11 +1004,11 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, target.Id, new BanMemberRequest(), _auditService);
 
@@ -1019,12 +1026,12 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         _db.BannedMembers.Add(new BannedMember { ServerId = server.Id, UserId = target.Id, BannedByUserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UnbanMember(server.Id, target.Id, _auditService);
 
@@ -1038,11 +1045,11 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UnbanMember(server.Id, Guid.NewGuid(), _auditService);
 
@@ -1060,7 +1067,7 @@ public class ServersControllerTests : IDisposable
         _db.Users.AddRange(banned1, banned2);
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         _db.BannedMembers.AddRange(
             new BannedMember { ServerId = server.Id, UserId = banned1.Id, BannedByUserId = _testUser.Id, Reason = "Spam", BannedAt = DateTimeOffset.UtcNow.AddMinutes(-2) },
             new BannedMember { ServerId = server.Id, UserId = banned2.Id, BannedByUserId = _testUser.Id, Reason = "Trolling", BannedAt = DateTimeOffset.UtcNow.AddMinutes(-1) }
@@ -1068,7 +1075,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetBans(server.Id);
 
@@ -1082,11 +1089,11 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetBans(server.Id);
 
@@ -1132,7 +1139,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteChannel(server.Id, channel.Id, _auditService);
 
@@ -1148,7 +1155,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteChannel(server.Id, Guid.NewGuid(), _auditService);
 
@@ -1166,7 +1173,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteChannel(server.Id, channel.Id, _auditService);
 
@@ -1184,7 +1191,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _avatarService.Setup(a => a.DeleteServerIconAsync(server.Id)).Returns(Task.CompletedTask);
 
         var result = await _controller.DeleteServerIcon(server.Id, _auditService);
@@ -1202,7 +1209,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteServerIcon(server.Id, _auditService);
 
@@ -1235,7 +1242,7 @@ public class ServersControllerTests : IDisposable
 
         _avatarService.Setup(a => a.Validate(It.IsAny<IFormFile>())).Returns((string?)null);
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _avatarService.Setup(a => a.SaveServerIconAsync(server.Id, It.IsAny<IFormFile>()))
             .ReturnsAsync("icons/new.png");
 
@@ -1255,7 +1262,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RenameEmoji(server.Id, Guid.NewGuid(), new RenameEmojiRequest("new_name"), _auditService);
 
@@ -1272,7 +1279,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RenameEmoji(server.Id, emoji.Id, new RenameEmojiRequest("new_name"), _auditService);
 
@@ -1292,7 +1299,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RenameEmoji(server.Id, emoji1.Id, new RenameEmojiRequest("emoji_b"), _auditService);
 
@@ -1309,7 +1316,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteEmoji(server.Id, Guid.NewGuid(), _auditService);
 
@@ -1326,7 +1333,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _emojiService.Setup(e => e.DeleteEmojiAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
 
         var result = await _controller.DeleteEmoji(server.Id, emoji.Id, _auditService);
@@ -1348,7 +1355,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateCategoryOrderRequest([
             new CategoryOrderItem(cat2.Id, 0),
@@ -1373,7 +1380,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         // Only include one category when there are two
         var request = new UpdateCategoryOrderRequest([
@@ -1395,7 +1402,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateCategoryOrderRequest([
             new CategoryOrderItem(Guid.NewGuid(), 0)
@@ -1416,7 +1423,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new CreateWebhookRequest
         {
@@ -1439,7 +1446,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new CreateWebhookRequest
         {
@@ -1461,7 +1468,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new CreateWebhookRequest
         {
@@ -1485,7 +1492,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetWebhooks(server.Id);
 
@@ -1500,7 +1507,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateWebhook(server.Id, Guid.NewGuid(), new UpdateWebhookRequest { Name = "Updated" }, _auditService);
 
@@ -1517,7 +1524,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateWebhook(server.Id, webhook.Id, new UpdateWebhookRequest { Name = "Updated" }, _auditService);
 
@@ -1536,7 +1543,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateWebhook(server.Id, webhook.Id, new UpdateWebhookRequest { EventTypes = ["FakeEvent"] }, _auditService);
 
@@ -1553,7 +1560,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateWebhook(server.Id, webhook.Id, new UpdateWebhookRequest { Url = "http://127.0.0.1/hook" }, _auditService);
 
@@ -1568,7 +1575,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteWebhook(server.Id, Guid.NewGuid(), _auditService);
 
@@ -1585,7 +1592,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteWebhook(server.Id, webhook.Id, _auditService);
 
@@ -1603,7 +1610,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetWebhookDeliveries(server.Id, Guid.NewGuid());
 
@@ -1621,7 +1628,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetWebhookDeliveries(server.Id, webhook.Id);
 
@@ -1636,13 +1643,13 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
-        var result = await _controller.UpdateMemberRole(server.Id, _testUser.Id, new UpdateMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
+        var result = await _controller.UpdateMemberRole(server.Id, _testUser.Id, new UpdateSingleMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -1655,14 +1662,14 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (ownerRole, adminRole, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
-        var result = await _controller.UpdateMemberRole(server.Id, target.Id, new UpdateMemberRoleRequest { Role = ownerRole.Id.ToString() }, _auditService);
+        var result = await _controller.UpdateMemberRole(server.Id, target.Id, new UpdateSingleMemberRoleRequest { Role = ownerRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -1673,13 +1680,13 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
-        var result = await _controller.UpdateMemberRole(server.Id, Guid.NewGuid(), new UpdateMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
+        var result = await _controller.UpdateMemberRole(server.Id, Guid.NewGuid(), new UpdateSingleMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<NotFoundObjectResult>();
     }
@@ -1690,13 +1697,13 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
-        var result = await _controller.UpdateMemberRole(server.Id, Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "NonExistentRole" }, _auditService);
+        var result = await _controller.UpdateMemberRole(server.Id, Guid.NewGuid(), new UpdateSingleMemberRoleRequest { Role = "NonExistentRole" }, _auditService);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -1704,7 +1711,7 @@ public class ServersControllerTests : IDisposable
     [Fact]
     public async Task UpdateMemberRole_EmptyRole_ReturnsBadRequest()
     {
-        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateMemberRoleRequest { Role = "" }, _auditService);
+        var result = await _controller.UpdateMemberRole(Guid.NewGuid(), Guid.NewGuid(), new UpdateSingleMemberRoleRequest { Role = "" }, _auditService);
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -1732,7 +1739,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateChannel(server.Id, channel.Id, new UpdateChannelRequest(null, "new desc"), _auditService);
 
@@ -1794,12 +1801,16 @@ public class ServersControllerTests : IDisposable
         _db.Users.Add(target);
         _db.Servers.Add(server);
         var (_, adminRole, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = target.Id });
+        await _db.SaveChangesAsync();
+        // Both have admin role — caller cannot kick someone at equal position
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = target.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.KickMembers, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, target.Id, _auditService);
 
@@ -1832,7 +1843,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.MuteChannel(server.Id, Guid.NewGuid(), new MuteRequest(true));
@@ -1860,7 +1871,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteCategory(server.Id, Guid.NewGuid(), _auditService);
 
@@ -1875,7 +1886,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (ownerRole, _, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         var cutoff = DateTimeOffset.UtcNow;
         _db.AuditLogEntries.AddRange(
             new AuditLogEntry { ServerId = server.Id, ActorUserId = _testUser.Id, Action = AuditAction.ChannelCreated, CreatedAt = cutoff.AddMinutes(-5) },
@@ -1884,7 +1895,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeOwnerRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetAuditLog(server.Id, cutoff, 50);
 
@@ -1901,7 +1912,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var fileMock = new Mock<IFormFile>();
         var result = await _controller.UploadEmoji(server.Id, "a", fileMock.Object, _auditService); // too short
@@ -1917,7 +1928,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _emojiService.Setup(e => e.Validate(It.IsAny<IFormFile>())).Returns("File too large.");
 
         var fileMock = new Mock<IFormFile>();
@@ -1939,7 +1950,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _emojiService.Setup(e => e.Validate(It.IsAny<IFormFile>())).Returns((string?)null);
 
         var fileMock = new Mock<IFormFile>();
@@ -1957,7 +1968,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _emojiService.Setup(e => e.Validate(It.IsAny<IFormFile>())).Returns((string?)null);
 
         var fileMock = new Mock<IFormFile>();
@@ -1974,7 +1985,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _emojiService.Setup(e => e.Validate(It.IsAny<IFormFile>())).Returns((string?)null);
         _emojiService.Setup(e => e.SaveEmojiAsync(server.Id, "happy", It.IsAny<IFormFile>()))
             .ReturnsAsync("emojis/happy.png");
@@ -1999,7 +2010,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateWebhook(server.Id, webhook.Id, new UpdateWebhookRequest { IsActive = false }, _auditService);
 
@@ -2035,7 +2046,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new CreateWebhookRequest
         {
@@ -2066,7 +2077,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateWebhook(server.Id, webhook.Id, new UpdateWebhookRequest
         {
@@ -2091,7 +2102,7 @@ public class ServersControllerTests : IDisposable
 
         _avatarService.Setup(a => a.Validate(It.IsAny<IFormFile>())).Returns((string?)null);
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _avatarService.Setup(a => a.DeleteServerIconAsync(server.Id)).Returns(Task.CompletedTask);
         _avatarService.Setup(a => a.SaveServerIconAsync(server.Id, It.IsAny<IFormFile>()))
             .ReturnsAsync("icons/new.png");
@@ -2117,15 +2128,15 @@ public class ServersControllerTests : IDisposable
 
         var targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "t-1", DisplayName = "Target" };
         _db.Users.Add(targetUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = ownerRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ownerRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateMemberRole(server.Id, targetUser.Id,
-            new UpdateMemberRoleRequest { Role = adminRole.Id.ToString() }, _auditService);
+            new UpdateSingleMemberRoleRequest { Role = adminRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -2140,15 +2151,17 @@ public class ServersControllerTests : IDisposable
 
         var ownerUser = new User { Id = Guid.NewGuid(), GoogleSubject = "own-1", DisplayName = "Owner" };
         _db.Users.Add(ownerUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = ownerUser.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = ownerUser.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = ownerUser.Id, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = adminRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateMemberRole(server.Id, ownerUser.Id,
-            new UpdateMemberRoleRequest { Role = memberRole.Name }, _auditService);
+            new UpdateSingleMemberRoleRequest { Role = memberRole.Name }, _auditService);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -2163,15 +2176,15 @@ public class ServersControllerTests : IDisposable
 
         var targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "t-2", DisplayName = "Target" };
         _db.Users.Add(targetUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = ownerRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ownerRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateMemberRole(server.Id, targetUser.Id,
-            new UpdateMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
+            new UpdateSingleMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -2186,16 +2199,16 @@ public class ServersControllerTests : IDisposable
 
         var targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "t-3", DisplayName = "Target" };
         _db.Users.Add(targetUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = adminRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         // Admin (position 1) cannot assign Owner (position 0)
         var result = await _controller.UpdateMemberRole(server.Id, targetUser.Id,
-            new UpdateMemberRoleRequest { Role = ownerRole.Id.ToString() }, _auditService);
+            new UpdateSingleMemberRoleRequest { Role = ownerRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -2210,7 +2223,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateInvite(server.Id,
             new CreateInviteRequest { ExpiresInHours = 0 }, _auditService);
@@ -2227,7 +2240,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateInvite(server.Id,
             new CreateInviteRequest { ExpiresInHours = 24, MaxUses = 10 }, _auditService);
@@ -2245,7 +2258,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateInvite(server.Id,
             new CreateInviteRequest { ExpiresInHours = -5 }, _auditService);
@@ -2297,7 +2310,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var mockClient = new Mock<HttpMessageHandler>();
         var httpClient = new HttpClient(mockClient.Object) { BaseAddress = new Uri("http://localhost:3001") };
@@ -2322,7 +2335,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateChannel(server.Id, ch.Id,
             new UpdateChannelRequest("new-name", null), _auditService);
@@ -2342,7 +2355,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateServer(server.Id,
             new UpdateServerRequest("New", "New desc"), _auditService);
@@ -2361,7 +2374,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateServer(server.Id,
             new UpdateServerRequest("Same", "desc"), _auditService);
@@ -2382,7 +2395,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         // Only send 1 of 2 channels
         var result = await _controller.UpdateChannelOrder(server.Id,
@@ -2404,7 +2417,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateCategoryOrder(server.Id,
             new UpdateCategoryOrderRequest([new CategoryOrderItem(cat1.Id, 0)]), _auditService);
@@ -2424,16 +2437,20 @@ public class ServersControllerTests : IDisposable
 
         var targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "t-k", DisplayName = "Target" };
         _db.Users.Add(targetUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id });
+        await _db.SaveChangesAsync();
+        // Caller has member role, target has admin role (higher rank = lower position number)
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = targetUser.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = adminRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, targetUser.Id, _auditService);
 
-        result.Should().BeOfType<BadRequestObjectResult>(); // Cannot kick the server owner
+        result.Should().BeOfType<ForbidResult>();
     }
 
     // ═══════════════════ MuteChannel — already muted, update ═══════════════════
@@ -2445,7 +2462,7 @@ public class ServersControllerTests : IDisposable
         _db.Servers.Add(server);
         var ch = new Channel { ServerId = server.Id, Name = "ch" };
         _db.Channels.Add(ch);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = Guid.NewGuid() });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
         {
             UserId = _testUser.Id, ChannelId = ch.Id, IsMuted = true
@@ -2486,7 +2503,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetAuditLog(server.Id, null, -10);
 
@@ -2501,7 +2518,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetAuditLog(server.Id, null, 500);
 
@@ -2517,7 +2534,7 @@ public class ServersControllerTests : IDisposable
         _db.Servers.Add(server);
         var role = MakeMemberRole(server.Id);
         _db.ServerRoles.Add(role);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = role.Id, SortOrder = 5 });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, SortOrder = 5 });
         await _db.SaveChangesAsync();
 
         var unknownServerId = Guid.NewGuid();
@@ -2541,7 +2558,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateChannel(server.Id,
             new CreateChannelRequest("new-channel"), _auditService);
@@ -2563,12 +2580,12 @@ public class ServersControllerTests : IDisposable
 
         var targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "ban-t", DisplayName = "Banned" };
         _db.Users.Add(targetUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = ownerRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.BanMembers, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ownerRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.BanMember(server.Id, targetUser.Id,
             new BanMemberRequest { Reason = "Rule violation", DeleteMessages = false }, _auditService);
@@ -2591,19 +2608,19 @@ public class ServersControllerTests : IDisposable
 
         var targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "t-id", DisplayName = "Target" };
         _db.Users.Add(targetUser);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = ownerRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ownerRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateMemberRole(server.Id, targetUser.Id,
-            new UpdateMemberRoleRequest { Role = adminRole.Id.ToString() }, _auditService);
+            new UpdateSingleMemberRoleRequest { Role = adminRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<OkObjectResult>();
-        var updatedMembership = await _db.ServerMembers.FirstAsync(m => m.UserId == targetUser.Id && m.ServerId == server.Id);
-        updatedMembership.RoleId.Should().Be(adminRole.Id);
+        var hasRole = await _db.ServerMemberRoles.AnyAsync(mr => mr.UserId == targetUser.Id && mr.RoleId == adminRole.Id);
+        hasRole.Should().BeTrue();
     }
 
     // ═══════════════════ UpdateMemberRole — cannot modify higher role target ═══════════════════
@@ -2618,15 +2635,19 @@ public class ServersControllerTests : IDisposable
 
         var targetAdmin = new User { Id = Guid.NewGuid(), GoogleSubject = "t-admin", DisplayName = "OtherAdmin" };
         _db.Users.Add(targetAdmin);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = adminRole.Id });
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetAdmin.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = targetAdmin.Id });
+        await _db.SaveChangesAsync();
+        // Caller has member role, target has admin role (higher rank)
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = targetAdmin.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = adminRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateMemberRole(server.Id, targetAdmin.Id,
-            new UpdateMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
+            new UpdateSingleMemberRoleRequest { Role = memberRole.Id.ToString() }, _auditService);
 
         result.Should().BeOfType<ForbidResult>();
     }
@@ -2639,7 +2660,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.MuteServer(server.Id, new MuteRequest(true));
@@ -2655,7 +2676,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id, IsMuted = true });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, IsMuted = true });
         await _db.SaveChangesAsync();
 
         var result = await _controller.MuteServer(server.Id, new MuteRequest(false));
@@ -2673,7 +2694,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         var channel = new Channel { ServerId = server.Id, Name = "test-channel" };
         _db.Channels.Add(channel);
         await _db.SaveChangesAsync();
@@ -2692,7 +2713,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         var channel = new Channel { ServerId = server.Id, Name = "test-channel" };
         _db.Channels.Add(channel);
         _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
@@ -2717,7 +2738,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         var channel = new Channel { ServerId = server.Id, Name = "test-channel" };
         _db.Channels.Add(channel);
         await _db.SaveChangesAsync();
@@ -2735,7 +2756,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id, IsMuted = true });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, IsMuted = true });
         var channel = new Channel { ServerId = server.Id, Name = "test-channel" };
         _db.Channels.Add(channel);
         _db.ChannelNotificationOverrides.Add(new ChannelNotificationOverride
@@ -2761,7 +2782,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UnbanMember(server.Id, Guid.NewGuid(), _auditService);
 
@@ -2785,7 +2806,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UnbanMember(server.Id, bannedUser.Id, _auditService);
 
@@ -2809,7 +2830,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetBans(server.Id);
 
@@ -2830,7 +2851,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateCategoryOrderRequest([
             new CategoryOrderItem(cat3.Id, 0),
@@ -2854,7 +2875,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateCategoryOrderRequest([
             new CategoryOrderItem(Guid.NewGuid(), 0)
@@ -2934,7 +2955,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetAuditLog(server.Id, null, 50);
 
@@ -2965,7 +2986,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.GetInvites(server.Id);
 
@@ -2989,7 +3010,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RevokeInvite(server.Id, invite.Id, _auditService);
 
@@ -3008,7 +3029,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateServer(server.Id,
             new UpdateServerRequest(null, "New desc"), _auditService);
@@ -3040,7 +3061,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
@@ -3063,7 +3084,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteChannel(server.Id, channel.Id, _auditService);
 
@@ -3080,7 +3101,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteChannel(server.Id, Guid.NewGuid(), _auditService);
 
@@ -3099,7 +3120,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.DeleteChannel(server.Id, channel.Id, _auditService);
 
@@ -3118,7 +3139,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateChannel(server.Id,
             new CreateChannelRequest("  spaced  "), _auditService);
@@ -3159,7 +3180,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateChannel(server.Id, channel.Id,
             new UpdateChannelRequest("new-name", null), _auditService);
@@ -3177,7 +3198,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UpdateChannel(server.Id, Guid.NewGuid(),
             new UpdateChannelRequest("x", null), _auditService);
@@ -3195,7 +3216,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.CreateInvite(server.Id,
             new CreateInviteRequest { ExpiresInHours = null }, _auditService);
@@ -3251,11 +3272,11 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (ownerRole, _, _) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = ownerRole });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.KickMember(server.Id, Guid.NewGuid(), _auditService);
 
@@ -3293,7 +3314,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         await _controller.CreateCategory(server.Id, new CreateCategoryRequest("First"), _auditService);
         await _controller.CreateCategory(server.Id, new CreateCategoryRequest("Second"), _auditService);
@@ -3322,7 +3343,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.RenameCategory(server.Id, cat.Id,
             new RenameCategoryRequest("  New Name  "), _auditService);
@@ -3344,7 +3365,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var request = new UpdateChannelOrderRequest([
             new ChannelOrderItem(Guid.NewGuid(), null, 0) // non-existent channel
@@ -3362,7 +3383,7 @@ public class ServersControllerTests : IDisposable
         var server = new Server { Name = "S" };
         _db.Servers.Add(server);
         var (_, _, memberRole) = CreateDefaultRoles(server);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.GetNotificationPreferences(server.Id);
@@ -3388,7 +3409,7 @@ public class ServersControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, Role = MakeAdminRole(server.Id) });
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
 
         var result = await _controller.UnbanMember(server.Id, bannedUser.Id, _auditService);
 

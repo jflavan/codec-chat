@@ -80,18 +80,16 @@ public class PermissionResolverServiceTests : IDisposable
         var memberUser = new User { Id = _memberId, DisplayName = "Regular Member" };
         _db.Users.AddRange(ownerUser, memberUser);
 
-        // Seed: server members (legacy RoleId for owner detection)
+        // Seed: server members
         var ownerMember = new ServerMember
         {
             ServerId = _serverId,
             UserId = _ownerId,
-            RoleId = _ownerRole.Id,
         };
         var regularMember = new ServerMember
         {
             ServerId = _serverId,
             UserId = _memberId,
-            RoleId = _memberRole.Id,
         };
         _db.ServerMembers.AddRange(ownerMember, regularMember);
 

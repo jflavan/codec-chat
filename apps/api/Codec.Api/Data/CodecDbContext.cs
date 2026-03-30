@@ -131,11 +131,6 @@ public class CodecDbContext : DbContext
             .WithMany(user => user.ServerMemberships)
             .HasForeignKey(member => member.UserId);
 
-        modelBuilder.Entity<ServerMember>()
-            .HasOne(member => member.Role)
-            .WithMany(role => role.Members)
-            .HasForeignKey(member => member.RoleId);
-
         modelBuilder.Entity<ServerRoleEntity>(e =>
         {
             e.HasOne(r => r.Server)
