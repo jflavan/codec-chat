@@ -1188,6 +1188,90 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     }
 
     /// <summary>
+    /// Lists all permission overrides for a channel. Requires ManageChannels permission.
+    /// </summary>
+    [HttpGet("{channelId:guid}/overrides")]
+    public async Task<IActionResult> GetChannelOverrides(Guid channelId)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return NotFound();
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
+
+        var overrides = await db.ChannelPermissionOverrides.AsNoTracking()
+            .Where(o => o.ChannelId == channelId)
+            .Include(o => o.Role)
+            .Select(o => new { o.ChannelId, o.RoleId, RoleName = o.Role!.Name, Allow = (long)o.Allow, Deny = (long)o.Deny })
+            .ToListAsync();
+
+        return Ok(overrides);
+    }
+
+    /// <summary>
+    /// Sets or updates a permission override for a role in a channel. Requires ManageChannels permission.
+    /// </summary>
+    [HttpPut("{channelId:guid}/overrides/{roleId:guid}")]
+    public async Task<IActionResult> SetChannelOverride(Guid channelId, Guid roleId, [FromBody] ChannelOverrideRequest request)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return NotFound();
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
+
+        var role = await db.ServerRoles.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == channel.ServerId);
+        if (role is null) return NotFound();
+
+        var existing = await db.ChannelPermissionOverrides
+            .FirstOrDefaultAsync(o => o.ChannelId == channelId && o.RoleId == roleId);
+
+        if (existing is not null)
+        {
+            existing.Allow = (Permission)request.Allow;
+            existing.Deny = (Permission)request.Deny;
+        }
+        else
+        {
+            db.ChannelPermissionOverrides.Add(new ChannelPermissionOverride
+            {
+                Id = Guid.NewGuid(), ChannelId = channelId, RoleId = roleId,
+                Allow = (Permission)request.Allow, Deny = (Permission)request.Deny
+            });
+        }
+        await db.SaveChangesAsync();
+
+        await chatHub.Clients.Group($"server-{channel.ServerId}")
+            .SendAsync("ChannelOverrideUpdated", new { channelId, roleId, request.Allow, request.Deny });
+        return Ok();
+    }
+
+    /// <summary>
+    /// Removes a permission override for a role in a channel. Requires ManageChannels permission.
+    /// </summary>
+    [HttpDelete("{channelId:guid}/overrides/{roleId:guid}")]
+    public async Task<IActionResult> DeleteChannelOverride(Guid channelId, Guid roleId)
+    {
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return NotFound();
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+        await userService.EnsurePermissionAsync(channel.ServerId, appUser.Id, Permission.ManageChannels, appUser.IsGlobalAdmin);
+
+        var existing = await db.ChannelPermissionOverrides
+            .FirstOrDefaultAsync(o => o.ChannelId == channelId && o.RoleId == roleId);
+        if (existing is null) return NotFound();
+
+        db.ChannelPermissionOverrides.Remove(existing);
+        await db.SaveChangesAsync();
+
+        await chatHub.Clients.Group($"server-{channel.ServerId}")
+            .SendAsync("ChannelOverrideUpdated", new { channelId, roleId, allow = 0, deny = 0 });
+        return Ok();
+    }
+
+    /// <summary>
     /// Parses <c>&lt;@guid&gt;</c> mention tokens from a message body and returns
     /// the distinct set of referenced user IDs.
     /// </summary>
