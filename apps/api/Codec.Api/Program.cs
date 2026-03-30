@@ -214,6 +214,7 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 });
 
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPermissionResolverService, PermissionResolverService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.Configure<Codec.Api.Models.RecaptchaSettings>(builder.Configuration.GetSection("Recaptcha"));
 builder.Services.AddHttpClient<RecaptchaService>();
