@@ -319,8 +319,13 @@ public class SamlService(
                 {
                     ServerId = Server.DefaultServerId,
                     User = user,
-                    RoleId = defaultMemberRole.Id,
                     JoinedAt = DateTimeOffset.UtcNow
+                });
+                db.ServerMemberRoles.Add(new ServerMemberRole
+                {
+                    UserId = user.Id,
+                    RoleId = defaultMemberRole.Id,
+                    AssignedAt = DateTimeOffset.UtcNow
                 });
             }
         }

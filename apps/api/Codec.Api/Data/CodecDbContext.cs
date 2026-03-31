@@ -36,6 +36,8 @@ public class CodecDbContext : DbContext
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<BannedMember> BannedMembers => Set<BannedMember>();
     public DbSet<ServerRoleEntity> ServerRoles => Set<ServerRoleEntity>();
+    public DbSet<ServerMemberRole> ServerMemberRoles => Set<ServerMemberRole>();
+    public DbSet<ChannelPermissionOverride> ChannelPermissionOverrides => Set<ChannelPermissionOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -129,11 +131,6 @@ public class CodecDbContext : DbContext
             .WithMany(user => user.ServerMemberships)
             .HasForeignKey(member => member.UserId);
 
-        modelBuilder.Entity<ServerMember>()
-            .HasOne(member => member.Role)
-            .WithMany(role => role.Members)
-            .HasForeignKey(member => member.RoleId);
-
         modelBuilder.Entity<ServerRoleEntity>(e =>
         {
             e.HasOne(r => r.Server)
@@ -144,6 +141,36 @@ public class CodecDbContext : DbContext
             e.Property(r => r.Color).HasMaxLength(7);
             e.HasIndex(r => new { r.ServerId, r.Position });
             e.HasIndex(r => new { r.ServerId, r.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ServerMemberRole>(e =>
+        {
+            e.HasKey(mr => new { mr.UserId, mr.RoleId });
+
+            e.HasOne(mr => mr.User)
+                .WithMany()
+                .HasForeignKey(mr => mr.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(mr => mr.Role)
+                .WithMany(r => r.MemberRoles)
+                .HasForeignKey(mr => mr.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChannelPermissionOverride>(e =>
+        {
+            e.HasOne(o => o.Channel)
+                .WithMany()
+                .HasForeignKey(o => o.ChannelId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(o => o.Role)
+                .WithMany()
+                .HasForeignKey(o => o.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(o => new { o.ChannelId, o.RoleId }).IsUnique();
         });
 
         modelBuilder.Entity<Reaction>(entity =>

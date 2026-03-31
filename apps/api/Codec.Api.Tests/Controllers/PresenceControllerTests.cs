@@ -58,7 +58,6 @@ public class PresenceControllerTests : IDisposable
         {
             ServerId = _server.Id,
             UserId = userId,
-            RoleId = Guid.NewGuid()
         });
         _db.SaveChanges();
     }

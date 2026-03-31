@@ -19,7 +19,8 @@ public class UserServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new CodecDbContext(options);
-        _svc = new UserService(_db);
+        var permissionResolver = new PermissionResolverService(_db);
+        _svc = new UserService(_db, permissionResolver);
     }
 
     public void Dispose() => _db.Dispose();
@@ -105,12 +106,16 @@ public class UserServiceTests : IDisposable
         var principal = CreatePrincipal("google-4", "NewUser");
         var (user, _) = await _svc.GetOrCreateUserAsync(principal);
 
-        var membership = await _db.ServerMembers
-            .Include(m => m.Role)
+        var membership = await _db.ServerMembers.AsNoTracking()
             .FirstOrDefaultAsync(m => m.UserId == user.Id && m.ServerId == Server.DefaultServerId);
         membership.Should().NotBeNull();
-        membership!.Role.Should().NotBeNull();
-        membership.Role!.Name.Should().Be("Member");
+
+        // Verify role was assigned via the multi-role join table
+        var memberRoleAssignment = await _db.ServerMemberRoles.AsNoTracking()
+            .Include(mr => mr.Role)
+            .FirstOrDefaultAsync(mr => mr.UserId == user.Id && mr.RoleId == memberRole.Id);
+        memberRoleAssignment.Should().NotBeNull();
+        memberRoleAssignment!.Role!.Name.Should().Be("Member");
     }
 
     // --- GetOrCreateUserAsync (Local JWT --- issuer "codec-api") ---
@@ -228,7 +233,9 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         _db.Users.Add(user);
         var (_, _, memberRole) = CreateDefaultRoles(server.Id);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         (await _svc.IsMemberAsync(server.Id, user.Id)).Should().BeTrue();
@@ -254,12 +261,15 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         _db.Users.Add(user);
         var (_, adminRole, _) = CreateDefaultRoles(server.Id);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var member = await _svc.EnsureMemberAsync(server.Id, user.Id);
-        member.Role.Should().NotBeNull();
-        member.Role!.Name.Should().Be("Admin");
+        member.Should().NotBeNull();
+        member.ServerId.Should().Be(server.Id);
+        member.UserId.Should().Be(user.Id);
     }
 
     [Fact]
@@ -301,12 +311,13 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         _db.Users.Add(user);
         var (_, adminRole, _) = CreateDefaultRoles(server.Id);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var member = await _svc.EnsureAdminAsync(server.Id, user.Id);
-        member.Role.Should().NotBeNull();
-        member.Role!.Name.Should().Be("Admin");
+        member.Should().NotBeNull();
     }
 
     [Fact]
@@ -317,7 +328,9 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         _db.Users.Add(user);
         var (_, _, memberRole) = CreateDefaultRoles(server.Id);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         await _svc.Invoking(s => s.EnsureAdminAsync(server.Id, user.Id))
@@ -334,13 +347,13 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         _db.Users.Add(user);
         var (ownerRole, _, _) = CreateDefaultRoles(server.Id);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = ownerRole.Id });
         await _db.SaveChangesAsync();
 
         var member = await _svc.EnsureOwnerAsync(server.Id, user.Id);
-        member.Role.Should().NotBeNull();
-        member.Role!.Name.Should().Be("Owner");
-        member.Role.Position.Should().Be(0);
+        member.Should().NotBeNull();
     }
 
     [Fact]
@@ -351,7 +364,9 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         _db.Users.Add(user);
         var (_, adminRole, _) = CreateDefaultRoles(server.Id);
-        _db.ServerMembers.Add(new ServerMember { Server = server, User = user, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, User = user });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         await _svc.Invoking(s => s.EnsureOwnerAsync(server.Id, user.Id))
@@ -402,7 +417,9 @@ public class UserServiceTests : IDisposable
         var (_, _, memberRole) = CreateDefaultRoles(server.Id);
         var user = new User { GoogleSubject = "perm-user", DisplayName = "Perm" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         var permissions = await _svc.GetPermissionsAsync(server.Id, user.Id);
@@ -432,7 +449,9 @@ public class UserServiceTests : IDisposable
         var (ownerRole, _, _) = CreateDefaultRoles(server.Id);
         var user = new User { GoogleSubject = "owner-check", DisplayName = "Owner" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = ownerRole.Id });
         await _db.SaveChangesAsync();
 
         var isOwner = await _svc.IsOwnerAsync(server.Id, user.Id);
@@ -448,7 +467,9 @@ public class UserServiceTests : IDisposable
         var (_, adminRole, _) = CreateDefaultRoles(server.Id);
         var user = new User { GoogleSubject = "admin-check", DisplayName = "Admin" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var isOwner = await _svc.IsOwnerAsync(server.Id, user.Id);
@@ -504,7 +525,9 @@ public class UserServiceTests : IDisposable
         var (_, adminRole, _) = CreateDefaultRoles(server.Id);
         var user = new User { GoogleSubject = "perm-check", DisplayName = "PermUser" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var result = await _svc.EnsurePermissionAsync(server.Id, user.Id, Permission.ManageServer);
@@ -520,7 +543,9 @@ public class UserServiceTests : IDisposable
         var (_, _, memberRole) = CreateDefaultRoles(server.Id);
         var user = new User { GoogleSubject = "no-perm", DisplayName = "NoPerm" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         await _svc.Invoking(s => s.EnsurePermissionAsync(server.Id, user.Id, Permission.ManageServer))
@@ -553,7 +578,7 @@ public class UserServiceTests : IDisposable
         _db.Servers.Add(server);
         var user = new User { GoogleSubject = "null-role", DisplayName = "NullRole" };
         _db.Users.Add(user);
-        // Member with no role assigned
+        // Member with no role assigned (no ServerMemberRole entries)
         _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
         await _db.SaveChangesAsync();
 
@@ -571,7 +596,9 @@ public class UserServiceTests : IDisposable
         var (ownerRole, _, _) = CreateDefaultRoles(server.Id);
         var user = new User { GoogleSubject = "owner-test2", DisplayName = "Owner2" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = ownerRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = ownerRole.Id });
         await _db.SaveChangesAsync();
 
         var result = await _svc.EnsureOwnerAsync(server.Id, user.Id);
@@ -698,7 +725,9 @@ public class UserServiceTests : IDisposable
 
         var user = new User { Id = Guid.NewGuid(), GoogleSubject = "perm-test", DisplayName = "Test" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = memberRole.Id });
         await _db.SaveChangesAsync();
 
         // Member role does not have ManageServer permission
@@ -718,7 +747,9 @@ public class UserServiceTests : IDisposable
 
         var user = new User { Id = Guid.NewGuid(), GoogleSubject = "admin-test", DisplayName = "Admin" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         await _svc.Invoking(s => s.EnsureOwnerAsync(server.Id, user.Id))
@@ -737,7 +768,9 @@ public class UserServiceTests : IDisposable
 
         var user = new User { Id = Guid.NewGuid(), GoogleSubject = "admin-perm", DisplayName = "Admin" };
         _db.Users.Add(user);
-        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, RoleId = adminRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id });
+        await _db.SaveChangesAsync();
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = user.Id, RoleId = adminRole.Id });
         await _db.SaveChangesAsync();
 
         var result = await _svc.EnsureAdminAsync(server.Id, user.Id);

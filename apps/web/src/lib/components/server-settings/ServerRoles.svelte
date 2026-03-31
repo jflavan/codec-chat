@@ -10,6 +10,7 @@
 	let editingRoleId = $state<string | null>(null);
 	let editName = $state('');
 	let editColor = $state('');
+	let editPermissions = $state(0);
 	let deletingRoleId = $state<string | null>(null);
 
 	$effect(() => {
@@ -27,15 +28,16 @@
 		isCreating = false;
 	}
 
-	function startEdit(role: { id: string; name: string; color?: string | null }): void {
+	function startEdit(role: { id: string; name: string; color?: string | null; permissions: number }): void {
 		editingRoleId = role.id;
 		editName = role.name;
 		editColor = role.color ?? '#99aab5';
+		editPermissions = role.permissions;
 	}
 
 	async function saveEdit(): Promise<void> {
 		if (!editingRoleId || !editName.trim()) return;
-		await app.updateRole(editingRoleId, { name: editName.trim(), color: editColor });
+		await app.updateRole(editingRoleId, { name: editName.trim(), color: editColor, permissions: editPermissions });
 		editingRoleId = null;
 	}
 
@@ -48,23 +50,72 @@
 		deletingRoleId = null;
 	}
 
-	/** Permission labels for the UI. */
-	const permissionEntries = [
-		{ flag: Permission.ManageChannels, label: 'Manage Channels' },
-		{ flag: Permission.ManageServer, label: 'Manage Server' },
-		{ flag: Permission.ManageRoles, label: 'Manage Roles' },
-		{ flag: Permission.ManageEmojis, label: 'Manage Emojis' },
-		{ flag: Permission.ViewAuditLog, label: 'View Audit Log' },
-		{ flag: Permission.CreateInvites, label: 'Create Invites' },
-		{ flag: Permission.ManageInvites, label: 'Manage Invites' },
-		{ flag: Permission.KickMembers, label: 'Kick Members' },
-		{ flag: Permission.SendMessages, label: 'Send Messages' },
-		{ flag: Permission.AttachFiles, label: 'Attach Files' },
-		{ flag: Permission.AddReactions, label: 'Add Reactions' },
-		{ flag: Permission.ManageMessages, label: 'Manage Messages' },
-		{ flag: Permission.PinMessages, label: 'Pin Messages' },
-		{ flag: Permission.Connect, label: 'Connect to Voice' },
-		{ flag: Permission.Administrator, label: 'Administrator' },
+	/** Check if a single bit is actually set in the bitmask (ignores Administrator grant-all). */
+	function hasBit(mask: number, flag: number): boolean {
+		if (flag > (1 << 30) || mask > (1 << 30)) {
+			return Math.floor(mask / flag) % 2 === 1;
+		}
+		return (mask & flag) === flag;
+	}
+
+	/** Toggle a permission bit, handling values beyond 32-bit range via float arithmetic. */
+	function togglePermission(current: number, flag: number): number {
+		if (hasBit(current, flag)) {
+			return flag > (1 << 30) || current > (1 << 30) ? current - flag : current & ~flag;
+		} else {
+			return flag > (1 << 30) || current > (1 << 30) ? current + flag : current | flag;
+		}
+	}
+
+	/** Permission categories for the edit UI. */
+	const permissionCategories = [
+		{
+			name: 'General',
+			permissions: [
+				{ flag: Permission.ViewChannels, label: 'View Channels' },
+				{ flag: Permission.ManageChannels, label: 'Manage Channels' },
+				{ flag: Permission.ManageServer, label: 'Manage Server' },
+				{ flag: Permission.ManageRoles, label: 'Manage Roles' },
+				{ flag: Permission.ManageEmojis, label: 'Manage Emojis' },
+				{ flag: Permission.ViewAuditLog, label: 'View Audit Log' },
+				{ flag: Permission.CreateInvites, label: 'Create Invites' },
+				{ flag: Permission.ManageInvites, label: 'Manage Invites' },
+			]
+		},
+		{
+			name: 'Membership',
+			permissions: [
+				{ flag: Permission.KickMembers, label: 'Kick Members' },
+				{ flag: Permission.BanMembers, label: 'Ban Members' },
+			]
+		},
+		{
+			name: 'Messages',
+			permissions: [
+				{ flag: Permission.SendMessages, label: 'Send Messages' },
+				{ flag: Permission.EmbedLinks, label: 'Embed Links' },
+				{ flag: Permission.AttachFiles, label: 'Attach Files' },
+				{ flag: Permission.AddReactions, label: 'Add Reactions' },
+				{ flag: Permission.MentionEveryone, label: 'Mention @everyone' },
+				{ flag: Permission.ManageMessages, label: 'Manage Messages' },
+				{ flag: Permission.PinMessages, label: 'Pin Messages' },
+			]
+		},
+		{
+			name: 'Voice',
+			permissions: [
+				{ flag: Permission.Connect, label: 'Connect' },
+				{ flag: Permission.Speak, label: 'Speak' },
+				{ flag: Permission.MuteMembers, label: 'Mute Members' },
+				{ flag: Permission.DeafenMembers, label: 'Deafen Members' },
+			]
+		},
+		{
+			name: 'Dangerous',
+			permissions: [
+				{ flag: Permission.Administrator, label: 'Administrator' },
+			]
+		}
 	];
 </script>
 
@@ -77,19 +128,50 @@
 	{:else}
 		<ul class="role-list" role="list">
 			{#each app.serverRoles as role (role.id)}
-				<li class="role-row">
+				<li class="role-row {editingRoleId === role.id ? 'role-row--editing' : ''}">
 					{#if editingRoleId === role.id}
-						<div class="role-edit">
-							<input
-								type="text"
-								class="role-name-input"
-								bind:value={editName}
-								disabled={role.isSystemRole}
-								placeholder="Role name"
-							/>
-							<input type="color" class="role-color-input" bind:value={editColor} />
-							<button class="role-btn role-btn-save" onclick={saveEdit}>Save</button>
-							<button class="role-btn role-btn-cancel" onclick={() => (editingRoleId = null)}>Cancel</button>
+						<div class="role-edit-panel">
+							<div class="role-edit-header">
+								<input
+									type="text"
+									class="role-name-input"
+									bind:value={editName}
+									disabled={role.isSystemRole}
+									placeholder="Role name"
+								/>
+								<input type="color" class="role-color-input" bind:value={editColor} />
+								<button class="role-btn role-btn-save" onclick={saveEdit}>Save</button>
+								<button class="role-btn role-btn-cancel" onclick={() => (editingRoleId = null)}>Cancel</button>
+							</div>
+							<div class="permissions-section">
+								<h4 class="permissions-title">Permissions</h4>
+								{#if role.isSystemRole}
+									<p class="permissions-readonly-note">This is a system role. All permissions are granted and cannot be changed.</p>
+								{/if}
+								{#each permissionCategories as category (category.name)}
+									<div class="permission-category">
+										<h5 class="permission-category-name">{category.name}</h5>
+										<div class="permission-grid">
+											{#each category.permissions as perm (perm.flag)}
+												<label class="permission-toggle {role.isSystemRole ? 'permission-toggle--readonly' : ''}">
+													<input
+														type="checkbox"
+														class="permission-checkbox"
+														checked={hasPermission(editPermissions, perm.flag)}
+														disabled={role.isSystemRole}
+														onchange={() => {
+															if (!role.isSystemRole) {
+																editPermissions = togglePermission(editPermissions, perm.flag);
+															}
+														}}
+													/>
+													<span class="permission-label">{perm.label}</span>
+												</label>
+											{/each}
+										</div>
+									</div>
+								{/each}
+							</div>
 						</div>
 					{:else}
 						<div class="role-info">
@@ -184,6 +266,13 @@
 		background: var(--bg-message-hover);
 	}
 
+	.role-row--editing {
+		display: block;
+		background: var(--bg-message-hover);
+		padding: 12px;
+		margin-bottom: 4px;
+	}
+
 	.role-info {
 		display: flex;
 		align-items: center;
@@ -228,11 +317,17 @@
 		margin-left: 12px;
 	}
 
-	.role-edit {
+	/* Edit panel */
+	.role-edit-panel {
+		width: 100%;
+	}
+
+	.role-edit-header {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		width: 100%;
+		margin-bottom: 16px;
 	}
 
 	.role-name-input {
@@ -258,6 +353,88 @@
 		cursor: pointer;
 		background: transparent;
 		padding: 0;
+	}
+
+	/* Permissions section */
+	.permissions-section {
+		border-top: 1px solid var(--border);
+		padding-top: 12px;
+	}
+
+	.permissions-title {
+		font-size: 13px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--text-muted);
+		margin: 0 0 12px;
+	}
+
+	.permissions-readonly-note {
+		font-size: 12px;
+		color: var(--text-muted);
+		margin: 0 0 12px;
+		font-style: italic;
+	}
+
+	.permission-category {
+		margin-bottom: 16px;
+	}
+
+	.permission-category-name {
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--text-muted);
+		margin: 0 0 8px;
+	}
+
+	.permission-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: 6px;
+	}
+
+	.permission-toggle {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: 3px;
+		cursor: pointer;
+		transition: background-color 100ms ease;
+		user-select: none;
+	}
+
+	.permission-toggle:hover {
+		background: var(--bg-tertiary);
+	}
+
+	.permission-toggle--readonly {
+		cursor: default;
+		opacity: 0.7;
+	}
+
+	.permission-toggle--readonly:hover {
+		background: transparent;
+	}
+
+	.permission-checkbox {
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
+		accent-color: var(--accent);
+		cursor: pointer;
+	}
+
+	.permission-toggle--readonly .permission-checkbox {
+		cursor: default;
+	}
+
+	.permission-label {
+		font-size: 13px;
+		color: var(--text-normal);
 	}
 
 	.create-role-form {

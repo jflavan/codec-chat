@@ -60,8 +60,8 @@
 					<span class="user-panel-custom-status">
 						{#if app.me.user.statusEmoji}{app.me.user.statusEmoji} {/if}{app.me.user.statusText ?? ''}
 					</span>
-				{:else if app.currentServerRole}
-					<span class="user-panel-role">{app.currentServerRole}</span>
+				{:else if app.isServerOwner}
+					<span class="user-panel-role">Server Owner</span>
 				{/if}
 			</div>
 		</div>

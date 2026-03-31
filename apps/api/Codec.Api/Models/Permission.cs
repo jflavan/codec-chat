@@ -46,11 +46,26 @@ public enum Permission : long
 
 public static class PermissionExtensions
 {
+    /// <summary>Bitmask of all defined permission flags. Used to reject undefined/reserved bits.</summary>
+    public static readonly Permission AllDefined =
+        Permission.ViewChannels | Permission.ManageChannels | Permission.ManageServer |
+        Permission.ManageRoles | Permission.ManageEmojis | Permission.ViewAuditLog |
+        Permission.CreateInvites | Permission.ManageInvites | Permission.KickMembers |
+        Permission.BanMembers | Permission.SendMessages | Permission.EmbedLinks |
+        Permission.AttachFiles | Permission.AddReactions | Permission.MentionEveryone |
+        Permission.ManageMessages | Permission.PinMessages | Permission.Connect |
+        Permission.Speak | Permission.MuteMembers | Permission.DeafenMembers |
+        Permission.Administrator;
+
+    /// <summary>Returns true if the value contains bits outside the defined permission flags.</summary>
+    public static bool HasUndefinedBits(this Permission value) =>
+        (value & ~AllDefined) != Permission.None;
+
     /// <summary>All permissions that the default "Admin" system role receives.</summary>
     public static readonly Permission AdminDefaults =
         Permission.ViewChannels | Permission.ManageChannels | Permission.ManageServer |
         Permission.ManageRoles | Permission.ManageEmojis | Permission.ViewAuditLog |
-        Permission.CreateInvites | Permission.ManageInvites | Permission.KickMembers |
+        Permission.CreateInvites | Permission.ManageInvites | Permission.KickMembers | Permission.BanMembers |
         Permission.SendMessages | Permission.EmbedLinks | Permission.AttachFiles |
         Permission.AddReactions | Permission.MentionEveryone | Permission.ManageMessages |
         Permission.PinMessages | Permission.Connect | Permission.Speak |

@@ -17,7 +17,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("servers/{serverId:guid}/roles")]
-public class RolesController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> hub) : ControllerBase
+public class RolesController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> hub, IPermissionResolverService permissionResolver) : ControllerBase
 {
     /// <summary>
     /// Lists all roles for a server, ordered by position.
@@ -42,7 +42,7 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
                 r.IsSystemRole,
                 r.IsHoisted,
                 r.IsMentionable,
-                MemberCount = r.Members.Count
+                MemberCount = db.ServerMemberRoles.Count(mr => mr.RoleId == r.Id)
             })
             .ToListAsync();
 
@@ -66,7 +66,7 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
 
         // Check for duplicate name
         var exists = await db.ServerRoles.AnyAsync(r => r.ServerId == serverId && r.Name == request.Name.Trim());
@@ -80,15 +80,28 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
             .Where(r => r.ServerId == serverId)
             .MaxAsync(r => r.Position);
 
-        // Ensure caller cannot create roles higher than their own
-        if (!appUser.IsGlobalAdmin && callerMembership.Role is not null)
+        // Reject undefined/reserved permission bits
+        if (request.Permissions is not null && ((Permission)request.Permissions.Value).HasUndefinedBits())
         {
-            var requestedPerms = (Permission)(request.Permissions ?? 0);
-            // Cannot grant permissions you don't have
-            if ((requestedPerms & ~callerMembership.Role.Permissions) != Permission.None
-                && !callerMembership.Role.Permissions.Has(Permission.Administrator))
+            return BadRequest(new { error = "Request contains undefined permission bits." });
+        }
+
+        // Ensure caller cannot grant permissions they don't have
+        if (!appUser.IsGlobalAdmin)
+        {
+            var callerPermsList = await db.ServerMemberRoles
+                .Where(mr => mr.UserId == appUser.Id && mr.Role!.ServerId == serverId)
+                .Select(mr => mr.Role!.Permissions)
+                .ToListAsync();
+            var callerEffectivePerms = callerPermsList.Aggregate(Permission.None, (acc, p) => acc | p);
+
+            if (!callerEffectivePerms.Has(Permission.Administrator))
             {
-                return Forbid();
+                var requestedPerms = (Permission)(request.Permissions ?? 0);
+                if ((requestedPerms & ~callerEffectivePerms) != Permission.None)
+                {
+                    return Forbid();
+                }
             }
         }
 
@@ -155,7 +168,7 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
     public async Task<IActionResult> UpdateRole(Guid serverId, Guid roleId, [FromBody] UpdateRoleRequest request, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
 
         var role = await db.ServerRoles.FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == serverId);
         if (role is null)
@@ -171,10 +184,13 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         }
 
         // Cannot edit roles equal to or higher than your own (unless global admin)
-        if (!appUser.IsGlobalAdmin && callerMembership.Role is not null
-            && role.Position <= callerMembership.Role.Position)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
+            var callerHighest = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            if (role.Position <= callerHighest)
+            {
+                return Forbid();
+            }
         }
 
         if (request.Name is not null)
@@ -200,13 +216,17 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         if (request.Permissions is not null)
         {
             var newPerms = (Permission)request.Permissions.Value;
-            // Cannot grant permissions you don't have (unless global admin or admin)
-            if (!appUser.IsGlobalAdmin && callerMembership.Role is not null
-                && !callerMembership.Role.Permissions.Has(Permission.Administrator))
+            if (newPerms.HasUndefinedBits())
             {
-                if ((newPerms & ~callerMembership.Role.Permissions) != Permission.None)
+                return BadRequest(new { error = "Request contains undefined permission bits." });
+            }
+            // Cannot grant permissions you don't have (unless global admin)
+            if (!appUser.IsGlobalAdmin)
+            {
+                var callerPerms = await permissionResolver.ResolveServerPermissionsAsync(serverId, appUser.Id);
+                if (!callerPerms.Has(Permission.Administrator) && (newPerms & ~callerPerms) != Permission.None)
                 {
-                    return Forbid();
+                    return BadRequest(new { error = "Cannot grant permissions you don't have." });
                 }
             }
             role.Permissions = newPerms;
@@ -256,7 +276,7 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
     public async Task<IActionResult> DeleteRole(Guid serverId, Guid roleId, [FromServices] AuditService audit)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
-        var callerMembership = await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
+        await userService.EnsurePermissionAsync(serverId, appUser.Id, Permission.ManageRoles, appUser.IsGlobalAdmin);
 
         var role = await db.ServerRoles.FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == serverId);
         if (role is null)
@@ -270,23 +290,42 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         }
 
         // Cannot delete roles equal to or higher than your own
-        if (!appUser.IsGlobalAdmin && callerMembership.Role is not null
-            && role.Position <= callerMembership.Role.Position)
+        if (!appUser.IsGlobalAdmin)
         {
-            return Forbid();
+            var callerHighest = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            if (role.Position <= callerHighest)
+            {
+                return Forbid();
+            }
         }
 
-        // Move members with this role to the default Member role
+        // Remove all ServerMemberRole entries for the deleted role;
+        // for users who now have no roles, auto-assign the Member system role
         var memberRole = await db.ServerRoles
             .FirstAsync(r => r.ServerId == serverId && r.IsSystemRole && r.Name == "Member");
 
-        var affectedMembers = await db.ServerMembers
-            .Where(m => m.ServerId == serverId && m.RoleId == roleId)
+        var affectedEntries = await db.ServerMemberRoles
+            .Where(mr => mr.RoleId == roleId)
             .ToListAsync();
 
-        foreach (var member in affectedMembers)
+        var affectedUserIds = affectedEntries.Select(mr => mr.UserId).Distinct().ToList();
+        db.ServerMemberRoles.RemoveRange(affectedEntries);
+
+        // After removal, find users who have no remaining roles in this server and give them Member
+        foreach (var userId in affectedUserIds)
         {
-            member.RoleId = memberRole.Id;
+            var remainingRoleCount = await db.ServerMemberRoles
+                .CountAsync(mr => mr.UserId == userId && mr.RoleId != roleId
+                    && db.ServerRoles.Any(r => r.Id == mr.RoleId && r.ServerId == serverId));
+            if (remainingRoleCount == 0)
+            {
+                db.ServerMemberRoles.Add(new ServerMemberRole
+                {
+                    UserId = userId,
+                    RoleId = memberRole.Id,
+                    AssignedAt = DateTimeOffset.UtcNow
+                });
+            }
         }
 
         var roleName = role.Name;
@@ -340,6 +379,27 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         if (ownerRole is not null && request.RoleIds.Count > 0 && request.RoleIds[0] != ownerRole.Id)
         {
             return BadRequest(new { error = "Owner role must remain at position 0." });
+        }
+
+        // Non-admin/non-owner callers cannot reorder roles at or above their own position
+        var isCallerOwner = await permissionResolver.IsOwnerAsync(serverId, appUser.Id);
+        if (!appUser.IsGlobalAdmin && !isCallerOwner)
+        {
+            var callerHighestPosition = await permissionResolver.GetHighestRolePositionAsync(serverId, appUser.Id);
+            // Build a map of old positions
+            var oldPositionById = roles.ToDictionary(r => r.Id, r => r.Position);
+            for (var i = 0; i < request.RoleIds.Count; i++)
+            {
+                var roleId = request.RoleIds[i];
+                var oldPosition = oldPositionById[roleId];
+                var newPosition = i;
+                // If a role's position changed, both old and new positions must be below (higher number than) the caller's
+                if (oldPosition != newPosition &&
+                    (oldPosition <= callerHighestPosition || newPosition <= callerHighestPosition))
+                {
+                    return Forbid();
+                }
+            }
         }
 
         // Apply new positions

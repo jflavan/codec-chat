@@ -13,9 +13,19 @@ export type MemberServer = {
 	name: string;
 	description?: string;
 	iconUrl?: string | null;
-	role: string | null;
+	roles: MemberRole[];
 	sortOrder: number;
 	permissions: number;
+	isOwner: boolean;
+};
+
+/** A role assigned to a member (subset of ServerRole for API responses). */
+export type MemberRole = {
+	id: string;
+	name: string;
+	color?: string | null;
+	position: number;
+	isSystemRole: boolean;
 };
 
 /** A custom or system role within a server. */
@@ -29,6 +39,15 @@ export type ServerRole = {
 	isHoisted: boolean;
 	isMentionable: boolean;
 	memberCount?: number;
+};
+
+/** Per-channel permission override for a role. */
+export type ChannelPermissionOverride = {
+	channelId: string;
+	roleId: string;
+	roleName: string;
+	allow: number;
+	deny: number;
 };
 
 /** Granular permission flags (matches the API Permission enum). */
@@ -52,6 +71,9 @@ export const Permission = {
 	ManageMessages: 1 << 25,
 	PinMessages: 1 << 26,
 	Connect: 1 << 30,
+	Speak: 2 ** 31,
+	MuteMembers: 2 ** 32,
+	DeafenMembers: 2 ** 33,
 	// Administrator uses 2**40 which exceeds 32-bit bitwise range.
 	// We use a float constant and compare via isAdministrator() helper.
 	Administrator: 2 ** 40,
@@ -69,6 +91,10 @@ export function hasPermission(permissions: number, flag: number): boolean {
 	// Administrator grants everything
 	if (isAdministrator(permissions)) return true;
 	if (flag === Permission.Administrator) return false;
+	// Flags or masks beyond 2^30 exceed 32-bit signed range; use float arithmetic
+	if (flag > (1 << 30) || permissions > (1 << 30)) {
+		return Math.floor(permissions / flag) % 2 === 1;
+	}
 	return (permissions & flag) === flag;
 }
 
@@ -176,11 +202,10 @@ export type Member = {
 	displayName: string;
 	email?: string | null;
 	avatarUrl?: string | null;
-	role: string;
-	rolePosition: number;
-	roleColor?: string | null;
-	roleIsHoisted: boolean;
+	roles: MemberRole[];
 	permissions: number;
+	displayRole?: MemberRole | null;
+	highestPosition: number;
 	joinedAt: string;
 	statusText?: string | null;
 	statusEmoji?: string | null;

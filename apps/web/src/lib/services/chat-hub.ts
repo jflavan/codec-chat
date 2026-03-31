@@ -90,6 +90,13 @@ export type MentionReceivedEvent = {
 	body: string;
 };
 
+export type ChannelOverrideUpdatedEvent = {
+	channelId: string;
+	roleId: string;
+	allow: number;
+	deny: number;
+};
+
 export type ChannelOrderChangedEvent = { serverId: string };
 export type CategoryOrderChangedEvent = { serverId: string };
 export type CategoryCreatedEvent = { serverId: string; categoryId: string; name: string; position: number };
@@ -319,6 +326,7 @@ export type SignalRCallbacks = {
 	onChannelDescriptionChanged?: (event: ChannelDescriptionChangedEvent) => void;
 	onMessagePinned?: (event: MessagePinnedEvent) => void;
 	onMessageUnpinned?: (event: MessageUnpinnedEvent) => void;
+	onChannelOverrideUpdated?: (event: ChannelOverrideUpdatedEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -513,6 +521,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onMessageUnpinned) {
 			connection.on('MessageUnpinned', callbacks.onMessageUnpinned);
+		}
+		if (callbacks.onChannelOverrideUpdated) {
+			connection.on('ChannelOverrideUpdated', callbacks.onChannelOverrideUpdated);
 		}
 
 		if (callbacks.onReconnecting) {

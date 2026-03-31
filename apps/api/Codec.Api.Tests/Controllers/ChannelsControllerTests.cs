@@ -45,7 +45,7 @@ public class ChannelsControllerTests : IDisposable
         _db.Channels.Add(_testChannel);
         var memberRole = new ServerRoleEntity { ServerId = _testServer.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
         _db.ServerRoles.Add(memberRole);
-        _db.ServerMembers.Add(new ServerMember { Server = _testServer, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = _testServer, UserId = _testUser.Id });
         _db.SaveChanges();
 
         _messageCache = new MessageCacheService(new Mock<ILogger<MessageCacheService>>().Object);
@@ -57,7 +57,10 @@ public class ChannelsControllerTests : IDisposable
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxy.Object);
 
         var webhookService = new WebhookService(_scopeFactory.Object, new Mock<IHttpClientFactory>().Object, new Mock<ILogger<WebhookService>>().Object);
-        _controller = new ChannelsController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, _messageCache, webhookService);
+        var permissionResolver = new Mock<IPermissionResolverService>();
+        permissionResolver.Setup(p => p.HasChannelPermissionAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Permission>()))
+            .ReturnsAsync(true);
+        _controller = new ChannelsController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, _messageCache, webhookService, permissionResolver.Object);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -328,7 +331,7 @@ public class ChannelsControllerTests : IDisposable
     private void SetupAdminUser()
     {
         _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
-            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id, Role = new ServerRoleEntity { Name = "Admin", Position = 1, Permissions = PermissionExtensions.AdminDefaults, IsSystemRole = true } });
+            .ReturnsAsync(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id });
     }
 
     [Fact]
@@ -435,7 +438,7 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task PinMessage_RequiresAdmin_ThrowsForbidden()
     {
-        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(_testServer.Id, _testUser.Id, Permission.PinMessages, false))
             .ThrowsAsync(new Codec.Api.Services.Exceptions.ForbiddenException());
 
         var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Pin me" };
@@ -868,7 +871,7 @@ public class ChannelsControllerTests : IDisposable
     [Fact]
     public async Task UnpinMessage_RequiresAdmin_ThrowsForbidden()
     {
-        _userService.Setup(u => u.EnsureAdminAsync(_testServer.Id, _testUser.Id, false))
+        _userService.Setup(u => u.EnsurePermissionAsync(_testServer.Id, _testUser.Id, Permission.PinMessages, false))
             .ThrowsAsync(new Codec.Api.Services.Exceptions.ForbiddenException());
 
         var msg = new Message { Channel = _testChannel, AuthorUserId = _testUser.Id, AuthorName = "T", Body = "Unpin" };
@@ -888,7 +891,7 @@ public class ChannelsControllerTests : IDisposable
         var otherUser = new User { Id = Guid.NewGuid(), DisplayName = "Other" };
         _db.Users.Add(otherUser);
         var memberRole = _db.ServerRoles.First(r => r.ServerId == _testServer.Id && r.Name == "Member");
-        _db.ServerMembers.Add(new ServerMember { ServerId = _testServer.Id, UserId = otherUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { ServerId = _testServer.Id, UserId = otherUser.Id });
         await _db.SaveChangesAsync();
 
         var result = await _controller.PostMessage(_testChannel.Id, new CreateMessageRequest("<@here> attention everyone"));

@@ -10,28 +10,32 @@
 	let banReason = $state('');
 	let banDeleteMessages = $state(false);
 
-	const isOwner = $derived(app.currentServerRole === 'Owner');
+	const isOwner = $derived(app.isServerOwner);
 
-	const canKick = (member: { userId: string; role: string; rolePosition: number }) =>
+	const canKick = (member: { userId: string; highestPosition: number }) =>
 		app.canKickMembers &&
 		member.userId !== app.me?.user.id &&
-		member.role !== 'Owner' &&
-		(isOwner || member.rolePosition > (app.members.find(m => m.userId === app.me?.user.id)?.rolePosition ?? 999));
+		!isMemberOwner(member.userId) &&
+		(isOwner || member.highestPosition > (app.members.find(m => m.userId === app.me?.user.id)?.highestPosition ?? 999));
 
-	const canBan = (member: { userId: string; role: string; rolePosition: number }) =>
+	const canBan = (member: { userId: string; highestPosition: number }) =>
 		app.canBanMembers &&
 		member.userId !== app.me?.user.id &&
-		member.role !== 'Owner' &&
-		(isOwner || member.rolePosition > (app.members.find(m => m.userId === app.me?.user.id)?.rolePosition ?? 999));
+		!isMemberOwner(member.userId) &&
+		(isOwner || member.highestPosition > (app.members.find(m => m.userId === app.me?.user.id)?.highestPosition ?? 999));
 
-	const canChangeRole = (member: { userId: string; role: string }) =>
+	const canChangeRole = (member: { userId: string }) =>
 		app.canManageRoles &&
 		member.userId !== app.me?.user.id &&
-		member.role !== 'Owner';
+		!isMemberOwner(member.userId);
+
+	function isMemberOwner(userId: string): boolean {
+		return app.members.find(m => m.userId === userId)?.roles.some(r => r.isSystemRole && r.name === 'Owner') ?? false;
+	}
 
 	/** Roles that the current user can assign (only roles below their own position). */
 	const assignableRoles = $derived(() => {
-		const myPosition = app.members.find(m => m.userId === app.me?.user.id)?.rolePosition ?? 999;
+		const myPosition = app.members.find(m => m.userId === app.me?.user.id)?.highestPosition ?? 999;
 		return app.serverRoles
 			.filter(r => !r.isSystemRole || r.name !== 'Owner')
 			.filter(r => isOwner || r.position > myPosition);
@@ -43,8 +47,8 @@
 		}
 	});
 
-	async function changeRole(userId: string, roleName: string): Promise<void> {
-		await app.updateMemberRole(userId, roleName);
+	async function addRole(userId: string, roleId: string): Promise<void> {
+		await app.addMemberRole(userId, roleId);
 		changingRoleUserId = null;
 	}
 
@@ -83,7 +87,7 @@
 	}
 </script>
 
-{#snippet banButton(member: { userId: string; displayName: string; role: string; rolePosition: number })}
+{#snippet banButton(member: { userId: string; displayName: string; highestPosition: number })}
 	{#if canBan(member)}
 		{#if banningUserId === member.userId}
 			<div class="ban-confirm">
@@ -134,25 +138,25 @@
 					<span class="member-name">{member.displayName}</span>
 					<span
 						class="member-role"
-						style:color={member.roleColor ?? 'var(--text-muted)'}
+						style:color={member.displayRole?.color ?? 'var(--text-muted)'}
 					>
-						{member.role}
+						{member.displayRole?.name ?? 'Member'}
 					</span>
 				</div>
 
 				<div class="member-actions">
-					{#if member.role === 'Owner' || member.userId === app.me?.user.id}
+					{#if isMemberOwner(member.userId) || member.userId === app.me?.user.id}
 						<!-- No actions for owner or self -->
 					{:else}
 						{#if canChangeRole(member)}
 							{#if changingRoleUserId === member.userId}
 								<select
 									class="role-select"
-									value={member.role}
-									onchange={(e) => changeRole(member.userId, (e.target as HTMLSelectElement).value)}
+									onchange={(e) => addRole(member.userId, (e.target as HTMLSelectElement).value)}
 								>
+									<option value="" disabled selected>Add role…</option>
 									{#each assignableRoles() as role (role.id)}
-										<option value={role.name} selected={role.name === member.role}>{role.name}</option>
+										<option value={role.id}>{role.name}</option>
 									{/each}
 								</select>
 								<button class="role-btn role-btn-cancel" onclick={() => (changingRoleUserId = null)}>

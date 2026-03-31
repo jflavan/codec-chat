@@ -58,7 +58,7 @@ public class VoiceControllerTests : IDisposable
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
             .ReturnsAsync((_db.Users.First(u => u.Id == _testUser.Id), false));
         _userService.Setup(u => u.EnsureMemberAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<bool>()))
-            .ReturnsAsync(new ServerMember { ServerId = _server.Id, UserId = _testUser.Id, RoleId = Guid.NewGuid() });
+            .ReturnsAsync(new ServerMember { ServerId = _server.Id, UserId = _testUser.Id });
     }
 
     public void Dispose() => _db.Dispose();

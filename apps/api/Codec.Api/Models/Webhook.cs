@@ -55,6 +55,7 @@ public enum WebhookEventType
     MemberJoined,
     MemberLeft,
     MemberRoleChanged,
+    MemberRolesUpdated,
     ChannelCreated,
     ChannelUpdated,
     ChannelDeleted

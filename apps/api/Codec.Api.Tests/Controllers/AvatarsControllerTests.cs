@@ -107,7 +107,7 @@ public class AvatarsControllerTests : IDisposable
         _db.Servers.Add(server);
         var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
         _db.ServerRoles.Add(memberRole);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
         await _db.SaveChangesAsync();
 
         var file = new Mock<IFormFile>();
@@ -205,7 +205,7 @@ public class AvatarsControllerTests : IDisposable
         _db.Servers.Add(server);
         var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
         _db.ServerRoles.Add(memberRole);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, CustomAvatarPath = null });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, CustomAvatarPath = null });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
@@ -222,7 +222,7 @@ public class AvatarsControllerTests : IDisposable
         _db.Servers.Add(server);
         var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
         _db.ServerRoles.Add(memberRole);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, CustomAvatarPath = "https://storage/server-avatar.png" });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, CustomAvatarPath = "https://storage/server-avatar.png" });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
@@ -241,7 +241,7 @@ public class AvatarsControllerTests : IDisposable
         _db.Servers.Add(server);
         var memberRole = new ServerRoleEntity { ServerId = server.Id, Name = "Member", Position = 2, Permissions = PermissionExtensions.MemberDefaults, IsSystemRole = true };
         _db.ServerRoles.Add(memberRole);
-        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, RoleId = memberRole.Id, CustomAvatarPath = "https://storage/old-server-avatar.png" });
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, CustomAvatarPath = "https://storage/old-server-avatar.png" });
         await _db.SaveChangesAsync();
 
         var file = new Mock<IFormFile>();

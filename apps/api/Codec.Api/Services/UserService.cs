@@ -10,7 +10,7 @@ namespace Codec.Api.Services;
 /// Resolves and manages application users from authentication claims.
 /// Handles concurrent user creation gracefully for PostgreSQL.
 /// </summary>
-public class UserService(CodecDbContext db) : IUserService
+public class UserService(CodecDbContext db, IPermissionResolverService permissionResolver) : IUserService
 {
     /// <inheritdoc />
     public async Task<(User user, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal)
@@ -81,13 +81,14 @@ public class UserService(CodecDbContext db) : IUserService
 
         if (defaultMemberRole is not null)
         {
-            db.ServerMembers.Add(new ServerMember
+            var newMember = new ServerMember
             {
                 ServerId = Server.DefaultServerId,
                 User = appUser,
-                RoleId = defaultMemberRole.Id,
                 JoinedAt = DateTimeOffset.UtcNow
-            });
+            };
+            db.ServerMembers.Add(newMember);
+            db.ServerMemberRoles.Add(new ServerMemberRole { UserId = appUser.Id, RoleId = defaultMemberRole.Id });
         }
 
         try
@@ -144,30 +145,22 @@ public class UserService(CodecDbContext db) : IUserService
     {
         if (isGlobalAdmin)
         {
-            var member = await db.ServerMembers
-                .AsNoTracking()
-                .Include(m => m.Role)
+            var member = await db.ServerMembers.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
             if (member is not null) return member;
-
             var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
             if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
-
             return new ServerMember { ServerId = serverId, UserId = userId };
         }
 
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .Include(m => m.Role)
+        var membership = await db.ServerMembers.AsNoTracking()
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-
         if (membership is null)
         {
             var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
             if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
             throw new Exceptions.ForbiddenException();
         }
-
         return membership;
     }
 
@@ -178,19 +171,13 @@ public class UserService(CodecDbContext db) : IUserService
         {
             var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
             if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
-
-            var member = await db.ServerMembers
-                .AsNoTracking()
-                .Include(m => m.Role)
+            var member = await db.ServerMembers.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
             return member ?? new ServerMember { ServerId = serverId, UserId = userId };
         }
 
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .Include(m => m.Role)
+        var membership = await db.ServerMembers.AsNoTracking()
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-
         if (membership is null)
         {
             var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
@@ -198,12 +185,8 @@ public class UserService(CodecDbContext db) : IUserService
             throw new Exceptions.ForbiddenException();
         }
 
-        if (membership.Role is null)
-            throw new Exceptions.ForbiddenException();
-
-        if (!membership.Role.Permissions.Has(permission))
-            throw new Exceptions.ForbiddenException();
-
+        var hasPermission = await permissionResolver.HasServerPermissionAsync(serverId, userId, permission);
+        if (!hasPermission) throw new Exceptions.ForbiddenException();
         return membership;
     }
 
@@ -221,19 +204,13 @@ public class UserService(CodecDbContext db) : IUserService
         {
             var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
             if (!serverExists) throw new Exceptions.NotFoundException("Server not found.");
-
-            var member = await db.ServerMembers
-                .AsNoTracking()
-                .Include(m => m.Role)
+            var member = await db.ServerMembers.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
             return member ?? new ServerMember { ServerId = serverId, UserId = userId };
         }
 
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .Include(m => m.Role)
+        var membership = await db.ServerMembers.AsNoTracking()
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-
         if (membership is null)
         {
             var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverId);
@@ -241,9 +218,8 @@ public class UserService(CodecDbContext db) : IUserService
             throw new Exceptions.ForbiddenException();
         }
 
-        if (membership.Role is null || !membership.Role.IsSystemRole || membership.Role.Position != 0)
-            throw new Exceptions.ForbiddenException();
-
+        var isOwner = await permissionResolver.IsOwnerAsync(serverId, userId);
+        if (!isOwner) throw new Exceptions.ForbiddenException();
         return membership;
     }
 
@@ -263,25 +239,11 @@ public class UserService(CodecDbContext db) : IUserService
 
     /// <inheritdoc />
     public async Task<Permission> GetPermissionsAsync(Guid serverId, Guid userId)
-    {
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .Include(m => m.Role)
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-
-        return membership?.Role?.Permissions ?? Permission.None;
-    }
+        => await permissionResolver.ResolveServerPermissionsAsync(serverId, userId);
 
     /// <inheritdoc />
     public async Task<bool> IsOwnerAsync(Guid serverId, Guid userId)
-    {
-        var membership = await db.ServerMembers
-            .AsNoTracking()
-            .Include(m => m.Role)
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
-
-        return membership?.Role is { IsSystemRole: true, Position: 0 };
-    }
+        => await permissionResolver.IsOwnerAsync(serverId, userId);
 
     /// <inheritdoc />
     public async Task<(ServerRoleEntity owner, ServerRoleEntity admin, ServerRoleEntity member)> CreateDefaultRolesAsync(Guid serverId)

@@ -199,6 +199,15 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - A global exception handler converts exceptions to RFC 7807 ProblemDetails JSON responses
 - Request DTOs use `System.ComponentModel.DataAnnotations` (`[Required]`, `[StringLength]`, etc.) for structural validation; business logic validation remains inline in controllers
 
+### Permission Resolution
+- **Multi-role data model** — `ServerMemberRoles` join table links members to zero or more roles; replaces the legacy single `RoleId` column on `ServerMember`
+- **`PermissionResolverService`** — central service that computes the effective permission set for a member in a given context:
+  1. Collects all roles assigned to the member via `ServerMemberRoles`
+  2. OR-merges the `Permissions` bitmask across all roles
+  3. If the result includes `Administrator`, bypasses all further checks (server Owners are also always granted full access)
+  4. For channel-scoped checks, loads `ChannelPermissionOverrides` for each role and applies them using a deny-wins model: deny bits are unioned across roles and subtracted from the allow set, then merged with the base permissions
+- **`ChannelPermissionOverrides` table** — stores `(ChannelId, RoleId, Allow, Deny)` rows; `Deny` always wins over `Allow` when the same bit appears in both; absence of an override row means the channel inherits the role's base permissions unchanged
+
 ### Real-time Layer (SignalR)
 - **Hub endpoint:** `/hubs/chat`
 - **Transport:** WebSockets (with automatic fallback to Server-Sent Events / Long Polling)
@@ -424,7 +433,12 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `PATCH /servers/{serverId}/roles/{roleId}` - Update role name, color, permissions, hoisted/mentionable flags (requires ManageRoles permission; cannot edit roles above your own position)
 - `DELETE /servers/{serverId}/roles/{roleId}` - Delete a custom role (requires ManageRoles permission; system roles cannot be deleted)
 - `PUT /servers/{serverId}/roles/order` - Bulk update role positions (requires ManageRoles permission)
-- `PUT /servers/{serverId}/members/{userId}/roles` - Assign roles to a member (requires ManageRoles permission)
+- `PUT /servers/{serverId}/members/{userId}/roles` - Replace all roles for a member (requires ManageRoles permission)
+- `POST /servers/{serverId}/members/{userId}/roles/{roleId}` - Add a single role to a member (requires ManageRoles permission)
+- `DELETE /servers/{serverId}/members/{userId}/roles/{roleId}` - Remove a single role from a member (requires ManageRoles permission)
+- `GET /channels/{channelId}/overrides/{roleId}` - Get per-channel permission overrides for a role (requires ManageChannels permission)
+- `PUT /channels/{channelId}/overrides/{roleId}` - Set per-channel allow/deny bitmasks for a role (requires ManageChannels permission; broadcasts `ChannelPermissionsChanged` via SignalR)
+- `DELETE /channels/{channelId}/overrides/{roleId}` - Remove per-channel overrides for a role (requires ManageChannels permission; broadcasts `ChannelPermissionsChanged` via SignalR)
 
 #### Webhooks
 - `GET /servers/{serverId}/webhooks` - List webhooks for a server (requires Owner, Admin, or ManageServer permission)

@@ -11,17 +11,19 @@
 		return aOnline - bOnline;
 	}
 
-	/** Group members by their hoisted role, ordered by role position. */
+	/** Group members by their highest hoisted role, ordered by role position. */
 	const roleGroups = $derived(() => {
 		const groups: { name: string; color?: string | null; members: Member[] }[] = [];
 		const hoisted = new Map<string, { name: string; color?: string | null; position: number; members: Member[] }>();
 		const unhoisted: Member[] = [];
 
 		for (const m of app.members) {
-			if (m.roleIsHoisted) {
-				const key = m.role;
+			// Use displayRole as the hoisted role if available; fall back to unhoisted
+			const displayRole = m.displayRole ?? null;
+			if (displayRole) {
+				const key = displayRole.id;
 				if (!hoisted.has(key)) {
-					hoisted.set(key, { name: m.role, color: m.roleColor, position: m.rolePosition, members: [] });
+					hoisted.set(key, { name: displayRole.name, color: displayRole.color, position: displayRole.position, members: [] });
 				}
 				hoisted.get(key)!.members.push(m);
 			} else {
