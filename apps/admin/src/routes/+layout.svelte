@@ -11,33 +11,37 @@
 
 	let { children } = $props();
 
-	const state = createAdminState();
+	const appState = createAdminState();
 	const hub = new AdminHubService();
 	let authenticated = $state(false);
 	let loading = $state(true);
 
 	const isLoginPage = $derived($page.url.pathname === '/login');
 
-	onMount(async () => {
-		if (isLoginPage) { loading = false; return; }
+	onMount(() => {
+		async function init() {
+			if (isLoginPage) { loading = false; return; }
 
-		const token = getToken();
-		if (!token) { await goto('/login'); loading = false; return; }
+			const token = getToken();
+			if (!token) { await goto('/login'); loading = false; return; }
 
-		const isAdmin = await verifyAdmin();
-		if (!isAdmin) { clearToken(); await goto('/login'); loading = false; return; }
+			const isAdmin = await verifyAdmin();
+			if (!isAdmin) { clearToken(); await goto('/login'); loading = false; return; }
 
-		try {
-			state.currentUser = await adminApi.getMe();
-			await hub.start((data) => state.updateLiveStats(data));
-			authenticated = true;
-		} catch {
-			clearToken();
-			await goto('/login');
+			try {
+				appState.currentUser = await adminApi.getMe();
+				await hub.start((data) => appState.updateLiveStats(data));
+				authenticated = true;
+			} catch {
+				clearToken();
+				await goto('/login');
+			}
+			loading = false;
 		}
-		loading = false;
 
-		return () => hub.stop();
+		init();
+
+		return () => { hub.stop(); };
 	});
 </script>
 

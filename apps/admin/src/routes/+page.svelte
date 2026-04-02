@@ -4,20 +4,20 @@
 	import { getAdminState } from '$lib/state/admin-state.svelte';
 	import StatCard from '$lib/components/dashboard/StatCard.svelte';
 
-	const state = getAdminState();
+	const appState = getAdminState();
 	let loading = $state(true);
 
 	onMount(async () => {
 		try {
-			state.stats = await adminApi.getStats();
+			appState.stats = await adminApi.getStats();
 		} catch (e) {
 			console.error('Failed to load stats:', e);
 		}
 		loading = false;
 	});
 
-	const stats = $derived(state.stats);
-	const live = $derived(state.stats?.live);
+	const stats = $derived(appState.stats);
+	const live = $derived(appState.stats?.live);
 </script>
 
 <h1>Dashboard</h1>

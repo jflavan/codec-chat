@@ -2,8 +2,8 @@
 	import { page } from '$app/stores';
 	import { getAdminState } from '$lib/state/admin-state.svelte';
 
-	const state = getAdminState();
-	const reportCount = $derived(state.openReportCount);
+	const appState = getAdminState();
+	const reportCount = $derived(appState.openReportCount);
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard', icon: '📊' },
@@ -35,7 +35,7 @@
 		{/each}
 	</ul>
 	<div class="user-info">
-		{state.currentUser?.displayName ?? 'Admin'}
+		{appState.currentUser?.displayName ?? 'Admin'}
 	</div>
 </nav>
 
