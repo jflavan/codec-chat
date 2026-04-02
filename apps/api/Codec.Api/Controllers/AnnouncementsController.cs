@@ -1,4 +1,5 @@
 using Codec.Api.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,6 +7,7 @@ namespace Codec.Api.Controllers;
 
 [ApiController]
 [Route("announcements")]
+[Authorize]
 public class AnnouncementsController(CodecDbContext db) : ControllerBase
 {
     [HttpGet("active")]

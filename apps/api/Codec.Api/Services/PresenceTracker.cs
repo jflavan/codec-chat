@@ -143,4 +143,12 @@ public class PresenceTracker
     {
         return _connections.Values.Select(c => c.UserId).Distinct().Count();
     }
+
+    /// <summary>
+    /// Returns the total number of active connections across all users.
+    /// </summary>
+    public int GetConnectionCount()
+    {
+        return _connections.Count;
+    }
 }

@@ -101,6 +101,10 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> DisableUser(Guid id, [FromBody] DisableRequest request)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
+        if (id == admin.Id)
+            return BadRequest(new { error = "Cannot disable yourself." });
+
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
@@ -113,7 +117,6 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
 
         await db.SaveChangesAsync();
 
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.UserDisabled, "User", id.ToString(), request.Reason);
 
         return Ok();

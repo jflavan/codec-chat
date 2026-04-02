@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { adminApi } from '$lib/api/client';
+	import { getAdminState } from '$lib/state/admin-state.svelte';
 
 	const REPORT_STATUS_LABELS: Record<number, string> = {
 		0: 'Open',
@@ -23,11 +24,13 @@
 	let resolution = $state('');
 	let dismissReason = $state('');
 
+	const appState = getAdminState();
+
 	async function load() {
 		loading = true;
 		error = '';
 		try {
-			report = await adminApi.getReport($page.params.id!);
+			report = await adminApi.getReport(page.params.id!);
 		} catch (e: any) {
 			error = e.message || 'Failed to load report.';
 		}
@@ -47,7 +50,7 @@
 	}
 
 	function handleAssignSelf() {
-		doAction({ assignToSelf: true });
+		doAction({ assignedToUserId: appState.currentUser?.id });
 	}
 
 	function handleMarkReviewing() {
@@ -61,7 +64,7 @@
 
 	function handleDismiss() {
 		if (!dismissReason.trim()) { actionError = 'Please enter a reason.'; return; }
-		doAction({ status: 3, dismissReason: dismissReason.trim() });
+		doAction({ status: 3, resolution: dismissReason.trim() });
 	}
 
 	onMount(() => load());

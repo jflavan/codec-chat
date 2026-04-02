@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { getAdminState } from '$lib/state/admin-state.svelte';
 
 	const appState = getAdminState();
@@ -24,7 +24,7 @@
 	<ul>
 		{#each navItems as item}
 			<li>
-				<a href={item.href} class:active={isActive(item.href, $page.url.pathname)}>
+				<a href={item.href} class:active={isActive(item.href, page.url.pathname)}>
 					<span class="icon">{item.icon}</span>
 					<span class="label">{item.label}</span>
 					{#if item.href === '/moderation' && reportCount > 0}

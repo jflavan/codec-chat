@@ -17,10 +17,13 @@ public class AdminMetricsService(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+
             try
             {
-                var messagesPerMinute = metrics.GetMessagesPerMinute();
-                metrics.ResetMinuteCounter();
+                var recentMessages = metrics.ReadAndReset();
+                var messagesPerMinute = recentMessages * 12;
+                metrics.SetMessagesPerMinute(messagesPerMinute);
 
                 int openReports = 0;
                 using (var scope = scopeFactory.CreateScope())
@@ -32,7 +35,7 @@ public class AdminMetricsService(
                 await hub.Clients.All.SendAsync("StatsUpdated", new
                 {
                     activeUsers = presence.GetOnlineUserCount(),
-                    activeConnections = presence.GetOnlineUserCount(),
+                    activeConnections = presence.GetConnectionCount(),
                     messagesPerMinute,
                     openReports
                 }, stoppingToken);
@@ -41,8 +44,6 @@ public class AdminMetricsService(
             {
                 logger.LogError(ex, "Error broadcasting admin metrics");
             }
-
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
     }
 }

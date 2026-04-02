@@ -35,7 +35,7 @@ public class AdminStatsController(CodecDbContext db, MetricsCounterService metri
 
         var openReports = await db.Reports.CountAsync(r => r.Status == Models.ReportStatus.Open);
 
-        var activeConnections = presence.GetOnlineUserCount();
+        var activeConnections = presence.GetConnectionCount();
         var messagesPerMinute = metrics.GetMessagesPerMinute();
 
         return Ok(new

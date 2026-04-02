@@ -13,7 +13,7 @@ public class GlobalAdminHandler(IUserService userService) : AuthorizationHandler
             return;
 
         var (user, _) = await userService.GetOrCreateUserAsync(context.User);
-        if (user.IsGlobalAdmin)
+        if (user.IsGlobalAdmin && !user.IsDisabled)
             context.Succeed(requirement);
     }
 }

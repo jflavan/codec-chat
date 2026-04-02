@@ -49,10 +49,18 @@ public class AdminReportsController(CodecDbContext db, IUserService userService,
     public async Task<IActionResult> GetReport(Guid id)
     {
         var report = await db.Reports.AsNoTracking()
-            .Include(r => r.Reporter)
-            .Include(r => r.AssignedToUser)
-            .Include(r => r.ResolvedByUser)
-            .FirstOrDefaultAsync(r => r.Id == id);
+            .Where(r => r.Id == id)
+            .Select(r => new
+            {
+                r.Id, r.ReportType, r.TargetId, r.TargetSnapshot,
+                r.Reason, r.Status, r.CreatedAt,
+                r.AssignedToUserId, r.Resolution, r.ResolvedAt,
+                ReporterName = r.Reporter!.DisplayName,
+                AssignedToName = r.AssignedToUser != null ? r.AssignedToUser.DisplayName : null,
+                ResolvedByName = r.ResolvedByUser != null ? r.ResolvedByUser.DisplayName : null,
+                RelatedCount = db.Reports.Count(r2 => r2.ReportType == r.ReportType && r2.TargetId == r.TargetId && r2.Id != r.Id)
+            })
+            .FirstOrDefaultAsync();
         if (report is null) return NotFound();
 
         return Ok(report);

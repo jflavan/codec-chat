@@ -2,9 +2,12 @@ namespace Codec.Api.Services;
 
 public class MetricsCounterService
 {
-    private long _messagesThisMinute;
+    private long _messageCount;
+    private long _lastMessagesPerMinute;
 
-    public void IncrementMessages() => Interlocked.Increment(ref _messagesThisMinute);
-    public long GetMessagesPerMinute() => Interlocked.Read(ref _messagesThisMinute);
-    public void ResetMinuteCounter() => Interlocked.Exchange(ref _messagesThisMinute, 0);
+    public void IncrementMessages() => Interlocked.Increment(ref _messageCount);
+    public long GetCount() => Interlocked.Read(ref _messageCount);
+    public long ReadAndReset() => Interlocked.Exchange(ref _messageCount, 0);
+    public long GetMessagesPerMinute() => Interlocked.Read(ref _lastMessagesPerMinute);
+    public void SetMessagesPerMinute(long value) => Interlocked.Exchange(ref _lastMessagesPerMinute, value);
 }

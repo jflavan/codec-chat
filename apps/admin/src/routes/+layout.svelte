@@ -2,7 +2,7 @@
 	import '$lib/styles/global.css';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { getToken, verifyAdmin, clearToken } from '$lib/auth/auth';
 	import { createAdminState } from '$lib/state/admin-state.svelte';
 	import { AdminHubService } from '$lib/services/admin-hub';
@@ -16,7 +16,7 @@
 	let authenticated = $state(false);
 	let loading = $state(true);
 
-	const isLoginPage = $derived($page.url.pathname === '/login');
+	const isLoginPage = $derived(page.url.pathname === '/login');
 
 	onMount(() => {
 		async function init() {

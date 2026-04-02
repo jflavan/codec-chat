@@ -54,4 +54,18 @@ public class GlobalAdminHandlerTests : IDisposable
         await _handler.HandleAsync(context);
         context.HasSucceeded.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task Fails_WhenGlobalAdminIsDisabled()
+    {
+        var user = new User { Id = Guid.NewGuid(), DisplayName = "Disabled Admin", IsGlobalAdmin = true, IsDisabled = true };
+        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync((user, false));
+
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "test")], "Bearer"));
+        var context = new AuthorizationHandlerContext([new GlobalAdminRequirement()], principal, null);
+
+        await _handler.HandleAsync(context);
+        context.HasSucceeded.Should().BeFalse();
+    }
 }

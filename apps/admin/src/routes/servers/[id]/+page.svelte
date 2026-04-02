@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { adminApi } from '$lib/api/client';
 	import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte';
 
@@ -25,7 +25,9 @@
 		loading = true;
 		error = '';
 		try {
-			server = await adminApi.getServer($page.params.id!);
+			const data = await adminApi.getServer(page.params.id!);
+			const ownerMember = data.members?.find((m: any) => m.userId === data.ownerId);
+			server = { ...data.server, ownerId: data.ownerId, ownerName: ownerMember?.displayName, memberCount: data.memberCount, members: data.members, channels: data.channels, roles: data.roles };
 		} catch (e: any) {
 			error = e.message || 'Failed to load server.';
 		}
@@ -130,7 +132,7 @@
 				<div class="info-item"><span class="label">ID</span><span class="value mono">{server.id}</span></div>
 				<div class="info-item"><span class="label">Owner</span><span class="value">
 					{#if server.ownerName}
-						<a href="/users/{server.ownerUserId}">{server.ownerName}</a>
+						<a href="/users/{server.ownerId}">{server.ownerName}</a>
 					{:else}
 						—
 					{/if}

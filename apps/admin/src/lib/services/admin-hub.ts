@@ -6,12 +6,11 @@ export class AdminHubService {
 	private connection: HubConnection | null = null;
 
 	async start(onStatsUpdated: (data: any) => void) {
-		const token = getToken();
-		if (!token) return;
+		if (!getToken()) return;
 
 		const baseUrl = env.PUBLIC_API_BASE_URL || 'http://localhost:5050';
 		this.connection = new HubConnectionBuilder()
-			.withUrl(`${baseUrl}/hubs/admin`, { accessTokenFactory: () => token })
+			.withUrl(`${baseUrl}/hubs/admin`, { accessTokenFactory: () => getToken() ?? '' })
 			.withAutomaticReconnect()
 			.build();
 

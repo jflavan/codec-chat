@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { adminApi } from '$lib/api/client';
 	import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte';
 
@@ -26,7 +26,8 @@
 		loading = true;
 		error = '';
 		try {
-			user = await adminApi.getUser($page.params.id!);
+			const data = await adminApi.getUser(page.params.id!);
+			user = { ...data.user, memberships: data.memberships, recentMessages: data.recentMessages, reportHistory: data.reportHistory, adminHistory: data.adminHistory };
 		} catch (e: any) {
 			error = e.message || 'Failed to load user.';
 		}
@@ -96,7 +97,7 @@
 	function handleResetPassword() {
 		openDialog({
 			title: 'Reset Password',
-			message: `Send a password reset to ${user.email}?`,
+			message: `Remove the password credential for ${user.email}? The user will need to use another auth provider (Google, GitHub, Discord, or SAML) to sign in.`,
 			label: 'Reset',
 			action: () => adminApi.resetPassword(user.id)
 		});
@@ -164,11 +165,11 @@
 		</section>
 
 		<!-- Server Memberships -->
-		{#if user.serverMemberships?.length}
+		{#if user.memberships?.length}
 			<section class="card">
-				<h2>Server Memberships ({user.serverMemberships.length})</h2>
+				<h2>Server Memberships ({user.memberships.length})</h2>
 				<ul class="member-list">
-					{#each user.serverMemberships as m}
+					{#each user.memberships as m}
 						<li>
 							<a href="/servers/{m.serverId}">{m.serverName}</a>
 							<span class="muted">joined {new Date(m.joinedAt).toLocaleDateString()}</span>
@@ -186,7 +187,7 @@
 					{#each user.recentMessages as msg}
 						<li>
 							<span class="msg-time muted">{new Date(msg.createdAt).toLocaleString()}</span>
-							<span class="msg-body">{msg.body}</span>
+							<span class="msg-body">{msg.content}</span>
 						</li>
 					{/each}
 				</ul>
