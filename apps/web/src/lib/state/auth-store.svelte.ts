@@ -22,7 +22,20 @@ import {
 } from '$lib/auth/google.js';
 import { PushNotificationManager } from '$lib/services/push-notifications.js';
 import { applyTheme } from '$lib/utils/theme.js';
+import { getContext, setContext } from 'svelte';
 import type { UIStore } from './ui-store.svelte.js';
+
+const AUTH_KEY = Symbol('auth-store');
+
+export function createAuthStore(api: ApiClient, ui: UIStore, googleClientId: string): AuthStore {
+	const store = new AuthStore(api, ui, googleClientId);
+	setContext(AUTH_KEY, store);
+	return store;
+}
+
+export function getAuthStore(): AuthStore {
+	return getContext<AuthStore>(AUTH_KEY);
+}
 
 export class AuthStore {
 	/* ───── $state fields ───── */
