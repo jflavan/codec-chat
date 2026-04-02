@@ -135,4 +135,12 @@ public class PresenceTracker
     {
         return _connections.Where(c => c.Value.UserId == userId).Select(c => c.Key).ToList();
     }
+
+    /// <summary>
+    /// Returns the count of distinct users with at least one active connection.
+    /// </summary>
+    public int GetOnlineUserCount()
+    {
+        return _connections.Values.Select(c => c.UserId).Distinct().Count();
+    }
 }
