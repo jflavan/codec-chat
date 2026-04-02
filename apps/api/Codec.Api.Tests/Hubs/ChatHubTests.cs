@@ -31,6 +31,7 @@ public class ChatHubTests : IDisposable
     private readonly Mock<IClientProxy> _mockClientProxy = new();
     private readonly Mock<IClientProxy> _mockOthersProxy = new();
     private readonly Mock<IPermissionResolverService> _permissionResolver = new();
+    private readonly MetricsCounterService _metricsCounter = new();
 
     private readonly User _testUser;
     private readonly User _testUser2;
@@ -170,7 +171,8 @@ public class ChatHubTests : IDisposable
             _logger.Object,
             _callTimeoutService.Object,
             _presenceTracker,
-            _permissionResolver.Object
+            _permissionResolver.Object,
+            _metricsCounter
         );
         hub.Context = _mockContext.Object;
         hub.Clients = _mockClients.Object;
@@ -200,7 +202,8 @@ public class ChatHubTests : IDisposable
             _logger.Object,
             _callTimeoutService.Object,
             _presenceTracker,
-            _permissionResolver.Object
+            _permissionResolver.Object,
+            _metricsCounter
         );
         hub.Context = mockContext2.Object;
         hub.Clients = _mockClients.Object;
@@ -1851,7 +1854,8 @@ public class ChatHubTests : IDisposable
             _logger.Object,
             _callTimeoutService.Object,
             _presenceTracker,
-            _permissionResolver.Object
+            _permissionResolver.Object,
+            _metricsCounter
         );
         hub2.Context = mockContext2.Object;
         hub2.Clients = _mockClients.Object;

@@ -15,7 +15,7 @@ namespace Codec.Api.Hubs;
 /// Clients join channel-scoped, user-scoped, server-scoped, and voice-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker, IPermissionResolverService permissionResolver) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker, IPermissionResolverService permissionResolver, MetricsCounterService metricsCounter) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
@@ -588,6 +588,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         };
         await Clients.Group($"user-{call.CallerUserId}").SendAsync("ReceiveDm", msgPayload);
         await Clients.Group($"user-{call.RecipientUserId}").SendAsync("ReceiveDm", msgPayload);
+        metricsCounter.IncrementMessages();
     }
 
     /// <summary>
@@ -696,6 +697,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         };
         await Clients.Group($"user-{call.CallerUserId}").SendAsync("ReceiveDm", msgPayload);
         await Clients.Group($"user-{call.RecipientUserId}").SendAsync("ReceiveDm", msgPayload);
+        metricsCounter.IncrementMessages();
     }
 
     /* ═══════════════════ Voice ═══════════════════ */
