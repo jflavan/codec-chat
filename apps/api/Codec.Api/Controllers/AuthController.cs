@@ -173,6 +173,9 @@ public class AuthController(
             await db.SaveChangesAsync();
         }
 
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account is disabled.", reason = user.DisabledReason });
+
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
 
@@ -206,6 +209,9 @@ public class AuthController(
         }
 
         var (user, accessToken, newRefreshToken) = result.Value;
+
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account is disabled." });
 
         return Ok(new
         {
@@ -512,6 +518,9 @@ public class AuthController(
             }
         }
 
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account is disabled." });
+
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
         var effectiveAvatarUrl = avatarService.ResolveUrl(user.CustomAvatarPath) ?? user.AvatarUrl;
@@ -667,6 +676,9 @@ public class AuthController(
                     return Conflict(new { error = "Account creation conflict. Please try again." });
             }
         }
+
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account is disabled." });
 
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
