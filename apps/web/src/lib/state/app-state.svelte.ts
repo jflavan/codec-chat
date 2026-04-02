@@ -46,7 +46,8 @@ import {
 	setAuthType,
 	getAuthType,
 	persistRefreshToken,
-	loadStoredRefreshToken
+	loadStoredRefreshToken,
+	hasStoredAuthType
 } from '$lib/auth/session.js';
 import {
 	initGoogleIdentity,
@@ -521,7 +522,7 @@ export class AppState {
 	private renderSignIn(): void {
 		initGoogleIdentity(this.googleClientId, (token) => this.handleCredential(token), {
 			renderButtonIds: ['google-button', 'login-google-button'],
-			autoSelect: true
+			autoSelect: hasStoredAuthType() && this.authType === 'google'
 		});
 	}
 
