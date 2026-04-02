@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 
-	const app = getAppState();
+	const voice = getVoiceStore();
 
 	let ringCleanup: (() => void) | null = null;
 
@@ -37,29 +37,29 @@
 	});
 
 	function accept() {
-		if (app.incomingCall) {
-			app.acceptCall(app.incomingCall.callId);
+		if (voice.incomingCall) {
+			voice.acceptCall(voice.incomingCall.callId);
 		}
 	}
 
 	function decline() {
-		if (app.incomingCall) {
-			app.declineCall(app.incomingCall.callId);
+		if (voice.incomingCall) {
+			voice.declineCall(voice.incomingCall.callId);
 		}
 	}
 </script>
 
-{#if app.incomingCall}
+{#if voice.incomingCall}
 	<div class="call-overlay" role="alertdialog" aria-label="Incoming voice call">
 		<div class="call-card">
-			{#if app.incomingCall.callerAvatarUrl}
-				<img class="caller-avatar" src={app.incomingCall.callerAvatarUrl} alt="" />
+			{#if voice.incomingCall.callerAvatarUrl}
+				<img class="caller-avatar" src={voice.incomingCall.callerAvatarUrl} alt="" />
 			{:else}
 				<div class="caller-avatar-placeholder">
-					{app.incomingCall.callerDisplayName.slice(0, 1).toUpperCase()}
+					{voice.incomingCall.callerDisplayName.slice(0, 1).toUpperCase()}
 				</div>
 			{/if}
-			<div class="caller-name">{app.incomingCall.callerDisplayName}</div>
+			<div class="caller-name">{voice.incomingCall.callerDisplayName}</div>
 			<div class="call-label">Incoming Voice Call</div>
 			<div class="call-actions">
 				<button class="call-btn accept-btn" onclick={accept} aria-label="Accept call">

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 	import { Permission, hasPermission } from '$lib/types/index.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	let newRoleName = $state('');
 	let newRoleColor = $state('#99aab5');
@@ -14,15 +14,15 @@
 	let deletingRoleId = $state<string | null>(null);
 
 	$effect(() => {
-		if (app.selectedServerId) {
-			app.loadRoles();
+		if (servers.selectedServerId) {
+			servers.loadRoles();
 		}
 	});
 
 	async function createRole(): Promise<void> {
 		if (!newRoleName.trim()) return;
 		isCreating = true;
-		await app.createRole(newRoleName.trim(), { color: newRoleColor, isHoisted: true });
+		await servers.createRole(newRoleName.trim(), { color: newRoleColor, isHoisted: true });
 		newRoleName = '';
 		newRoleColor = '#99aab5';
 		isCreating = false;
@@ -37,7 +37,7 @@
 
 	async function saveEdit(): Promise<void> {
 		if (!editingRoleId || !editName.trim()) return;
-		await app.updateRole(editingRoleId, { name: editName.trim(), color: editColor, permissions: editPermissions });
+		await servers.updateRole(editingRoleId, { name: editName.trim(), color: editColor, permissions: editPermissions });
 		editingRoleId = null;
 	}
 
@@ -46,7 +46,7 @@
 			deletingRoleId = roleId;
 			return;
 		}
-		await app.deleteRole(roleId);
+		await servers.deleteRole(roleId);
 		deletingRoleId = null;
 	}
 
@@ -123,11 +123,11 @@
 	<h2 class="section-title">Roles</h2>
 	<p class="section-desc">Manage roles and permissions for this server.</p>
 
-	{#if app.isLoadingRoles}
+	{#if servers.isLoadingRoles}
 		<p class="loading">Loading roles…</p>
 	{:else}
 		<ul class="role-list" role="list">
-			{#each app.serverRoles as role (role.id)}
+			{#each servers.serverRoles as role (role.id)}
 				<li class="role-row {editingRoleId === role.id ? 'role-row--editing' : ''}">
 					{#if editingRoleId === role.id}
 						<div class="role-edit-panel">

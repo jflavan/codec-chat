@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 	import ServerSettingsSidebar from './ServerSettingsSidebar.svelte';
 	import ServerSettings from './ServerSettings.svelte';
 	import ServerEmojis from './ServerEmojis.svelte';
@@ -11,13 +11,13 @@
 	import ServerAuditLog from './ServerAuditLog.svelte';
 	import ServerBans from './ServerBans.svelte';
 
-	const app = getAppState();
+	const ui = getUIStore();
 
 	let dialogEl: HTMLDialogElement;
 	let previousFocus: HTMLElement | null = null;
 
 	$effect(() => {
-		if (app.serverSettingsOpen) {
+		if (ui.serverSettingsOpen) {
 			previousFocus = document.activeElement as HTMLElement | null;
 			dialogEl?.showModal();
 		} else {
@@ -28,14 +28,14 @@
 
 	function handleBackdropClick(e: MouseEvent) {
 		if (e.target === dialogEl) {
-			app.closeServerSettings();
+			ui.closeServerSettings();
 		}
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			e.preventDefault();
-			app.closeServerSettings();
+			ui.closeServerSettings();
 		}
 	}
 </script>
@@ -54,7 +54,7 @@
 		<div class="settings-content-col">
 			<button
 				class="close-btn"
-				onclick={() => app.closeServerSettings()}
+				onclick={() => ui.closeServerSettings()}
 				aria-label="Close settings"
 				title="Close"
 			>
@@ -62,21 +62,21 @@
 					<path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
 				</svg>
 			</button>
-			{#if app.serverSettingsCategory === 'channels'}
+			{#if ui.serverSettingsCategory === 'channels'}
 				<ServerChannels />
-			{:else if app.serverSettingsCategory === 'invites'}
+			{:else if ui.serverSettingsCategory === 'invites'}
 				<ServerInvites />
-			{:else if app.serverSettingsCategory === 'webhooks'}
+			{:else if ui.serverSettingsCategory === 'webhooks'}
 				<ServerWebhooks />
-			{:else if app.serverSettingsCategory === 'emojis'}
+			{:else if ui.serverSettingsCategory === 'emojis'}
 				<ServerEmojis />
-			{:else if app.serverSettingsCategory === 'roles'}
+			{:else if ui.serverSettingsCategory === 'roles'}
 				<ServerRoles />
-			{:else if app.serverSettingsCategory === 'members'}
+			{:else if ui.serverSettingsCategory === 'members'}
 				<ServerMembers />
-			{:else if app.serverSettingsCategory === 'bans'}
+			{:else if ui.serverSettingsCategory === 'bans'}
 				<ServerBans />
-			{:else if app.serverSettingsCategory === 'audit-log'}
+			{:else if ui.serverSettingsCategory === 'audit-log'}
 				<ServerAuditLog />
 			{:else}
 				<ServerSettings />

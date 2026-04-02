@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 	import SettingsSidebar from './SettingsSidebar.svelte';
 	import ProfileSettings from './ProfileSettings.svelte';
 	import AccountSettings from './AccountSettings.svelte';
@@ -7,13 +7,13 @@
 	import NotificationSettings from './NotificationSettings.svelte';
 	import AppearanceSettings from './AppearanceSettings.svelte';
 
-	const app = getAppState();
+	const ui = getUIStore();
 
 	let dialogEl: HTMLDialogElement;
 	let previousFocus: HTMLElement | null = null;
 
 	$effect(() => {
-		if (app.settingsOpen) {
+		if (ui.settingsOpen) {
 			previousFocus = document.activeElement as HTMLElement | null;
 			dialogEl?.showModal();
 		} else {
@@ -24,14 +24,14 @@
 
 	function handleBackdropClick(e: MouseEvent) {
 		if (e.target === dialogEl) {
-			app.closeSettings();
+			ui.closeSettings();
 		}
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			e.preventDefault();
-			app.closeSettings();
+			ui.closeSettings();
 		}
 	}
 </script>
@@ -50,7 +50,7 @@
 		<div class="settings-content-col">
 			<button
 				class="close-btn"
-				onclick={() => app.closeSettings()}
+				onclick={() => ui.closeSettings()}
 				aria-label="Close settings"
 				title="Close"
 			>
@@ -58,13 +58,13 @@
 					<path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
 				</svg>
 			</button>
-			{#if app.settingsCategory === 'profile'}
+			{#if ui.settingsCategory === 'profile'}
 				<ProfileSettings />
-			{:else if app.settingsCategory === 'notifications'}
+			{:else if ui.settingsCategory === 'notifications'}
 				<NotificationSettings />
-			{:else if app.settingsCategory === 'voice-audio'}
+			{:else if ui.settingsCategory === 'voice-audio'}
 				<VoiceAudioSettings />
-			{:else if app.settingsCategory === 'appearance'}
+			{:else if ui.settingsCategory === 'appearance'}
 				<AppearanceSettings />
 			{:else}
 				<AccountSettings />

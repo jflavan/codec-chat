@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 
 	let resendCooldown = $state(0);
 	let resendError = $state('');
@@ -24,7 +24,7 @@
 		resendError = '';
 		resendSuccess = false;
 		try {
-			await app.resendVerification();
+			await auth.resendVerification();
 			resendSuccess = true;
 			startCooldown();
 		} catch (err: unknown) {
@@ -39,7 +39,7 @@
 
 	async function handleCheck() {
 		checking = true;
-		const verified = await app.checkEmailVerified();
+		const verified = await auth.checkEmailVerified();
 		if (!verified) {
 			checking = false;
 		}
@@ -81,7 +81,7 @@
 			<p class="error">{resendError}</p>
 		{/if}
 
-		<button class="btn-link" onclick={() => app.signOut()}>Sign out</button>
+		<button class="btn-link" onclick={() => auth.signOut()}>Sign out</button>
 	</div>
 </div>
 

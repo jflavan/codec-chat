@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 	import type { WebhookEventType } from '$lib/types/index.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	const allEventTypes: WebhookEventType[] = [
 		'MessageCreated',
@@ -23,8 +23,8 @@
 	let showCreateForm = $state(false);
 
 	$effect(() => {
-		if (app.selectedServerId) {
-			app.loadWebhooks();
+		if (servers.selectedServerId) {
+			servers.loadWebhooks();
 		}
 	});
 
@@ -40,7 +40,7 @@
 
 	async function handleCreate() {
 		if (!nameInput.trim() || !urlInput.trim() || selectedEvents.size === 0) return;
-		await app.createWebhook({
+		await servers.createWebhook({
 			name: nameInput.trim(),
 			url: urlInput.trim(),
 			secret: secretInput.trim() || undefined,
@@ -54,7 +54,7 @@
 	}
 
 	async function handleToggleActive(webhookId: string, currentActive: boolean) {
-		await app.updateWebhook(webhookId, { isActive: !currentActive });
+		await servers.updateWebhook(webhookId, { isActive: !currentActive });
 	}
 
 	function formatDate(iso: string): string {
@@ -135,13 +135,13 @@
 					<button
 						type="button"
 						class="btn-primary"
-						disabled={app.isCreatingWebhook ||
+						disabled={servers.isCreatingWebhook ||
 							!nameInput.trim() ||
 							!urlInput.trim() ||
 							selectedEvents.size === 0}
 						onclick={handleCreate}
 					>
-						{app.isCreatingWebhook ? 'Creating…' : 'Create'}
+						{servers.isCreatingWebhook ? 'Creating…' : 'Create'}
 					</button>
 					<button type="button" class="btn-cancel" onclick={() => (showCreateForm = false)}>
 						Cancel
@@ -152,13 +152,13 @@
 	</section>
 
 	<section class="settings-section">
-		{#if app.isLoadingWebhooks}
+		{#if servers.isLoadingWebhooks}
 			<p class="muted">Loading webhooks…</p>
-		{:else if app.webhooks.length === 0}
+		{:else if servers.webhooks.length === 0}
 			<p class="muted">No webhooks configured. Create one to receive event notifications.</p>
 		{:else}
 			<div class="webhook-list">
-				{#each app.webhooks as webhook (webhook.id)}
+				{#each servers.webhooks as webhook (webhook.id)}
 					<div class="webhook-card" class:inactive={!webhook.isActive}>
 						<div class="webhook-header">
 							<div class="webhook-info">
@@ -178,7 +178,7 @@
 								<button
 									type="button"
 									class="btn-deliveries"
-									onclick={() => app.loadWebhookDeliveries(webhook.id)}
+									onclick={() => servers.loadWebhookDeliveries(webhook.id)}
 								>
 									Deliveries
 								</button>
@@ -186,7 +186,7 @@
 									type="button"
 									class="btn-delete"
 									aria-label="Delete webhook"
-									onclick={() => app.deleteWebhook(webhook.id)}
+									onclick={() => servers.deleteWebhook(webhook.id)}
 								>
 									Delete
 								</button>
@@ -204,12 +204,12 @@
 							{/if}
 						</div>
 
-						{#if app.selectedWebhookId === webhook.id}
+						{#if servers.selectedWebhookId === webhook.id}
 							<div class="deliveries-panel">
 								<h3 class="deliveries-title">Recent Deliveries</h3>
-								{#if app.isLoadingDeliveries}
+								{#if servers.isLoadingDeliveries}
 									<p class="muted">Loading…</p>
-								{:else if app.webhookDeliveries.length === 0}
+								{:else if servers.webhookDeliveries.length === 0}
 									<p class="muted">No deliveries yet.</p>
 								{:else}
 									<div class="delivery-table">
@@ -219,7 +219,7 @@
 											<span class="col-attempt">Attempt</span>
 											<span class="col-time">Time</span>
 										</div>
-										{#each app.webhookDeliveries as delivery (delivery.id)}
+										{#each servers.webhookDeliveries as delivery (delivery.id)}
 											<div class="delivery-row" class:success={delivery.success} class:failure={!delivery.success}>
 												<span class="col-event">{formatEventType(delivery.eventType)}</span>
 												<span class="col-status">
@@ -241,8 +241,8 @@
 									type="button"
 									class="btn-close-deliveries"
 									onclick={() => {
-										app.selectedWebhookId = null;
-										app.webhookDeliveries = [];
+										servers.selectedWebhookId = null;
+										servers.webhookDeliveries = [];
 									}}
 								>
 									Close

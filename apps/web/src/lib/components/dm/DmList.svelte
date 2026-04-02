@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getDmStore } from '$lib/state/dm-store.svelte.js';
 	import PresenceDot from '$lib/components/shared/PresenceDot.svelte';
 
-	const app = getAppState();
+	const ui = getUIStore();
+	const dms = getDmStore();
 
 	function truncate(text: string, max: number): string {
 		return text.length > max ? text.slice(0, max) + '…' : text;
@@ -12,17 +14,17 @@
 <div class="dm-list">
 	<h3 class="dm-list-header">Direct Messages</h3>
 
-	{#if app.isLoadingDmConversations}
+	{#if dms.isLoadingDmConversations}
 		<p class="status-text">Loading conversations…</p>
-	{:else if app.dmConversations.length === 0}
+	{:else if dms.dmConversations.length === 0}
 		<p class="status-text">No conversations yet. Click a friend to start chatting!</p>
 	{:else}
 		<ul class="list" role="list">
-			{#each app.dmConversations as conversation (conversation.id)}
-				<li class="dm-item" class:active={conversation.id === app.activeDmChannelId}>
+			{#each dms.dmConversations as conversation (conversation.id)}
+				<li class="dm-item" class:active={conversation.id === dms.activeDmChannelId}>
 					<button
 						class="dm-button"
-						onclick={() => app.selectDmConversation(conversation.id)}
+						onclick={() => dms.selectDmConversation(conversation.id)}
 						aria-label="Open conversation with {conversation.participant.displayName}"
 					>
 						<div class="avatar-wrapper">
@@ -33,7 +35,7 @@
 									{conversation.participant.displayName.slice(0, 1).toUpperCase()}
 								</div>
 							{/if}
-							<PresenceDot status={app.userPresence.get(conversation.participant.id) ?? 'offline'} />
+							<PresenceDot status={ui.userPresence.get(conversation.participant.id) ?? 'offline'} />
 						</div>
 						<div class="dm-details">
 							<span class="dm-name">{conversation.participant.displayName}</span>
@@ -43,15 +45,15 @@
 								</span>
 							{/if}
 						</div>
-						{#if app.unreadDmCounts.get(conversation.id)}
-							<span class="unread-badge" aria-label="{app.unreadDmCounts.get(conversation.id)} unread messages">
-								{app.unreadDmCounts.get(conversation.id)}
+						{#if dms.unreadDmCounts.get(conversation.id)}
+							<span class="unread-badge" aria-label="{dms.unreadDmCounts.get(conversation.id)} unread messages">
+								{dms.unreadDmCounts.get(conversation.id)}
 							</span>
 						{/if}
 					</button>
 					<button
 						class="close-btn"
-						onclick={(e: MouseEvent) => { e.stopPropagation(); app.closeDmConversation(conversation.id); }}
+						onclick={(e: MouseEvent) => { e.stopPropagation(); dms.closeDmConversation(conversation.id); }}
 						aria-label="Close conversation with {conversation.participant.displayName}"
 						title="Close conversation"
 					>

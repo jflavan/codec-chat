@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 
-	const app = getAppState();
+	const voice = getVoiceStore();
 
 	let isRecordingKey = $state(false);
 	let recorderEl: HTMLDivElement;
@@ -13,7 +13,7 @@
 	});
 
 	function handleModeChange(mode: 'voice-activity' | 'push-to-talk') {
-		app.setVoiceInputMode(mode);
+		voice.setVoiceInputMode(mode);
 	}
 
 	function startKeyRecording() {
@@ -27,7 +27,7 @@
 			isRecordingKey = false;
 			return;
 		}
-		app.setPttKey(e.code);
+		voice.setPttKey(e.code);
 		isRecordingKey = false;
 	}
 
@@ -74,7 +74,7 @@
 					type="radio"
 					name="inputMode"
 					value="voice-activity"
-					checked={app.voiceInputMode === 'voice-activity'}
+					checked={voice.voiceInputMode === 'voice-activity'}
 					onchange={() => handleModeChange('voice-activity')}
 				/>
 				<div class="radio-content">
@@ -87,7 +87,7 @@
 					type="radio"
 					name="inputMode"
 					value="push-to-talk"
-					checked={app.voiceInputMode === 'push-to-talk'}
+					checked={voice.voiceInputMode === 'push-to-talk'}
 					onchange={() => handleModeChange('push-to-talk')}
 				/>
 				<div class="radio-content">
@@ -98,7 +98,7 @@
 		</div>
 	</div>
 
-	{#if app.voiceInputMode === 'push-to-talk'}
+	{#if voice.voiceInputMode === 'push-to-talk'}
 		<div class="setting-group">
 			<h3 class="setting-label">Push to Talk Key</h3>
 			{#if isRecordingKey}
@@ -108,7 +108,7 @@
 				</div>
 			{:else}
 				<div class="key-display">
-					<span class="current-key">{formatKeyCode(app.pttKey)}</span>
+					<span class="current-key">{formatKeyCode(voice.pttKey)}</span>
 					<button class="record-btn" onclick={startKeyRecording}>
 						Change Key
 					</button>

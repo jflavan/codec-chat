@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 	import MessageFeed from './MessageFeed.svelte';
 	import TypingIndicator from './TypingIndicator.svelte';
 	import Composer from './Composer.svelte';
@@ -7,7 +11,11 @@
 	import PinnedMessagesPanel from './PinnedMessagesPanel.svelte';
 	import VideoGrid from '$lib/components/voice/VideoGrid.svelte';
 
-	const app = getAppState();
+	const ui = getUIStore();
+	const servers = getServerStore();
+	const channelStore = getChannelStore();
+	const msgStore = getMessageStore();
+	const voice = getVoiceStore();
 
 	let isDragOver = $state(false);
 	let dragCounter = 0;
@@ -16,7 +24,7 @@
 	let editingServerDescription = $state(false);
 	let serverDescriptionDraft = $state('');
 
-	const selectedServer = $derived(app.servers.find((s) => s.serverId === app.selectedServerId) ?? null);
+	const selectedServer = $derived(servers.servers.find((s) => s.serverId === servers.selectedServerId) ?? null);
 
 	function startEditServerDescription() {
 		serverDescriptionDraft = selectedServer?.description ?? '';
@@ -25,14 +33,14 @@
 
 	async function saveServerDescription() {
 		editingServerDescription = false;
-		await app.updateServerDescription(serverDescriptionDraft.trim());
+		await servers.updateServerDescription(serverDescriptionDraft.trim());
 	}
 
 	// ── channel description inline edit ───────────────────────────────────────
 	let editingChannelDescription = $state(false);
 	let channelDescriptionDraft = $state('');
 
-	const selectedChannel = $derived(app.channels.find((c) => c.id === app.selectedChannelId) ?? null);
+	const selectedChannel = $derived(channelStore.channels.find((c) => c.id === channelStore.selectedChannelId) ?? null);
 
 	function startEditChannelDescription() {
 		channelDescriptionDraft = selectedChannel?.description ?? '';
@@ -40,9 +48,9 @@
 	}
 
 	async function saveChannelDescription() {
-		if (!app.selectedChannelId) return;
+		if (!channelStore.selectedChannelId) return;
 		editingChannelDescription = false;
-		await app.updateChannelDescription(app.selectedChannelId, channelDescriptionDraft.trim());
+		await channelStore.updateChannelDescription(channelStore.selectedChannelId, channelDescriptionDraft.trim());
 	}
 
 	function handleDragEnter(e: DragEvent): void {
@@ -71,15 +79,15 @@
 		e.preventDefault();
 		dragCounter = 0;
 		isDragOver = false;
-		if (!app.selectedChannelId) return;
+		if (!channelStore.selectedChannelId) return;
 		const file = e.dataTransfer?.files[0];
 		if (file?.type.startsWith('image/')) {
-			app.attachImage(file);
+			msgStore.attachImage(file);
 		}
 	}
 </script>
 
-<div class="chat-wrapper" class:search-open={app.isSearchOpen}>
+<div class="chat-wrapper" class:search-open={msgStore.isSearchOpen}>
 <main
 	class="chat-main"
 	aria-label="Chat"
@@ -89,7 +97,7 @@
 	ondrop={handleDrop}
 >
 	<header class="chat-header">
-		<button class="mobile-nav-btn" onclick={() => { app.mobileNavOpen = true; }} aria-label="Open navigation">
+		<button class="mobile-nav-btn" onclick={() => { ui.mobileNavOpen = true; }} aria-label="Open navigation">
 			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path d="M3 5h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2z"/>
 			</svg>
@@ -99,9 +107,9 @@
 				<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
 			</svg>
 			<h1 class="chat-channel-name">
-				{app.selectedChannelName ?? 'Select a channel'}
+				{channelStore.selectedChannelName ?? 'Select a channel'}
 			</h1>
-			{#if selectedChannel?.description || (app.canManageChannels && app.selectedChannelId)}
+			{#if selectedChannel?.description || (servers.canManageChannels && channelStore.selectedChannelId)}
 				{#if !editingChannelDescription}
 					<span class="header-divider" aria-hidden="true">|</span>
 					<span
@@ -109,7 +117,7 @@
 						title={selectedChannel?.description ?? ''}
 					>
 						{selectedChannel?.description ? selectedChannel.description.slice(0, 80) + (selectedChannel.description.length > 80 ? '…' : '') : ''}
-						{#if app.canManageChannels}
+						{#if servers.canManageChannels}
 							<button class="edit-pencil" aria-label="Edit channel description" onclick={startEditChannelDescription}>
 								<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 									<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -133,38 +141,38 @@
 		</div>
 		<button
 			class="pin-btn"
-			onclick={() => app.togglePinnedPanel()}
+			onclick={() => msgStore.togglePinnedPanel()}
 			title="Pinned Messages"
 			aria-label="Pinned Messages"
-			class:active={app.showPinnedPanel}
+			class:active={msgStore.showPinnedPanel}
 		>
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
 			</svg>
-			{#if app.pinnedMessageCount > 0}
-				<span class="pin-badge">{app.pinnedMessageCount}</span>
+			{#if msgStore.pinnedMessageCount > 0}
+				<span class="pin-badge">{msgStore.pinnedMessageCount}</span>
 			{/if}
 		</button>
 		<button
 			class="search-btn"
-			onclick={() => app.toggleSearch()}
+			onclick={() => msgStore.toggleSearch()}
 			title="Search messages"
 			aria-label="Search messages"
-			class:active={app.isSearchOpen}
+			class:active={msgStore.isSearchOpen}
 		>
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 				<circle cx="11" cy="11" r="8"/>
 				<path d="m21 21-4.3-4.3"/>
 			</svg>
 		</button>
-		<button class="mobile-members-btn" onclick={() => { app.mobileMembersOpen = true; }} aria-label="Show members">
+		<button class="mobile-members-btn" onclick={() => { ui.mobileMembersOpen = true; }} aria-label="Show members">
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
 			</svg>
 		</button>
 	</header>
 
-	{#if isDragOver && app.selectedChannelId}
+	{#if isDragOver && channelStore.selectedChannelId}
 		<div class="drop-overlay" aria-hidden="true">
 			<div class="drop-overlay-content">
 				<svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -176,11 +184,11 @@
 	{/if}
 
 	<div class="chat-body">
-		{#if app.error}
-			<div class="error-banner" role="alert">{app.error}</div>
+		{#if ui.error}
+			<div class="error-banner" role="alert">{ui.error}</div>
 		{/if}
 
-		{#if app.activeVoiceChannelId || app.activeCall}
+		{#if voice.activeVoiceChannelId || voice.activeCall}
 			<VideoGrid />
 		{/if}
 
@@ -191,10 +199,10 @@
 		<Composer />
 	</div>
 </main>
-{#if app.isSearchOpen}
+{#if msgStore.isSearchOpen}
 	<SearchPanel />
 {/if}
-{#if app.showPinnedPanel}
+{#if msgStore.showPinnedPanel}
 	<PinnedMessagesPanel />
 {/if}
 </div>

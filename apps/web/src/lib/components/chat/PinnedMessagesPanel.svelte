@@ -1,14 +1,16 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import { formatTime } from '$lib/utils/format.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
+	const msgStore = getMessageStore();
 </script>
 
 <aside class="pinned-panel">
 	<header class="pinned-panel-header">
 		<h2>Pinned Messages</h2>
-		<button class="close-btn" onclick={() => { app.showPinnedPanel = false; }} aria-label="Close">
+		<button class="close-btn" onclick={() => { msgStore.showPinnedPanel = false; }} aria-label="Close">
 			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/>
 			</svg>
@@ -16,7 +18,7 @@
 	</header>
 
 	<div class="pinned-list">
-		{#if app.pinnedMessages.length === 0}
+		{#if msgStore.pinnedMessages.length === 0}
 			<div class="pinned-empty">
 				<svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 					<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
@@ -24,7 +26,7 @@
 				<p>No pinned messages yet.</p>
 			</div>
 		{:else}
-			{#each app.pinnedMessages as pin (pin.messageId)}
+			{#each msgStore.pinnedMessages as pin (pin.messageId)}
 				<div class="pinned-item">
 					<div class="pinned-item-header">
 						<span class="pinned-author">{pin.message.authorName}</span>
@@ -34,14 +36,14 @@
 					<div class="pinned-item-footer">
 						<button
 							class="jump-btn"
-							onclick={() => app.jumpToMessage(pin.messageId, pin.channelId, false)}
+							onclick={() => msgStore.jumpToMessage(pin.messageId, pin.channelId, false)}
 						>
 							Jump to message
 						</button>
-						{#if app.canPinMessages}
+						{#if servers.canPinMessages}
 							<button
 								class="unpin-btn"
-								onclick={() => app.unpinMessage(pin.messageId)}
+								onclick={() => msgStore.unpinMessage(pin.messageId)}
 							>
 								Unpin
 							</button>

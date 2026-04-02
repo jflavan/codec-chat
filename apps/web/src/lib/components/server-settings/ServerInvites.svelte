@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	let copiedId = $state<string | null>(null);
 	let expiresInHours = $state<string>('never');
 	let maxUsesInput = $state<string>('');
 
 	$effect(() => {
-		if (app.selectedServerId) {
-			app.loadInvites();
+		if (servers.selectedServerId) {
+			servers.loadInvites();
 		}
 	});
 
@@ -32,7 +32,7 @@
 	async function handleGenerateInvite() {
 		const hours = expiresInHours === 'never' ? null : Number(expiresInHours);
 		const uses = maxUsesInput.trim() ? Number(maxUsesInput.trim()) : null;
-		await app.createInvite({ expiresInHours: hours, maxUses: uses });
+		await servers.createInvite({ expiresInHours: hours, maxUses: uses });
 	}
 
 	function formatExpiry(expiresAt: string | null): string {
@@ -85,19 +85,19 @@
 			<button
 				type="button"
 				class="btn-primary"
-				disabled={app.isCreatingInvite}
+				disabled={servers.isCreatingInvite}
 				onclick={handleGenerateInvite}
 			>
-				{app.isCreatingInvite ? 'Generating…' : 'Generate Invite'}
+				{servers.isCreatingInvite ? 'Generating…' : 'Generate Invite'}
 			</button>
 		</div>
 	</section>
 
 	<section class="settings-section">
 		<h2 class="section-title">Active Invites</h2>
-		{#if app.isLoadingInvites}
+		{#if servers.isLoadingInvites}
 			<p class="muted">Loading invites…</p>
-		{:else if app.serverInvites.length === 0}
+		{:else if servers.serverInvites.length === 0}
 			<p class="muted">No active invites.</p>
 		{:else}
 			<div class="invite-table">
@@ -108,7 +108,7 @@
 					<span class="col-expires">Expires</span>
 					<span class="col-actions"></span>
 				</div>
-				{#each app.serverInvites as invite (invite.id)}
+				{#each servers.serverInvites as invite (invite.id)}
 					<div class="invite-row">
 						<span class="col-code">
 							<code class="invite-code">{invite.code}</code>
@@ -131,7 +131,7 @@
 								type="button"
 								class="btn-revoke"
 								aria-label="Revoke invite"
-								onclick={() => app.revokeInvite(invite.id)}
+								onclick={() => servers.revokeInvite(invite.id)}
 							>
 								Revoke
 							</button>

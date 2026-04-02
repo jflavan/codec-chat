@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
 
 	let dialogEl: HTMLDialogElement;
 	let title = $state('');
@@ -11,7 +13,7 @@
 	let error = $state<string | null>(null);
 
 	$effect(() => {
-		if (app.bugReportOpen) {
+		if (ui.bugReportOpen) {
 			title = '';
 			description = '';
 			successUrl = null;
@@ -23,7 +25,7 @@
 	});
 
 	function close() {
-		app.bugReportOpen = false;
+		ui.bugReportOpen = false;
 	}
 
 	function handleBackdropClick(e: MouseEvent) {
@@ -45,7 +47,7 @@
 		error = null;
 
 		try {
-			const result = await app.submitBugReport(
+			const result = await auth.submitBugReport(
 				title.trim(),
 				description.trim(),
 				navigator.userAgent,

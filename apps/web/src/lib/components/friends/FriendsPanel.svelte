@@ -1,10 +1,12 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getFriendStore } from '$lib/state/friend-store.svelte.js';
 	import FriendsList from './FriendsList.svelte';
 	import PendingRequests from './PendingRequests.svelte';
 	import AddFriend from './AddFriend.svelte';
 
-	const app = getAppState();
+	const ui = getUIStore();
+	const friends = getFriendStore();
 
 	const tabs = [
 		{ key: 'all' as const, label: 'All Friends' },
@@ -12,12 +14,12 @@
 		{ key: 'add' as const, label: 'Add Friend' }
 	];
 
-	const pendingCount = $derived(app.incomingRequests.length);
+	const pendingCount = $derived(friends.incomingRequests.length);
 </script>
 
 <div class="friends-panel">
 	<div class="friends-header">
-		<button class="mobile-nav-btn" onclick={() => { app.mobileNavOpen = true; }} aria-label="Open navigation">
+		<button class="mobile-nav-btn" onclick={() => { ui.mobileNavOpen = true; }} aria-label="Open navigation">
 			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path d="M3 5h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2z"/>
 			</svg>
@@ -29,9 +31,9 @@
 		{#each tabs as tab (tab.key)}
 			<button
 				class="tab-button"
-				class:active={app.friendsTab === tab.key}
-				onclick={() => { app.friendsTab = tab.key; }}
-				aria-selected={app.friendsTab === tab.key}
+				class:active={ui.friendsTab === tab.key}
+				onclick={() => { ui.friendsTab = tab.key; }}
+				aria-selected={ui.friendsTab === tab.key}
 				role="tab"
 			>
 				{tab.label}
@@ -43,9 +45,9 @@
 	</nav>
 
 	<div class="tab-content">
-		{#if app.friendsTab === 'all'}
+		{#if ui.friendsTab === 'all'}
 			<FriendsList />
-		{:else if app.friendsTab === 'pending'}
+		{:else if ui.friendsTab === 'pending'}
 			<PendingRequests />
 		{:else}
 			<AddFriend />

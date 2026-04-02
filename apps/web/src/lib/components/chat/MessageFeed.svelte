@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import MessageItem from './MessageItem.svelte';
 	import ChannelWelcome from './ChannelWelcome.svelte';
 
-	const app = getAppState();
+	const channelStore = getChannelStore();
+	const messages = getMessageStore();
 	const BOTTOM_THRESHOLD = 50;
 	const TOP_THRESHOLD = 200;
 
@@ -48,7 +50,7 @@
 		}
 
 		// Trigger loading older messages when scrolled near the top.
-		if (container && container.scrollTop < TOP_THRESHOLD && app.hasMoreMessages && !app.isLoadingOlderMessages) {
+		if (container && container.scrollTop < TOP_THRESHOLD && messages.hasMoreMessages && !messages.isLoadingOlderMessages) {
 			loadOlderAndPreserveScroll();
 		}
 	}
@@ -60,11 +62,11 @@
 		// so we can restore it after new content is prepended above.
 		const previousScrollHeight = container.scrollHeight;
 
-		await app.loadOlderMessages();
+		await messages.loadOlderMessages();
 
 		// Sync previousMessageCount so the auto-scroll effect doesn't
 		// misinterpret prepended older messages as new incoming messages.
-		previousMessageCount = app.messages.length;
+		previousMessageCount = messages.messages.length;
 
 		await tick();
 
@@ -101,7 +103,7 @@
 	// The auto-scroll effect may fire before the browser has completed layout
 	// for freshly rendered content, so we wait for the first animation frame.
 	onMount(() => {
-		if (!app.isLoadingMessages && app.messages.length > 0) {
+		if (!messages.isLoadingMessages && messages.messages.length > 0) {
 			tick().then(() => {
 				requestAnimationFrame(() => scrollToBottom(true));
 			});
@@ -134,7 +136,7 @@
 
 	// Scroll to highlighted message from search jump
 	$effect(() => {
-		const targetId = app.highlightedMessageId;
+		const targetId = messages.highlightedMessageId;
 		if (targetId && container) {
 			setTimeout(() => {
 				const el = container?.querySelector(`[data-message-id="${CSS.escape(targetId)}"]`);
@@ -147,7 +149,7 @@
 
 	// Reset scroll state on channel change
 	$effect(() => {
-		const channelId = app.selectedChannelId;
+		const channelId = channelStore.selectedChannelId;
 		if (channelId !== previousChannelId) {
 			previousChannelId = channelId;
 			isLockedToBottom = true;
@@ -158,9 +160,9 @@
 
 	// Auto-scroll when locked, or track unread when unlocked
 	$effect(() => {
-		const count = app.messages.length;
-		const loading = app.isLoadingMessages;
-		const loadingOlder = app.isLoadingOlderMessages;
+		const count = messages.messages.length;
+		const loading = messages.isLoadingMessages;
+		const loadingOlder = messages.isLoadingOlderMessages;
 
 		// While messages are being fetched, the array still holds stale data from
 		// the previous channel. Don't sync previousMessageCount here — the reset
@@ -200,25 +202,25 @@
 
 <div class="feed-wrapper">
 	<div class="message-feed" bind:this={container} onscroll={handleScroll}>
-		{#if app.isLoadingMessages}
+		{#if messages.isLoadingMessages}
 			<p class="muted feed-status">Loading messages…</p>
-		{:else if app.messages.length === 0}
-			{#if app.selectedChannelName}
-				<ChannelWelcome channelName={app.selectedChannelName} />
+		{:else if messages.messages.length === 0}
+			{#if channelStore.selectedChannelName}
+				<ChannelWelcome channelName={channelStore.selectedChannelName} />
 			{:else}
 				<p class="muted feed-status">No messages yet. Start the conversation!</p>
 			{/if}
 		{:else}
-			{#if !app.hasMoreMessages && !app.isLoadingOlderMessages && app.selectedChannelName}
-				<ChannelWelcome channelName={app.selectedChannelName} />
+			{#if !messages.hasMoreMessages && !messages.isLoadingOlderMessages && channelStore.selectedChannelName}
+				<ChannelWelcome channelName={channelStore.selectedChannelName} />
 			{/if}
-			{#if app.isLoadingOlderMessages}
+			{#if messages.isLoadingOlderMessages}
 				<p class="muted feed-status loading-older">Loading older messages…</p>
 			{/if}
-			{#each app.messages as message, i (message.id)}
-				{@const prev = i > 0 ? app.messages[i - 1] : null}
+			{#each messages.messages as message, i (message.id)}
+				{@const prev = i > 0 ? messages.messages[i - 1] : null}
 				{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
-				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={app.highlightedMessageId === message.id}>
+				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={messages.highlightedMessageId === message.id}>
 					<MessageItem {message} grouped={isGrouped} onScrollToMessage={scrollToMessage} />
 				</div>
 			{/each}

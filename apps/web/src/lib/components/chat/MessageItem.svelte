@@ -8,7 +8,10 @@
 	import YouTubeEmbed from './YouTubeEmbed.svelte';
 	import ReplyReference from './ReplyReference.svelte';
 	import MessageActionBar from './MessageActionBar.svelte';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 
 	let {
@@ -21,15 +24,18 @@
 		onScrollToMessage?: (messageId: string) => void;
 	} = $props();
 
-	const app = getAppState();
-	const currentUserId = $derived(app.me?.user.id ?? null);
+	const auth = getAuthStore();
+	const ui = getUIStore();
+	const servers = getServerStore();
+	const msgStore = getMessageStore();
+	const currentUserId = $derived(auth.me?.user.id ?? null);
 
 	/* Build a comprehensive mentions list: API-provided mentions take priority,
 	   then fall back to the current server member list for any unresolved IDs. */
 	const effectiveMentions: Mention[] = $derived.by(() => {
 		const apiMentions = message.mentions ?? [];
 		const seen = new Set(apiMentions.map((m) => m.userId));
-		const memberFallbacks = app.members
+		const memberFallbacks = servers.members
 			.filter((m) => !seen.has(m.userId))
 			.map((m) => ({ userId: m.userId, displayName: m.displayName }));
 		return [...apiMentions, ...memberFallbacks];
@@ -59,22 +65,22 @@
 	});
 
 	function handleToggleReaction(emoji: string) {
-		app.toggleReaction(message.id, emoji);
+		msgStore.toggleReaction(message.id, emoji);
 	}
 
 	function handleReply() {
 		const bodyPreview = message.body.length > 100 ? message.body.slice(0, 100) : message.body;
-		app.startReply(message.id, message.authorName, bodyPreview, 'channel');
+		msgStore.startReply(message.id, message.authorName, bodyPreview);
 	}
 
 	const isOwnMessage = $derived(currentUserId != null && message.authorUserId === currentUserId);
-	const canDeleteMessage = $derived(isOwnMessage || app.isGlobalAdmin);
+	const canDeleteMessage = $derived(isOwnMessage || auth.isGlobalAdmin);
 
 	let isEditing = $state(false);
 	let editBody = $state('');
 
 	function handleDelete() {
-		app.deleteMessage(message.id);
+		msgStore.deleteMessage(message.id);
 	}
 
 	function startEdit() {
@@ -93,7 +99,7 @@
 			cancelEdit();
 			return;
 		}
-		await app.editMessage(message.id, trimmed);
+		await msgStore.editMessage(message.id, trimmed);
 		isEditing = false;
 		editBody = '';
 	}
@@ -108,7 +114,7 @@
 		}
 	}
 
-	const isPinned = $derived(app.pinnedMessageIds.has(message.id));
+	const isPinned = $derived(msgStore.pinnedMessageIds.has(message.id));
 	const isSystemMessage = $derived(message.messageType === 2);
 </script>
 
@@ -129,15 +135,15 @@
 	<MessageActionBar
 		{isOwnMessage}
 		canDelete={canDeleteMessage}
-		canPin={app.canPinMessages}
+		canPin={servers.canPinMessages}
 		{isPinned}
-		onPin={() => app.pinMessage(message.id)}
-		onUnpin={() => app.unpinMessage(message.id)}
+		onPin={() => msgStore.pinMessage(message.id)}
+		onUnpin={() => msgStore.unpinMessage(message.id)}
 		onReply={handleReply}
 		onReact={handleToggleReaction}
 		onEdit={startEdit}
 		onDelete={handleDelete}
-		isReactionPending={(emoji) => app.isReactionPending(message.id, emoji)}
+		isReactionPending={(emoji) => ui.isReactionPending(message.id, emoji)}
 	/>
 
 	{#if isPinned}
@@ -185,10 +191,10 @@
 					</div>
 				</div>
 			{:else if message.body}
-				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={app.customEmojis} /></p>
+				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={servers.customEmojis} /></p>
 			{/if}
 			{#if message.imageUrl}
-				<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
@@ -214,9 +220,9 @@
 					reactions={message.reactions}
 					{currentUserId}
 					onToggle={handleToggleReaction}
-					isPending={(emoji) => app.isReactionPending(message.id, emoji)}
-					members={app.members}
-					customEmojis={app.customEmojis}
+					isPending={(emoji) => ui.isReactionPending(message.id, emoji)}
+					members={servers.members}
+					customEmojis={servers.customEmojis}
 				/>
 			{/if}
 		</div>
@@ -244,14 +250,14 @@
 				</div>
 			{:else if message.body}
 				<p class="message-body">
-					<LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={app.customEmojis} />
+					<LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={servers.customEmojis} />
 					{#if message.editedAt}
 						<span class="edited-label">(edited)</span>
 					{/if}
 				</p>
 			{/if}
 			{#if message.imageUrl}
-				<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
@@ -277,9 +283,9 @@
 					reactions={message.reactions}
 					{currentUserId}
 					onToggle={handleToggleReaction}
-					isPending={(emoji) => app.isReactionPending(message.id, emoji)}
-					members={app.members}
-					customEmojis={app.customEmojis}
+					isPending={(emoji) => ui.isReactionPending(message.id, emoji)}
+					members={servers.members}
+					customEmojis={servers.customEmojis}
 				/>
 			{/if}
 		</div>

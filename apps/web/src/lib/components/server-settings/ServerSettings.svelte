@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	let serverNameEdit = $state('');
 	let isEditingServerName = $state(false);
@@ -10,7 +10,7 @@
 	let iconFileInput = $state<HTMLInputElement>();
 
 	function startEditingServerName() {
-		serverNameEdit = app.selectedServerName;
+		serverNameEdit = servers.selectedServerName;
 		isEditingServerName = true;
 	}
 
@@ -21,14 +21,14 @@
 
 	async function saveServerName() {
 		if (!serverNameEdit.trim()) return;
-		await app.updateServerName(serverNameEdit);
+		await servers.updateServerName(serverNameEdit);
 		isEditingServerName = false;
 		serverNameEdit = '';
 	}
 
 	async function handleDeleteServer() {
-		if (!app.selectedServerId) return;
-		await app.deleteServer(app.selectedServerId);
+		if (!servers.selectedServerId) return;
+		await servers.deleteServer(servers.selectedServerId);
 		confirmDeleteServer = false;
 	}
 
@@ -40,21 +40,21 @@
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
-		await app.uploadServerIcon(file);
+		await servers.uploadServerIcon(file);
 		input.value = '';
 	}
 
 	async function handleRemoveIcon() {
-		await app.removeServerIcon();
+		await servers.removeServerIcon();
 	}
 
 	$effect(() => {
-		const server = app.servers.find((s) => s.serverId === app.selectedServerId);
+		const server = servers.servers.find((s) => s.serverId === servers.selectedServerId);
 		serverDescriptionEdit = server?.description ?? '';
 	});
 
 	async function saveDescription() {
-		await app.updateServerDescription(serverDescriptionEdit);
+		await servers.updateServerDescription(serverDescriptionEdit);
 	}
 </script>
 
@@ -71,31 +71,31 @@
 			<span class="label" id="server-icon-label">Server Icon</span>
 			<div class="icon-upload-area" role="group" aria-labelledby="server-icon-label">
 				<div class="icon-preview">
-					{#if app.selectedServerIconUrl}
+					{#if servers.selectedServerIconUrl}
 						<img
-							src={app.selectedServerIconUrl}
-							alt="{app.selectedServerName} icon"
+							src={servers.selectedServerIconUrl}
+							alt="{servers.selectedServerName} icon"
 							class="icon-image"
 						/>
 					{:else}
-						<span class="icon-placeholder">{app.selectedServerName.slice(0, 1).toUpperCase()}</span>
+						<span class="icon-placeholder">{servers.selectedServerName.slice(0, 1).toUpperCase()}</span>
 					{/if}
 				</div>
-				{#if app.canManageChannels}
+				{#if servers.canManageChannels}
 					<div class="icon-actions">
 						<button
 							type="button"
 							class="btn-primary"
-							disabled={app.isUploadingServerIcon}
+							disabled={servers.isUploadingServerIcon}
 							onclick={triggerIconUpload}
 						>
-							{app.isUploadingServerIcon ? 'Uploading…' : app.selectedServerIconUrl ? 'Change Icon' : 'Upload Icon'}
+							{servers.isUploadingServerIcon ? 'Uploading…' : servers.selectedServerIconUrl ? 'Change Icon' : 'Upload Icon'}
 						</button>
-						{#if app.selectedServerIconUrl}
+						{#if servers.selectedServerIconUrl}
 							<button
 								type="button"
 								class="btn-secondary"
-								disabled={app.isUploadingServerIcon}
+								disabled={servers.isUploadingServerIcon}
 								onclick={handleRemoveIcon}
 							>
 								Remove
@@ -123,7 +123,7 @@
 						class="input"
 						bind:value={serverNameEdit}
 						maxlength="100"
-						disabled={app.isUpdatingServerName}
+						disabled={servers.isUpdatingServerName}
 						onkeydown={(e) => {
 							if (e.key === 'Enter') saveServerName();
 							if (e.key === 'Escape') cancelEditingServerName();
@@ -138,15 +138,15 @@
 						<button
 							type="button"
 							class="btn-primary"
-							disabled={app.isUpdatingServerName || !serverNameEdit.trim()}
+							disabled={servers.isUpdatingServerName || !serverNameEdit.trim()}
 							onclick={() => saveServerName()}
 						>
-							{app.isUpdatingServerName ? 'Saving...' : 'Save'}
+							{servers.isUpdatingServerName ? 'Saving...' : 'Save'}
 						</button>
 						<button
 							type="button"
 							class="btn-secondary"
-							disabled={app.isUpdatingServerName}
+							disabled={servers.isUpdatingServerName}
 							onclick={cancelEditingServerName}
 						>
 							Cancel
@@ -155,8 +155,8 @@
 				</div>
 			{:else}
 				<div class="display-field">
-					<span class="field-value">{app.selectedServerName}</span>
-					{#if app.canManageChannels}
+					<span class="field-value">{servers.selectedServerName}</span>
+					{#if servers.canManageChannels}
 						<button type="button" class="btn-edit" onclick={startEditingServerName}>
 							Edit
 						</button>
@@ -165,7 +165,7 @@
 			{/if}
 		</div>
 
-		{#if app.canManageChannels}
+		{#if servers.canManageChannels}
 			<div class="form-group">
 				<label for="server-description" class="label">Server Description</label>
 				<textarea
@@ -185,15 +185,15 @@
 			</div>
 		{/if}
 
-		{#if app.canDeleteServer}
+		{#if servers.canDeleteServer}
 			<div class="danger-zone">
 				{#if confirmDeleteServer}
 					<p class="danger-warning">Are you sure? This will permanently delete the server and all its channels, messages, members, and invites.</p>
 					<div class="inline-actions">
-						<button type="button" class="btn-danger" disabled={app.isDeletingServer} onclick={handleDeleteServer}>
-							{app.isDeletingServer ? 'Deleting…' : 'Delete'}
+						<button type="button" class="btn-danger" disabled={servers.isDeletingServer} onclick={handleDeleteServer}>
+							{servers.isDeletingServer ? 'Deleting…' : 'Delete'}
 						</button>
-						<button type="button" class="btn-secondary" disabled={app.isDeletingServer} onclick={() => (confirmDeleteServer = false)}>Cancel</button>
+						<button type="button" class="btn-secondary" disabled={servers.isDeletingServer} onclick={() => (confirmDeleteServer = false)}>Cancel</button>
 					</div>
 				{:else}
 					<button type="button" class="btn-danger" onclick={() => (confirmDeleteServer = true)}>Delete Server</button>
