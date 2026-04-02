@@ -52,7 +52,6 @@ import {
 import {
 	initGoogleIdentity,
 	renderGoogleButton,
-	requestFreshToken,
 	consumeRedirectCredential
 } from '$lib/auth/google.js';
 import { PushNotificationManager } from '$lib/services/push-notifications.js';
@@ -424,14 +423,8 @@ export class AppState {
 
 		this.refreshPromise = (async () => {
 			try {
-				if (this.authType === 'local' || this.authType === 'github' || this.authType === 'discord') {
-					const success = await this.refreshAccessToken();
-					return success ? this.idToken : null;
-				}
-				const freshToken = await requestFreshToken();
-				this.idToken = freshToken;
-				persistToken(freshToken);
-				return freshToken;
+				const success = await this.refreshAccessToken();
+				return success ? this.idToken : null;
 			} catch {
 				await this.signOut();
 				return null;
@@ -498,21 +491,51 @@ export class AppState {
 		if (!isSessionExpired()) {
 			const stored = loadStoredToken();
 			if (stored && !isTokenExpired(stored)) {
-				this.handleCredential(stored);
-				return;
-			}
-			// For local/oauth auth, try refresh token
-			if (this.authType === 'local' || this.authType === 'github' || this.authType === 'discord') {
-				this.refreshAccessToken().then((success) => {
-					if (success && this.idToken) {
-						this.handleCredential(this.idToken);
-					} else {
-						this.isInitialLoading = false;
-						this.renderSignIn();
-					}
+				// Token still valid — restore session directly (skip token exchange)
+				this.idToken = stored;
+				this.status = 'Signed in';
+				this.isInitialLoading = true;
+
+				this.loadMe().then(async () => {
+					await Promise.all([
+						this.loadServers(),
+						this.loadFriends(),
+						this.loadFriendRequests(),
+						this.loadDmConversations(),
+						this.startSignalR()
+					]);
+					this.isInitialLoading = false;
+					this.showAlphaNotification = true;
+					this.checkPushSubscription();
+				}).catch(() => {
+					this.isInitialLoading = false;
+					this.renderSignIn();
 				});
 				return;
 			}
+			// Token expired — try refresh for all auth types
+			this.refreshAccessToken().then(async (success) => {
+				if (success && this.idToken) {
+					this.status = 'Signed in';
+					this.isInitialLoading = true;
+
+					await this.loadMe();
+					await Promise.all([
+						this.loadServers(),
+						this.loadFriends(),
+						this.loadFriendRequests(),
+						this.loadDmConversations(),
+						this.startSignalR()
+					]);
+					this.isInitialLoading = false;
+					this.showAlphaNotification = true;
+					this.checkPushSubscription();
+				} else {
+					this.isInitialLoading = false;
+					this.renderSignIn();
+				}
+			});
+			return;
 		}
 		clearStoredSession();
 		this.isInitialLoading = false;
@@ -527,50 +550,51 @@ export class AppState {
 	}
 
 	async handleCredential(token: string): Promise<void> {
-		this.idToken = token;
-		this.status = 'Signed in';
 		this.isInitialLoading = true;
-		persistToken(token);
 
-		// Load user profile first to ensure user is created and auto-joined to default server
-		await this.loadMe();
+		try {
+			const response = await this.api.googleSignIn(token);
 
-		// Check if local auth user needs email verification
-		if (this.authType === 'local' && this.me && !this.me.user.emailVerified) {
-			this.emailVerified = false;
+			// Account linking needed — user has an existing email/password account
+			if (response.needsLinking) {
+				this.needsLinking = true;
+				this.linkingEmail = response.email ?? '';
+				this.pendingGoogleCredential = token;
+				this.isInitialLoading = false;
+				return;
+			}
+
+			// Store backend-issued tokens
+			this.idToken = response.accessToken;
+			this.status = 'Signed in';
+			persistToken(response.accessToken);
+			persistRefreshToken(response.refreshToken);
+			setAuthType('google');
+			this.authType = 'google';
+
+			// New Google user needs to set a nickname
+			if (response.isNewUser) {
+				this.needsNickname = true;
+				this.isInitialLoading = false;
+				return;
+			}
+
+			await this.loadMe();
+
+			await Promise.all([
+				this.loadServers(),
+				this.loadFriends(),
+				this.loadFriendRequests(),
+				this.loadDmConversations(),
+				this.startSignalR()
+			]);
 			this.isInitialLoading = false;
-			return;
-		}
-
-		// Check if this Google sign-in needs account linking
-		if (this.me?.needsLinking) {
-			this.needsLinking = true;
-			this.linkingEmail = this.me.email ?? '';
-			this.pendingGoogleCredential = token;
+			this.showAlphaNotification = true;
+			this.checkPushSubscription();
+		} catch {
 			this.isInitialLoading = false;
-			return;
+			this.renderSignIn();
 		}
-
-		// Check if this is a new Google user who needs to set a nickname
-		if (this.me?.isNewUser) {
-			this.needsNickname = true;
-			this.isInitialLoading = false;
-			return;
-		}
-
-		// Then load all other data in parallel
-		await Promise.all([
-			this.loadServers(),
-			this.loadFriends(),
-			this.loadFriendRequests(),
-			this.loadDmConversations(),
-			this.startSignalR()
-		]);
-		this.isInitialLoading = false;
-		this.showAlphaNotification = true;
-
-		// Check push subscription status (non-blocking).
-		this.checkPushSubscription();
 	}
 
 	async register(email: string, password: string, nickname: string, recaptchaToken?: string): Promise<AuthResponse> {
