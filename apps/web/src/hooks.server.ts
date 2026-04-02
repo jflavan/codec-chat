@@ -11,15 +11,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// via svelte.config.js. Here we append the dynamic directives that depend on
 	// runtime environment variables.
 	const existing = response.headers.get('Content-Security-Policy') ?? '';
-	// Open Graph images can originate from any HTTPS domain, so we allow https:
-	// as a scheme-source. Specific CDNs are listed for documentation clarity, but
-	// https: already covers them.
 	const dynamicDirectives: Record<string, string> = {
 		'img-src': [
 			"'self'",
 			'data:',
 			'blob:',
-			'https:',
 			'https://lh3.googleusercontent.com',
 			'https://*.blob.core.windows.net',
 			'https://opengraph.githubassets.com',
@@ -50,7 +46,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-	response.headers.set('Permissions-Policy', 'microphone=(self), camera=(self)');
+	response.headers.set('Permissions-Policy', 'microphone=(self), camera=(self), geolocation=(), payment=(), usb=(), bluetooth=()');
+	response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
 	return response;
 };
