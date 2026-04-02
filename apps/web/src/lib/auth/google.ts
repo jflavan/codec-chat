@@ -57,6 +57,7 @@ export function initGoogleIdentity(
 			auto_select: opts?.autoSelect ?? true,
 			ux_mode: useRedirect ? 'redirect' : 'popup',
 			login_uri: loginUri,
+			log_level: 'none',
 			callback: (response: { credential: string }) => {
 				onCredential(response.credential);
 			}
@@ -76,7 +77,7 @@ export function initGoogleIdentity(
 				rendered = true;
 			}
 		}
-		if (rendered) {
+		if (rendered && opts?.autoSelect) {
 			google.accounts.id.prompt();
 		}
 	};
