@@ -5,8 +5,8 @@ This document tracks implemented and planned features for Codec.
 ## Implemented
 
 ### Authentication & Users
-- Google Sign-In with persistent sessions (1-week, `localStorage`)
-- Automatic silent token refresh via Google One Tap
+- Google Sign-In with backend token exchange (`POST /auth/google`) — Google ID tokens are exchanged for backend-issued JWTs with rotating refresh tokens, giving Google users the same reliable 7-day session persistence as all other auth methods
+- Automatic token refresh via `POST /auth/refresh` for all auth types (Google, email/password, GitHub, Discord, SAML)
 - Email/password registration and sign-in (bcrypt hashing, API-issued JWTs, rotating refresh tokens)
 - Nickname selection during sign-up for both email/password and Google flows
 - Account linking — email/password users can link a Google account after confirming their password

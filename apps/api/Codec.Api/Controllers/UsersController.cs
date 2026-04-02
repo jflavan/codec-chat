@@ -24,27 +24,6 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     [HttpGet("me")]
     public async Task<IActionResult> Me()
     {
-        var issuer = User.FindFirst("iss")?.Value;
-
-        // Check for account linking: Google sign-in where email matches an email/password account
-        if (issuer is "https://accounts.google.com" or "accounts.google.com")
-        {
-            var googleEmail = User.FindFirst("email")?.Value;
-            if (googleEmail is not null)
-            {
-                var existingByEmail = await db.Users.FirstOrDefaultAsync(
-                    u => u.Email == googleEmail.ToLowerInvariant() && u.GoogleSubject == null && u.PasswordHash != null);
-                if (existingByEmail is not null)
-                {
-                    return Ok(new
-                    {
-                        needsLinking = true,
-                        email = existingByEmail.Email
-                    });
-                }
-            }
-        }
-
         var (appUser, isNewUser) = await userService.GetOrCreateUserAsync(User);
         var claims = User.Claims.Select(claim => new { claim.Type, claim.Value });
         var effectiveAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;

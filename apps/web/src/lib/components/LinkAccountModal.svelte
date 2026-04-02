@@ -14,7 +14,7 @@
 		isSubmitting = true;
 		try {
 			const data = await app.linkGoogle(app.linkingEmail, password, app.pendingGoogleCredential);
-			await app.handleLocalAuth(data);
+			await app.handleLinkGoogleSuccess(data);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
 		} finally {

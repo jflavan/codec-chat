@@ -51,6 +51,10 @@ export function getAuthType(): AuthType {
 	return (localStorage.getItem(AUTH_TYPE_KEY) as AuthType) ?? 'google';
 }
 
+export function hasStoredAuthType(): boolean {
+	return localStorage.getItem(AUTH_TYPE_KEY) !== null;
+}
+
 export function setAuthType(type: AuthType): void {
 	localStorage.setItem(AUTH_TYPE_KEY, type);
 }

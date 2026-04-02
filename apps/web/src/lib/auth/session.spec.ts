@@ -7,6 +7,7 @@ import {
 	clearSession,
 	getAuthType,
 	setAuthType,
+	hasStoredAuthType,
 	persistRefreshToken,
 	loadStoredRefreshToken
 } from './session';
@@ -151,6 +152,21 @@ describe('getAuthType', () => {
 	it('returns stored auth type', () => {
 		localStorage.setItem('codec_auth_type', 'local');
 		expect(getAuthType()).toBe('local');
+	});
+});
+
+describe('hasStoredAuthType', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('returns false when no auth type stored', () => {
+		expect(hasStoredAuthType()).toBe(false);
+	});
+
+	it('returns true when auth type is stored', () => {
+		localStorage.setItem('codec_auth_type', 'google');
+		expect(hasStoredAuthType()).toBe(true);
 	});
 });
 

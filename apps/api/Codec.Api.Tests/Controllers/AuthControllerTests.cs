@@ -36,7 +36,8 @@ public class AuthControllerTests : IDisposable
                 ["Jwt:Issuer"] = "codec-api",
                 ["Jwt:Audience"] = "codec-api",
                 ["Jwt:ExpiryMinutes"] = "60",
-                ["Frontend:BaseUrl"] = "http://localhost:5174"
+                ["Frontend:BaseUrl"] = "http://localhost:5174",
+                ["Google:ClientId"] = "test-client-id"
             })
             .Build();
 
@@ -396,6 +397,22 @@ public class AuthControllerTests : IDisposable
     {
         var result = await _controller.VerifyEmail(new VerifyEmailRequest { Token = "bad-token" });
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+
+    // --- Google Sign-In ---
+
+    [Fact]
+    public async Task GoogleSignIn_InvalidCredential_ReturnsUnauthorized()
+    {
+        var result = await _controller.GoogleSignIn(new GoogleSignInRequest
+        {
+            Credential = "invalid-token"
+        });
+
+        var unauthorized = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
+        var body = unauthorized.Value as dynamic;
+        ((string)body!.error).Should().Contain("Invalid or expired Google credential");
     }
 
     // --- OAuth: GitHub Callback ---
@@ -897,6 +914,7 @@ public class AuthControllerTests : IDisposable
                 ["Jwt:Audience"] = "codec-api",
                 ["Jwt:ExpiryMinutes"] = "60",
                 ["Frontend:BaseUrl"] = "http://localhost:5174",
+                ["Google:ClientId"] = "test-client-id",
                 ["OAuth:GitHub:ClientId"] = "gh-client-id",
                 ["OAuth:Discord:ClientId"] = "dc-client-id"
             })

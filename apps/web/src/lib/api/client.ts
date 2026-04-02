@@ -141,6 +141,14 @@ export class ApiClient {
 		});
 	}
 
+	async googleSignIn(credential: string): Promise<AuthResponse> {
+		return this.requestNoRetry(`${this.baseUrl}/auth/google`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ credential })
+		});
+	}
+
 	async refreshToken(refreshToken: string): Promise<TokenRefreshResponse> {
 		return this.requestNoRetry(`${this.baseUrl}/auth/refresh`, {
 			method: 'POST',

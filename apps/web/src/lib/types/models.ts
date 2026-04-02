@@ -230,10 +230,13 @@ export type UserProfile = {
 	email?: string;
 };
 
-/** Response from POST /auth/register and POST /auth/login. */
+/** Response from POST /auth/register, POST /auth/login, and POST /auth/google. */
 export type AuthResponse = {
 	accessToken: string;
 	refreshToken: string;
+	isNewUser?: boolean;
+	needsLinking?: boolean;
+	email?: string;
 	user: {
 		id: string;
 		displayName: string;

@@ -1,7 +1,7 @@
 # Architecture
 
 ## Overview
-Codec is a modern Discord-like chat application built as a monorepo. The architecture follows a clean separation between the client and server, with Google Identity Services handling authentication through ID tokens.
+Codec is a modern Discord-like chat application built as a monorepo. The architecture follows a clean separation between the client and server. All authentication methods (Google Sign-In, email/password, GitHub OAuth, Discord OAuth, SAML 2.0 SSO) produce backend-issued JWTs with rotating refresh tokens.
 
 ### Technology Stack
 - **Frontend:** SvelteKit 2.x, TypeScript, Vite
@@ -249,20 +249,21 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
        │  3. Consent & Login   │                        │
        ├──────────────────────>│                        │
        │                       │                        │
-       │  4. ID Token (JWT)    │                        │
+       │  4. Google ID Token   │                        │
        │<──────────────────────┤                        │
        │                       │                        │
-       │  5. API Call + Bearer Token                    │
+       │  5. POST /auth/google { credential }           │
        ├───────────────────────────────────────────────>│
        │                       │                        │
-       │                       │  6. Validate Token     │
+       │                       │  6. Validate Google    │
+       │                       │     ID Token (JWKS)    │
        │                       │<───────────────────────┤
        │                       │                        │
-       │                       │  7. Token Valid        │
-       │                       ├───────────────────────>│
-       │                       │                        │
-       │  8. Response (JSON)                            │
+       │  7. { accessToken, refreshToken, user }        │
        │<───────────────────────────────────────────────┤
+       │                       │                        │
+       │  8. API calls + Bearer <accessToken>           │
+       ├───────────────────────────────────────────────>│
        │                       │                        │
        │  9. SignalR connect (/hubs/chat?access_token)  │
        ├───────────────────────────────────────────────>│
@@ -276,19 +277,19 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 1. User clicks "Sign in with Google" in the web client
 2. Google Identity Services displays authentication UI
 3. User consents and authenticates with Google
-4. Web client receives a JWT ID token
-5. Client sends API requests with `Authorization: Bearer <token>` header
-6. API validates the token against Google's JWKS endpoint
-7. API extracts user claims (subject, email, name, picture)
-8. API returns requested data or performs operations
+4. Web client receives a Google ID token
+5. Client sends the Google ID token to `POST /auth/google`
+6. API validates the Google ID token against Google's JWKS endpoint
+7. API issues a backend JWT access token (1-hour) and rotating refresh token (7-day)
+8. Client uses the backend JWT for all subsequent API requests
 
 **Key Points:**
-- Stateless authentication (no server-side sessions)
-- Tokens are short-lived (typically 1 hour)
-- API does not issue its own tokens
-- User identity mapped to internal User records via Google subject
-- Web client persists token in `localStorage` for session continuity (up to 1 week)
-- Automatic silent token refresh via Google One Tap (`auto_select: true`)
+- All auth methods (Google, email/password, GitHub, Discord, SAML) produce identical backend-issued JWTs (`iss` = `codec-api`)
+- Tokens are short-lived (1 hour); refresh tokens provide 7-day session persistence
+- User identity mapped to internal User records via Google subject (at token exchange time)
+- Web client persists backend tokens in `localStorage` for session continuity
+- Token refresh uses `POST /auth/refresh` for all auth types (no Google One Tap silent re-auth)
+- Google One Tap `auto_select` only enabled for returning Google users (prevents FedCM console errors)
 - SignalR WebSocket connections authenticate via `access_token` query parameter (standard pattern for WebSocket auth since `Authorization` headers aren't supported)
 
 **reCAPTCHA v3 Bot Protection:**
@@ -297,7 +298,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 - `RecaptchaService` sends the token to Google's reCAPTCHA Enterprise Assessment API and validates the score against a configurable threshold (default 0.5)
 - Fail-closed: if the Google API is unreachable or returns an error, the request is rejected (403)
 - Disabled by default in local development (`Recaptcha:Enabled = false` in `appsettings.json`); enabled in production when `Recaptcha:SiteKey` is configured (derived in Bicep)
-- Google Sign-In flow is unaffected (does not go through `AuthController`)
+- Google Sign-In flow uses `POST /auth/google` (separate from login/register, not reCAPTCHA-protected)
 
 **Account Lockout:**
 - After 5 consecutive failed login attempts, the account is locked for 15 minutes

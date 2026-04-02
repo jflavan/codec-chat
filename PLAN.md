@@ -29,7 +29,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Decisions
 - Web: SvelteKit
 - API: .NET 10
-- Auth: Two equivalent sign-in methods — (1) email/password with bcrypt hashing and API-issued JWTs, (2) Google Sign-In with Google-issued ID tokens validated by the API. Both flows require a nickname on first sign-up. Returning users sign in directly with either method. Email/password registrations require email verification before app access (24-hour token, SHA-256 hashed; `[RequireEmailVerified]` filter on data endpoints; Google users auto-verified).
+- Auth: Two equivalent sign-in methods — (1) email/password with bcrypt hashing and API-issued JWTs, (2) Google Sign-In with token exchange (`POST /auth/google` exchanges Google ID tokens for backend-issued JWTs with rotating refresh tokens). Both flows require a nickname on first sign-up. Returning users sign in directly with either method. All auth methods produce identical `codec-api`-issued tokens. Email/password registrations require email verification before app access (24-hour token, SHA-256 hashed; `[RequireEmailVerified]` filter on data endpoints; Google users auto-verified).
 - Layout: apps/web + apps/api + docs + .github
 - Package manager: npm
 - Data: PostgreSQL + EF Core (Npgsql); Azure Database for PostgreSQL Flexible Server in production
