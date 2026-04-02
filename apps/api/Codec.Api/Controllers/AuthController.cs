@@ -363,7 +363,7 @@ public class AuthController(
             user.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
-        catch (SecurityTokenException)
+        catch (Exception ex) when (ex is SecurityTokenException or ArgumentException)
         {
             return BadRequest(new { error = "Invalid or expired Google credential." });
         }
@@ -425,7 +425,7 @@ public class AuthController(
             if (string.IsNullOrWhiteSpace(googleSubject))
                 return BadRequest(new { error = "Invalid Google credential." });
         }
-        catch (SecurityTokenException)
+        catch (Exception ex) when (ex is SecurityTokenException or ArgumentException)
         {
             return Unauthorized(new { error = "Invalid or expired Google credential." });
         }
