@@ -252,7 +252,7 @@ Required GitHub Actions secrets: `VOICE_VM_HOST`, `VOICE_VM_SSH_KEY`, `VOICE_SFU
 | File | Description |
 |------|-------------|
 | `src/lib/services/voice-service.ts` | `VoiceService` class — mediasoup-client lifecycle (join, consume, mute, leave) |
-| `src/lib/state/app-state.svelte.ts` | Voice state (`voiceChannelId`, `voiceMembers`, `isMuted`) and actions |
+| `src/lib/state/voice-store.svelte.ts` | VoiceStore: voice state (`voiceChannelId`, `voiceMembers`, `isMuted`) and actions |
 | `src/lib/services/chat-hub.ts` | SignalR hub methods and events for voice (`joinVoiceChannel`, `leaveVoiceChannel`, etc.) |
 | `src/lib/components/channel-sidebar/VoiceChannel.svelte` | Voice channel row with participant list and join/leave |
 | `src/lib/components/voice/VoiceControls.svelte` | Mute/deafen controls shown while in a voice channel |
@@ -260,7 +260,7 @@ Required GitHub Actions secrets: `VOICE_VM_HOST`, `VOICE_VM_SSH_KEY`, `VOICE_SFU
 
 ### Join Flow
 
-1. User clicks a voice channel row — `AppState.joinVoice(channelId)` is called
+1. User clicks a voice channel row — `VoiceStore.joinVoiceChannel(channelId)` is called
 2. `VoiceService.join()` requests microphone access via `navigator.mediaDevices.getUserMedia` (throws immediately if denied — before any network work)
 3. `hub.joinVoiceChannel(channelId)` is called over SignalR; the API creates a `VoiceState` record, creates SFU room/transports, and returns capabilities + transport options + existing member list
 4. The mediasoup `Device` is loaded with `routerRtpCapabilities`
@@ -420,12 +420,12 @@ Added to `DirectMessage` entity. System messages with `MessageType = VoiceCallEv
 | `src/lib/components/voice/IncomingCallOverlay.svelte` | Full-screen incoming call modal with ring tone (Web Audio API oscillator) |
 | `src/lib/components/voice/DmCallHeader.svelte` | Compact header bar during active calls (elapsed time, mute/deafen, end) |
 | `src/lib/components/dm/DmChatArea.svelte` | Call button in DM header; system message rendering for voice call events |
-| `src/lib/state/app-state.svelte.ts` | `activeCall` and `incomingCall` state; call lifecycle methods |
+| `src/lib/state/voice-store.svelte.ts` | VoiceStore: `activeCall` and `incomingCall` state; call lifecycle methods |
 | `src/lib/services/voice-service.ts` | `joinWithOptions()` for connecting to calls with pre-fetched transport options |
 
 #### Call Flow (Caller)
 
-1. User clicks phone icon in DM header — `AppState.startCall(dmChannelId)` is called
+1. User clicks phone icon in DM header — `VoiceStore.startCall(dmChannelId)` is called
 2. `hub.startCall(dmChannelId)` sends SignalR request; API creates `VoiceCall` record (Ringing)
 3. Caller sees `DmCallHeader` with "Calling..." status
 4. On `CallAccepted` event: `VoiceService.joinWithOptions()` connects to SFU with transport options

@@ -13,7 +13,7 @@ src/
 │   ├── api/             # Typed HTTP client (ApiClient class)
 │   ├── auth/            # Token persistence (localStorage) & Google Identity Services
 │   ├── services/        # SignalR hub connection lifecycle (ChatHubService)
-│   ├── state/           # Central reactive state (AppState with $state/$derived runes)
+│   ├── state/           # Domain-specific reactive stores (UIStore, AuthStore, ServerStore, etc.)
 │   ├── styles/          # CSS design tokens & global base styles
 │   ├── utils/           # Pure utility functions (date formatting, etc.)
 │   ├── components/      # Presentational Svelte 5 components grouped by feature
@@ -33,11 +33,11 @@ src/
 
 ### Key patterns
 
-- **State management:** A single `AppState` class uses Svelte 5 `$state` and `$derived` runes. It is created in `+page.svelte` via `createAppState()` and injected into the component tree through `setContext()` / `getContext()`.
+- **State management:** State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`, `ServerStore`, `ChannelStore`). Each store is created once in `+page.svelte` via its `create*Store()` factory and injected into the component tree with `setContext()`. Child components retrieve only the stores they need via `get*Store()` helpers. Cross-store orchestration lives in `navigation.svelte.ts` and `signalr.svelte.ts`.
 - **API client:** `ApiClient` provides typed methods for every REST endpoint, with `encodeURIComponent` on path parameters and a custom `ApiError` class.
 - **Auth module:** `session.ts` handles token persistence, expiration checks, and 1-week session enforcement. `google.ts` wraps Google Identity Services initialization.
 - **SignalR service:** `ChatHubService` manages the WebSocket connection lifecycle, channel join/leave, and typing indicator events.
-- **Components:** Small, focused Svelte 5 components using `$props()` or `getAppState()` for data. Feature-grouped directories keep related files together.
+- **Components:** Small, focused Svelte 5 components using `$props()` or `get*Store()` helpers for data. Feature-grouped directories keep related files together.
 
 For full architectural details, see [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
 

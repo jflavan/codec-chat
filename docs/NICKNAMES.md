@@ -61,7 +61,7 @@ Nickname (if not null and not empty)
 
 This resolution is performed:
 - **Server-side:** In `UserService` when building user profile responses and when snapshotting `AuthorName` on new messages
-- **Client-side:** In `AppState` when displaying the current user's name in the User Panel
+- **Client-side:** In `AuthStore` when displaying the current user's name in the User Panel
 
 ### Schema Change
 
@@ -325,7 +325,7 @@ ALTER TABLE Users ADD COLUMN Nickname TEXT NULL;
 ### Web
 - [x] Add `nickname` and `effectiveDisplayName` fields to the `UserProfile` type in `models.ts`
 - [x] Add `setNickname(nickname: string)` and `removeNickname()` methods to `ApiClient`
-- [x] Update `AppState` to expose `effectiveDisplayName` derived from the `me` profile
+- [x] Update `AuthStore` to expose `effectiveDisplayName` derived from the `me` profile
 - [x] Update `UserPanel.svelte` to display `effectiveDisplayName`
 - [x] Wire nickname input in `ProfileSettings.svelte` to the nickname API endpoints (see [USER_SETTINGS.md](USER_SETTINGS.md))
 - [x] Update typing indicator to use `effectiveDisplayName` when broadcasting

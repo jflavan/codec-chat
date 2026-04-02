@@ -385,7 +385,7 @@ export type DirectMessage = {
 
 ### State Management
 
-In `AppState`:
+In `MessageStore` (for channel messages) and `DmStore` (for DM messages):
 
 ```typescript
 // New reactive state for the reply-in-progress
@@ -451,14 +451,14 @@ type ReplyComposerBarProps = {
 - If `message.replyContext` is non-null, render `<ReplyReference>` above the message body
 - Add a **Reply** button to the floating action bar on message hover (alongside existing reaction button)
   - Icon: ↩ reply arrow
-  - Clicking it calls `appState.startReply(message.id, message.authorName, bodyPreview)`
+  - Clicking it calls `messageStore.startReply(message.id, message.authorName, bodyPreview)`
 - A thin connecting line (2px, `--text-muted` at 30% opacity) extends from the `ReplyReference` down to the message body, similar to Discord's visual treatment
 
 ### Updated Component: `Composer.svelte`
 
-- When `appState.replyingTo` is non-null, render `<ReplyComposerBar>` above the input field
-- Pass `appState.replyingTo.messageId` to the API call when sending the message
-- Clear `appState.replyingTo` after successful send
+- When `messageStore.replyingTo` is non-null, render `<ReplyComposerBar>` above the input field
+- Pass `messageStore.replyingTo.messageId` to the API call when sending the message
+- Clear `messageStore.replyingTo` after successful send
 
 ### Updated Component: `DmChatArea.svelte`
 
@@ -628,7 +628,7 @@ The existing floating action bar on message hover currently shows an emoji react
 
 - **Prerequisite:** Existing messaging system (server channels and DMs)
 - **Impacts:** `MessageItem.svelte`, `Composer.svelte`, `DmChatArea.svelte`, `MessageFeed.svelte`
-- **Reuses:** Existing floating action bar on message hover, `AppState` pattern, `ApiClient` methods
+- **Reuses:** Existing floating action bar on message hover, domain store pattern, `ApiClient` methods
 - **Related:** Message editing/deletion (future) — deleting a message must handle `ON DELETE SET NULL` for replies; @-mentions (implemented) — replies can optionally include a mention of the original author
 
 ## Migration Plan
@@ -685,9 +685,9 @@ CREATE INDEX IX_DirectMessage_ReplyToDirectMessageId ON DirectMessages(ReplyToDi
 - [ ] Update `sendDm()` in `ApiClient` to accept optional `replyToDirectMessageId` parameter
 
 ### Web — State management
-- [ ] Add `replyingTo` reactive state to `AppState` (per-channel/DM context)
-- [ ] Add `startReply(messageId, authorName, bodyPreview)` method to `AppState`
-- [ ] Add `cancelReply()` method to `AppState`
+- [ ] Add `replyingTo` reactive state to `MessageStore` and `DmStore` (per-channel/DM context)
+- [ ] Add `startReply(messageId, authorName, bodyPreview)` method to `MessageStore` and `DmStore`
+- [ ] Add `cancelReply()` method to `MessageStore` and `DmStore`
 - [ ] Clear `replyingTo` on channel/DM switch and after successful send
 
 ### Web — UI components
