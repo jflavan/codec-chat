@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 
 	const MAX_LEN = 32;
 	const MIN_LEN = 2;
 
-	let nickname = $state(app.me?.user.displayName ?? '');
+	let nickname = $state(auth.me?.user.displayName ?? '');
 	let isSubmitting = $state(false);
 	let error = $state('');
 
@@ -19,7 +19,7 @@
 		error = '';
 		isSubmitting = true;
 		try {
-			await app.confirmNickname(trimmed);
+			await auth.confirmNickname(trimmed);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
 		} finally {

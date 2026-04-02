@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 	import { validateState } from '$lib/auth/oauth.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 	let error = $state('');
 
 	onMount(async () => {
@@ -23,7 +23,7 @@
 		}
 
 		try {
-			await app.handleOAuthCallback('github', code);
+			await auth.handleOAuthCallback('github', code);
 			// Navigate to app root
 			window.history.replaceState({}, '', '/');
 		} catch (err: unknown) {

@@ -1,12 +1,18 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import type { Member } from '$lib/types/index.js';
 	import ReplyComposerBar from './ReplyComposerBar.svelte';
 	import ComposerOverlay from './ComposerOverlay.svelte';
 	import EmojiPicker from './EmojiPicker.svelte';
 	import { recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 
-	const app = getAppState();
+	const ui = getUIStore();
+	const servers = getServerStore();
+	const channelStore = getChannelStore();
+	const msgStore = getMessageStore();
 	let inputEl: HTMLTextAreaElement;
 	let fileInputEl: HTMLInputElement;
 	let overlayEl: HTMLDivElement;
@@ -28,8 +34,8 @@
 		const q = mentionQuery.toLowerCase();
 		const members =
 			mentionQuery.length === 0
-				? app.members
-				: app.members.filter((m) => m.displayName.toLowerCase().includes(q));
+				? servers.members
+				: servers.members.filter((m) => m.displayName.toLowerCase().includes(q));
 		const showHere = 'here'.includes(q);
 		return showHere ? [hereMember, ...members] : members;
 	});
@@ -61,13 +67,13 @@
 	}
 
 	function insertMention(member: Member): void {
-		const value = app.messageBody;
+		const value = msgStore.messageBody;
 		const before = value.slice(0, mentionStartIndex);
 		const afterCursor = value.slice(mentionStartIndex + 1 + mentionQuery.length);
-		app.messageBody = `${before}@${member.displayName} ${afterCursor}`;
+		msgStore.messageBody = `${before}@${member.displayName} ${afterCursor}`;
 		// @here is resolved as a keyword, not via pendingMentions
 		if (member.userId !== 'here') {
-			app.pendingMentions.set(member.displayName, member.userId);
+			msgStore.pendingMentions.set(member.displayName, member.userId);
 		}
 		showMentionPicker = false;
 		mentionQuery = '';
@@ -77,11 +83,11 @@
 	function handleEmojiInsert(emoji: string) {
 		recordEmojiUse(emoji);
 		if (!inputEl) return;
-		const start = inputEl.selectionStart ?? app.messageBody.length;
+		const start = inputEl.selectionStart ?? msgStore.messageBody.length;
 		const end = inputEl.selectionEnd ?? start;
-		const before = app.messageBody.slice(0, start);
-		const after = app.messageBody.slice(end);
-		app.messageBody = before + emoji + after;
+		const before = msgStore.messageBody.slice(0, start);
+		const after = msgStore.messageBody.slice(end);
+		msgStore.messageBody = before + emoji + after;
 		// Set cursor position after inserted emoji
 		const newPos = start + emoji.length;
 		requestAnimationFrame(() => {
@@ -111,8 +117,8 @@
 
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			if (app.messageBody.trim() || app.pendingImage || app.pendingFile) {
-				app.sendMessage();
+			if (msgStore.messageBody.trim() || msgStore.pendingImage || msgStore.pendingFile) {
+				msgStore.sendMessage();
 				requestAnimationFrame(() => autoResize());
 			}
 			return;
@@ -122,22 +128,22 @@
 			requestAnimationFrame(() => autoResize());
 		}
 
-		if (e.key === 'Escape' && app.replyingTo?.context === 'channel') {
+		if (e.key === 'Escape' && msgStore.replyingTo?.context === 'channel') {
 			e.preventDefault();
-			app.cancelReply();
+			msgStore.cancelReply();
 		}
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		if (showMentionPicker) return;
-		await app.sendMessage();
+		await msgStore.sendMessage();
 		requestAnimationFrame(() => autoResize());
 		inputEl?.focus();
 	}
 
 	function handleInput(): void {
-		app.handleComposerInput();
+		msgStore.handleComposerInput();
 		detectMentionTrigger();
 		autoResize();
 		syncOverlayScroll();
@@ -168,9 +174,9 @@
 		const file = input.files?.[0];
 		if (file) {
 			if (file.type.startsWith('image/')) {
-				app.attachImage(file);
+				msgStore.attachImage(file);
 			} else {
-				app.attachFile(file);
+				msgStore.attachFile(file);
 			}
 		}
 		input.value = '';
@@ -188,7 +194,7 @@
 				e.preventDefault();
 				const file = item.getAsFile();
 				if (file) {
-					app.attachImage(file);
+					msgStore.attachImage(file);
 				}
 				return;
 			}
@@ -197,13 +203,13 @@
 </script>
 
 <form class="composer" onsubmit={handleSubmit}>
-	{#if app.pendingImagePreview}
+	{#if msgStore.pendingImagePreview}
 		<div class="image-preview">
-			<img src={app.pendingImagePreview} alt="Attachment preview" class="preview-thumb" />
+			<img src={msgStore.pendingImagePreview} alt="Attachment preview" class="preview-thumb" />
 			<button
 				type="button"
 				class="remove-preview"
-				onclick={() => app.clearPendingImage()}
+				onclick={() => msgStore.clearPendingImage()}
 				aria-label="Remove image"
 			>
 				<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -212,14 +218,14 @@
 			</button>
 		</div>
 	{/if}
-	{#if app.pendingFile}
+	{#if msgStore.pendingFile}
 		<div class="file-preview">
 			<svg class="file-preview-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h7v5h5v11H6z"/></svg>
-			<span class="file-preview-name">{app.pendingFile.name}</span>
+			<span class="file-preview-name">{msgStore.pendingFile.name}</span>
 			<button
 				type="button"
 				class="remove-preview"
-				onclick={() => app.clearPendingFile()}
+				onclick={() => msgStore.clearPendingFile()}
 				aria-label="Remove file"
 			>
 				<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -257,11 +263,11 @@
 		</ul>
 	{/if}
 
-	{#if app.replyingTo?.context === 'channel'}
-		<ReplyComposerBar authorName={app.replyingTo.authorName} bodyPreview={app.replyingTo.bodyPreview} onCancel={() => app.cancelReply()} />
+	{#if msgStore.replyingTo?.context === 'channel'}
+		<ReplyComposerBar authorName={msgStore.replyingTo.authorName} bodyPreview={msgStore.replyingTo.bodyPreview} onCancel={() => msgStore.cancelReply()} />
 	{/if}
 
-	{#if !app.isHubConnected}
+	{#if !ui.isHubConnected}
 		<div class="composer-row">
 			<div class="composer-input-wrapper composer-disconnected">
 				<span class="connecting-message" aria-live="polite">Codec connecting<span class="animated-ellipsis"></span></span>
@@ -274,7 +280,7 @@
 				class="composer-attach"
 				type="button"
 				onclick={() => fileInputEl?.click()}
-				disabled={!app.selectedChannelId || app.isSending}
+				disabled={!channelStore.selectedChannelId || msgStore.isSending}
 				aria-label="Attach file"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -282,16 +288,16 @@
 				</svg>
 			</button>
 			<div class="composer-input-wrapper">
-				<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={app.messageBody} customEmojis={app.customEmojis} /></div>
+				<div class="composer-input-overlay" bind:this={overlayEl} aria-hidden="true"><ComposerOverlay text={msgStore.messageBody} customEmojis={servers.customEmojis} /></div>
 				<textarea
 					bind:this={inputEl}
 					class="composer-input"
 					rows="1"
 					inputmode="text"
 					autocomplete="off"
-					placeholder={app.selectedChannelName ? `Message #${app.selectedChannelName}` : 'Select a channel…'}
-					bind:value={app.messageBody}
-					disabled={!app.selectedChannelId || app.isSending}
+					placeholder={channelStore.selectedChannelName ? `Message #${channelStore.selectedChannelName}` : 'Select a channel…'}
+					bind:value={msgStore.messageBody}
+					disabled={!channelStore.selectedChannelId || msgStore.isSending}
 					oninput={handleInput}
 					onkeydown={handleKeydown}
 					onscroll={syncOverlayScroll}
@@ -302,7 +308,7 @@
 				class="composer-emoji"
 				type="button"
 				onclick={() => (showEmojiPicker = !showEmojiPicker)}
-				disabled={!app.selectedChannelId || app.isSending}
+				disabled={!channelStore.selectedChannelId || msgStore.isSending}
 				aria-label="Add emoji"
 				title="Add emoji"
 			>
@@ -313,7 +319,7 @@
 			<button
 				class="composer-send"
 				type="submit"
-				disabled={!app.selectedChannelId || (!app.messageBody.trim() && !app.pendingImage && !app.pendingFile) || app.isSending}
+				disabled={!channelStore.selectedChannelId || (!msgStore.messageBody.trim() && !msgStore.pendingImage && !msgStore.pendingFile) || msgStore.isSending}
 				aria-label="Send message"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -327,7 +333,7 @@
 					mode="insert"
 					onSelect={handleEmojiInsert}
 					onClose={() => { showEmojiPicker = false; }}
-					customEmojis={app.customEmojis}
+					customEmojis={servers.customEmojis}
 				/>
 			</div>
 		{/if}

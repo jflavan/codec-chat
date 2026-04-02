@@ -1,26 +1,28 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
 </script>
 
 <div class="account-settings" role="tabpanel" aria-labelledby="tab-account">
 	<h2 class="section-title">My Account</h2>
 
-	{#if app.me}
+	{#if auth.me}
 		<div class="info-grid">
 			<div class="info-row">
 				<span class="info-label">Email</span>
-				<span class="info-value">{app.me.user.email ?? '—'}</span>
+				<span class="info-value">{auth.me.user.email ?? '—'}</span>
 			</div>
 			<div class="info-row">
 				<span class="info-label">Google Display Name</span>
-				<span class="info-value">{app.me.user.displayName}</span>
+				<span class="info-value">{auth.me.user.displayName}</span>
 			</div>
 		</div>
 
 		<div class="sign-out-section">
-			<button class="sign-out-btn" onclick={() => { app.closeSettings(); app.signOut(); }}>
+			<button class="sign-out-btn" onclick={() => { ui.closeSettings(); auth.signOut(); }}>
 				Sign Out
 			</button>
 		</div>

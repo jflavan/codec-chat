@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import SearchResultItem from './SearchResultItem.svelte';
 	import SearchFilterBar from './SearchFilterBar.svelte';
 
 	let { isDm = false }: { isDm?: boolean } = $props();
 
-	const app = getAppState();
+	const messages = getMessageStore();
 
 	let inputValue = $state('');
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -20,12 +20,12 @@
 		if (debounceTimer) clearTimeout(debounceTimer);
 
 		if (inputValue.trim().length < 2) {
-			app.searchQuery = inputValue;
+			messages.searchQuery = inputValue;
 			return;
 		}
 
 		debounceTimer = setTimeout(() => {
-			app.searchMessages(inputValue, app.searchFilters);
+			messages.searchMessages(inputValue, messages.searchFilters);
 		}, 300);
 	}
 
@@ -33,24 +33,24 @@
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			e.stopPropagation();
-			app.toggleSearch();
+			messages.toggleSearch();
 		}
 	}
 
 	function handleJump(messageId: string, channelId: string, isDm: boolean): void {
-		app.jumpToMessage(messageId, channelId, isDm);
+		messages.jumpToMessage(messageId, channelId, isDm);
 	}
 
 	const totalPages = $derived(
-		app.searchResults
-			? Math.max(1, Math.ceil(app.searchResults.totalCount / app.searchResults.pageSize))
+		messages.searchResults
+			? Math.max(1, Math.ceil(messages.searchResults.totalCount / messages.searchResults.pageSize))
 			: 1
 	);
 
-	const currentPage = $derived(app.searchResults?.page ?? 1);
+	const currentPage = $derived(messages.searchResults?.page ?? 1);
 
-	const hasSearched = $derived(app.searchQuery.trim().length >= 2 && !app.isSearching);
-	const noResults = $derived(hasSearched && app.searchResults !== null && app.searchResults.results.length === 0);
+	const hasSearched = $derived(messages.searchQuery.trim().length >= 2 && !messages.isSearching);
+	const noResults = $derived(hasSearched && messages.searchResults !== null && messages.searchResults.results.length === 0);
 </script>
 
 <aside class="search-panel" aria-label="Search messages">
@@ -58,7 +58,7 @@
 		<h2 class="search-title">Search</h2>
 		<button
 			class="search-close"
-			onclick={() => app.toggleSearch()}
+			onclick={() => messages.toggleSearch()}
 			type="button"
 			aria-label="Close search"
 		>
@@ -86,15 +86,15 @@
 	<SearchFilterBar {isDm} />
 
 	<div class="search-results">
-		{#if app.isSearching}
+		{#if messages.isSearching}
 			<p class="search-status">Searching...</p>
 		{:else if noResults}
 			<p class="search-status">No results found.</p>
-		{:else if app.searchResults && app.searchResults.results.length > 0}
-			<p class="results-count">{app.searchResults.totalCount} result{app.searchResults.totalCount === 1 ? '' : 's'}</p>
+		{:else if messages.searchResults && messages.searchResults.results.length > 0}
+			<p class="results-count">{messages.searchResults.totalCount} result{messages.searchResults.totalCount === 1 ? '' : 's'}</p>
 			<div class="results-list">
-				{#each app.searchResults.results as result (result.id)}
-					<SearchResultItem {result} query={app.searchQuery} onJump={handleJump} />
+				{#each messages.searchResults.results as result (result.id)}
+					<SearchResultItem {result} query={messages.searchQuery} onJump={handleJump} />
 				{/each}
 			</div>
 
@@ -103,7 +103,7 @@
 					<button
 						class="page-btn"
 						disabled={currentPage <= 1}
-						onclick={() => app.searchPage(currentPage - 1)}
+						onclick={() => messages.searchPage(currentPage - 1)}
 						type="button"
 						aria-label="Previous page"
 					>
@@ -115,7 +115,7 @@
 					<button
 						class="page-btn"
 						disabled={currentPage >= totalPages}
-						onclick={() => app.searchPage(currentPage + 1)}
+						onclick={() => messages.searchPage(currentPage + 1)}
 						type="button"
 						aria-label="Next page"
 					>
@@ -125,9 +125,9 @@
 					</button>
 				</div>
 			{/if}
-		{:else if app.searchQuery.trim().length < 2 && app.searchQuery.length > 0}
+		{:else if messages.searchQuery.trim().length < 2 && messages.searchQuery.length > 0}
 			<p class="search-status">Type at least 2 characters to search.</p>
-		{:else if app.searchQuery.length === 0}
+		{:else if messages.searchQuery.length === 0}
 			<p class="search-status search-hint">Search messages in {isDm ? 'this conversation' : 'this channel'}</p>
 		{/if}
 	</div>

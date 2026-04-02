@@ -5,7 +5,7 @@
 	import { getFrequentEmojis, recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 	import { isNearScrollTop } from '$lib/utils/dom.js';
 	import { CUSTOM_EMOJI_EXACT_REGEX } from '$lib/utils/emoji-regex.js';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
 	let {
 		isOwnMessage,
@@ -33,7 +33,7 @@
 		isReactionPending?: (emoji: string) => boolean;
 	} = $props();
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	let showPicker = $state(false);
 	let showFullPicker = $state(false);
@@ -46,7 +46,7 @@
 
 	const quickEmojis = getFrequentEmojis(8);
 
-	const customEmojiMap = $derived(new Map(app.customEmojis.map((e) => [e.name.toLowerCase(), e])));
+	const customEmojiMap = $derived(new Map(servers.customEmojis.map((e) => [e.name.toLowerCase(), e])));
 
 	function getCustomEmoji(emoji: string): CustomEmoji | undefined {
 		const match = CUSTOM_EMOJI_EXACT_REGEX.exec(emoji);
@@ -192,7 +192,7 @@
 			mode="reaction"
 			onSelect={handleReact}
 			onClose={() => { showFullPicker = false; }}
-			customEmojis={app.customEmojis}
+			customEmojis={servers.customEmojis}
 			flipped={isFlipped}
 		/>
 	{/if}

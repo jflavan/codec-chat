@@ -421,7 +421,7 @@ A single EF Core migration (`AddDirectMessages`) will:
 - [ ] Add `DmChannel`, `DmConversation`, and `DirectMessage` types to `models.ts`
 - [ ] Add DM-related API methods to `ApiClient`
 - [ ] Add DM-related SignalR event handlers to `ChatHubService`
-- [ ] Add DM state management to `AppState` (conversations list, active conversation, messages)
+- [ ] Add DM state management to `DmStore` (conversations list, active conversation, messages)
 - [ ] Create `DmList.svelte` component (conversation sidebar entries)
 - [ ] Create `DmChatArea.svelte` wrapper (adapts `ChatArea` components for DM context)
 - [ ] Wire Home icon navigation to show DM list + Friends panel

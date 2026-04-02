@@ -418,7 +418,7 @@ type LinkPreviewCardProps = {
 
 ### State Management
 
-In `AppState`:
+In `MessageStore` / `DmStore`:
 - `onLinkPreviewsReady` callback updates the matching message's `linkPreviews` array in-place
 - Messages initially arrive with `linkPreviews: []` and are patched when the `LinkPreviewsReady` event fires
 - No separate state is needed — previews are stored directly on the message objects
@@ -604,7 +604,7 @@ A single EF Core migration (`AddLinkPreviews`) will:
 
 ### Web — SignalR & state
 - [x] Add `LinkPreviewsReady` event handler to `ChatHubService`
-- [x] Add `onLinkPreviewsReady` callback in `AppState.startSignalR()` to patch messages in-place
+- [x] Add `onLinkPreviewsReady` callback in SignalR orchestration (`signalr.svelte.ts`) to patch messages in-place
 - [x] Ensure newly received messages initialize with `linkPreviews: []`
 
 ### Web — UI components

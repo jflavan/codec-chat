@@ -1,8 +1,12 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
 	import { Permission, hasPermission, type ChannelPermissionOverride } from '$lib/types/models.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const servers = getServerStore();
+	const channelStore = getChannelStore();
 
 	let { channelId }: { channelId: string } = $props();
 
@@ -23,7 +27,7 @@
 		isLoading = true;
 		errorMessage = null;
 		try {
-			overrides = await app.getChannelOverrides(channelId);
+			overrides = await channelStore.getChannelOverrides(channelId);
 		} catch {
 			overrides = [];
 			errorMessage = 'Failed to load permission overrides. You may not have permission to manage this channel.';
@@ -70,7 +74,7 @@
 	}
 
 	async function setPermissionState(flag: number, targetState: 'allow' | 'neutral' | 'deny'): Promise<void> {
-		if (!selectedRoleId || !app.idToken || isSaving) return;
+		if (!selectedRoleId || !auth.idToken || isSaving) return;
 
 		// Compute new allow/deny bitmasks
 		let newAllow = clearBit(currentAllow, flag);
@@ -86,11 +90,11 @@
 		try {
 			if (newAllow === 0 && newDeny === 0) {
 				// No overrides remain — delete the row
-				await app.deleteChannelOverride(channelId, selectedRoleId);
+				await channelStore.deleteChannelOverride(channelId, selectedRoleId);
 				overrides = overrides.filter((o) => o.roleId !== selectedRoleId);
 			} else {
-				await app.setChannelOverride(channelId, selectedRoleId, newAllow, newDeny);
-				const role = app.serverRoles.find((r) => r.id === selectedRoleId);
+				await channelStore.setChannelOverride(channelId, selectedRoleId, newAllow, newDeny);
+				const role = servers.serverRoles.find((r) => r.id === selectedRoleId);
 				const updated: ChannelPermissionOverride = {
 					channelId,
 					roleId: selectedRoleId,
@@ -163,11 +167,11 @@
 		<!-- Role list -->
 		<aside class="role-sidebar">
 			<h4 class="sidebar-title">Roles</h4>
-			{#if app.isLoadingRoles}
+			{#if servers.isLoadingRoles}
 				<p class="loading-text">Loading roles…</p>
 			{:else}
 				<ul class="role-list" role="list">
-					{#each app.serverRoles as role (role.id)}
+					{#each servers.serverRoles as role (role.id)}
 						{@const hasOverride = overrides.some((o) => o.roleId === role.id)}
 						<li>
 							<button
@@ -196,7 +200,7 @@
 			{:else if isLoading}
 				<p class="loading-text">Loading overrides…</p>
 			{:else}
-				{@const role = app.serverRoles.find((r) => r.id === selectedRoleId)}
+				{@const role = servers.serverRoles.find((r) => r.id === selectedRoleId)}
 				<h4 class="editor-title">
 					{role?.name ?? 'Role'} — Channel Overrides
 				</h4>

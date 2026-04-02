@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 	import type { AuditLogEntry } from '$lib/types/index.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	$effect(() => {
-		if (app.selectedServerId) {
-			app.loadAuditLog();
+		if (servers.selectedServerId) {
+			servers.loadAuditLog();
 		}
 	});
 
@@ -62,8 +62,8 @@
 	function handleScroll() {
 		if (!scrollEl) return;
 		const { scrollTop, scrollHeight, clientHeight } = scrollEl;
-		if (scrollHeight - scrollTop - clientHeight < 120 && app.hasMoreAuditLog && !app.isLoadingAuditLog) {
-			app.loadOlderAuditLog();
+		if (scrollHeight - scrollTop - clientHeight < 120 && servers.hasMoreAuditLog && !servers.isLoadingAuditLog) {
+			servers.loadOlderAuditLog();
 		}
 	}
 </script>
@@ -71,13 +71,13 @@
 <div class="server-audit-log">
 	<h1 class="settings-title">Audit Log</h1>
 
-	{#if app.isLoadingAuditLog && app.auditLogEntries.length === 0}
+	{#if servers.isLoadingAuditLog && servers.auditLogEntries.length === 0}
 		<p class="muted centered">Loading…</p>
-	{:else if app.auditLogEntries.length === 0}
+	{:else if servers.auditLogEntries.length === 0}
 		<p class="muted centered">No audit log entries.</p>
 	{:else}
 		<div class="log-list" bind:this={scrollEl} onscroll={handleScroll}>
-			{#each app.auditLogEntries as entry (entry.id)}
+			{#each servers.auditLogEntries as entry (entry.id)}
 				<div class="log-entry">
 					<div class="actor-avatar">
 						{#if entry.actorAvatarUrl}
@@ -95,9 +95,9 @@
 					</span>
 				</div>
 			{/each}
-			{#if app.isLoadingAuditLog}
+			{#if servers.isLoadingAuditLog}
 				<div class="loading-more">Loading more…</div>
-			{:else if !app.hasMoreAuditLog && app.auditLogEntries.length > 0}
+			{:else if !servers.hasMoreAuditLog && servers.auditLogEntries.length > 0}
 				<div class="end-marker muted">End of audit log</div>
 			{/if}
 		</div>

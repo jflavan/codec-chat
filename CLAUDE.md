@@ -85,7 +85,7 @@ apps/
       api/           # ApiClient class (typed HTTP client)
       auth/          # Token persistence (localStorage) + Google SDK init + OAuth helpers
       services/      # ChatHubService (SignalR lifecycle), push-notifications.ts
-      state/         # AppState class — central $state/$derived reactive state
+      state/         # Domain-specific stores (auth, channel, dm, friend, message, server, ui, voice) + SignalR + navigation
       types/         # Domain models (models.ts)
       styles/        # CSS design tokens (tokens.css) + global.css
       utils/         # Pure helpers (format.ts)
@@ -93,13 +93,13 @@ apps/
         server-settings/  # ServerSettings, ServerChannels, ServerRoles, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerBans, ServerWebhooks, ServerSettingsSidebar, ServerSettingsModal
     routes/
       +layout.svelte  # Root layout
-      +page.svelte    # Thin shell (~75 lines); creates AppState, sets context
+      +page.svelte    # Root shell; creates stores, wires cross-store callbacks, sets context
 infra/               # Bicep IaC modules (Azure)
 .github/             # Copilot agent/instruction files, CI/CD workflows
 ```
 
 ### Frontend State Pattern
-`AppState` (`lib/state/app-state.svelte.ts`) is the single source of truth. It is created once in `+page.svelte` via `createAppState()` and injected into the component tree with `setContext()`. All child components retrieve it with `getAppState()`. Use Svelte 5 runes (`$state`, `$derived`) — never legacy stores.
+State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`, `ServerStore`, `ChannelStore`). Each store is created once in `+page.svelte` via its `create*Store()` factory and injected into the component tree with `setContext()`. Child components retrieve only the stores they need via `get*Store()` helpers (e.g. `getAuthStore()`, `getServerStore()`). Cross-store orchestration lives in `navigation.svelte.ts` and `signalr.svelte.ts`. Use Svelte 5 runes (`$state`, `$derived`) — never legacy stores.
 
 ### API Design
 - Controller-based (`[ApiController]`), all endpoints require `[Authorize]` except `/health/*`

@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getFriendStore } from '$lib/state/friend-store.svelte.js';
 
-	const app = getAppState();
+	const friends = getFriendStore();
 	let searchInput = $state('');
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleInput(): void {
 		if (debounceTimer) clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
-			app.searchUsers(searchInput);
+			friends.searchUsers(searchInput);
 		}, 300);
 	}
 </script>
@@ -26,15 +26,15 @@
 	</div>
 
 	<div class="results">
-		{#if app.isSearchingUsers}
+		{#if friends.isSearchingUsers}
 			<p class="status-text">Searching…</p>
 		{:else if searchInput.trim().length < 2}
 			<p class="status-text">Type at least 2 characters to search.</p>
-		{:else if app.userSearchResults.length === 0}
+		{:else if friends.userSearchResults.length === 0}
 			<p class="status-text">No users found.</p>
 		{:else}
 			<ul class="list" role="list">
-				{#each app.userSearchResults as user (user.id)}
+				{#each friends.userSearchResults as user (user.id)}
 					<li class="user-item">
 						<div class="user-info">
 							{#if user.avatarUrl}
@@ -58,7 +58,7 @@
 						{:else}
 							<button
 								class="btn-send"
-								onclick={() => app.sendFriendRequest(user.id)}
+								onclick={() => friends.sendFriendRequest(user.id)}
 								aria-label="Send friend request to {user.displayName}"
 							>
 								Send Request

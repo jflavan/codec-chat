@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 	import { hasPermission, Permission } from '$lib/types/index.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const servers = getServerStore();
 
 	let kickingUserId = $state<string | null>(null);
 	let changingRoleUserId = $state<string | null>(null);
@@ -10,45 +12,45 @@
 	let banReason = $state('');
 	let banDeleteMessages = $state(false);
 
-	const isOwner = $derived(app.isServerOwner);
+	const isOwner = $derived(servers.isServerOwner);
 
 	const canKick = (member: { userId: string; highestPosition: number }) =>
-		app.canKickMembers &&
-		member.userId !== app.me?.user.id &&
+		servers.canKickMembers &&
+		member.userId !== auth.me?.user.id &&
 		!isMemberOwner(member.userId) &&
-		(isOwner || member.highestPosition > (app.members.find(m => m.userId === app.me?.user.id)?.highestPosition ?? 999));
+		(isOwner || member.highestPosition > (servers.members.find(m => m.userId === auth.me?.user.id)?.highestPosition ?? 999));
 
 	const canBan = (member: { userId: string; highestPosition: number }) =>
-		app.canBanMembers &&
-		member.userId !== app.me?.user.id &&
+		servers.canBanMembers &&
+		member.userId !== auth.me?.user.id &&
 		!isMemberOwner(member.userId) &&
-		(isOwner || member.highestPosition > (app.members.find(m => m.userId === app.me?.user.id)?.highestPosition ?? 999));
+		(isOwner || member.highestPosition > (servers.members.find(m => m.userId === auth.me?.user.id)?.highestPosition ?? 999));
 
 	const canChangeRole = (member: { userId: string }) =>
-		app.canManageRoles &&
-		member.userId !== app.me?.user.id &&
+		servers.canManageRoles &&
+		member.userId !== auth.me?.user.id &&
 		!isMemberOwner(member.userId);
 
 	function isMemberOwner(userId: string): boolean {
-		return app.members.find(m => m.userId === userId)?.roles.some(r => r.isSystemRole && r.name === 'Owner') ?? false;
+		return servers.members.find(m => m.userId === userId)?.roles.some(r => r.isSystemRole && r.name === 'Owner') ?? false;
 	}
 
 	/** Roles that the current user can assign (only roles below their own position). */
 	const assignableRoles = $derived(() => {
-		const myPosition = app.members.find(m => m.userId === app.me?.user.id)?.highestPosition ?? 999;
-		return app.serverRoles
+		const myPosition = servers.members.find(m => m.userId === auth.me?.user.id)?.highestPosition ?? 999;
+		return servers.serverRoles
 			.filter(r => !r.isSystemRole || r.name !== 'Owner')
 			.filter(r => isOwner || r.position > myPosition);
 	});
 
 	$effect(() => {
-		if (app.selectedServerId && app.canManageRoles) {
-			app.loadRoles();
+		if (servers.selectedServerId && servers.canManageRoles) {
+			servers.loadRoles();
 		}
 	});
 
 	async function addRole(userId: string, roleId: string): Promise<void> {
-		await app.addMemberRole(userId, roleId);
+		await servers.addMemberRole(userId, roleId);
 		changingRoleUserId = null;
 	}
 
@@ -57,7 +59,7 @@
 			kickingUserId = userId;
 			return;
 		}
-		await app.kickMember(userId);
+		await servers.kickMember(userId);
 		kickingUserId = null;
 	}
 
@@ -74,7 +76,7 @@
 			banDeleteMessages = false;
 			return;
 		}
-		await app.banMember(userId, { reason: banReason || undefined, deleteMessages: banDeleteMessages });
+		await servers.banMember(userId, { reason: banReason || undefined, deleteMessages: banDeleteMessages });
 		banningUserId = null;
 		banReason = '';
 		banDeleteMessages = false;
@@ -124,7 +126,7 @@
 	<p class="section-desc">Manage member roles for this server.</p>
 
 	<ul class="member-list" role="list">
-		{#each app.members as member (member.userId)}
+		{#each servers.members as member (member.userId)}
 			<li class="member-row">
 				{#if member.avatarUrl}
 					<img class="member-avatar" src={member.avatarUrl} alt="" />
@@ -145,7 +147,7 @@
 				</div>
 
 				<div class="member-actions">
-					{#if isMemberOwner(member.userId) || member.userId === app.me?.user.id}
+					{#if isMemberOwner(member.userId) || member.userId === auth.me?.user.id}
 						<!-- No actions for owner or self -->
 					{:else}
 						{#if canChangeRole(member)}

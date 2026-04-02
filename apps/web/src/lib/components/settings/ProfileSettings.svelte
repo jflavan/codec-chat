@@ -1,46 +1,46 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
 	const MAX_NICKNAME_LENGTH = 32;
 	const MAX_STATUS_LENGTH = 128;
 
-	let nicknameInput = $state(app.me?.user.nickname ?? '');
-	let statusTextInput = $state(app.me?.user.statusText ?? '');
-	let statusEmojiInput = $state(app.me?.user.statusEmoji ?? '');
+	let nicknameInput = $state(auth.me?.user.nickname ?? '');
+	let statusTextInput = $state(auth.me?.user.statusText ?? '');
+	let statusEmojiInput = $state(auth.me?.user.statusEmoji ?? '');
 	let isSaving = $state(false);
 	let isSavingStatus = $state(false);
 	let fileInput = $state<HTMLInputElement | undefined>(undefined);
 
 	// Keep local inputs in sync when profile changes from outside.
 	$effect(() => {
-		nicknameInput = app.me?.user.nickname ?? '';
+		nicknameInput = auth.me?.user.nickname ?? '';
 	});
 
 	$effect(() => {
-		statusTextInput = app.me?.user.statusText ?? '';
-		statusEmojiInput = app.me?.user.statusEmoji ?? '';
+		statusTextInput = auth.me?.user.statusText ?? '';
+		statusEmojiInput = auth.me?.user.statusEmoji ?? '';
 	});
 
 	const previewName = $derived(
 		nicknameInput.trim()
 			? nicknameInput.trim()
-			: (app.me?.user.displayName ?? '')
+			: (auth.me?.user.displayName ?? '')
 	);
 
 	const hasChanged = $derived(
-		nicknameInput.trim() !== (app.me?.user.nickname ?? '')
+		nicknameInput.trim() !== (auth.me?.user.nickname ?? '')
 	);
 
 	const hasStatusChanged = $derived(
-		statusTextInput.trim() !== (app.me?.user.statusText ?? '') ||
-		statusEmojiInput.trim() !== (app.me?.user.statusEmoji ?? '')
+		statusTextInput.trim() !== (auth.me?.user.statusText ?? '') ||
+		statusEmojiInput.trim() !== (auth.me?.user.statusEmoji ?? '')
 	);
 
 	const hasCustomAvatar = $derived(
-		app.me?.user.avatarUrl && !app.me.user.avatarUrl.includes('googleusercontent.com')
+		auth.me?.user.avatarUrl && !auth.me.user.avatarUrl.includes('googleusercontent.com')
 	);
 
 	async function saveNickname() {
@@ -48,7 +48,7 @@
 		if (!trimmed || trimmed.length > MAX_NICKNAME_LENGTH) return;
 		isSaving = true;
 		try {
-			await app.setNickname(trimmed);
+			await auth.setNickname(trimmed);
 		} finally {
 			isSaving = false;
 		}
@@ -57,7 +57,7 @@
 	async function resetNickname() {
 		isSaving = true;
 		try {
-			await app.removeNickname();
+			await auth.removeNickname();
 			nicknameInput = '';
 		} finally {
 			isSaving = false;
@@ -70,7 +70,7 @@
 		if (!text && !emoji) return;
 		isSavingStatus = true;
 		try {
-			await app.setStatus(text, emoji);
+			await auth.setStatus(text, emoji);
 		} finally {
 			isSavingStatus = false;
 		}
@@ -79,7 +79,7 @@
 	async function clearStatus() {
 		isSavingStatus = true;
 		try {
-			await app.clearStatus();
+			await auth.clearStatus();
 			statusTextInput = '';
 			statusEmojiInput = '';
 		} finally {
@@ -94,7 +94,7 @@
 	async function handleFileChange() {
 		const file = fileInput?.files?.[0];
 		if (!file) return;
-		await app.uploadAvatar(file);
+		await auth.uploadAvatar(file);
 		if (fileInput) fileInput.value = '';
 	}
 </script>
@@ -103,7 +103,7 @@
 	<h2 class="section-title">My Profile</h2>
 
 	<!-- Profile Preview Card -->
-	{#if app.me}
+	{#if auth.me}
 		<div class="preview-card">
 			<input
 				bind:this={fileInput}
@@ -116,14 +116,14 @@
 			<button
 				class="preview-avatar-btn"
 				onclick={openFilePicker}
-				disabled={app.isUploadingAvatar}
+				disabled={auth.isUploadingAvatar}
 				title="Click to change avatar"
 				aria-label="Change avatar"
 			>
-				{#if app.isUploadingAvatar}
+				{#if auth.isUploadingAvatar}
 					<div class="preview-avatar placeholder" aria-hidden="true">…</div>
-				{:else if app.me.user.avatarUrl}
-					<img class="preview-avatar" src={app.me.user.avatarUrl} alt="Your avatar" />
+				{:else if auth.me.user.avatarUrl}
+					<img class="preview-avatar" src={auth.me.user.avatarUrl} alt="Your avatar" />
 				{:else}
 					<div class="preview-avatar placeholder" aria-hidden="true">
 						{previewName.slice(0, 1).toUpperCase()}
@@ -133,7 +133,7 @@
 			</button>
 			<div class="preview-info">
 				<span class="preview-name">{previewName}</span>
-				<span class="preview-email">{app.me.user.email ?? ''}</span>
+				<span class="preview-email">{auth.me.user.email ?? ''}</span>
 				<span class="preview-helper">This is how others see you</span>
 			</div>
 		</div>
@@ -141,8 +141,8 @@
 		{#if hasCustomAvatar}
 			<button
 				class="remove-avatar-btn"
-				onclick={() => app.deleteAvatar()}
-				disabled={app.isUploadingAvatar}
+				onclick={() => auth.deleteAvatar()}
+				disabled={auth.isUploadingAvatar}
 			>
 				Remove Avatar
 			</button>
@@ -176,7 +176,7 @@
 					{isSaving ? 'Saving…' : 'Save'}
 				</button>
 			</div>
-			{#if app.me.user.nickname}
+			{#if auth.me.user.nickname}
 				<button class="reset-link" onclick={resetNickname} disabled={isSaving}>
 					Reset to Google display name
 				</button>
@@ -219,7 +219,7 @@
 					{isSavingStatus ? 'Saving…' : 'Save'}
 				</button>
 			</div>
-			{#if app.me.user.statusText || app.me.user.statusEmoji}
+			{#if auth.me.user.statusText || auth.me.user.statusEmoji}
 				<button class="reset-link" onclick={clearStatus} disabled={isSavingStatus}>
 					Clear status
 				</button>

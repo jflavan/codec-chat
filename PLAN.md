@@ -87,7 +87,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
 - `PUBLIC_API_BASE_URL` GitHub Secret set to `https://api.codec-chat.com`
-- **Message pinning** — `PinnedMessage` entity with unique `(ChannelId, MessageId)` index; pin/unpin/list endpoints in `ChannelsController` (Owner/Admin/GlobalAdmin, 50-pin limit); `PinNotification` system messages; `MessagePinned`/`MessageUnpinned` SignalR events; audit logging (`MessagePinned`/`MessageUnpinned` actions); frontend pin button in action bar, pin indicator on messages, slide-in pinned messages panel with unpin controls, reactive pin state in `AppState`
+- **Message pinning** — `PinnedMessage` entity with unique `(ChannelId, MessageId)` index; pin/unpin/list endpoints in `ChannelsController` (Owner/Admin/GlobalAdmin, 50-pin limit); `PinNotification` system messages; `MessagePinned`/`MessageUnpinned` SignalR events; audit logging (`MessagePinned`/`MessageUnpinned` actions); frontend pin button in action bar, pin indicator on messages, slide-in pinned messages panel with unpin controls, reactive pin state in `MessageStore`
 - **Custom roles and granular permissions** — `ServerRoleEntity` with 21 `Permission` flags (bitmask); role hierarchy with position ordering; system roles (Owner, Admin, Member, @everyone) + custom roles; full CRUD via `RolesController`; role management UI with permission editor; role badges with custom colors; `IsMentionable` and `IsHoisted` options
 - **User banning** — `BannedMember` entity with reason and actor tracking; ban/unban/list endpoints; ban check on invite join; optional message purge on ban; real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management tab in server settings
 - **Video chat and screen sharing** — Voice Phase 5 complete; webcam video and screen sharing via mediasoup video/screen producers; `IsVideoEnabled` and `IsScreenSharing` state per participant; `VideoTile` and `VideoGrid` components; `getDisplayMedia()` for screen capture
@@ -182,7 +182,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Create `$lib/auth/session.ts` — token persistence, expiration checking, session management
 - [x] Create `$lib/auth/google.ts` — Google Identity Services SDK initialization wrapper
 - [x] Create `$lib/services/chat-hub.ts` — `ChatHubService` for SignalR hub connection lifecycle
-- [x] Create `$lib/state/app-state.svelte.ts` — central `AppState` class with `$state`/`$derived` runes and context-based DI
+- [x] Create `$lib/state/app-state.svelte.ts` — central `AppState` class with `$state`/`$derived` runes and context-based DI _(later decomposed into 8 domain stores: UIStore, AuthStore, ServerStore, ChannelStore, MessageStore, DmStore, FriendStore, VoiceStore)_
 
 ### Styles extraction
 - [x] Create `$lib/styles/tokens.css` — CSS custom properties (CODEC CRT design tokens)
@@ -242,7 +242,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Register `ReactionUpdated` handler in hub `start()` method
 
 ### Web – State & UI components
-- [x] Add `toggleReaction(messageId, emoji)` action to `AppState`
+- [x] Add `toggleReaction(messageId, emoji)` action to `MessageStore`
 - [x] Wire `onReactionUpdated` SignalR callback in `startSignalR()`
 - [x] Create `ReactionBar.svelte` — reaction pills (emoji + count, active highlight)
 - [x] Add floating action bar to `MessageItem.svelte` (react button at top-right on hover)
@@ -274,7 +274,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `Friendship`, `FriendRequest`, and `FriendshipStatus` types to `models.ts`
 - [x] Add friend-related API methods to `ApiClient`
 - [x] Add friend-related SignalR event handlers to `ChatHubService`
-- [x] Add friends state management to `AppState`
+- [x] Add friends state management to `FriendStore`
 - [x] Create `FriendsPanel.svelte` component with tab navigation
 - [x] Create `FriendsList.svelte` (All Friends tab)
 - [x] Create `PendingRequests.svelte` (Pending tab)
@@ -304,7 +304,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `DmChannel`, `DmConversation`, and `DirectMessage` types to `models.ts`
 - [x] Add DM-related API methods to `ApiClient`
 - [x] Add DM-related SignalR event handlers to `ChatHubService`
-- [x] Add DM state management to `AppState` (conversations list, active conversation, messages)
+- [x] Add DM state management to `DmStore` (conversations list, active conversation, messages)
 - [x] Create `DmList.svelte` component (conversation sidebar entries)
 - [x] Create `DmChatArea.svelte` wrapper (adapts `ChatArea` components for DM context)
 - [x] Create `HomeSidebar.svelte` — sidebar with Friends nav + DM conversations list
@@ -341,7 +341,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `imageUrl` field to `Message` and `DirectMessage` types in `models.ts`
 - [x] Add `uploadImage()` method to `ApiClient`
 - [x] Update `sendMessage()` and `sendDm()` API methods to accept optional `imageUrl`
-- [x] Add image attachment state and methods to `AppState` (`attachImage`, `clearPendingImage`, etc.)
+- [x] Add image attachment state and methods to `MessageStore` (`attachImage`, `clearPendingImage`, etc.)
 - [x] Add client-side file type and size validation with `ALLOWED_IMAGE_TYPES` and `MAX_IMAGE_SIZE_BYTES`
 
 ### Web — UI components
@@ -379,7 +379,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `ReplyContext` type to `models.ts` (messageId, authorName, authorAvatarUrl, authorUserId, bodyPreview, isDeleted)
 - [x] Add `replyContext` field to `Message` and `DirectMessage` types
 - [x] Update `sendMessage()` and `sendDm()` API methods to accept optional reply ID parameters
-- [x] Add `replyingTo` reactive state to `AppState` with `startReply()` and `cancelReply()` methods
+- [x] Add `replyingTo` reactive state to `MessageStore` with `startReply()` and `cancelReply()` methods
 - [x] Clear reply state on channel/DM switch and sign-out
 - [x] Wire `replyContext` into SignalR message callbacks
 
@@ -398,8 +398,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Task breakdown: Image Preview Lightbox
 
 ### Web — State
-- [x] Add `lightboxImageUrl` reactive state to `AppState`
-- [x] Add `openImagePreview(url)` and `closeImagePreview()` methods to `AppState`
+- [x] Add `lightboxImageUrl` reactive state to `UIStore`
+- [x] Add `openImagePreview(url)` and `closeImagePreview()` methods to `UIStore`
 - [x] Clear lightbox state on sign-out
 
 ### Web — UI components
@@ -433,7 +433,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 ## Task breakdown: Loading Screen
 
 ### Web — State
-- [x] Add `isInitialLoading = $state(true)` flag to `AppState`
+- [x] Add `isInitialLoading = $state(true)` flag to `UIStore`
 - [x] Make `handleCredential()` async — await `loadMe()`, `loadServers()`, and `startSignalR()` in parallel via `Promise.all`, then set `isInitialLoading = false`
 - [x] Set `isInitialLoading = false` in `init()` when no stored session exists (sign-in UI path)
 - [x] Reset `isInitialLoading = true` on `signOut()` for next login cycle
@@ -470,8 +470,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `onMemberJoined` and `onMemberLeft` callbacks to `SignalRCallbacks`
 - [x] Register `MemberJoined` and `MemberLeft` handlers in `ChatHubService.start()`
 - [x] Add `joinServer(serverId)` and `leaveServer(serverId)` methods to `ChatHubService`
-- [x] Wire `onMemberJoined` callback in `AppState.startSignalR()` to reload member list
-- [x] Wire `onMemberLeft` callback in `AppState.startSignalR()` to reload member list
+- [x] Wire `onMemberJoined` callback in SignalR orchestration to reload member list
+- [x] Wire `onMemberLeft` callback in SignalR orchestration to reload member list
 - [x] Call `hub.joinServer()` after `joinViaInvite` succeeds
 - [x] Call `hub.leaveServer()` in `onKickedFromServer` handler
 
@@ -487,8 +487,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Auto-label issues with `bug` and `alpha-tester` labels
 
 ### Web — Alpha notification banner
-- [x] Add `showAlphaNotification` flag to `AppState` (set `true` at end of `handleCredential`)
-- [x] Add `dismissAlphaNotification()` method to `AppState`
+- [x] Add `showAlphaNotification` flag to `UIStore` (set `true` at end of auth flow)
+- [x] Add `dismissAlphaNotification()` method to `UIStore`
 - [x] Create `AlphaNotification.svelte` modal overlay component
 - [x] Display ALPHA badge, welcome message, and bug reporting guidance
 - [x] Link directly to GitHub bug report template (`/issues/new?template=bug-report.yml`)
@@ -526,8 +526,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `deleteMessage()` and `deleteDmMessage()` methods to `ApiClient`
 
 ### Web — State & UI
-- [x] Add `deleteMessage(messageId)` action to `AppState` — calls API, falls back to local removal if SignalR disconnected
-- [x] Add `deleteDmMessage(messageId)` action to `AppState` — calls API, falls back to local removal if SignalR disconnected
+- [x] Add `deleteMessage(messageId)` action to `MessageStore` — calls API, falls back to local removal if SignalR disconnected
+- [x] Add `deleteDmMessage(messageId)` action to `DmStore` — calls API, falls back to local removal if SignalR disconnected
 - [x] Wire `onMessageDeleted` SignalR callback in `startSignalR()` to filter from `messages` array
 - [x] Wire `onDmMessageDeleted` SignalR callback in `startSignalR()` to filter from `dmMessages` array
 - [x] Add delete button (trash icon) to `MessageItem.svelte` floating action bar — visible only on own messages, red hover state
@@ -566,8 +566,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Register `MessageEdited` and `DmMessageEdited` handlers in `ChatHubService.start()`
 
 ### Web — State & UI
-- [x] Add `editMessage(messageId, newBody)` action to `AppState` — calls API, falls back to local update if SignalR disconnected
-- [x] Add `editDmMessage(messageId, newBody)` action to `AppState` — calls API, falls back to local update if SignalR disconnected
+- [x] Add `editMessage(messageId, newBody)` action to `MessageStore` — calls API, falls back to local update if SignalR disconnected
+- [x] Add `editDmMessage(messageId, newBody)` action to `DmStore` — calls API, falls back to local update if SignalR disconnected
 - [x] Wire `onMessageEdited` SignalR callback to update `messages` array (body + editedAt)
 - [x] Wire `onDmMessageEdited` SignalR callback to update `dmMessages` array (body + editedAt)
 - [x] Add edit button (pencil icon) to `MessageItem.svelte` floating action bar — visible only on own messages
@@ -595,7 +595,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Update `getMessages()` in `ApiClient` to accept optional `{ before?, limit? }` options and return `PaginatedMessages`
 
 ### Web — State management
-- [x] Add `hasMoreMessages` and `isLoadingOlderMessages` reactive state fields to `AppState`
+- [x] Add `hasMoreMessages` and `isLoadingOlderMessages` reactive state fields to `MessageStore`
 - [x] Update `loadMessages()` to use paginated response and set `hasMoreMessages`
 - [x] Add `loadOlderMessages()` method — uses oldest message timestamp as cursor, prepends results
 - [x] Reset `hasMoreMessages` on sign-out, goHome, kicked, and channel deselection
@@ -653,7 +653,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Return `{ hasMore, messages }` response shape instead of flat `DirectMessage[]` array
 - [x] Add `PaginatedDmMessages` type to frontend (`models.ts` + barrel export)
 - [x] Update `ApiClient.getDmMessages` return type to `Promise<PaginatedDmMessages>`
-- [x] Update `AppState.loadDmMessages` to destructure paginated response
+- [x] Update `DmStore.loadDmMessages` to destructure paginated response
 
 ## Task breakdown: Redis Cache & SignalR Backplane
 
@@ -693,7 +693,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Wire `connection.onreconnecting()`, `connection.onreconnected()`, and `connection.onclose()` handlers in `ChatHubService.start()`
 
 ### Web — Hub connection state
-- [x] Add `isHubConnected = $state(false)` reactive field to `AppState`
+- [x] Add `isHubConnected = $state(false)` reactive field to `UIStore`
 - [x] Set `isHubConnected` to `true` after successful `hub.start()` and on `onReconnected`
 - [x] Set `isHubConnected` to `false` on `signOut()`, `onReconnecting`, and `onClose`
 - [x] Auto-refresh page via `window.location.reload()` if WebSocket cannot reconnect within 5 seconds (reconnect timer in `onReconnecting`, cleared in `onReconnected`)
@@ -746,7 +746,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `deleteServer(serverId)` and `deleteChannel(serverId, channelId)` methods to `ApiClient`
 
 ### Web — State management
-- [x] Add `isGlobalAdmin` derived state to `AppState`
+- [x] Add `isGlobalAdmin` derived state to `AuthStore`
 - [x] Add `canDeleteServer` and `canDeleteChannel` derived properties
 - [x] Add `canKickMembers` derived property (includes global admin)
 - [x] Add `deleteServer(serverId)` and `deleteChannel(serverId, channelId)` actions
@@ -908,7 +908,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
   - [x] Capture transport `const` locals in event handlers (avoids null dereference on concurrent `leave()`)
 - [x] Add `VoiceChannelMember` type to `models.ts`
 - [x] Add voice SignalR hub methods and events to `ChatHubService`
-- [x] Add voice state and actions to `AppState` (`voiceChannelId`, `voiceMembers`, `isMuted`, `joinVoice`, `leaveVoice`, `toggleMute`)
+- [x] Add voice state and actions to `VoiceStore` (`voiceChannelId`, `voiceMembers`, `isMuted`, `joinVoiceChannel`, `leaveVoiceChannel`, `toggleMute`)
 
 ### Frontend — UI components
 - [x] Update channel list to show voice channels with speaker icon and participant avatars
@@ -1179,10 +1179,10 @@ Add email/password registration as a second auth method alongside Google Sign-In
 ### Frontend — SignalR event handlers
 - [x] Add event types and callbacks for `ServerDescriptionChanged`, `ChannelDescriptionChanged`, `CategoryCreated`, `CategoryRenamed`, `CategoryDeleted`, `ChannelOrderChanged`, `CategoryOrderChanged`
 - [x] Register all new handlers in `ChatHubService.start()`
-- [x] Wire all callbacks in `AppState.startSignalR()`
+- [x] Wire all callbacks in SignalR orchestration (`signalr.svelte.ts`)
 
-### Frontend — AppState
-- [x] Add `categories`, `notificationPreferences`, `serverSettingsTab` state
+### Frontend — Stores (formerly AppState)
+- [x] Add `categories`, `notificationPreferences`, `serverSettingsTab` state to `ChannelStore` / `ServerStore`
 - [x] Add description update, category CRUD, channel/category order, and mute action methods
 - [x] Update SignalR callbacks to keep categories and channel order in sync
 

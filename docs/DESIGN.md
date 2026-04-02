@@ -330,7 +330,7 @@ When a user is kicked from a server, a transient error banner appears as an over
 - **Animation:** `banner-lifecycle` keyframe (5s total)
   - 0–75% (0–3.75s): fully visible (`opacity: 1`)
   - 75–100% (3.75–5s): fades out (`opacity: 0`) with slight upward slide (`translateY(-8px)`)
-- **State management:** `AppState.setTransientError()` sets the error and schedules auto-clear after 5 seconds via `setTimeout`
+- **State management:** `UIStore.setTransientError()` sets the error and schedules auto-clear after 5 seconds via `setTimeout`
 - **Scope:** Applied in both `ChatArea.svelte` and `DmChatArea.svelte`
 
 ## Link Preview Card
@@ -392,7 +392,7 @@ Inline replies allow users to reference a previous message. The reply system is 
 
 - Added to the floating action bar on message hover (positioned before the emoji react button)
 - Icon: ↩ reply arrow (16×16 SVG), same styling as existing action buttons
-- Clicking sets the reply target in `AppState` and focuses the composer
+- Clicking sets the reply target in `MessageStore` and focuses the composer
 
 ### Reply Reference (above message body)
 
@@ -475,7 +475,7 @@ Full-screen overlay for viewing images at full resolution. Triggered by clicking
 | Close triggers | Click backdrop, Escape key, close button |
 | Thumbnail hover | `opacity: 0.85` transition (150ms ease) on inline images |
 
-**Component:** `ImagePreview.svelte` — mounted once in `+page.svelte`, reads `lightboxImageUrl` from `AppState`.
+**Component:** `ImagePreview.svelte` — mounted once in `+page.svelte`, reads `lightboxImageUrl` from `UIStore`.
 
 ## Animations & Micro-interactions
 

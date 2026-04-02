@@ -74,7 +74,7 @@ Pure unit tests using Vitest with jsdom environment. No browser or API server re
 - `lib/api/client.ts` — All 50+ ApiClient methods, auth methods (register, login, refresh, link-google), error handling, 401 retry logic (97%+ coverage)
 
 **What's excluded from coverage** (requires browser APIs or framework integration):
-- `lib/state/app-state.svelte.ts` — Svelte 5 reactive state with context injection
+- `lib/state/*.svelte.ts` — Svelte 5 reactive stores with context injection
 - `lib/services/chat-hub.ts` — SignalR client lifecycle
 - `lib/services/voice-service.ts` — mediasoup WebRTC client
 - `lib/auth/google.ts` — Google Identity Services SDK

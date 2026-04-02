@@ -37,9 +37,9 @@ All methods:
 
 **Hierarchy enforcement:** When assigning roles, check that the caller's role position is lower (higher rank) than the target role's position. Members cannot assign roles equal to or above their own.
 
-### Frontend (AppState)
+### Frontend (ServerStore)
 
-`apps/web/src/lib/state/app-state.svelte.ts` uses `hasPermission()` for derived flags:
+`apps/web/src/lib/state/server-store.svelte.ts` uses `hasPermission()` for derived flags:
 
 ```typescript
 readonly canManageChannels = $derived(
@@ -84,7 +84,7 @@ The `currentServerPermissions` number comes from the API's `permissions` field o
 | Seed data | `apps/api/Codec.Api/Data/SeedData.cs` |
 | Migration | `apps/api/Codec.Api/Migrations/20260324223326_CustomRolesAndPermissions.cs` |
 | Frontend types | `apps/web/src/lib/types/models.ts` |
-| Frontend state | `apps/web/src/lib/state/app-state.svelte.ts` |
+| Frontend state | `apps/web/src/lib/state/server-store.svelte.ts` |
 | Role mgmt UI | `apps/web/src/lib/components/server-settings/ServerRoles.svelte` |
 | Member list | `apps/web/src/lib/components/members/MembersSidebar.svelte` |
 
@@ -94,5 +94,5 @@ The `currentServerPermissions` number comes from the API's `permissions` field o
 2. **Backend:** Add it to `AdminDefaults` and/or `MemberDefaults` in `PermissionExtensions` if it should be granted by default.
 3. **Backend:** Use `EnsurePermissionAsync(serverId, userId, Permission.NewFlag, isGlobalAdmin)` in your controller.
 4. **Frontend:** Add the flag value to `Permission` in `apps/web/src/lib/types/models.ts`.
-5. **Frontend:** Add a `canDoThing` derived property in `AppState` using `hasPermission()`.
+5. **Frontend:** Add a `canDoThing` derived property in `ServerStore` using `hasPermission()`.
 6. **Documentation:** Update `docs/ROLES.md` permission table.

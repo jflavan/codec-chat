@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 
 	let {
 		userId,
@@ -15,7 +15,7 @@
 		onclose: () => void;
 	} = $props();
 
-	const app = getAppState();
+	const voice = getVoiceStore();
 
 	const isMobile = !window.matchMedia('(pointer: fine)').matches;
 
@@ -25,17 +25,17 @@
 		if (sheetEl) sheetEl.focus();
 	});
 
-	let sliderValue = $state(Math.round((app.userVolumes.get(userId) ?? 1.0) * 100));
+	let sliderValue = $state(Math.round((voice.userVolumes.get(userId) ?? 1.0) * 100));
 
 	function handleVolumeChange(e: Event) {
 		const val = parseInt((e.target as HTMLInputElement).value, 10);
 		sliderValue = val;
-		app.setUserVolume(userId, val / 100);
+		voice.setUserVolume(userId, val / 100);
 	}
 
 	function handleReset() {
 		sliderValue = 100;
-		app.resetUserVolume(userId);
+		voice.resetUserVolume(userId);
 	}
 
 	function handleBackdropClick(e: MouseEvent) {

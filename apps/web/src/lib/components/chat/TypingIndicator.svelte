@@ -1,19 +1,19 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 
-	const app = getAppState();
+	const messages = getMessageStore();
 </script>
 
-{#if app.typingUsers.length > 0}
+{#if messages.typingUsers.length > 0}
 	<div class="typing-indicator" aria-live="polite">
 		<span class="typing-dots" aria-hidden="true">
 			<span class="dot"></span><span class="dot"></span><span class="dot"></span>
 		</span>
 		<span class="typing-text">
-			{#if app.typingUsers.length === 1}
-				<strong>{app.typingUsers[0]}</strong> is typing…
-			{:else if app.typingUsers.length === 2}
-				<strong>{app.typingUsers[0]}</strong> and <strong>{app.typingUsers[1]}</strong> are typing…
+			{#if messages.typingUsers.length === 1}
+				<strong>{messages.typingUsers[0]}</strong> is typing…
+			{:else if messages.typingUsers.length === 2}
+				<strong>{messages.typingUsers[0]}</strong> and <strong>{messages.typingUsers[1]}</strong> are typing…
 			{:else}
 				Several people are typing…
 			{/if}

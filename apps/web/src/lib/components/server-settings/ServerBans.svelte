@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	let unbanningUserId = $state<string | null>(null);
 
 	$effect(() => {
-		if (app.selectedServerId) {
-			app.loadBans();
+		if (servers.selectedServerId) {
+			servers.loadBans();
 		}
 	});
 
@@ -16,7 +16,7 @@
 			unbanningUserId = userId;
 			return;
 		}
-		await app.unbanMember(userId);
+		await servers.unbanMember(userId);
 		unbanningUserId = null;
 	}
 
@@ -37,13 +37,13 @@
 	<h2 class="section-title">Bans</h2>
 	<p class="section-desc">View and manage banned users for this server.</p>
 
-	{#if app.isLoadingBans}
+	{#if servers.isLoadingBans}
 		<p class="loading-text">Loading bans…</p>
-	{:else if app.bans.length === 0}
+	{:else if servers.bans.length === 0}
 		<p class="empty-text">No banned users.</p>
 	{:else}
 		<ul class="ban-list" role="list">
-			{#each app.bans as ban (ban.userId)}
+			{#each servers.bans as ban (ban.userId)}
 				<li class="ban-row">
 					{#if ban.avatarUrl}
 						<img class="ban-avatar" src={ban.avatarUrl} alt="" />

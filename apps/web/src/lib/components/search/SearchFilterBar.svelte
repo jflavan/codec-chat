@@ -1,10 +1,14 @@
 <script lang="ts">
 	import type { SearchFilters } from '$lib/types/models.js';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
+	import { getDmStore } from '$lib/state/dm-store.svelte.js';
 
 	let { isDm = false }: { isDm?: boolean } = $props();
 
-	const app = getAppState();
+	const channelStore = getChannelStore();
+	const msgStore = getMessageStore();
+	const dms = getDmStore();
 
 	let scope = $state<'channel' | 'server'>('channel');
 	let afterDate = $state('');
@@ -18,9 +22,9 @@
 		// In "channel" scope, include the channelId to restrict search
 		if (scope === 'channel') {
 			if (isDm) {
-				filters.channelId = app.activeDmChannelId ?? undefined;
+				filters.channelId = dms.activeDmChannelId ?? undefined;
 			} else {
-				filters.channelId = app.selectedChannelId ?? undefined;
+				filters.channelId = channelStore.selectedChannelId ?? undefined;
 			}
 		}
 		// In "server" scope, omit channelId so it searches all channels
@@ -34,8 +38,8 @@
 	}
 
 	function triggerSearch(): void {
-		if (app.searchQuery.trim().length >= 2) {
-			app.searchMessages(app.searchQuery, buildFilters());
+		if (msgStore.searchQuery.trim().length >= 2) {
+			msgStore.searchMessages(msgStore.searchQuery, buildFilters());
 		}
 	}
 
