@@ -92,7 +92,21 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task JoinServer(string serverId)
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverId}");
+        if (!Guid.TryParse(serverId, out var serverGuid))
+            throw new HubException("Invalid server ID.");
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
+
+        var serverExists = await db.Servers.AsNoTracking().AnyAsync(s => s.Id == serverGuid);
+        if (!serverExists)
+            throw new HubException("Server not found.");
+
+        var isMember = appUser.IsGlobalAdmin || await db.ServerMembers.AsNoTracking()
+            .AnyAsync(m => m.ServerId == serverGuid && m.UserId == appUser.Id);
+        if (!isMember)
+            throw new HubException("Not a member of this server.");
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"server-{serverGuid}");
     }
 
     /// <summary>
@@ -101,7 +115,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task LeaveServer(string serverId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"server-{serverId}");
+        if (!Guid.TryParse(serverId, out var serverGuid))
+            throw new HubException("Invalid server ID.");
+
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"server-{serverGuid}");
     }
     /// <summary>
     /// Adds the caller to a SignalR group scoped to <paramref name="channelId"/>

@@ -2775,25 +2775,59 @@ public class ChatHubTests : IDisposable
     // ═══════════════════ JoinServer / LeaveServer ═══════════════════
 
     [Fact]
-    public async Task JoinServer_AddsToCorrectGroup()
+    public async Task JoinServer_ValidMember_JoinsGroup()
     {
         var hub = CreateHub();
-        var serverId = Guid.NewGuid().ToString();
-
-        await hub.JoinServer(serverId);
-
-        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, $"server-{serverId}", default), Times.Once);
+        await hub.JoinServer(_testServer.Id.ToString());
+        _mockGroups.Verify(
+            g => g.AddToGroupAsync(_connectionId, $"server-{_testServer.Id}", default),
+            Times.Once);
     }
 
     [Fact]
-    public async Task LeaveServer_RemovesFromCorrectGroup()
+    public async Task JoinServer_InvalidGuid_ThrowsHubException()
     {
         var hub = CreateHub();
-        var serverId = Guid.NewGuid().ToString();
+        var act = () => hub.JoinServer("not-a-guid");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid server ID.");
+    }
 
-        await hub.LeaveServer(serverId);
+    [Fact]
+    public async Task JoinServer_NonMember_ThrowsHubException()
+    {
+        var nonMemberServer = new Server { Id = Guid.NewGuid(), Name = "Other Server" };
+        _db.Servers.Add(nonMemberServer);
+        await _db.SaveChangesAsync();
 
-        _mockGroups.Verify(g => g.RemoveFromGroupAsync(_connectionId, $"server-{serverId}", default), Times.Once);
+        var hub = CreateHub();
+        var act = () => hub.JoinServer(nonMemberServer.Id.ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Not a member of this server.");
+    }
+
+    [Fact]
+    public async Task JoinServer_ServerNotFound_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.JoinServer(Guid.NewGuid().ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Server not found.");
+    }
+
+    [Fact]
+    public async Task LeaveServer_InvalidGuid_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.LeaveServer("not-a-guid");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid server ID.");
+    }
+
+    [Fact]
+    public async Task LeaveServer_ValidId_LeavesGroup()
+    {
+        var hub = CreateHub();
+        await hub.LeaveServer(_testServer.Id.ToString());
+        _mockGroups.Verify(
+            g => g.RemoveFromGroupAsync(_connectionId, $"server-{_testServer.Id}", default),
+            Times.Once);
     }
 
     // ═══════════════════ DM Typing ═══════════════════
