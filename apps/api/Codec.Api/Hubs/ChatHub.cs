@@ -161,7 +161,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task StartTyping(string channelId, string displayName)
     {
-        await Clients.OthersInGroup(channelId).SendAsync("UserTyping", channelId, displayName);
+        if (!Guid.TryParse(channelId, out _))
+            throw new HubException("Invalid channel ID.");
+        var safeName = Truncate(displayName, 100);
+        await Clients.OthersInGroup(channelId).SendAsync("UserTyping", channelId, safeName);
     }
 
     /// <summary>
@@ -169,7 +172,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task StopTyping(string channelId, string displayName)
     {
-        await Clients.OthersInGroup(channelId).SendAsync("UserStoppedTyping", channelId, displayName);
+        if (!Guid.TryParse(channelId, out _))
+            throw new HubException("Invalid channel ID.");
+        var safeName = Truncate(displayName, 100);
+        await Clients.OthersInGroup(channelId).SendAsync("UserStoppedTyping", channelId, safeName);
     }
 
     /// <summary>
@@ -205,8 +211,11 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task StartDmTyping(string dmChannelId, string displayName)
     {
+        if (!Guid.TryParse(dmChannelId, out _))
+            throw new HubException("Invalid DM channel ID.");
+        var safeName = Truncate(displayName, 100);
         await Clients.OthersInGroup($"dm-{dmChannelId}")
-            .SendAsync("DmTyping", dmChannelId, displayName);
+            .SendAsync("DmTyping", dmChannelId, safeName);
     }
 
     /// <summary>
@@ -214,8 +223,11 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task StopDmTyping(string dmChannelId, string displayName)
     {
+        if (!Guid.TryParse(dmChannelId, out _))
+            throw new HubException("Invalid DM channel ID.");
+        var safeName = Truncate(displayName, 100);
         await Clients.OthersInGroup($"dm-{dmChannelId}")
-            .SendAsync("DmStoppedTyping", dmChannelId, displayName);
+            .SendAsync("DmStoppedTyping", dmChannelId, safeName);
     }
 
     /* ═══════════════════ DM Voice Calls ═══════════════════ */
@@ -1348,4 +1360,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         resp.EnsureSuccessStatusCode();
         return await resp.Content.ReadFromJsonAsync<JsonElement>();
     }
+
+    private static string Truncate(string? value, int maxLength)
+        => string.IsNullOrEmpty(value) ? "" : value.Length <= maxLength ? value : value[..maxLength];
 }

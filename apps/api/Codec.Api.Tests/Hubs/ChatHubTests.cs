@@ -379,6 +379,28 @@ public class ChatHubTests : IDisposable
     }
 
     [Fact]
+    public async Task StartTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StartTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid channel ID.");
+    }
+
+    [Fact]
+    public async Task StartTyping_TruncatesLongDisplayName()
+    {
+        var hub = CreateHub();
+        var longName = new string('A', 200);
+        await hub.StartTyping(_textChannel.Id.ToString(), longName);
+        _mockClients.Verify(c => c.OthersInGroup(_textChannel.Id.ToString()), Times.Once);
+        _mockOthersProxy.Verify(
+            p => p.SendCoreAsync("UserTyping",
+                It.Is<object?[]>(args => args.Length == 2 && ((string)args[1]!).Length == 100),
+                default),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task StopTyping_BroadcastsToOthersInGroup()
     {
         var hub = CreateHub();
@@ -390,6 +412,14 @@ public class ChatHubTests : IDisposable
         _mockOthersProxy.Verify(
             p => p.SendCoreAsync("UserStoppedTyping", It.Is<object?[]>(a => a.Length == 2), default),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task StopTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StopTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid channel ID.");
     }
 
     // ── DM Channel groups ──
@@ -454,6 +484,14 @@ public class ChatHubTests : IDisposable
     }
 
     [Fact]
+    public async Task StartDmTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StartDmTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid DM channel ID.");
+    }
+
+    [Fact]
     public async Task StopDmTyping_BroadcastsToOthersInDmGroup()
     {
         var hub = CreateHub();
@@ -465,6 +503,14 @@ public class ChatHubTests : IDisposable
         _mockOthersProxy.Verify(
             p => p.SendCoreAsync("DmStoppedTyping", It.Is<object?[]>(a => a.Length == 2), default),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task StopDmTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StopDmTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid DM channel ID.");
     }
 
     // ── StartCall ──
