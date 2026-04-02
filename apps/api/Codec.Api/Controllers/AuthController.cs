@@ -388,6 +388,153 @@ public class AuthController(
         });
     }
 
+    [HttpPost("google")]
+    public async Task<IActionResult> GoogleSignIn([FromBody] GoogleSignInRequest request)
+    {
+        var googleClientId = configuration["Google:ClientId"];
+        var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+            "https://accounts.google.com/.well-known/openid-configuration",
+            new OpenIdConnectConfigurationRetriever());
+
+        string? googleSubject;
+        string? googleEmail;
+        string? googleName;
+        string? googlePicture;
+
+        try
+        {
+            var openIdConfig = await configManager.GetConfigurationAsync();
+            var validationParams = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuers = new[] { "https://accounts.google.com", "accounts.google.com" },
+                ValidateAudience = true,
+                ValidAudience = googleClientId,
+                ValidateLifetime = true,
+                IssuerSigningKeys = openIdConfig.SigningKeys
+            };
+
+            var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+            var principal = handler.ValidateToken(request.Credential, validationParams, out _);
+
+            googleSubject = principal.FindFirst("sub")?.Value;
+            googleEmail = principal.FindFirst("email")?.Value;
+            googleName = principal.FindFirst("name")?.Value;
+            googlePicture = principal.FindFirst("picture")?.Value;
+
+            if (string.IsNullOrWhiteSpace(googleSubject))
+                return BadRequest(new { error = "Invalid Google credential." });
+        }
+        catch (SecurityTokenException)
+        {
+            return Unauthorized(new { error = "Invalid or expired Google credential." });
+        }
+
+        // Check for account linking: existing email/password user without Google linked
+        if (googleEmail is not null)
+        {
+            var existingByEmail = await db.Users.FirstOrDefaultAsync(
+                u => u.Email == googleEmail.ToLowerInvariant() && u.GoogleSubject == null && u.PasswordHash != null);
+            if (existingByEmail is not null)
+            {
+                return Ok(new
+                {
+                    needsLinking = true,
+                    email = existingByEmail.Email
+                });
+            }
+        }
+
+        // Find or create user by Google subject
+        var user = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSubject);
+        var isNewUser = false;
+
+        if (user is not null)
+        {
+            // Update profile if changed
+            var hasChanges = user.DisplayName != googleName
+                          || user.Email != googleEmail
+                          || user.AvatarUrl != googlePicture;
+            if (hasChanges)
+            {
+                user.DisplayName = googleName ?? user.DisplayName;
+                user.Email = googleEmail;
+                user.AvatarUrl = googlePicture;
+                user.UpdatedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync();
+            }
+        }
+        else
+        {
+            user = new User
+            {
+                GoogleSubject = googleSubject,
+                DisplayName = googleName ?? "Unknown",
+                Email = googleEmail,
+                AvatarUrl = googlePicture,
+                EmailVerified = true
+            };
+            db.Users.Add(user);
+
+            // Auto-join default server
+            var defaultMemberRole = await db.ServerRoles
+                .AsNoTracking()
+                .Where(r => r.ServerId == Server.DefaultServerId && r.IsSystemRole && r.Name == "Member")
+                .FirstOrDefaultAsync();
+
+            if (defaultMemberRole is not null)
+            {
+                db.ServerMembers.Add(new ServerMember
+                {
+                    ServerId = Server.DefaultServerId,
+                    User = user,
+                    JoinedAt = DateTimeOffset.UtcNow
+                });
+                db.ServerMemberRoles.Add(new ServerMemberRole
+                {
+                    UserId = user.Id,
+                    RoleId = defaultMemberRole.Id,
+                    AssignedAt = DateTimeOffset.UtcNow
+                });
+            }
+
+            try
+            {
+                await db.SaveChangesAsync();
+                isNewUser = true;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                db.Entry(user).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                user = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSubject);
+                if (user is null)
+                    return Conflict(new { error = "Account creation conflict. Please try again." });
+            }
+        }
+
+        var accessToken = tokenService.GenerateAccessToken(user);
+        var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);
+        var effectiveAvatarUrl = avatarService.ResolveUrl(user.CustomAvatarPath) ?? user.AvatarUrl;
+
+        return Ok(new
+        {
+            accessToken,
+            refreshToken,
+            isNewUser,
+            user = new
+            {
+                user.Id,
+                user.DisplayName,
+                user.Nickname,
+                EffectiveDisplayName = user.EffectiveDisplayName,
+                user.Email,
+                AvatarUrl = effectiveAvatarUrl,
+                user.IsGlobalAdmin,
+                user.EmailVerified
+            }
+        });
+    }
+
     [HttpPost("oauth/github")]
     public async Task<IActionResult> GitHubCallback([FromBody] OAuthCallbackRequest request)
     {
