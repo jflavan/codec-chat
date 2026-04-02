@@ -66,6 +66,11 @@
 			dms.loadDmConversations(),
 			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui, reconnectTimerRef)
 		]);
+
+		// Load channels/members/emojis for the auto-selected first server
+		if (servers.selectedServerId) {
+			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);
+		}
 	};
 
 	auth.onSignedOut = async () => {
