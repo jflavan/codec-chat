@@ -534,6 +534,9 @@ export class AppState {
 					this.isInitialLoading = false;
 					this.renderSignIn();
 				}
+			}).catch(() => {
+				this.isInitialLoading = false;
+				this.renderSignIn();
 			});
 			return;
 		}

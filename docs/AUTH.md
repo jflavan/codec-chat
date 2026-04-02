@@ -6,7 +6,7 @@ This document explains how authentication works in Codec, which supports Google 
 
 Codec supports **five authentication methods** with equivalent security guarantees:
 
-1. **Google Sign-In** — Stateless authentication using Google-issued ID tokens validated on every API request.
+1. **Google Sign-In** — Google-issued ID tokens are exchanged for backend-issued JWTs via `POST /auth/google`, giving Google users the same rotating refresh token lifecycle as all other auth methods.
 2. **Email/Password** — Registration and login with bcrypt password hashing; the API issues its own signed JWTs (access tokens + refresh tokens).
 3. **GitHub OAuth** — Authorization code flow; API exchanges code for GitHub access token, fetches user profile and email.
 4. **Discord OAuth** — Authorization code flow; API exchanges code for Discord access token, fetches user profile and avatar.
@@ -14,11 +14,11 @@ Codec supports **five authentication methods** with equivalent security guarante
 
 All methods use the same JWT-based authorization middleware in the API and produce access tokens with identical claims shapes. All authenticated API requests use `Authorization: Bearer <token>`, regardless of how the token was obtained.
 
-The web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week** (Google session limit or refresh-token lifetime).
+The web client persists the token in `localStorage` so that users stay logged in across page reloads for up to **one week** (refresh-token lifetime).
 
 ## Authentication Flow
 
-Codec supports two parallel auth flows. Both result in a JWT access token stored in `localStorage` and sent with every API request.
+Codec supports two parallel auth flows. Both result in a backend-issued JWT access token stored in `localStorage` and sent with every API request. All auth methods produce identical `codec-api`-issued tokens with rotating refresh tokens.
 
 ---
 
@@ -72,30 +72,30 @@ The web client uses the Google Identity Services JavaScript SDK. The initializat
 import { initGoogleIdentity, renderGoogleButton } from '$lib/auth/google';
 
 initGoogleIdentity(clientId, (credential) => {
-  // credential is the JWT ID token
-  persistToken(credential); // $lib/auth/session.ts
-}, { autoSelect: true });
+  // credential is a Google ID token — exchanged for backend JWTs below
+}, { autoSelect: hasStoredAuthType() && authType === 'google' });
 ```
 
-Token persistence and session management are handled by `$lib/auth/session.ts`:
+### 2. Token Exchange (`POST /auth/google`)
 
-```typescript
-// $lib/auth/session.ts — token lifecycle management
-import { persistToken, loadStoredToken, clearSession, isTokenExpired, isSessionExpired } from '$lib/auth/session';
+When the user signs in with Google, the frontend sends the Google ID token to the backend for exchange:
 
-// On sign-in: persist token + login timestamp
-persistToken(idToken);
+1. Client calls `POST /auth/google` with `{ credential: "<google-id-token>" }`.
+2. API validates the Google ID token against Google's JWKS (issuer, audience, lifetime, signature).
+3. API checks for account-linking scenarios: if an existing email/password user has the same email but no linked Google account, returns `{ needsLinking: true, email }` instead of creating a duplicate.
+4. API finds or creates a user by `GoogleSubject`, syncing profile fields (name, email, avatar) if changed.
+5. API issues a 1-hour access token and a 7-day rotating refresh token (identical to email/password flow).
+6. Returns `{ accessToken, refreshToken, isNewUser, user }`.
 
-// On page load: restore token if still valid
-const storedToken = loadStoredToken(); // returns null if expired or session > 1 week
+The frontend stores the backend-issued tokens and uses the standard `POST /auth/refresh` flow for token renewal — no Google One Tap silent re-authentication is needed.
 
-// On sign-out or session expiry
-clearSession();
-```
+### 3. FedCM Console Error Suppression
 
-### 2. API Request with Token
+Google One Tap `auto_select` is only enabled when the user has a previously stored auth type of `'google'` (`hasStoredAuthType() && authType === 'google'`). This prevents FedCM console errors for first-time visitors who have no prior Google session.
 
-All authenticated API requests include the ID token in the Authorization header:
+### 4. API Request with Token
+
+All authenticated API requests include the backend-issued JWT in the Authorization header:
 
 ```http
 GET /servers HTTP/1.1
@@ -103,12 +103,14 @@ Host: localhost:5050
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-### 3. Token Validation (API)
+### 5. Token Validation (API)
 
 The API uses a **dual JWT Bearer scheme** with a policy-based selector. On each request, the selector peeks at the JWT `iss` claim (without validating) to route the token to the correct handler:
 
 - **`iss` = `codec-api`** → `"Local"` scheme (validates with the API's HMAC-SHA256 signing key)
 - **Any other issuer** → `"Google"` scheme (validates against Google's JWKS)
+
+Since Google Sign-In now exchanges tokens for backend-issued JWTs (`iss` = `codec-api`), Google users' subsequent API requests are validated via the `"Local"` scheme — the same as email/password users. The `"Google"` scheme is retained for backward compatibility.
 
 ```csharp
 builder.Services.AddAuthentication("Selector")
@@ -153,29 +155,29 @@ builder.Services.AddAuthentication("Selector")
     });
 ```
 
-**Validation Steps (Google):**
+**Validation Steps (Local — used by email/password, Google, GitHub, Discord, and SAML users):**
+1. Verify HMAC-SHA256 signature using `Jwt:Secret`
+2. Check issuer and audience are `codec-api`
+3. Verify token has not expired
+4. Extract user claims (sub = user GUID, email, name, picture)
+
+**Validation Steps (Google — retained for backward compatibility):**
 1. Verify JWT signature using Google's public keys (JWKS)
 2. Check issuer is Google (`accounts.google.com`)
 3. Validate audience matches your Google Client ID
 4. Verify token has not expired
 5. Extract user claims (subject, email, name, picture)
 
-**Validation Steps (Local):**
-1. Verify HMAC-SHA256 signature using `Jwt:Secret`
-2. Check issuer and audience are `codec-api`
-3. Verify token has not expired
-4. Extract user claims (sub = user GUID, email, name, picture)
-
-### 4. Nickname on First Sign-Up
+### 6. Nickname on First Sign-Up
 
 Both flows gate entry to the app on a nickname being set:
 
 - **Email/password users** — Nickname is collected during registration (`RegisterRequest.Nickname`) and written directly to `User.Nickname`.
-- **Google users** — After the first Google sign-in, `/me` returns `isNewUser: true`. The frontend shows a `NicknameModal` (pre-filled with the Google display name) before allowing navigation. On submit, the frontend calls `PATCH /me/nickname`.
+- **Google users** — After the first Google sign-in, `POST /auth/google` returns `isNewUser: true`. The frontend shows a `NicknameModal` (pre-filled with the Google display name) before allowing navigation. On submit, the frontend calls `PATCH /me/nickname`.
 
 ---
 
-### 5. Account Linking
+### 7. Account Linking
 
 An email/password user can link their Google account by visiting Settings → My Account → Link Google Account.
 
@@ -183,18 +185,21 @@ An email/password user can link their Google account by visiting Settings → My
 2. Frontend sends `{ googleIdToken, password }` to `POST /auth/link-google`.
 3. API confirms the password (required — user must prove ownership of the email/password account).
 4. API stores the Google subject on the existing `User` record.
-5. From that point on, the user can sign in with either method.
+5. API issues backend JWTs; the frontend switches to `authType = 'google'`.
+6. From that point on, the user can sign in with either method.
+
+Account linking is also detected automatically during `POST /auth/google`: if a Google sign-in matches an existing email/password account by email, the API returns `{ needsLinking: true }` and the frontend prompts the user to confirm their password before linking.
 
 > **Deferred:** Reverse linking (Google-first users adding a password) and password reset via email are not yet implemented.
 
 ---
 
-### 6. User Identity Mapping
+### 8. User Identity Mapping
 
 After validation, `UserService.GetOrCreateUserAsync` checks the JWT `iss` claim to determine the auth method and maps claims to an internal `User` record:
 
-- **Local tokens** (`iss` = `codec-api`): The `sub` claim is the user's GUID. The user is looked up directly by `Id`.
-- **Google tokens** (`iss` = `accounts.google.com`): The `sub` claim is the Google subject string. The user is looked up by `GoogleSubject`, and profile fields (display name, email, avatar) are synced from the Google token on each request.
+- **Local tokens** (`iss` = `codec-api`): The `sub` claim is the user's GUID. The user is looked up directly by `Id`. This covers email/password, Google (post-exchange), GitHub, Discord, and SAML users.
+- **Google tokens** (`iss` = `accounts.google.com`): Retained for backward compatibility. The `sub` claim is the Google subject string. The user is looked up by `GoogleSubject`.
 
 ```csharp
 public async Task<(User, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal principal)
@@ -209,7 +214,7 @@ public async Task<(User, bool isNewUser)> GetOrCreateUserAsync(ClaimsPrincipal p
         return (user!, false);
     }
 
-    // Google JWT — sub is the Google subject string
+    // Google JWT (backward compat) — sub is the Google subject string
     var googleSubject = principal.FindFirst("sub")?.Value;
     var existing = await db.Users.FirstOrDefaultAsync(u => u.GoogleSubject == googleSubject);
 
@@ -323,28 +328,28 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - Session is cleared automatically when the 1-week limit is reached
 
 ✅ **Automatic Token Refresh**
-- Google Identity Services initialized with `auto_select: true`
-- `google.accounts.id.prompt()` triggers One Tap silent re-authentication
-- When a stored token expires (but session is still within 1 week), Google silently issues a fresh token
+- All auth methods (Google, email/password, GitHub, Discord, SAML) use the same `POST /auth/refresh` rotating refresh token flow
+- When a stored access token expires (but session is still within 1 week), the frontend automatically calls `POST /auth/refresh` to obtain a new access token
+- Google One Tap `auto_select` is only enabled for returning Google users (prevents FedCM console errors for new visitors)
 
 ### Security Comparison: Google vs. Email/Password
 
 | Property | Google Sign-In | Email/Password |
 |---|---|---|
 | Access token lifetime | 1 hour | 1 hour |
-| Session duration | 7 days (One Tap refresh) | 7 days (refresh token) |
+| Session duration | 7 days (refresh token) | 7 days (refresh token) |
 | Password storage | N/A (Google manages) | bcrypt cost factor 12 |
-| Token signing | Google RSA (JWKS) | API HMAC-SHA256 secret |
+| Token signing | API HMAC-SHA256 secret (post-exchange) | API HMAC-SHA256 secret |
 | Rate limiting on auth endpoints | Standard (100 req/min) | Strict (10 req/min per IP) |
 | Account lockout | N/A (Google manages) | 5 failed attempts → 15-min lockout |
-| Refresh mechanism | Google One Tap silent re-auth | Rotating opaque refresh tokens (stored hashed) |
-| Logout | Client-side only | Server-side revocation via `POST /auth/logout` |
+| Refresh mechanism | Rotating opaque refresh tokens (stored hashed) | Rotating opaque refresh tokens (stored hashed) |
+| Logout | Server-side revocation via `POST /auth/logout` | Server-side revocation via `POST /auth/logout` |
 
 ### Current Limitations
 
 ⚠️ **Token Revocation**
-- Google tokens: no real-time invalidation; compromised tokens valid until expiration
-- Local tokens: access tokens cannot be individually revoked (short 1-hour TTL mitigates); refresh tokens are invalidated on use (rotation) and on sign-out via the logout endpoint
+- Access tokens (all auth methods): cannot be individually revoked (short 1-hour TTL mitigates)
+- Refresh tokens: invalidated on use (rotation) and on sign-out via the logout endpoint
 
 ⚠️ **Password Reset**
 - Password reset via email is not yet implemented
@@ -354,8 +359,8 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 
 ⚠️ **Sign-Out**
 - Sign-out button is available in the user panel (bottom of channel sidebar)
-- For email/password users, sign-out calls `POST /auth/logout` to revoke the refresh token server-side before clearing local state
-- For Google users, calls `google.accounts.id.disableAutoSelect()` and clears `localStorage`
+- All auth methods call `POST /auth/logout` to revoke the refresh token server-side before clearing local state
+- For Google users, also calls `google.accounts.id.disableAutoSelect()`
 - Resets application state and returns user to the sign-in screen
 
 ### Accepted Tradeoffs
@@ -632,8 +637,8 @@ If Google's assessment API is unreachable, verification fails and the request is
 **Solution:** Add web origin to `Cors:AllowedOrigins` in API settings
 
 ### Error: "Token expired"
-**Cause:** ID token older than 1 hour
-**Solution:** The client automatically attempts silent re-authentication via Google One Tap. If One Tap is blocked or the 1-week session has expired, the user must sign in again manually
+**Cause:** Access token older than 1 hour
+**Solution:** The client automatically attempts a token refresh via `POST /auth/refresh`. If the refresh token is also expired or revoked (beyond the 7-day lifetime), the user must sign in again manually
 
 ## References
 
