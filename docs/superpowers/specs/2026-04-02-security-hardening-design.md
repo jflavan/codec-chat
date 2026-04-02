@@ -109,9 +109,9 @@ Implement a custom `IHubFilter` that tracks per-connection invocation counts usi
 
 ### 5a. Audit logging for admin-sensitive operations
 
-**Problem:** Audit logging exists for message deletion, channel purging, and pinning. Missing for: role create/update/delete, permission override changes, member ban/unban, server settings updates.
+**Problem:** Audit logging is comprehensive for most operations (roles, bans, server settings, channels, webhooks, emojis, invites are all covered). The only gap was channel permission override changes (`SetChannelOverride` and `DeleteChannelOverride` in `ChannelsController`).
 
-**Fix:** Add `audit.Log()` calls to role CRUD in `RolesController`, permission override changes in `ChannelsController`, ban/unban in `ServersController`, and server settings updates.
+**Fix:** Added `ChannelOverrideUpdated` and `ChannelOverrideDeleted` to `AuditAction` enum and added `audit.Log()` calls to both methods.
 
 ### 5b. Expand `Permissions-Policy` header
 
