@@ -53,7 +53,7 @@ The following transitive npm dependencies are flagged as outdated by FOSSA but a
 **Not present in our dependency tree** (FOSSA may be scanning stale data):
 `data-uri-to-buffer`, `postgres-interval`, `string-width`, `@types/tedious`, `wrap-ansi`
 
-Last reviewed: 2026-03-20. Revisit when `workbox-build`, `vitest`, or `@vitest/coverage-v8` release new major versions.
+Last reviewed: 2026-04-02. Revisit when `workbox-build`, `vitest`, or `@vitest/coverage-v8` release new major versions.
 
 ## Disclosure Policy
 
