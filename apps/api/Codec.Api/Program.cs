@@ -352,6 +352,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutSe
 
 builder.Services.AddSingleton<PresenceTracker>();
 builder.Services.AddHostedService<PresenceBackgroundService>();
+builder.Services.AddHostedService<AdminMetricsService>();
 
 // Web Push notification service (VAPID-authenticated).
 var vapidPublicKey = builder.Configuration["Vapid:PublicKey"];
@@ -677,6 +678,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<AdminHub>("/hubs/admin");
 
 app.MapOpenApi();
 if (app.Environment.IsDevelopment())
