@@ -79,6 +79,21 @@ public class User
     public string? EmailVerificationToken { get; set; }
 
     /// <summary>
+    /// When true, the user cannot log in or refresh tokens. Set by global admins.
+    /// </summary>
+    public bool IsDisabled { get; set; }
+
+    /// <summary>
+    /// Reason provided by the admin who disabled this account. Max 500 chars.
+    /// </summary>
+    public string? DisabledReason { get; set; }
+
+    /// <summary>
+    /// When the account was disabled.
+    /// </summary>
+    public DateTimeOffset? DisabledAt { get; set; }
+
+    /// <summary>
     /// When the email verification token expires.
     /// </summary>
     public DateTimeOffset? EmailVerificationTokenExpiresAt { get; set; }
