@@ -609,6 +609,33 @@ export class AppState {
 		return this.api.linkGoogle(email, password, googleCredential);
 	}
 
+	async handleLinkGoogleSuccess(response: AuthResponse): Promise<void> {
+		this.needsLinking = false;
+		this.linkingEmail = '';
+		this.pendingGoogleCredential = '';
+
+		this.idToken = response.accessToken;
+		this.status = 'Signed in';
+		persistToken(response.accessToken);
+		persistRefreshToken(response.refreshToken);
+		setAuthType('google');
+		this.authType = 'google';
+
+		this.isInitialLoading = true;
+		await this.loadMe();
+
+		await Promise.all([
+			this.loadServers(),
+			this.loadFriends(),
+			this.loadFriendRequests(),
+			this.loadDmConversations(),
+			this.startSignalR()
+		]);
+		this.isInitialLoading = false;
+		this.showAlphaNotification = true;
+		this.checkPushSubscription();
+	}
+
 	async handleOAuthCallback(provider: 'github' | 'discord', code: string): Promise<void> {
 		const response = await this.api.oauthCallback(provider, code);
 		this.idToken = response.accessToken;
