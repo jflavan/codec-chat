@@ -177,7 +177,16 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task JoinDmChannel(string dmChannelId)
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"dm-{dmChannelId}");
+        if (!Guid.TryParse(dmChannelId, out var dmChannelGuid))
+            throw new HubException("Invalid DM channel ID.");
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
+        var isMember = await db.DmChannelMembers.AsNoTracking()
+            .AnyAsync(m => m.DmChannelId == dmChannelGuid && m.UserId == appUser.Id);
+        if (!isMember)
+            throw new HubException("Not a member of this DM channel.");
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"dm-{dmChannelGuid}");
     }
 
     /// <summary>
@@ -185,7 +194,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     public async Task LeaveDmChannel(string dmChannelId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"dm-{dmChannelId}");
+        if (!Guid.TryParse(dmChannelId, out var dmChannelGuid))
+            throw new HubException("Invalid DM channel ID.");
+
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"dm-{dmChannelGuid}");
     }
 
     /// <summary>

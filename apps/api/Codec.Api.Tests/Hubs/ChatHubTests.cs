@@ -395,16 +395,33 @@ public class ChatHubTests : IDisposable
     // ── DM Channel groups ──
 
     [Fact]
-    public async Task JoinDmChannel_AddsToGroupWithDmPrefix()
+    public async Task JoinDmChannel_ValidMember_JoinsGroup()
     {
         var hub = CreateHub();
-        var dmId = _dmChannel.Id.ToString();
-
-        await hub.JoinDmChannel(dmId);
-
+        await hub.JoinDmChannel(_dmChannel.Id.ToString());
         _mockGroups.Verify(
-            g => g.AddToGroupAsync(_connectionId, $"dm-{dmId}", default),
+            g => g.AddToGroupAsync(_connectionId, $"dm-{_dmChannel.Id}", default),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task JoinDmChannel_InvalidGuid_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.JoinDmChannel("not-a-guid");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid DM channel ID.");
+    }
+
+    [Fact]
+    public async Task JoinDmChannel_NonMember_ThrowsHubException()
+    {
+        var otherDm = new DmChannel { Id = Guid.NewGuid() };
+        _db.DmChannels.Add(otherDm);
+        await _db.SaveChangesAsync();
+
+        var hub = CreateHub();
+        var act = () => hub.JoinDmChannel(otherDm.Id.ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Not a member of this DM channel.");
     }
 
     [Fact]
@@ -2864,22 +2881,21 @@ public class ChatHubTests : IDisposable
     public async Task JoinDmChannel_AddsWithDmPrefix()
     {
         var hub = CreateHub();
-        var dmId = Guid.NewGuid().ToString();
 
-        await hub.JoinDmChannel(dmId);
+        await hub.JoinDmChannel(_dmChannel.Id.ToString());
 
-        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, $"dm-{dmId}", default), Times.Once);
+        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, $"dm-{_dmChannel.Id}", default), Times.Once);
     }
 
     [Fact]
     public async Task LeaveDmChannel_RemovesWithDmPrefix()
     {
         var hub = CreateHub();
-        var dmId = Guid.NewGuid().ToString();
+        var dmId = _dmChannel.Id.ToString();
 
         await hub.LeaveDmChannel(dmId);
 
-        _mockGroups.Verify(g => g.RemoveFromGroupAsync(_connectionId, $"dm-{dmId}", default), Times.Once);
+        _mockGroups.Verify(g => g.RemoveFromGroupAsync(_connectionId, $"dm-{_dmChannel.Id}", default), Times.Once);
     }
 
     // ═══════════════════ StartCall — cleans up existing voice state ═══════════════════
