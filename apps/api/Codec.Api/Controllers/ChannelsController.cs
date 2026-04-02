@@ -1238,7 +1238,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     /// Sets or updates a permission override for a role in a channel. Requires ManageChannels permission.
     /// </summary>
     [HttpPut("{channelId:guid}/overrides/{roleId:guid}")]
-    public async Task<IActionResult> SetChannelOverride(Guid channelId, Guid roleId, [FromBody] ChannelOverrideRequest request)
+    public async Task<IActionResult> SetChannelOverride(Guid channelId, Guid roleId, [FromBody] ChannelOverrideRequest request, [FromServices] AuditService audit)
     {
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null) return NotFound();
@@ -1304,6 +1304,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 Allow = (Permission)request.Allow, Deny = (Permission)request.Deny
             });
         }
+        audit.Log(channel.ServerId, appUser.Id, AuditAction.ChannelOverrideUpdated,
+            targetType: "Channel", targetId: channelId.ToString(),
+            details: $"Role: {roleId}, Allow: {request.Allow}, Deny: {request.Deny}");
         await db.SaveChangesAsync();
 
         await chatHub.Clients.Group($"server-{channel.ServerId}")
@@ -1315,7 +1318,7 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
     /// Removes a permission override for a role in a channel. Requires ManageChannels permission.
     /// </summary>
     [HttpDelete("{channelId:guid}/overrides/{roleId:guid}")]
-    public async Task<IActionResult> DeleteChannelOverride(Guid channelId, Guid roleId)
+    public async Task<IActionResult> DeleteChannelOverride(Guid channelId, Guid roleId, [FromServices] AuditService audit)
     {
         var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null) return NotFound();
@@ -1350,6 +1353,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         }
 
         db.ChannelPermissionOverrides.Remove(existing);
+        audit.Log(channel.ServerId, appUser.Id, AuditAction.ChannelOverrideDeleted,
+            targetType: "Channel", targetId: channelId.ToString(),
+            details: $"Role: {roleId}");
         await db.SaveChangesAsync();
 
         await chatHub.Clients.Group($"server-{channel.ServerId}")

@@ -379,6 +379,28 @@ public class ChatHubTests : IDisposable
     }
 
     [Fact]
+    public async Task StartTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StartTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid channel ID.");
+    }
+
+    [Fact]
+    public async Task StartTyping_TruncatesLongDisplayName()
+    {
+        var hub = CreateHub();
+        var longName = new string('A', 200);
+        await hub.StartTyping(_textChannel.Id.ToString(), longName);
+        _mockClients.Verify(c => c.OthersInGroup(_textChannel.Id.ToString()), Times.Once);
+        _mockOthersProxy.Verify(
+            p => p.SendCoreAsync("UserTyping",
+                It.Is<object?[]>(args => args.Length == 2 && ((string)args[1]!).Length == 100),
+                default),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task StopTyping_BroadcastsToOthersInGroup()
     {
         var hub = CreateHub();
@@ -392,19 +414,44 @@ public class ChatHubTests : IDisposable
             Times.Once);
     }
 
+    [Fact]
+    public async Task StopTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StopTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid channel ID.");
+    }
+
     // ── DM Channel groups ──
 
     [Fact]
-    public async Task JoinDmChannel_AddsToGroupWithDmPrefix()
+    public async Task JoinDmChannel_ValidMember_JoinsGroup()
     {
         var hub = CreateHub();
-        var dmId = _dmChannel.Id.ToString();
-
-        await hub.JoinDmChannel(dmId);
-
+        await hub.JoinDmChannel(_dmChannel.Id.ToString());
         _mockGroups.Verify(
-            g => g.AddToGroupAsync(_connectionId, $"dm-{dmId}", default),
+            g => g.AddToGroupAsync(_connectionId, $"dm-{_dmChannel.Id}", default),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task JoinDmChannel_InvalidGuid_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.JoinDmChannel("not-a-guid");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid DM channel ID.");
+    }
+
+    [Fact]
+    public async Task JoinDmChannel_NonMember_ThrowsHubException()
+    {
+        var otherDm = new DmChannel { Id = Guid.NewGuid() };
+        _db.DmChannels.Add(otherDm);
+        await _db.SaveChangesAsync();
+
+        var hub = CreateHub();
+        var act = () => hub.JoinDmChannel(otherDm.Id.ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Not a member of this DM channel.");
     }
 
     [Fact]
@@ -437,6 +484,14 @@ public class ChatHubTests : IDisposable
     }
 
     [Fact]
+    public async Task StartDmTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StartDmTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid DM channel ID.");
+    }
+
+    [Fact]
     public async Task StopDmTyping_BroadcastsToOthersInDmGroup()
     {
         var hub = CreateHub();
@@ -448,6 +503,14 @@ public class ChatHubTests : IDisposable
         _mockOthersProxy.Verify(
             p => p.SendCoreAsync("DmStoppedTyping", It.Is<object?[]>(a => a.Length == 2), default),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task StopDmTyping_InvalidChannelId_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.StopDmTyping("not-a-guid", "User");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid DM channel ID.");
     }
 
     // ── StartCall ──
@@ -2775,25 +2838,59 @@ public class ChatHubTests : IDisposable
     // ═══════════════════ JoinServer / LeaveServer ═══════════════════
 
     [Fact]
-    public async Task JoinServer_AddsToCorrectGroup()
+    public async Task JoinServer_ValidMember_JoinsGroup()
     {
         var hub = CreateHub();
-        var serverId = Guid.NewGuid().ToString();
-
-        await hub.JoinServer(serverId);
-
-        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, $"server-{serverId}", default), Times.Once);
+        await hub.JoinServer(_testServer.Id.ToString());
+        _mockGroups.Verify(
+            g => g.AddToGroupAsync(_connectionId, $"server-{_testServer.Id}", default),
+            Times.Once);
     }
 
     [Fact]
-    public async Task LeaveServer_RemovesFromCorrectGroup()
+    public async Task JoinServer_InvalidGuid_ThrowsHubException()
     {
         var hub = CreateHub();
-        var serverId = Guid.NewGuid().ToString();
+        var act = () => hub.JoinServer("not-a-guid");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid server ID.");
+    }
 
-        await hub.LeaveServer(serverId);
+    [Fact]
+    public async Task JoinServer_NonMember_ThrowsHubException()
+    {
+        var nonMemberServer = new Server { Id = Guid.NewGuid(), Name = "Other Server" };
+        _db.Servers.Add(nonMemberServer);
+        await _db.SaveChangesAsync();
 
-        _mockGroups.Verify(g => g.RemoveFromGroupAsync(_connectionId, $"server-{serverId}", default), Times.Once);
+        var hub = CreateHub();
+        var act = () => hub.JoinServer(nonMemberServer.Id.ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Not a member of this server.");
+    }
+
+    [Fact]
+    public async Task JoinServer_ServerNotFound_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.JoinServer(Guid.NewGuid().ToString());
+        await act.Should().ThrowAsync<HubException>().WithMessage("Server not found.");
+    }
+
+    [Fact]
+    public async Task LeaveServer_InvalidGuid_ThrowsHubException()
+    {
+        var hub = CreateHub();
+        var act = () => hub.LeaveServer("not-a-guid");
+        await act.Should().ThrowAsync<HubException>().WithMessage("Invalid server ID.");
+    }
+
+    [Fact]
+    public async Task LeaveServer_ValidId_LeavesGroup()
+    {
+        var hub = CreateHub();
+        await hub.LeaveServer(_testServer.Id.ToString());
+        _mockGroups.Verify(
+            g => g.RemoveFromGroupAsync(_connectionId, $"server-{_testServer.Id}", default),
+            Times.Once);
     }
 
     // ═══════════════════ DM Typing ═══════════════════
@@ -2830,22 +2927,21 @@ public class ChatHubTests : IDisposable
     public async Task JoinDmChannel_AddsWithDmPrefix()
     {
         var hub = CreateHub();
-        var dmId = Guid.NewGuid().ToString();
 
-        await hub.JoinDmChannel(dmId);
+        await hub.JoinDmChannel(_dmChannel.Id.ToString());
 
-        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, $"dm-{dmId}", default), Times.Once);
+        _mockGroups.Verify(g => g.AddToGroupAsync(_connectionId, $"dm-{_dmChannel.Id}", default), Times.Once);
     }
 
     [Fact]
     public async Task LeaveDmChannel_RemovesWithDmPrefix()
     {
         var hub = CreateHub();
-        var dmId = Guid.NewGuid().ToString();
+        var dmId = _dmChannel.Id.ToString();
 
         await hub.LeaveDmChannel(dmId);
 
-        _mockGroups.Verify(g => g.RemoveFromGroupAsync(_connectionId, $"dm-{dmId}", default), Times.Once);
+        _mockGroups.Verify(g => g.RemoveFromGroupAsync(_connectionId, $"dm-{_dmChannel.Id}", default), Times.Once);
     }
 
     // ═══════════════════ StartCall — cleans up existing voice state ═══════════════════

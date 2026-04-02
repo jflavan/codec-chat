@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -80,7 +81,11 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
 
 builder.Services.AddSingleton<MessageCacheService>();
 
-var signalRBuilder = builder.Services.AddSignalR()
+builder.Services.AddSingleton<Codec.Api.Filters.HubRateLimitFilter>();
+var signalRBuilder = builder.Services.AddSignalR(options =>
+{
+    options.AddFilter<Codec.Api.Filters.HubRateLimitFilter>();
+})
     .AddJsonProtocol(options =>
     {
         options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;

@@ -32,7 +32,9 @@ public enum AuditAction
     MemberUnbanned,
     RoleCreated,
     RoleUpdated,
-    RoleDeleted
+    RoleDeleted,
+    ChannelOverrideUpdated,
+    ChannelOverrideDeleted
 }
 
 public class AuditLogEntry
