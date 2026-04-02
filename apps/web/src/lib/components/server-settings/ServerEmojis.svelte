@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
-	const app = getAppState();
+	const servers = getServerStore();
 
 	const MAX_EMOJIS = 50;
 
@@ -27,7 +27,7 @@
 
 	const nameValid = $derived(/^[a-zA-Z0-9_]{2,32}$/.test(emojiName));
 	const canUpload = $derived(
-		nameValid && selectedFile !== null && !app.isUploadingEmoji && app.customEmojis.length < MAX_EMOJIS
+		nameValid && selectedFile !== null && !servers.isUploadingEmoji && servers.customEmojis.length < MAX_EMOJIS
 	);
 
 	const renameValid = $derived(/^[a-zA-Z0-9_]{2,32}$/.test(renameValue));
@@ -46,7 +46,7 @@
 		uploadError = '';
 		clearTimeout(errorTimeout);
 		try {
-			await app.uploadCustomEmoji(emojiName, selectedFile);
+			await servers.uploadCustomEmoji(emojiName, selectedFile);
 			// Reset form only on success
 			emojiName = '';
 			selectedFile = null;
@@ -66,7 +66,7 @@
 
 	async function saveRename() {
 		if (!renamingId || !renameValid) return;
-		await app.renameCustomEmoji(renamingId, renameValue.trim());
+		await servers.renameCustomEmoji(renamingId, renameValue.trim());
 		renamingId = '';
 		renameValue = '';
 	}
@@ -78,7 +78,7 @@
 
 	async function confirmDelete() {
 		if (!deletingId) return;
-		await app.deleteCustomEmoji(deletingId);
+		await servers.deleteCustomEmoji(deletingId);
 		deletingId = '';
 	}
 
@@ -95,7 +95,7 @@
 
 <section class="settings-section">
 	<h2 class="section-title">Custom Emojis</h2>
-	<p class="section-desc">{app.customEmojis.length} / {MAX_EMOJIS} emoji slots used</p>
+	<p class="section-desc">{servers.customEmojis.length} / {MAX_EMOJIS} emoji slots used</p>
 
 	<!-- Upload form -->
 	<div class="upload-form">
@@ -140,7 +140,7 @@
 			disabled={!canUpload}
 			onclick={handleUpload}
 		>
-			{app.isUploadingEmoji ? 'Uploading...' : 'Upload Emoji'}
+			{servers.isUploadingEmoji ? 'Uploading...' : 'Upload Emoji'}
 		</button>
 		{#if uploadError}
 			<p class="upload-error" role="alert">{uploadError}</p>
@@ -148,9 +148,9 @@
 	</div>
 
 	<!-- Emoji list -->
-	{#if app.customEmojis.length > 0}
+	{#if servers.customEmojis.length > 0}
 		<div class="emoji-list">
-			{#each app.customEmojis as emoji (emoji.id)}
+			{#each servers.customEmojis as emoji (emoji.id)}
 				<div class="emoji-row">
 					<img src={emoji.imageUrl} alt={emoji.name} width="32" height="32" />
 					{#if renamingId === emoji.id}

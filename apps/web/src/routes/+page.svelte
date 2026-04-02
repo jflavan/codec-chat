@@ -1,7 +1,23 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { env } from '$env/dynamic/public';
-	import { createAppState } from '$lib/state/app-state.svelte.js';
+	import {
+		createUIStore,
+		createAuthStore,
+		createServerStore,
+		createChannelStore,
+		createMessageStore,
+		createDmStore,
+		createFriendStore,
+		createVoiceStore,
+		setupSignalR,
+		goHome,
+		selectServer
+	} from '$lib/state/index.js';
+	import type { AuthStore } from '$lib/state/index.js';
+	import { ApiClient } from '$lib/api/client.js';
+	import { ChatHubService } from '$lib/services/chat-hub.js';
+	import { VoiceService } from '$lib/services/voice-service.js';
 	import ServerSidebar from '$lib/components/server-sidebar/ServerSidebar.svelte';
 	import ChannelSidebar from '$lib/components/channel-sidebar/ChannelSidebar.svelte';
 	import ChatArea from '$lib/components/chat/ChatArea.svelte';
@@ -17,57 +33,123 @@
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
-import NicknameModal from '$lib/components/NicknameModal.svelte';
-import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
-import VerificationGate from '$lib/components/VerificationGate.svelte';
+	import NicknameModal from '$lib/components/NicknameModal.svelte';
+	import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
+	import VerificationGate from '$lib/components/VerificationGate.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
-	const app = createAppState(apiBaseUrl, googleClientId);
+	/* ───── Create stores in dependency order ───── */
+	const ui = createUIStore();
 
+	let authRef: AuthStore;
+	const api = new ApiClient(apiBaseUrl, () => authRef.refreshToken());
+	const hub = new ChatHubService(`${apiBaseUrl}/hubs/chat`);
+
+	const auth = authRef = createAuthStore(api, ui, googleClientId);
+	const servers = createServerStore(auth, api, ui, hub);
+	const channels = createChannelStore(auth, api, ui, hub);
+	const messages = createMessageStore(auth, channels, api, ui, hub);
+	const dms = createDmStore(auth, api, ui, hub);
+	const friends = createFriendStore(auth, api, ui);
+	const voice = createVoiceStore(auth, api, ui, hub, new VoiceService());
+
+	/* ───── Wire cross-store callbacks ───── */
+	const reconnectTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
+
+	auth.onSignedIn = async () => {
+		await Promise.all([
+			servers.loadServers(),
+			friends.loadFriends(),
+			friends.loadFriendRequests(),
+			dms.loadDmConversations(),
+			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui, reconnectTimerRef)
+		]);
+
+		// Load channels/members/emojis for the auto-selected first server
+		if (servers.selectedServerId) {
+			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);
+		}
+	};
+
+	auth.onSignedOut = async () => {
+		await hub.stop();
+		servers.reset();
+		channels.reset();
+		messages.reset();
+		dms.reset();
+		friends.reset();
+		voice.reset();
+		ui.resetNavigation();
+	};
+
+	auth.onMembersChanged = async () => {
+		if (servers.selectedServerId) {
+			await servers.loadMembers(servers.selectedServerId);
+		}
+	};
+
+	// ChannelStore callbacks
+	channels.getSelectedServerId = () => servers.selectedServerId;
+	channels.onLoadMessages = (channelId) => messages.loadMessages(channelId);
+	channels.onLoadVoiceStates = () => voice.loadAllVoiceStates(channels.channels);
+	channels.onLoadPinnedMessages = (channelId) => messages.loadPinnedMessages(channelId);
+	channels.onChannelSwitch = () => {
+		messages.typingUsers = [];
+		messages.pendingMentions = new Map();
+		messages.replyingTo = null;
+		messages.pinnedMessages = [];
+		messages.showPinnedPanel = false;
+	};
+
+	// ServerStore callbacks
+	servers.onGoHome = () => goHome(ui, servers, channels, messages, friends, dms);
+	servers.onSelectServer = (serverId) => selectServer(serverId, ui, servers, channels, dms, hub);
+
+	// MessageStore callbacks
+	messages.getSelectedServerId = () => servers.selectedServerId;
+	messages.getActiveDmChannelId = () => dms.activeDmChannelId;
+	messages.onSelectChannel = (channelId) => channels.selectChannel(channelId);
+	messages.onSelectDmConversation = (channelId) => dms.selectDmConversation(channelId);
+	messages.onSetDmMessages = (msgs) => { dms.dmMessages = msgs; };
+
+	/* ───── Lifecycle ───── */
 	onMount(() => {
 		if (!googleClientId) {
-			app.error = 'Missing PUBLIC_GOOGLE_CLIENT_ID.';
-			app.isInitialLoading = false;
+			ui.error = 'Missing PUBLIC_GOOGLE_CLIENT_ID.';
+			ui.isInitialLoading = false;
 			return;
 		}
 		if (!apiBaseUrl) {
-			app.error = 'Missing PUBLIC_API_BASE_URL.';
-			app.isInitialLoading = false;
+			ui.error = 'Missing PUBLIC_API_BASE_URL.';
+			ui.isInitialLoading = false;
 			return;
 		}
-		app.init();
+		auth.init();
 
-		const handleBeforeUnload = () => {
-			app.teardownVoiceSync();
-		};
+		const handleBeforeUnload = () => voice.teardownVoiceSync();
 		window.addEventListener('beforeunload', handleBeforeUnload);
-
-		return () => {
-			window.removeEventListener('beforeunload', handleBeforeUnload);
-		};
+		return () => window.removeEventListener('beforeunload', handleBeforeUnload);
 	});
 
-	onDestroy(() => {
-		app.destroy();
-	});
+	onDestroy(() => voice.destroy());
 
 	function closeMobileNav(): void {
-		app.mobileNavOpen = false;
+		ui.mobileNavOpen = false;
 	}
 
 	function closeMobileMembers(): void {
-		app.mobileMembersOpen = false;
+		ui.mobileMembersOpen = false;
 	}
 
 	function handleKeydown(e: KeyboardEvent): void {
 		if (e.key === 'Escape') {
-			if (app.mobileMembersOpen) {
-				app.mobileMembersOpen = false;
+			if (ui.mobileMembersOpen) {
+				ui.mobileMembersOpen = false;
 				e.stopPropagation();
-			} else if (app.mobileNavOpen) {
-				app.mobileNavOpen = false;
+			} else if (ui.mobileNavOpen) {
+				ui.mobileNavOpen = false;
 				e.stopPropagation();
 			}
 		}
@@ -80,16 +162,16 @@ import VerificationGate from '$lib/components/VerificationGate.svelte';
 	<title>Codec</title>
 </svelte:head>
 
-{#if app.isSignedIn && app.isInitialLoading}
+{#if auth.isSignedIn && ui.isInitialLoading}
 	<LoadingScreen />
 {/if}
 
-{#if !app.isInitialLoading}
-<div class="app-shell" class:home-mode={app.showFriendsPanel} class:dm-active={app.showFriendsPanel && app.activeDmChannelId}>
+{#if !ui.isInitialLoading}
+<div class="app-shell" class:home-mode={ui.showFriendsPanel} class:dm-active={ui.showFriendsPanel && dms.activeDmChannelId}>
 	<ServerSidebar />
-	{#if app.showFriendsPanel}
+	{#if ui.showFriendsPanel}
 		<HomeSidebar />
-		{#if app.activeDmChannelId}
+		{#if dms.activeDmChannelId}
 			<DmChatArea />
 		{:else}
 			<FriendsPanel />
@@ -102,14 +184,14 @@ import VerificationGate from '$lib/components/VerificationGate.svelte';
 </div>
 
 <!-- Mobile navigation drawer -->
-{#if app.mobileNavOpen}
+{#if ui.mobileNavOpen}
 	<div class="mobile-drawer-backdrop" onclick={closeMobileNav} aria-hidden="true"></div>
 	<div class="mobile-drawer" aria-label="Navigation">
 		<div class="mobile-drawer-servers">
 			<ServerSidebar />
 		</div>
 		<div class="mobile-drawer-channels">
-			{#if app.showFriendsPanel}
+			{#if ui.showFriendsPanel}
 				<HomeSidebar />
 			{:else}
 				<ChannelSidebar />
@@ -119,44 +201,44 @@ import VerificationGate from '$lib/components/VerificationGate.svelte';
 {/if}
 
 <!-- Mobile members drawer -->
-{#if app.mobileMembersOpen}
+{#if ui.mobileMembersOpen}
 	<div class="mobile-drawer-backdrop" onclick={closeMobileMembers} aria-hidden="true"></div>
 	<aside class="mobile-members-drawer" aria-label="Members">
 		<MembersSidebar />
 	</aside>
 {/if}
 
-{#if app.settingsOpen}
+{#if ui.settingsOpen}
 	<UserSettingsModal />
 {/if}
 
-{#if app.serverSettingsOpen}
+{#if ui.serverSettingsOpen}
 	<ServerSettingsModal />
 {/if}
 
-{#if app.bugReportOpen}
+{#if ui.bugReportOpen}
 	<BugReportModal />
 {/if}
 
 <ImagePreview />
 <AlphaNotification />
-{#if app.incomingCall}
+{#if voice.incomingCall}
 	<IncomingCallOverlay />
 {/if}
 
-{#if !app.isSignedIn}
+{#if !auth.isSignedIn}
 	<LoginScreen />
 {/if}
 
-{#if app.isSignedIn && !app.emailVerified}
+{#if auth.isSignedIn && !auth.emailVerified}
 	<VerificationGate />
 {/if}
 
-{#if app.needsNickname}
+{#if auth.needsNickname}
 	<NicknameModal />
 {/if}
 
-{#if app.needsLinking}
+{#if auth.needsLinking}
 	<LinkAccountModal />
 {/if}
 {/if}

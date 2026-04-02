@@ -366,7 +366,7 @@ A single EF Core migration (`AddFriendships`) will:
 - [ ] Add `Friendship`, `FriendRequest`, and `FriendshipStatus` types to `models.ts`
 - [ ] Add friend-related API methods to `ApiClient`
 - [ ] Add friend-related SignalR event handlers to `ChatHubService`
-- [ ] Add friends state management to `AppState`
+- [ ] Add friends state management to `FriendStore`
 - [ ] Create `FriendsPanel.svelte` component with tab navigation
 - [ ] Create `FriendsList.svelte` (All Friends tab)
 - [ ] Create `PendingRequests.svelte` (Pending tab)

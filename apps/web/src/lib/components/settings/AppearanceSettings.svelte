@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 	import { THEMES, type ThemeId } from '$lib/utils/theme.js';
 
-	const app = getAppState();
+	const ui = getUIStore();
 
 	const themeColors: Record<ThemeId, { bg: string; sidebar: string; accent: string; text: string }> = {
 		phosphor: { bg: '#0B1A10', sidebar: '#07110A', accent: '#00FF66', text: '#86FF6B' },
@@ -19,11 +19,11 @@
 	<div class="theme-grid">
 		{#each THEMES as theme}
 			{@const colors = themeColors[theme.id]}
-			{@const isActive = app.theme === theme.id}
+			{@const isActive = ui.theme === theme.id}
 			<button
 				class="theme-card"
 				class:active={isActive}
-				onclick={() => app.setTheme(theme.id)}
+				onclick={() => ui.setTheme(theme.id)}
 				style="--card-border: {isActive ? colors.accent : 'var(--border)'}"
 			>
 				<div class="theme-preview">

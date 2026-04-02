@@ -1,13 +1,17 @@
 <script lang="ts">
 	import type { Member } from '$lib/types/index.js';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 	import MemberItem from './MemberItem.svelte';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
+	const servers = getServerStore();
 
 	function byPresence(a: Member, b: Member): number {
-		const aOnline = (app.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
-		const bOnline = (app.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
+		const aOnline = (ui.userPresence.get(a.userId) ?? 'offline') !== 'offline' ? 0 : 1;
+		const bOnline = (ui.userPresence.get(b.userId) ?? 'offline') !== 'offline' ? 0 : 1;
 		return aOnline - bOnline;
 	}
 
@@ -17,7 +21,7 @@
 		const hoisted = new Map<string, { name: string; color?: string | null; position: number; members: Member[] }>();
 		const unhoisted: Member[] = [];
 
-		for (const m of app.members) {
+		for (const m of servers.members) {
 			// Use displayRole as the hoisted role if available; fall back to unhoisted
 			const displayRole = m.displayRole ?? null;
 			if (displayRole) {
@@ -46,13 +50,13 @@
 </script>
 
 <aside class="members-sidebar" aria-label="Members">
-	{#if !app.isSignedIn}
+	{#if !auth.isSignedIn}
 		<p class="muted sidebar-status">Sign in to see members.</p>
-	{:else if !app.selectedServerId}
+	{:else if !servers.selectedServerId}
 		<p class="muted sidebar-status">Select a server.</p>
-	{:else if app.isLoadingMembers}
+	{:else if servers.isLoadingMembers}
 		<p class="muted sidebar-status">Loading members…</p>
-	{:else if app.members.length === 0}
+	{:else if servers.members.length === 0}
 		<p class="muted sidebar-status">No members yet.</p>
 	{:else}
 		{#each roleGroups() as group (group.name)}
@@ -60,7 +64,7 @@
 				<h3 class="member-group-heading">{group.name} — {group.members.length}</h3>
 				<ul class="member-list" role="list">
 					{#each group.members as member (member.userId)}
-						<MemberItem {member} presence={app.userPresence.get(member.userId) ?? 'offline'} />
+						<MemberItem {member} presence={ui.userPresence.get(member.userId) ?? 'offline'} />
 					{/each}
 				</ul>
 			{/if}

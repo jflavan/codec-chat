@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getFriendStore } from '$lib/state/friend-store.svelte.js';
 
-	const app = getAppState();
+	const friends = getFriendStore();
 
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString(undefined, {
@@ -13,13 +13,13 @@
 </script>
 
 <div class="pending-requests">
-	{#if app.isLoadingFriends}
+	{#if friends.isLoadingFriends}
 		<p class="status-text">Loading requests…</p>
 	{:else}
-		{#if app.incomingRequests.length > 0}
-			<h3 class="section-heading">Incoming — {app.incomingRequests.length}</h3>
+		{#if friends.incomingRequests.length > 0}
+			<h3 class="section-heading">Incoming — {friends.incomingRequests.length}</h3>
 			<ul class="list" role="list">
-				{#each app.incomingRequests as req (req.id)}
+				{#each friends.incomingRequests as req (req.id)}
 					<li class="request-item">
 						<div class="request-info">
 							{#if req.requester.avatarUrl}
@@ -37,7 +37,7 @@
 						<div class="request-actions">
 							<button
 								class="btn-accept"
-								onclick={() => app.acceptFriendRequest(req.id)}
+								onclick={() => friends.acceptFriendRequest(req.id)}
 								aria-label="Accept request from {req.requester.displayName}"
 								title="Accept"
 							>
@@ -45,7 +45,7 @@
 							</button>
 							<button
 								class="btn-decline"
-								onclick={() => app.declineFriendRequest(req.id)}
+								onclick={() => friends.declineFriendRequest(req.id)}
 								aria-label="Decline request from {req.requester.displayName}"
 								title="Decline"
 							>
@@ -57,10 +57,10 @@
 			</ul>
 		{/if}
 
-		{#if app.outgoingRequests.length > 0}
-			<h3 class="section-heading">Outgoing — {app.outgoingRequests.length}</h3>
+		{#if friends.outgoingRequests.length > 0}
+			<h3 class="section-heading">Outgoing — {friends.outgoingRequests.length}</h3>
 			<ul class="list" role="list">
-				{#each app.outgoingRequests as req (req.id)}
+				{#each friends.outgoingRequests as req (req.id)}
 					<li class="request-item">
 						<div class="request-info">
 							{#if req.recipient.avatarUrl}
@@ -77,7 +77,7 @@
 						</div>
 						<button
 							class="btn-decline"
-							onclick={() => app.cancelFriendRequest(req.id)}
+							onclick={() => friends.cancelFriendRequest(req.id)}
 							aria-label="Cancel request to {req.recipient.displayName}"
 							title="Cancel"
 						>
@@ -88,7 +88,7 @@
 			</ul>
 		{/if}
 
-		{#if app.incomingRequests.length === 0 && app.outgoingRequests.length === 0}
+		{#if friends.incomingRequests.length === 0 && friends.outgoingRequests.length === 0}
 			<p class="status-text">No pending friend requests.</p>
 		{/if}
 	{/if}

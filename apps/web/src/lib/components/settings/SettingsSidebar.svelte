@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 
-	const app = getAppState();
+	const ui = getUIStore();
 
 	const categories = [
 		{ id: 'profile' as const, label: 'My Profile', icon: '👤' },
@@ -19,9 +19,9 @@
 				<button
 					role="tab"
 					class="category-item"
-					class:active={app.settingsCategory === cat.id}
-					aria-selected={app.settingsCategory === cat.id}
-					onclick={() => { app.settingsCategory = cat.id; }}
+					class:active={ui.settingsCategory === cat.id}
+					aria-selected={ui.settingsCategory === cat.id}
+					onclick={() => { ui.settingsCategory = cat.id; }}
 				>
 					<span class="category-icon" aria-hidden="true">{cat.icon}</span>
 					<span class="category-label">{cat.label}</span>
@@ -32,7 +32,7 @@
 	<div class="sidebar-footer">
 		<button
 			class="bug-report-btn"
-			onclick={() => { app.closeSettings(); app.bugReportOpen = true; }}
+			onclick={() => { ui.closeSettings(); ui.bugReportOpen = true; }}
 		>
 			🐛 Report a Bug
 		</button>

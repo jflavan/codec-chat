@@ -2,10 +2,10 @@
 	import { fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
 	import { env } from '$env/dynamic/public';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 	import { getOAuthConfig, getGitHubAuthUrl, getDiscordAuthUrl } from '$lib/auth/oauth.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 	const siteKey = env.PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 	let githubEnabled = $state(false);
 	let githubClientId = $state('');
@@ -77,9 +77,9 @@
 			const action = mode === 'signup' ? 'register' : 'login';
 			const recaptchaToken = await getRecaptchaToken(action);
 			const response = mode === 'signup'
-				? await app.register(email.trim(), password, nickname.trim(), recaptchaToken)
-				: await app.login(email.trim(), password, recaptchaToken);
-			await app.handleLocalAuth(response);
+				? await auth.register(email.trim(), password, nickname.trim(), recaptchaToken)
+				: await auth.login(email.trim(), password, recaptchaToken);
+			await auth.handleLocalAuth(response);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
 		} finally {

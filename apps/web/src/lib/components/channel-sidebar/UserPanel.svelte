@@ -1,7 +1,11 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
+	const servers = getServerStore();
 
 	/** Accepted image MIME types for avatar uploads. */
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
@@ -15,14 +19,14 @@
 	async function handleFileChange() {
 		const file = fileInput?.files?.[0];
 		if (!file) return;
-		await app.uploadAvatar(file);
+		await auth.uploadAvatar(file);
 		// Reset so the same file can be re-selected.
 		if (fileInput) fileInput.value = '';
 	}
 </script>
 
 <div class="user-panel">
-	{#if app.me}
+	{#if auth.me}
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -35,17 +39,17 @@
 			<button
 				class="avatar-upload-btn"
 				onclick={openFilePicker}
-				disabled={app.isUploadingAvatar}
+				disabled={auth.isUploadingAvatar}
 				title="Click to upload a new avatar"
 				aria-label="Upload avatar"
 			>
-				{#if app.isUploadingAvatar}
+				{#if auth.isUploadingAvatar}
 					<div class="user-panel-avatar placeholder" aria-hidden="true">…</div>
-				{:else if app.me.user.avatarUrl}
-					<img class="user-panel-avatar" src={app.me.user.avatarUrl} alt="Your avatar" />
+				{:else if auth.me.user.avatarUrl}
+					<img class="user-panel-avatar" src={auth.me.user.avatarUrl} alt="Your avatar" />
 				{:else}
 					<div class="user-panel-avatar placeholder" aria-hidden="true">
-						{app.me.user.effectiveDisplayName.slice(0, 1).toUpperCase()}
+						{auth.me.user.effectiveDisplayName.slice(0, 1).toUpperCase()}
 					</div>
 				{/if}
 				<div class="avatar-upload-overlay" aria-hidden="true">
@@ -55,29 +59,29 @@
 				</div>
 			</button>
 			<div class="user-panel-names">
-				<span class="user-panel-display">{app.me.user.effectiveDisplayName}</span>
-				{#if app.me.user.statusText || app.me.user.statusEmoji}
+				<span class="user-panel-display">{auth.me.user.effectiveDisplayName}</span>
+				{#if auth.me.user.statusText || auth.me.user.statusEmoji}
 					<span class="user-panel-custom-status">
-						{#if app.me.user.statusEmoji}{app.me.user.statusEmoji} {/if}{app.me.user.statusText ?? ''}
+						{#if auth.me.user.statusEmoji}{auth.me.user.statusEmoji} {/if}{auth.me.user.statusText ?? ''}
 					</span>
-				{:else if app.isServerOwner}
+				{:else if servers.isServerOwner}
 					<span class="user-panel-role">Server Owner</span>
 				{/if}
 			</div>
 		</div>
-		<button class="settings-btn" onclick={() => app.openSettings()} aria-label="User settings" title="User settings">
+		<button class="settings-btn" onclick={() => ui.openSettings()} aria-label="User settings" title="User settings">
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
 			</svg>
 		</button>
-		<button class="sign-out-btn" onclick={() => app.signOut()} aria-label="Sign out" title="Sign out">
+		<button class="sign-out-btn" onclick={() => auth.signOut()} aria-label="Sign out" title="Sign out">
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M5 5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7v-2H5V5zm16 7-4-4v3H9v2h8v3l4-4z"/>
 			</svg>
 		</button>
 	{:else}
 		<div id="google-button" class="google-button"></div>
-		<span class="user-panel-status">{app.status}</span>
+		<span class="user-panel-status">{auth.status}</span>
 	{/if}
 </div>
 

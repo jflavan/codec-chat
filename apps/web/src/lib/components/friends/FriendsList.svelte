@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getFriendStore } from '$lib/state/friend-store.svelte.js';
+	import { getDmStore } from '$lib/state/dm-store.svelte.js';
 
-	const app = getAppState();
+	const friends = getFriendStore();
+	const dms = getDmStore();
 
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString(undefined, {
@@ -13,17 +15,17 @@
 </script>
 
 <div class="friends-list">
-	{#if app.isLoadingFriends}
+	{#if friends.isLoadingFriends}
 		<p class="status-text">Loading friends…</p>
-	{:else if app.friends.length === 0}
+	{:else if friends.friends.length === 0}
 		<p class="status-text">No friends yet. Send a friend request to get started!</p>
 	{:else}
 		<ul class="list" role="list">
-			{#each app.friends as friend (friend.friendshipId)}
+			{#each friends.friends as friend (friend.friendshipId)}
 				<li class="friend-item">
 					<button
 						class="friend-info"
-						onclick={() => app.openDmWithUser(friend.user.id)}
+						onclick={() => dms.openDmWithUser(friend.user.id)}
 						aria-label="Message {friend.user.displayName}"
 					>
 						{#if friend.user.avatarUrl}
@@ -40,7 +42,7 @@
 					</button>
 					<button
 						class="btn-danger"
-						onclick={() => app.removeFriend(friend.friendshipId)}
+						onclick={() => friends.removeFriend(friend.friendshipId)}
 						aria-label="Remove {friend.user.displayName}"
 						title="Remove friend"
 					>

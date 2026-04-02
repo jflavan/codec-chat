@@ -1,24 +1,26 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 
-	const app = getAppState();
+	const channelStore = getChannelStore();
+	const voice = getVoiceStore();
 
-	const isInCall = $derived(!!app.activeCall);
+	const isInCall = $derived(!!voice.activeCall);
 
 	const label = $derived(
 		isInCall
-			? app.activeCall!.otherDisplayName
-			: app.channels.find((c) => c.id === app.activeVoiceChannelId)?.name ?? 'Voice'
+			? voice.activeCall!.otherDisplayName
+			: channelStore.channels.find((c) => c.id === voice.activeVoiceChannelId)?.name ?? 'Voice'
 	);
 </script>
 
-<div class="voice-bar" class:transmitting={app.isPttActive} role="status" aria-label="Voice connected">
+<div class="voice-bar" class:transmitting={voice.isPttActive} role="status" aria-label="Voice connected">
 	<div class="voice-info">
 		<span class="voice-label">
 			{#if isInCall}
 				In Call
-			{:else if app.voiceInputMode === 'push-to-talk'}
-				{app.isPttActive ? 'Transmitting' : 'Push to Talk'}
+			{:else if voice.voiceInputMode === 'push-to-talk'}
+				{voice.isPttActive ? 'Transmitting' : 'Push to Talk'}
 			{:else}
 				Voice Connected
 			{/if}
@@ -28,12 +30,12 @@
 	<div class="voice-controls">
 		<button
 			class="voice-btn"
-			class:active={app.isMuted}
-			onclick={() => app.toggleMute()}
-			aria-label={app.isMuted ? 'Unmute' : 'Mute'}
-			title={app.isMuted ? 'Unmute' : 'Mute'}
+			class:active={voice.isMuted}
+			onclick={() => voice.toggleMute()}
+			aria-label={voice.isMuted ? 'Unmute' : 'Mute'}
+			title={voice.isMuted ? 'Unmute' : 'Mute'}
 		>
-			{#if app.isMuted}
+			{#if voice.isMuted}
 				<!-- Mic off -->
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 					<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
@@ -48,12 +50,12 @@
 
 		<button
 			class="voice-btn"
-			class:active={app.isDeafened}
-			onclick={() => app.toggleDeafen()}
-			aria-label={app.isDeafened ? 'Undeafen' : 'Deafen'}
-			title={app.isDeafened ? 'Undeafen' : 'Deafen'}
+			class:active={voice.isDeafened}
+			onclick={() => voice.toggleDeafen()}
+			aria-label={voice.isDeafened ? 'Undeafen' : 'Deafen'}
+			title={voice.isDeafened ? 'Undeafen' : 'Deafen'}
 		>
-			{#if app.isDeafened}
+			{#if voice.isDeafened}
 				<!-- Headset with slash -->
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 					<path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z"/>
@@ -69,12 +71,12 @@
 
 		<button
 			class="voice-btn"
-			class:active={app.isVideoEnabled}
-			onclick={() => app.toggleVideo()}
-			aria-label={app.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
-			title={app.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+			class:active={voice.isVideoEnabled}
+			onclick={() => voice.toggleVideo()}
+			aria-label={voice.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+			title={voice.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
 		>
-			{#if app.isVideoEnabled}
+			{#if voice.isVideoEnabled}
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 					<path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
 				</svg>
@@ -87,14 +89,14 @@
 
 		<button
 			class="voice-btn"
-			class:active={app.isScreenSharing}
-			onclick={() => app.toggleScreenShare()}
-			aria-label={app.isScreenSharing ? 'Stop sharing' : 'Share screen'}
-			title={app.isScreenSharing ? 'Stop sharing' : 'Share screen'}
+			class:active={voice.isScreenSharing}
+			onclick={() => voice.toggleScreenShare()}
+			aria-label={voice.isScreenSharing ? 'Stop sharing' : 'Share screen'}
+			title={voice.isScreenSharing ? 'Stop sharing' : 'Share screen'}
 		>
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
-				{#if app.isScreenSharing}
+				{#if voice.isScreenSharing}
 					<rect x="8" y="9" width="8" height="4" rx="1"/>
 				{/if}
 			</svg>
@@ -102,7 +104,7 @@
 
 		<button
 			class="voice-btn leave-btn"
-			onclick={() => isInCall ? app.endCall() : app.leaveVoiceChannel()}
+			onclick={() => isInCall ? voice.endCall() : voice.leaveVoiceChannel()}
 			aria-label={isInCall ? 'End call' : 'Leave voice'}
 			title={isInCall ? 'End call' : 'Leave voice'}
 		>

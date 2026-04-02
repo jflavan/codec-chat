@@ -1,10 +1,14 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getDmStore } from '$lib/state/dm-store.svelte.js';
+	import { getFriendStore } from '$lib/state/friend-store.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 	import DmList from '$lib/components/dm/DmList.svelte';
 	import UserPanel from '$lib/components/channel-sidebar/UserPanel.svelte';
 	import VoiceConnectedBar from '$lib/components/channel-sidebar/VoiceConnectedBar.svelte';
 
-	const app = getAppState();
+	const dms = getDmStore();
+	const friends = getFriendStore();
+	const voice = getVoiceStore();
 
 	const tabs = [
 		{ key: 'friends' as const, label: 'Friends' },
@@ -12,13 +16,13 @@
 		{ key: 'add' as const, label: 'Add Friend' }
 	] as const;
 
-	const pendingCount = $derived(app.incomingRequests.length);
+	const pendingCount = $derived(friends.incomingRequests.length);
 
 	function handleFriendsClick(): void {
-		app.activeDmChannelId = null;
-		app.dmMessages = [];
-		app.dmTypingUsers = [];
-		app.dmMessageBody = '';
+		dms.activeDmChannelId = null;
+		dms.dmMessages = [];
+		dms.dmTypingUsers = [];
+		dms.dmMessageBody = '';
 	}
 </script>
 
@@ -26,7 +30,7 @@
 	<div class="sidebar-header">
 		<button
 			class="friends-nav"
-			class:active={!app.activeDmChannelId}
+			class:active={!dms.activeDmChannelId}
 			onclick={handleFriendsClick}
 		>
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -43,7 +47,7 @@
 		<DmList />
 	</div>
 
-	{#if app.activeVoiceChannelId || app.activeCall}
+	{#if voice.activeVoiceChannelId || voice.activeCall}
 		<VoiceConnectedBar />
 	{/if}
 

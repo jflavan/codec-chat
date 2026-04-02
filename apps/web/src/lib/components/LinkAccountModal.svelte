@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 
 	let password = $state('');
 	let isSubmitting = $state(false);
@@ -13,8 +13,8 @@
 		error = '';
 		isSubmitting = true;
 		try {
-			const data = await app.linkGoogle(app.linkingEmail, password, app.pendingGoogleCredential);
-			await app.handleLinkGoogleSuccess(data);
+			const data = await auth.linkGoogle(auth.linkingEmail, password, auth.pendingGoogleCredential);
+			await auth.handleLinkGoogleSuccess(data);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
 		} finally {
@@ -23,10 +23,10 @@
 	}
 
 	function handleCancel(): void {
-		app.needsLinking = false;
-		app.linkingEmail = '';
-		app.pendingGoogleCredential = '';
-		app.signOut();
+		auth.needsLinking = false;
+		auth.linkingEmail = '';
+		auth.pendingGoogleCredential = '';
+		auth.signOut();
 	}
 </script>
 
@@ -45,7 +45,7 @@
 
 		<h1 class="heading">Link your Google account</h1>
 		<p class="subtext">
-			An account with <strong class="email">{app.linkingEmail}</strong> already exists.
+			An account with <strong class="email">{auth.linkingEmail}</strong> already exists.
 			Enter your password to link your Google account.
 		</p>
 

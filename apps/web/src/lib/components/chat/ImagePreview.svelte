@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 
-	const app = getAppState();
+	const ui = getUIStore();
 
 	function handleClose(): void {
-		app.closeImagePreview();
+		ui.closeImagePreview();
 	}
 
 	function handleBackdropClick(e: MouseEvent): void {
@@ -21,7 +21,7 @@
 	}
 </script>
 
-{#if app.lightboxImageUrl}
+{#if ui.lightboxImageUrl}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="lightbox-backdrop"
@@ -36,7 +36,7 @@
 			<div class="lightbox-toolbar">
 				<a
 					class="toolbar-btn"
-					href={app.lightboxImageUrl}
+					href={ui.lightboxImageUrl}
 					target="_blank"
 					rel="noopener noreferrer"
 					title="Open original"
@@ -58,7 +58,7 @@
 				</button>
 			</div>
 			<img
-				src={app.lightboxImageUrl}
+				src={ui.lightboxImageUrl}
 				alt="Full-size preview"
 				class="lightbox-image"
 			/>
@@ -66,7 +66,7 @@
 	</div>
 {/if}
 
-<svelte:window onkeydown={app.lightboxImageUrl ? handleKeydown : undefined} />
+<svelte:window onkeydown={ui.lightboxImageUrl ? handleKeydown : undefined} />
 
 <style>
 	.lightbox-backdrop {

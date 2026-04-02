@@ -165,12 +165,12 @@ src/lib/components/settings/
 
 ### State Management
 
-The User Settings modal is controlled via the existing `AppState` class:
+The User Settings modal is controlled via the `UIStore` and `AuthStore`:
 
-- `settingsOpen: boolean` — tracks whether the settings modal is visible (new `$state` field)
-- `openSettings()` / `closeSettings()` — methods to toggle the modal
-- Nickname and avatar state are managed through the existing `me` profile object in `AppState`
-- The gear icon in `UserPanel.svelte` calls `appState.openSettings()`
+- `UIStore.settingsOpen: boolean` — tracks whether the settings modal is visible (`$state` field)
+- `UIStore.openSettings()` / `UIStore.closeSettings()` — methods to toggle the modal
+- Nickname and avatar state are managed through the `me` profile object in `AuthStore`
+- The gear icon in `UserPanel.svelte` calls `uiStore.openSettings()`
 
 ## Acceptance Criteria
 
@@ -237,7 +237,7 @@ The User Settings modal is controlled via the existing `AppState` class:
 ## Task Breakdown
 
 ### Web
-- [x] Add `settingsOpen` state and `openSettings()` / `closeSettings()` methods to `AppState`
+- [x] Add `settingsOpen` state and `openSettings()` / `closeSettings()` methods to `UIStore`
 - [x] Create `UserSettingsModal.svelte` with modal overlay, backdrop, close behavior, and two-column layout
 - [x] Create `SettingsSidebar.svelte` with category navigation and active state
 - [x] Create `ProfileSettings.svelte` with profile preview, nickname input, and avatar management

@@ -1,9 +1,24 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
+	import { getFriendStore } from '$lib/state/friend-store.svelte.js';
+	import { getDmStore } from '$lib/state/dm-store.svelte.js';
+	import { goHome } from '$lib/state/navigation.svelte.js';
 	import ContextMenu from '$lib/components/channel-sidebar/ContextMenu.svelte';
 	import type { MemberServer } from '$lib/types/index.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
+	const servers = getServerStore();
+	const channels = getChannelStore();
+	const messages = getMessageStore();
+	const friends = getFriendStore();
+	const dms = getDmStore();
+
+	const homeBadgeCount = $derived(friends.incomingRequests.length + dms.unreadDmCounts.size);
 
 	let serverContextMenu = $state<{ server: MemberServer; x: number; y: number } | null>(null);
 
@@ -47,15 +62,15 @@
 		dragOverId = null;
 		if (!dragSourceId || dragSourceId === targetServerId) return;
 
-		const fromIdx = app.servers.findIndex((s) => s.serverId === dragSourceId);
-		const toIdx = app.servers.findIndex((s) => s.serverId === targetServerId);
+		const fromIdx = servers.servers.findIndex((s) => s.serverId === dragSourceId);
+		const toIdx = servers.servers.findIndex((s) => s.serverId === targetServerId);
 		if (fromIdx === -1 || toIdx === -1) return;
 
-		const reordered = [...app.servers];
+		const reordered = [...servers.servers];
 		const [moved] = reordered.splice(fromIdx, 1);
 		reordered.splice(toIdx, 0, moved);
 
-		app.reorderServers(reordered.map((s) => s.serverId));
+		servers.reorderServers(reordered.map((s) => s.serverId));
 		dragSourceId = null;
 	}
 
@@ -69,9 +84,9 @@
 		if (!sidebarEl || sidebarEl.offsetParent === null) return;
 
 		const target = e.target as Node;
-		if (app.showCreateServer && createWrapperEl && !createWrapperEl.contains(target)) {
-			app.showCreateServer = false;
-			app.newServerName = '';
+		if (ui.showCreateServer && createWrapperEl && !createWrapperEl.contains(target)) {
+			ui.showCreateServer = false;
+			ui.newServerName = '';
 		}
 		if (showJoinByCode && joinWrapperEl && !joinWrapperEl.contains(target)) {
 			showJoinByCode = false;
@@ -82,7 +97,7 @@
 	async function handleJoinByCode() {
 		const code = inviteCode.trim();
 		if (!code) return;
-		await app.joinViaInvite(code);
+		await servers.joinViaInvite(code);
 		inviteCode = '';
 		showJoinByCode = false;
 	}
@@ -95,30 +110,30 @@
 		<!-- Home icon -->
 		<button
 			class="server-icon home-icon"
-			class:active={app.showFriendsPanel}
+			class:active={ui.showFriendsPanel}
 			aria-label="Home"
 			title="Home"
-			onclick={() => app.goHome()}
+			onclick={() => goHome(ui, servers, channels, messages, friends, dms)}
 		>
 			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M2.3 7.7l9-5.4a1.2 1.2 0 0 1 1.4 0l9 5.4a.6.6 0 0 1-.3 1.1H19v8.6a.6.6 0 0 1-.6.6h-3.8v-5a1 1 0 0 0-1-1h-3.2a1 1 0 0 0-1 1v5H5.6a.6.6 0 0 1-.6-.6V8.8H2.6a.6.6 0 0 1-.3-1.1z"/>
 			</svg>
-			{#if app.homeBadgeCount > 0}
-				<span class="notification-badge" aria-label="{app.homeBadgeCount} notifications">
-					{app.homeBadgeCount}
+			{#if homeBadgeCount > 0}
+				<span class="notification-badge" aria-label="{homeBadgeCount} notifications">
+					{homeBadgeCount}
 				</span>
 			{/if}
 		</button>
 
 		<div class="server-separator" role="separator"></div>
 
-		{#if !app.isSignedIn}
+		{#if !auth.isSignedIn}
 			<p class="muted server-hint">Sign in</p>
-		{:else if app.isLoadingServers}
+		{:else if servers.isLoadingServers}
 			<p class="muted server-hint">…</p>
 		{:else}
-			{#each app.servers as server}
-				{@const mentionCount = app.serverMentionCount(server.serverId)}
+			{#each servers.servers as server}
+				{@const mentionCount = servers.serverMentionCount(server.serverId, channels.channelMentionCounts, channels.channelServerMap)}
 				<div
 					class="server-pill-wrapper"
 					class:drag-over={dragOverId === server.serverId}
@@ -130,15 +145,15 @@
 					ondragend={handleDragEnd}
 					role="listitem"
 				>
-					<div class="server-pill" class:active={server.serverId === app.selectedServerId}></div>
+					<div class="server-pill" class:active={server.serverId === servers.selectedServerId}></div>
 					<button
 						class="server-icon"
-						class:active={server.serverId === app.selectedServerId}
+						class:active={server.serverId === servers.selectedServerId}
 						class:has-icon={Boolean(server.iconUrl)}
-						class:muted-server={server.serverId === app.selectedServerId && app.isServerMuted}
-						onclick={() => app.selectServer(server.serverId)}
+						class:muted-server={server.serverId === servers.selectedServerId && servers.isServerMuted}
+						onclick={() => servers.onSelectServer?.(server.serverId)}
 					oncontextmenu={(e) => openServerContextMenu(e, server)}
-						aria-label="Server: {server.name}{server.serverId === app.selectedServerId && app.isServerMuted ? ' (muted)' : ''}"
+						aria-label="Server: {server.name}{server.serverId === servers.selectedServerId && servers.isServerMuted ? ' (muted)' : ''}"
 						title={server.name}
 					>
 						{#if server.iconUrl}
@@ -158,40 +173,40 @@
 
 	</div>
 
-	{#if app.isSignedIn}
+	{#if auth.isSignedIn}
 		<div class="server-actions">
 			<div class="server-action-wrapper" bind:this={createWrapperEl}>
 				<button
 					class="server-icon add-server"
 					aria-label="Create a server"
 					title="Create a server"
-					onclick={() => { app.showCreateServer = !app.showCreateServer; }}
+					onclick={() => { ui.showCreateServer = !ui.showCreateServer; }}
 				>
 					<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 						<path d="M10 3a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H4a1 1 0 1 1 0-2h5V4a1 1 0 0 1 1-1z"/>
 					</svg>
 				</button>
-				{#if app.showCreateServer}
+				{#if ui.showCreateServer}
 					<div class="popover-mobile-backdrop" aria-hidden="true"></div>
 					<div class="server-create-popover">
-						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); app.createServer(); }}>
+						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); servers.createServer(); }}>
 							<input
 								type="text"
 								placeholder="Server name"
 								maxlength="100"
-								bind:value={app.newServerName}
-								disabled={app.isCreatingServer}
+								bind:value={ui.newServerName}
+								disabled={servers.isCreatingServer}
 							/>
 							<div class="form-meta">
-								<span class="char-counter" class:warn={app.newServerName.length >= 100}>
-									{app.newServerName.length}/100
+								<span class="char-counter" class:warn={ui.newServerName.length >= 100}>
+									{ui.newServerName.length}/100
 								</span>
 							</div>
 							<div class="inline-form-actions">
-								<button type="submit" class="btn-primary" disabled={app.isCreatingServer || !app.newServerName.trim()}>
-									{app.isCreatingServer ? '…' : 'Create'}
+								<button type="submit" class="btn-primary" disabled={servers.isCreatingServer || !ui.newServerName.trim()}>
+									{servers.isCreatingServer ? '…' : 'Create'}
 								</button>
-								<button type="button" class="btn-secondary" onclick={() => { app.showCreateServer = false; app.newServerName = ''; }}>Cancel</button>
+								<button type="button" class="btn-secondary" onclick={() => { ui.showCreateServer = false; ui.newServerName = ''; }}>Cancel</button>
 							</div>
 						</form>
 					</div>
@@ -218,11 +233,11 @@
 								placeholder="Invite code"
 								maxlength="8"
 								bind:value={inviteCode}
-								disabled={app.isJoining}
+								disabled={servers.isJoining}
 							/>
 							<div class="inline-form-actions">
-								<button type="submit" class="btn-primary" disabled={app.isJoining || !inviteCode.trim()}>
-									{app.isJoining ? '…' : 'Join'}
+								<button type="submit" class="btn-primary" disabled={servers.isJoining || !inviteCode.trim()}>
+									{servers.isJoining ? '…' : 'Join'}
 								</button>
 								<button type="button" class="btn-secondary" onclick={() => { showJoinByCode = false; inviteCode = ''; }}>Cancel</button>
 							</div>
@@ -241,8 +256,8 @@
 		y={serverContextMenu.y}
 		items={[
 			{
-				label: app.isServerMuted ? 'Unmute Server' : 'Mute Server',
-				onClick: () => app.toggleServerMute()
+				label: servers.isServerMuted ? 'Unmute Server' : 'Mute Server',
+				onClick: () => servers.toggleServerMute()
 			}
 		]}
 		onClose={() => { serverContextMenu = null; }}

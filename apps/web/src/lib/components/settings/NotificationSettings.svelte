@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
 
 	let isToggling = $state(false);
 
 	async function togglePush() {
 		isToggling = true;
 		try {
-			if (app.pushNotificationsEnabled) {
-				await app.disablePushNotifications();
+			if (auth.pushNotificationsEnabled) {
+				await auth.disablePushNotifications();
 			} else {
-				await app.enablePushNotifications();
+				await auth.enablePushNotifications();
 			}
 		} finally {
 			isToggling = false;
@@ -28,7 +28,7 @@
 			<p class="setting-description">
 				Receive notifications for DMs, mentions, and friend requests even when Codec is in the background.
 			</p>
-			{#if !app.pushNotificationsSupported}
+			{#if !auth.pushNotificationsSupported}
 				<p class="setting-warning">
 					Push notifications are not supported in this browser.
 				</p>
@@ -36,10 +36,10 @@
 		</div>
 		<button
 			class="toggle-btn"
-			class:active={app.pushNotificationsEnabled}
-			disabled={!app.pushNotificationsSupported || isToggling}
+			class:active={auth.pushNotificationsEnabled}
+			disabled={!auth.pushNotificationsSupported || isToggling}
 			onclick={togglePush}
-			aria-label={app.pushNotificationsEnabled ? 'Disable push notifications' : 'Enable push notifications'}
+			aria-label={auth.pushNotificationsEnabled ? 'Disable push notifications' : 'Enable push notifications'}
 		>
 			<span class="toggle-thumb"></span>
 		</button>

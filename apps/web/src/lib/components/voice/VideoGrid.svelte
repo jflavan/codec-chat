@@ -1,13 +1,15 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 	import VideoTile from './VideoTile.svelte';
 
-	const state = getAppState();
+	const auth = getAuthStore();
+	const voice = getVoiceStore();
 
 	const hasAnyVideo = $derived(
-		state.isVideoEnabled ||
-		state.isScreenSharing ||
-		state.remoteVideoTracks.size > 0
+		voice.isVideoEnabled ||
+		voice.isScreenSharing ||
+		voice.remoteVideoTracks.size > 0
 	);
 
 	type TileInfo = {
@@ -22,38 +24,38 @@
 		const result: TileInfo[] = [];
 
 		// Local camera
-		if (state.localVideoTrack && state.isVideoEnabled) {
+		if (voice.localVideoTrack && voice.isVideoEnabled) {
 			result.push({
 				key: 'self:video',
-				track: state.localVideoTrack,
+				track: voice.localVideoTrack,
 				label: 'video',
-				displayName: state.effectiveDisplayName + ' (You)',
+				displayName: auth.effectiveDisplayName + ' (You)',
 				isSelf: true,
 			});
 		}
 
 		// Local screen
-		if (state.localScreenTrack && state.isScreenSharing) {
+		if (voice.localScreenTrack && voice.isScreenSharing) {
 			result.push({
 				key: 'self:screen',
-				track: state.localScreenTrack,
+				track: voice.localScreenTrack,
 				label: 'screen',
-				displayName: state.effectiveDisplayName + ' (Screen)',
+				displayName: auth.effectiveDisplayName + ' (Screen)',
 				isSelf: true,
 			});
 		}
 
 		// Remote tracks
-		for (const [key, { track, label }] of state.remoteVideoTracks) {
+		for (const [key, { track, label }] of voice.remoteVideoTracks) {
 			const participantId = key.split(':')[0];
-			const channelId = state.activeVoiceChannelId;
+			const channelId = voice.activeVoiceChannelId;
 			let displayName = 'Unknown';
 			if (channelId) {
-				const members = state.voiceChannelMembers.get(channelId) ?? [];
+				const members = voice.voiceChannelMembers.get(channelId) ?? [];
 				const member = members.find((m) => m.participantId === participantId);
 				if (member) displayName = member.displayName;
-			} else if (state.activeCall) {
-				displayName = state.activeCall.otherDisplayName;
+			} else if (voice.activeCall) {
+				displayName = voice.activeCall.otherDisplayName;
 			}
 			const suffix = label === 'screen' ? ' (Screen)' : '';
 			result.push({

@@ -1,12 +1,20 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 	import UserPanel from './UserPanel.svelte';
 	import VoiceConnectedBar from './VoiceConnectedBar.svelte';
 	import UserActionSheet from '$lib/components/voice/UserActionSheet.svelte';
 	import ContextMenu from './ContextMenu.svelte';
 	import type { Channel } from '$lib/types/index.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
+	const servers = getServerStore();
+	const channelStore = getChannelStore();
+	const voice = getVoiceStore();
 
 	let contextMenu = $state<{ userId: string; displayName: string; x: number; y: number } | null>(null);
 	let channelContextMenu = $state<{ channel: Channel; x: number; y: number } | null>(null);
@@ -14,7 +22,7 @@
 	// ── category grouping ──────────────────────────────────────────────────────
 
 	const uncategorizedChannels = $derived(
-		app.channels
+		channelStore.channels
 			.filter((c) => !c.categoryId)
 			.sort((a, b) => {
 				// text before voice as secondary sort
@@ -24,11 +32,11 @@
 	);
 
 	const categorizedGroups = $derived(
-		app.categories
+		servers.categories
 			.sort((a, b) => a.position - b.position)
 			.map((cat) => ({
 				...cat,
-				channels: app.channels
+				channels: channelStore.channels
 					.filter((c) => c.categoryId === cat.id)
 					.sort((a, b) => {
 						const typeOrder = (c: Channel) => (c.type === 'voice' ? 1 : 0);
@@ -42,8 +50,8 @@
 	let collapsedCategories = $state<Set<string>>(new Set());
 
 	function loadCollapsedState() {
-		if (!app.selectedServerId) return;
-		const key = `codec:category-collapse:${app.selectedServerId}`;
+		if (!servers.selectedServerId) return;
+		const key = `codec:category-collapse:${servers.selectedServerId}`;
 		const stored = localStorage.getItem(key);
 		collapsedCategories = stored ? new Set(JSON.parse(stored)) : new Set();
 	}
@@ -53,15 +61,15 @@
 		if (next.has(categoryId)) next.delete(categoryId);
 		else next.add(categoryId);
 		collapsedCategories = next;
-		if (app.selectedServerId) {
-			localStorage.setItem(`codec:category-collapse:${app.selectedServerId}`, JSON.stringify([...next]));
+		if (servers.selectedServerId) {
+			localStorage.setItem(`codec:category-collapse:${servers.selectedServerId}`, JSON.stringify([...next]));
 		}
 	}
 
 	$effect(() => {
 		// Re-load collapse state whenever the selected server changes
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		app.selectedServerId;
+		servers.selectedServerId;
 		loadCollapsedState();
 	});
 
@@ -75,14 +83,14 @@
 
 <aside class="channel-sidebar" aria-label="Channels">
 	<div class="channel-header">
-		<h2 class="server-name">{app.selectedServerName}</h2>
+		<h2 class="server-name">{servers.selectedServerName}</h2>
 		<div class="header-actions">
-			{#if app.canManageChannels && app.selectedServerId}
+			{#if servers.canManageChannels && servers.selectedServerId}
 				<button
 					class="header-btn"
 					aria-label="Server settings"
 					title="Server settings"
-					onclick={() => app.openServerSettings()}
+					onclick={() => ui.openServerSettings()}
 				>
 					<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 						<path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
@@ -90,12 +98,12 @@
 					</svg>
 				</button>
 			{/if}
-			{#if app.canManageInvites && app.selectedServerId}
+			{#if servers.canManageInvites && servers.selectedServerId}
 				<button
 					class="header-btn"
 					aria-label="Manage invites"
 					title="Manage invites"
-					onclick={() => { app.serverSettingsOpen = true; app.serverSettingsCategory = 'invites'; }}
+					onclick={() => { ui.serverSettingsOpen = true; ui.serverSettingsCategory = 'invites'; }}
 				>
 					<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 						<path d="M8 1a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 4a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm-2.5 8a3.5 3.5 0 0 1 3.163-3.487A.5.5 0 0 0 7 8H5.5A3.5 3.5 0 0 0 2 11.5v.5h4.05a.5.5 0 0 0 .45-.72A3.48 3.48 0 0 1 3.5 12zM12 8.5a.5.5 0 0 1 .5.5v1.5H14a.5.5 0 0 1 0 1h-1.5V13a.5.5 0 0 1-1 0v-1.5H10a.5.5 0 0 1 0-1h1.5V9a.5.5 0 0 1 .5-.5z"/>
@@ -106,9 +114,9 @@
 	</div>
 
 	<div class="channel-list-scroll">
-		{#if app.isLoadingChannels}
+		{#if channelStore.isLoadingChannels}
 			<p class="muted channel-item">Loading…</p>
-		{:else if app.channels.length === 0}
+		{:else if channelStore.channels.length === 0}
 			<p class="muted channel-item">No channels yet.</p>
 		{:else}
 
@@ -116,18 +124,18 @@
 			{#if uncategorizedChannels.length > 0}
 				<ul class="channel-list" role="list">
 					{#each uncategorizedChannels as channel}
-						{@const isMuted = app.isChannelMuted(channel.id)}
+						{@const isMuted = servers.isChannelMuted(channel.id)}
 						<li>
 							{#if channel.type === 'voice'}
-								{@const members = app.voiceChannelMembers.get(channel.id) ?? []}
-								{@const isActive = channel.id === app.activeVoiceChannelId}
+								{@const members = voice.voiceChannelMembers.get(channel.id) ?? []}
+								{@const isActive = channel.id === voice.activeVoiceChannelId}
 								<button
 									class="channel-item voice-channel-item"
 									class:active={isActive}
 									class:muted-channel={isMuted}
-									onclick={() => app.joinVoiceChannel(channel.id)}
+									onclick={() => voice.joinVoiceChannel(channel.id)}
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
-									disabled={app.isJoiningVoice}
+									disabled={voice.isJoiningVoice}
 									aria-label="Join {channel.name}"
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -143,23 +151,23 @@
 										{#each members as member}
 											<li
 												class="voice-member"
-												class:voice-member--interactive={member.userId !== app.me?.user.id}
-												role={member.userId !== app.me?.user.id ? 'button' : undefined}
-												tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
-												aria-label={member.userId !== app.me?.user.id ? `${member.displayName} volume controls` : undefined}
+												class:voice-member--interactive={member.userId !== auth.me?.user.id}
+												role={member.userId !== auth.me?.user.id ? 'button' : undefined}
+												tabindex={member.userId !== auth.me?.user.id ? 0 : undefined}
+												aria-label={member.userId !== auth.me?.user.id ? `${member.displayName} volume controls` : undefined}
 												onclick={(e) => {
-													if (member.userId !== app.me?.user.id) {
+													if (member.userId !== auth.me?.user.id) {
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 													}
 												}}
 												oncontextmenu={(e) => {
-													if (member.userId !== app.me?.user.id) {
+													if (member.userId !== auth.me?.user.id) {
 														e.preventDefault();
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 													}
 												}}
 												onkeydown={(e) => {
-													if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+													if (member.userId !== auth.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
 														e.preventDefault();
 														const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
@@ -182,12 +190,12 @@
 									</ul>
 								{/if}
 							{:else}
-								{@const mentions = app.channelMentionCount(channel.id)}
+								{@const mentions = channelStore.channelMentionCount(channel.id)}
 								<button
 									class="channel-item"
-									class:active={channel.id === app.selectedChannelId}
+									class:active={channel.id === channelStore.selectedChannelId}
 									class:muted-channel={isMuted}
-									onclick={() => app.selectChannel(channel.id)}
+									onclick={() => channelStore.selectChannel(channel.id)}
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -212,8 +220,8 @@
 						<span class="category-arrow" class:collapsed={isCollapsed}>▾</span>
 						<span class="category-label">{group.name}</span>
 					</button>
-					{#if app.canManageChannels && app.selectedServerId && !app.showCreateChannel}
-						<button class="category-action" aria-label="Create channel in {group.name}" onclick={() => { app.showCreateChannel = true; app.newChannelType = 'text'; }}>
+					{#if servers.canManageChannels && servers.selectedServerId && !ui.showCreateChannel}
+						<button class="category-action" aria-label="Create channel in {group.name}" onclick={() => { ui.showCreateChannel = true; ui.newChannelType = 'text'; }}>
 							<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 								<path d="M8 2a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2H9v4a1 1 0 1 1-2 0V9H3a1 1 0 0 1 0-2h4V3a1 1 0 0 1 1-1z"/>
 							</svg>
@@ -224,18 +232,18 @@
 				{#if !isCollapsed}
 					<ul class="channel-list" role="list">
 						{#each group.channels as channel}
-							{@const isMuted = app.isChannelMuted(channel.id)}
+							{@const isMuted = servers.isChannelMuted(channel.id)}
 							<li>
 								{#if channel.type === 'voice'}
-									{@const members = app.voiceChannelMembers.get(channel.id) ?? []}
-									{@const isActive = channel.id === app.activeVoiceChannelId}
+									{@const members = voice.voiceChannelMembers.get(channel.id) ?? []}
+									{@const isActive = channel.id === voice.activeVoiceChannelId}
 									<button
 										class="channel-item voice-channel-item"
 										class:active={isActive}
 										class:muted-channel={isMuted}
-										onclick={() => app.joinVoiceChannel(channel.id)}
+										onclick={() => voice.joinVoiceChannel(channel.id)}
 										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
-										disabled={app.isJoiningVoice}
+										disabled={voice.isJoiningVoice}
 										aria-label="Join {channel.name}"
 									>
 										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -251,23 +259,23 @@
 											{#each members as member}
 												<li
 													class="voice-member"
-													class:voice-member--interactive={member.userId !== app.me?.user.id}
-													role={member.userId !== app.me?.user.id ? 'button' : undefined}
-													tabindex={member.userId !== app.me?.user.id ? 0 : undefined}
-													aria-label={member.userId !== app.me?.user.id ? `${member.displayName} volume controls` : undefined}
+													class:voice-member--interactive={member.userId !== auth.me?.user.id}
+													role={member.userId !== auth.me?.user.id ? 'button' : undefined}
+													tabindex={member.userId !== auth.me?.user.id ? 0 : undefined}
+													aria-label={member.userId !== auth.me?.user.id ? `${member.displayName} volume controls` : undefined}
 													onclick={(e) => {
-														if (member.userId !== app.me?.user.id) {
+														if (member.userId !== auth.me?.user.id) {
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 														}
 													}}
 													oncontextmenu={(e) => {
-														if (member.userId !== app.me?.user.id) {
+														if (member.userId !== auth.me?.user.id) {
 															e.preventDefault();
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 														}
 													}}
 													onkeydown={(e) => {
-														if (member.userId !== app.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+														if (member.userId !== auth.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
 															e.preventDefault();
 															const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
@@ -290,12 +298,12 @@
 										</ul>
 									{/if}
 								{:else}
-									{@const mentions = app.channelMentionCount(channel.id)}
+									{@const mentions = channelStore.channelMentionCount(channel.id)}
 									<button
 										class="channel-item"
-										class:active={channel.id === app.selectedChannelId}
+										class:active={channel.id === channelStore.selectedChannelId}
 										class:muted-channel={isMuted}
-										onclick={() => app.selectChannel(channel.id)}
+										onclick={() => channelStore.selectChannel(channel.id)}
 										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 									>
 										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -316,42 +324,42 @@
 		{/if}
 
 		<!-- Create channel inline form -->
-		{#if app.canManageChannels && app.selectedServerId && app.showCreateChannel}
-			<form class="inline-form channel-create-form" onsubmit={(e) => { e.preventDefault(); app.createChannel(); }}>
+		{#if servers.canManageChannels && servers.selectedServerId && ui.showCreateChannel}
+			<form class="inline-form channel-create-form" onsubmit={(e) => { e.preventDefault(); channelStore.createChannel(); }}>
 				<div class="type-toggle">
-					<label class="type-option" class:selected={app.newChannelType === 'text'}>
-						<input type="radio" name="channelType" value="text" bind:group={app.newChannelType} />
+					<label class="type-option" class:selected={ui.newChannelType === 'text'}>
+						<input type="radio" name="channelType" value="text" bind:group={ui.newChannelType} />
 						# Text
 					</label>
-					<label class="type-option" class:selected={app.newChannelType === 'voice'}>
-						<input type="radio" name="channelType" value="voice" bind:group={app.newChannelType} />
+					<label class="type-option" class:selected={ui.newChannelType === 'voice'}>
+						<input type="radio" name="channelType" value="voice" bind:group={ui.newChannelType} />
 						🔊 Voice
 					</label>
 				</div>
 				<input
 					type="text"
-					placeholder={app.newChannelType === 'voice' ? 'new-voice' : 'new-channel'}
+					placeholder={ui.newChannelType === 'voice' ? 'new-voice' : 'new-channel'}
 					maxlength="100"
-					bind:value={app.newChannelName}
-					disabled={app.isCreatingChannel}
+					bind:value={ui.newChannelName}
+					disabled={channelStore.isCreatingChannel}
 				/>
 				<div class="form-meta">
-					<span class="char-counter" class:warn={app.newChannelName.length >= 100}>
-						{app.newChannelName.length}/100
+					<span class="char-counter" class:warn={ui.newChannelName.length >= 100}>
+						{ui.newChannelName.length}/100
 					</span>
 				</div>
 				<div class="inline-form-actions">
-					<button type="submit" class="btn-primary" disabled={app.isCreatingChannel || !app.newChannelName.trim()}>
-						{app.isCreatingChannel ? '…' : 'Create'}
+					<button type="submit" class="btn-primary" disabled={channelStore.isCreatingChannel || !ui.newChannelName.trim()}>
+						{channelStore.isCreatingChannel ? '…' : 'Create'}
 					</button>
-					<button type="button" class="btn-secondary" onclick={() => { app.showCreateChannel = false; app.newChannelName = ''; }}>Cancel</button>
+					<button type="button" class="btn-secondary" onclick={() => { ui.showCreateChannel = false; ui.newChannelName = ''; }}>Cancel</button>
 				</div>
 			</form>
 		{/if}
 	</div>
 
 
-	{#if app.activeVoiceChannelId || app.activeCall}
+	{#if voice.activeVoiceChannelId || voice.activeCall}
 		<VoiceConnectedBar />
 	{/if}
 
@@ -375,8 +383,8 @@
 		y={channelContextMenu.y}
 		items={[
 			{
-				label: app.isChannelMuted(ch.id) ? 'Unmute Channel' : 'Mute Channel',
-				onClick: () => app.toggleChannelMute(ch.id)
+				label: servers.isChannelMuted(ch.id) ? 'Unmute Channel' : 'Mute Channel',
+				onClick: () => servers.toggleChannelMute(ch.id)
 			}
 		]}
 		onClose={() => { channelContextMenu = null; }}

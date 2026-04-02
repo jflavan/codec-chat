@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
+	import { getDmStore } from '$lib/state/dm-store.svelte.js';
+	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
 	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
@@ -16,7 +21,12 @@
 	import VideoGrid from '$lib/components/voice/VideoGrid.svelte';
 	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const ui = getUIStore();
+	const servers = getServerStore();
+	const msgStore = getMessageStore();
+	const dms = getDmStore();
+	const voice = getVoiceStore();
 	const BOTTOM_THRESHOLD = 50;
 
 	let container: HTMLDivElement;
@@ -70,15 +80,15 @@
 		setTimeout(() => { highlightedMessageId = null; }, 1500);
 	}
 
-	function handleReply(message: typeof app.dmMessages[0]): void {
-		app.startReply(message.id, message.authorName, message.body?.slice(0, 100) ?? '', 'dm');
+	function handleReply(message: typeof dms.dmMessages[0]): void {
+		dms.startReply(message.id, message.authorName, message.body?.slice(0, 100) ?? '');
 	}
 
 	/* ───── Inline message editing ───── */
 	let editingDmMessageId = $state<string | null>(null);
 	let editDmBody = $state('');
 
-	function startDmEdit(message: typeof app.dmMessages[0]): void {
+	function startDmEdit(message: typeof dms.dmMessages[0]): void {
 		editDmBody = message.body;
 		editingDmMessageId = message.id;
 	}
@@ -94,12 +104,12 @@
 			cancelDmEdit();
 			return;
 		}
-		const msg = app.dmMessages.find((m) => m.id === editingDmMessageId);
+		const msg = dms.dmMessages.find((m) => m.id === editingDmMessageId);
 		if (trimmed === msg?.body) {
 			cancelDmEdit();
 			return;
 		}
-		await app.editDmMessage(editingDmMessageId, trimmed);
+		await dms.editDmMessage(editingDmMessageId, trimmed);
 		editingDmMessageId = null;
 		editDmBody = '';
 	}
@@ -116,7 +126,7 @@
 
 	// Ensure the DM feed scrolls to the bottom on initial mount.
 	onMount(() => {
-		if (!app.isLoadingDmMessages && app.dmMessages.length > 0) {
+		if (!dms.isLoadingDmMessages && dms.dmMessages.length > 0) {
 			tick().then(() => {
 				requestAnimationFrame(() => scrollToBottom(true));
 			});
@@ -149,7 +159,7 @@
 
 	// Scroll to highlighted message from search jump
 	$effect(() => {
-		const targetId = app.highlightedMessageId;
+		const targetId = msgStore.highlightedMessageId;
 		if (targetId && container) {
 			setTimeout(() => {
 				const el = container?.querySelector(`[data-message-id="${CSS.escape(targetId)}"]`);
@@ -162,7 +172,7 @@
 
 	// Reset scroll on channel change
 	$effect(() => {
-		const channelId = app.activeDmChannelId;
+		const channelId = dms.activeDmChannelId;
 		if (channelId !== previousChannelId) {
 			previousChannelId = channelId;
 			isLockedToBottom = true;
@@ -173,8 +183,8 @@
 
 	// Auto-scroll when locked, or track unread when unlocked
 	$effect(() => {
-		const count = app.dmMessages.length;
-		const loading = app.isLoadingDmMessages;
+		const count = dms.dmMessages.length;
+		const loading = dms.isLoadingDmMessages;
 
 		// While messages are being fetched, the array still holds stale data from
 		// the previous conversation. Don't sync previousMessageCount here — the
@@ -205,7 +215,7 @@
 
 	async function handleDmSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		await app.sendDmMessage();
+		await dms.sendDmMessage();
 		dmInputEl?.focus();
 	}
 
@@ -214,9 +224,9 @@
 		const file = input.files?.[0];
 		if (file) {
 			if (file.type.startsWith('image/')) {
-				app.attachDmImage(file);
+				dms.attachDmImage(file);
 			} else {
-				app.attachDmFile(file);
+				dms.attachDmFile(file);
 			}
 		}
 		input.value = '';
@@ -230,7 +240,7 @@
 				e.preventDefault();
 				const file = item.getAsFile();
 				if (file) {
-					app.attachDmImage(file);
+					dms.attachDmImage(file);
 				}
 				return;
 			}
@@ -238,14 +248,14 @@
 	}
 
 	function handleDmKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Escape' && app.replyingTo?.context === 'dm') {
+		if (e.key === 'Escape' && dms.replyingTo?.context === 'dm') {
 			e.preventDefault();
-			app.cancelReply();
+			dms.cancelReply();
 		}
 	}
 
 	function handleDmInput(): void {
-		app.handleDmComposerInput();
+		dms.handleDmComposerInput();
 		syncDmOverlayScroll();
 	}
 
@@ -285,19 +295,19 @@
 		e.preventDefault();
 		dragCounter = 0;
 		isDragOver = false;
-		if (!app.activeDmChannelId) return;
+		if (!dms.activeDmChannelId) return;
 		const file = e.dataTransfer?.files[0];
 		if (file) {
 			if (file.type.startsWith('image/')) {
-				app.attachDmImage(file);
+				dms.attachDmImage(file);
 			} else {
-				app.attachDmFile(file);
+				dms.attachDmFile(file);
 			}
 		}
 	}
 </script>
 
-<div class="dm-chat-wrapper" class:search-open={app.isSearchOpen}>
+<div class="dm-chat-wrapper" class:search-open={msgStore.isSearchOpen}>
 <main
 	class="dm-chat"
 	aria-label="Direct message conversation"
@@ -307,30 +317,30 @@
 	ondrop={handleDrop}
 >
 	<header class="dm-header">
-		<button class="mobile-nav-btn" onclick={() => { app.mobileNavOpen = true; }} aria-label="Open navigation">
+		<button class="mobile-nav-btn" onclick={() => { ui.mobileNavOpen = true; }} aria-label="Open navigation">
 			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path d="M3 5h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2zm0 4h14a1 1 0 1 1 0 2H3a1 1 0 0 1 0-2z"/>
 			</svg>
 		</button>
 		<div class="dm-header-left">
-			{#if app.activeDmParticipant?.avatarUrl}
-				<img class="header-avatar" src={app.activeDmParticipant.avatarUrl} alt="" />
-			{:else if app.activeDmParticipant}
+			{#if dms.activeDmParticipant?.avatarUrl}
+				<img class="header-avatar" src={dms.activeDmParticipant.avatarUrl} alt="" />
+			{:else if dms.activeDmParticipant}
 				<div class="header-avatar-placeholder" aria-hidden="true">
-					{app.activeDmParticipant.displayName.slice(0, 1).toUpperCase()}
+					{dms.activeDmParticipant.displayName.slice(0, 1).toUpperCase()}
 				</div>
 			{/if}
 			<h1 class="dm-participant-name">
-				{app.activeDmParticipant?.displayName ?? 'Select a conversation'}
+				{dms.activeDmParticipant?.displayName ?? 'Select a conversation'}
 			</h1>
 		</div>
 		<div class="dm-header-right">
 			<button
 				class="search-btn"
-				onclick={() => app.toggleSearch()}
+				onclick={() => msgStore.toggleSearch()}
 				title="Search messages"
 				aria-label="Search messages"
-				class:active={app.isSearchOpen}
+				class:active={msgStore.isSearchOpen}
 			>
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 					<circle cx="11" cy="11" r="8"/>
@@ -339,8 +349,8 @@
 			</button>
 			<button
 				class="call-btn-header"
-				disabled={!!app.activeCall || !!app.incomingCall}
-				onclick={() => { if (app.activeDmChannelId) app.startCall(app.activeDmChannelId); }}
+				disabled={!!voice.activeCall || !!voice.incomingCall}
+				onclick={() => { if (dms.activeDmChannelId) voice.startCall(dms.activeDmChannelId); }}
 				aria-label="Start voice call"
 				title="Start voice call"
 			>
@@ -351,13 +361,13 @@
 		</div>
 	</header>
 
-	{#if app.activeCall && app.activeCall.dmChannelId === app.activeDmChannelId}
+	{#if voice.activeCall && voice.activeCall.dmChannelId === dms.activeDmChannelId}
 		<DmCallHeader />
 		<VideoGrid />
 	{/if}
 
 	<div class="dm-body">
-		{#if isDragOver && app.activeDmChannelId}
+		{#if isDragOver && dms.activeDmChannelId}
 			<div class="drop-overlay" aria-hidden="true">
 				<div class="drop-overlay-content">
 					<svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -367,21 +377,21 @@
 				</div>
 			</div>
 		{/if}
-		{#if app.error}
-			<div class="error-banner" role="alert">{app.error}</div>
+		{#if ui.error}
+			<div class="error-banner" role="alert">{ui.error}</div>
 		{/if}
 
 		<!-- Message feed -->
 		<div class="feed-wrapper">
 		<div class="message-feed" bind:this={container} onscroll={handleScroll}>
-			{#if app.isLoadingDmMessages}
+			{#if dms.isLoadingDmMessages}
 				<p class="muted feed-status">Loading messages…</p>
-			{:else if app.dmMessages.length === 0}
+			{:else if dms.dmMessages.length === 0}
 				<p class="muted feed-status">
-					No messages yet. Say hi to {app.activeDmParticipant?.displayName ?? 'your friend'}!
+					No messages yet. Say hi to {dms.activeDmParticipant?.displayName ?? 'your friend'}!
 				</p>
 			{:else}
-				{#each app.dmMessages as message, i (message.id)}
+				{#each dms.dmMessages as message, i (message.id)}
 					{#if message.messageType === 1}
 						<div class="system-message voice-call-event">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="call-event-icon" class:missed={message.body === 'missed'}>
@@ -400,20 +410,20 @@
 							<time class="call-event-time">{formatTime(message.createdAt)}</time>
 						</div>
 					{:else}
-					{@const prev = i > 0 ? app.dmMessages[i - 1] : null}
+					{@const prev = i > 0 ? dms.dmMessages[i - 1] : null}
 					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
 					{@const coveredIds = new Set((message.linkPreviews ?? []).map((lp) => { const m = /[\w-]{11}/.exec(lp.url); return m?.[0] ?? ''; }).filter(Boolean))}
-					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={app.highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
+					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={msgStore.highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
 					<!-- Floating action bar -->
 					<MessageActionBar
-						isOwnMessage={message.authorUserId === app.me?.user.id}
-						canDelete={message.authorUserId === app.me?.user.id}
+						isOwnMessage={message.authorUserId === auth.me?.user.id}
+						canDelete={message.authorUserId === auth.me?.user.id}
 						onReply={() => handleReply(message)}
-						onReact={(emoji) => app.toggleDmReaction(message.id, emoji)}
+						onReact={(emoji) => dms.toggleDmReaction(message.id, emoji)}
 						onEdit={() => startDmEdit(message)}
-						onDelete={() => app.deleteDmMessage(message.id)}
-						isReactionPending={(emoji) => app.isReactionPending(message.id, emoji)}
+						onDelete={() => dms.deleteDmMessage(message.id)}
+						isReactionPending={(emoji) => ui.isReactionPending(message.id, emoji)}
 					/>
 
 					{#if !isGrouped}
@@ -449,10 +459,10 @@
 									</div>
 								</div>
 							{:else if message.body}
-								<p class="message-body"><LinkifiedText text={message.body} customEmojis={app.customEmojis} /></p>
+								<p class="message-body"><LinkifiedText text={message.body} customEmojis={servers.customEmojis} /></p>
 							{/if}
 							{#if message.imageUrl}
-								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
+								<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 								</button>
 							{/if}
@@ -476,10 +486,10 @@
 							{#if (message.reactions ?? []).length > 0}
 								<ReactionBar
 									reactions={message.reactions}
-									currentUserId={app.me?.user.id ?? null}
-									onToggle={(emoji) => app.toggleDmReaction(message.id, emoji)}
-									isPending={(emoji) => app.isReactionPending(message.id, emoji)}
-									customEmojis={app.customEmojis}
+									currentUserId={auth.me?.user.id ?? null}
+									onToggle={(emoji) => dms.toggleDmReaction(message.id, emoji)}
+									isPending={(emoji) => ui.isReactionPending(message.id, emoji)}
+									customEmojis={servers.customEmojis}
 								/>
 							{/if}
 						</div>
@@ -504,14 +514,14 @@
 								</div>
 							{:else if message.body}
 								<p class="message-body">
-									<LinkifiedText text={message.body} customEmojis={app.customEmojis} />
+									<LinkifiedText text={message.body} customEmojis={servers.customEmojis} />
 									{#if message.editedAt}
 										<span class="edited-label">(edited)</span>
 									{/if}
 								</p>
 							{/if}
 							{#if message.imageUrl}
-								<button type="button" class="message-image-link" onclick={() => app.openImagePreview(message.imageUrl!)}>
+								<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
 									<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 								</button>
 							{/if}
@@ -535,10 +545,10 @@
 							{#if (message.reactions ?? []).length > 0}
 								<ReactionBar
 									reactions={message.reactions}
-									currentUserId={app.me?.user.id ?? null}
-									onToggle={(emoji) => app.toggleDmReaction(message.id, emoji)}
-									isPending={(emoji) => app.isReactionPending(message.id, emoji)}
-									customEmojis={app.customEmojis}
+									currentUserId={auth.me?.user.id ?? null}
+									onToggle={(emoji) => dms.toggleDmReaction(message.id, emoji)}
+									isPending={(emoji) => ui.isReactionPending(message.id, emoji)}
+									customEmojis={servers.customEmojis}
 								/>
 							{/if}
 							</div>
@@ -563,14 +573,14 @@
 		{/if}
 
 		<!-- Typing indicator -->
-		{#if app.dmTypingUsers.length > 0}
+		{#if dms.dmTypingUsers.length > 0}
 			<div class="typing-indicator" aria-live="polite">
 				<span class="typing-dots" aria-hidden="true">
 					<span class="dot"></span><span class="dot"></span><span class="dot"></span>
 				</span>
 				<span class="typing-text">
-					{#if app.dmTypingUsers.length === 1}
-						<strong>{app.dmTypingUsers[0]}</strong> is typing…
+					{#if dms.dmTypingUsers.length === 1}
+						<strong>{dms.dmTypingUsers[0]}</strong> is typing…
 					{:else}
 						Several people are typing…
 					{/if}
@@ -581,16 +591,16 @@
 
 		<!-- Composer -->
 		<form class="composer" onsubmit={handleDmSubmit}>
-		{#if app.replyingTo?.context === 'dm'}
-			<ReplyComposerBar authorName={app.replyingTo.authorName} bodyPreview={app.replyingTo.bodyPreview} onCancel={() => app.cancelReply()} />
+		{#if dms.replyingTo?.context === 'dm'}
+			<ReplyComposerBar authorName={dms.replyingTo.authorName} bodyPreview={dms.replyingTo.bodyPreview} onCancel={() => dms.cancelReply()} />
 		{/if}
-		{#if app.pendingDmImagePreview}
+		{#if dms.pendingDmImagePreview}
 			<div class="image-preview">
-				<img src={app.pendingDmImagePreview} alt="Attachment preview" class="preview-thumb" />
+				<img src={dms.pendingDmImagePreview} alt="Attachment preview" class="preview-thumb" />
 				<button
 					type="button"
 					class="remove-preview"
-					onclick={() => app.clearPendingDmImage()}
+					onclick={() => dms.clearPendingDmImage()}
 					aria-label="Remove image"
 				>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -599,14 +609,14 @@
 				</button>
 			</div>
 		{/if}
-		{#if app.pendingDmFile}
+		{#if dms.pendingDmFile}
 			<div class="file-preview">
 				<svg class="file-preview-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h7v5h5v11H6z"/></svg>
-				<span class="file-preview-name">{app.pendingDmFile.name}</span>
+				<span class="file-preview-name">{dms.pendingDmFile.name}</span>
 				<button
 					type="button"
 					class="remove-preview"
-					onclick={() => app.clearPendingDmFile()}
+					onclick={() => dms.clearPendingDmFile()}
 					aria-label="Remove file"
 				>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -615,7 +625,7 @@
 				</button>
 			</div>
 		{/if}
-		{#if !app.isHubConnected}
+		{#if !ui.isHubConnected}
 			<div class="composer-row">
 				<div class="composer-input-wrapper composer-disconnected">
 					<span class="connecting-message" aria-live="polite">Codec connecting<span class="animated-ellipsis"></span></span>
@@ -628,7 +638,7 @@
 				class="composer-attach"
 				type="button"
 				onclick={() => dmFileInputEl?.click()}
-				disabled={!app.activeDmChannelId || app.isSendingDm}
+				disabled={!dms.activeDmChannelId || dms.isSendingDm}
 				aria-label="Attach file"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -636,16 +646,16 @@
 				</svg>
 			</button>
 			<div class="composer-input-wrapper">
-				<div class="composer-input-overlay" bind:this={dmOverlayEl} aria-hidden="true"><ComposerOverlay text={app.dmMessageBody} customEmojis={app.customEmojis} /></div>
+				<div class="composer-input-overlay" bind:this={dmOverlayEl} aria-hidden="true"><ComposerOverlay text={dms.dmMessageBody} customEmojis={servers.customEmojis} /></div>
 				<input
 					bind:this={dmInputEl}
 					class="composer-input"
 					type="text"
 					inputmode="text"
 					autocomplete="off"
-					placeholder={app.activeDmParticipant ? `Message @${app.activeDmParticipant.displayName}` : 'Select a conversation…'}
-					bind:value={app.dmMessageBody}
-					disabled={!app.activeDmChannelId || app.isSendingDm}
+					placeholder={dms.activeDmParticipant ? `Message @${dms.activeDmParticipant.displayName}` : 'Select a conversation…'}
+					bind:value={dms.dmMessageBody}
+					disabled={!dms.activeDmChannelId || dms.isSendingDm}
 					oninput={handleDmInput}
 					onkeydown={handleDmKeydown}
 					onpaste={handleDmPaste}
@@ -654,7 +664,7 @@
 			<button
 				class="composer-send"
 				type="submit"
-				disabled={!app.activeDmChannelId || (!app.dmMessageBody.trim() && !app.pendingDmImage && !app.pendingDmFile) || app.isSendingDm}
+				disabled={!dms.activeDmChannelId || (!dms.dmMessageBody.trim() && !dms.pendingDmImage && !dms.pendingDmFile) || dms.isSendingDm}
 				aria-label="Send message"
 			>
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -666,7 +676,7 @@
 		</form>
 	</div>
 </main>
-{#if app.isSearchOpen}
+{#if msgStore.isSearchOpen}
 	<SearchPanel isDm />
 {/if}
 </div>

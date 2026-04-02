@@ -52,7 +52,17 @@ src/
 │   │   ├── chat-hub.ts     # SignalR hub connection lifecycle (ChatHubService)
 │   │   └── push-notifications.ts  # Web Push subscription management
 │   ├── state/
-│   │   └── app-state.svelte.ts  # Central reactive state (AppState class with $state/$derived)
+│   │   ├── ui-store.svelte.ts       # UIStore: modals, theme, errors, navigation flags, presence
+│   │   ├── auth-store.svelte.ts     # AuthStore: auth flows, tokens, user profile
+│   │   ├── server-store.svelte.ts   # ServerStore: server list, settings, moderation, roles
+│   │   ├── channel-store.svelte.ts  # ChannelStore: channels, selection, mentions
+│   │   ├── message-store.svelte.ts  # MessageStore: messages, reactions, pinning, search
+│   │   ├── dm-store.svelte.ts       # DmStore: DM conversations, messages
+│   │   ├── friend-store.svelte.ts   # FriendStore: friends, requests
+│   │   ├── voice-store.svelte.ts    # VoiceStore: voice/video, WebRTC, calls
+│   │   ├── navigation.svelte.ts     # Cross-store navigation orchestration (goHome, selectServer)
+│   │   ├── signalr.svelte.ts        # Cross-store SignalR event wiring
+│   │   └── index.ts                 # Barrel re-exports for all stores
 │   ├── styles/
 │   │   ├── tokens.css      # CSS custom properties (CODEC CRT design tokens)
 │   │   └── global.css      # Base styles, resets, font imports
@@ -136,33 +146,43 @@ src/
 
 **State Management Pattern:**
 
-The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$derived`) for fine-grained reactivity. It is created once in `+page.svelte` via `createAppState()` and injected into the component tree via Svelte's `setContext()`. Child components retrieve it with `getAppState()`.
+State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`, `ServerStore`, `ChannelStore`). Each store is created once in `+page.svelte` via its `create*Store()` factory and injected into the component tree with `setContext()`. Child components retrieve only the stores they need via `get*Store()` helpers (e.g. `getAuthStore()`, `getServerStore()`). Cross-store orchestration lives in `navigation.svelte.ts` and `signalr.svelte.ts`.
+
+| Store | Responsibility |
+|-------|---------------|
+| `UIStore` | Modals, theme, transient errors, navigation flags, presence, hub connection status |
+| `AuthStore` | Auth flows (Google, email/password, OAuth), tokens, user profile, nickname |
+| `ServerStore` | Server list, settings, moderation, roles, permissions, bans |
+| `ChannelStore` | Channels, categories, selection, mention badges |
+| `MessageStore` | Messages, reactions, pinning, search, replies, link previews |
+| `DmStore` | DM conversations, DM messages, DM typing |
+| `FriendStore` | Friends list, friend requests |
+| `VoiceStore` | Voice channels, DM calls, WebRTC, mute/deafen, video, screen sharing |
 
 ```
 +page.svelte
-  └─ createAppState(apiBaseUrl, googleClientId)  → setContext(APP_STATE_KEY, state)
-      ├── ServerSidebar      → getAppState()
-      ├── ChannelSidebar     → getAppState()
-      │   └── UserPanel      → getAppState()
-      ├── HomeSidebar        → getAppState()  (shown when Home is active)
-      │   └── DmList         → getAppState()
-      ├── FriendsPanel       → getAppState()  (shown when Home active, no DM selected)
-      │   ├── FriendsList    → getAppState()
-      │   ├── PendingRequests → getAppState()
-      │   └── AddFriend      → getAppState()
-      ├── DmChatArea         → getAppState()  (shown when DM conversation selected)
-      ├── ChatArea           → getAppState()
-      │   ├── MessageFeed    → getAppState()
-      │   ├── Composer       → getAppState()
-      │   └── TypingIndicator → getAppState()
-      ├── MembersSidebar     → getAppState()
-      │   └── MemberItem     (receives props, no context needed)
-      ├── UserSettingsModal  → getAppState()  (shown when settingsOpen)
-      │   ├── SettingsSidebar  → getAppState()
-      │   ├── ProfileSettings  → getAppState()
-      │   └── AccountSettings  → getAppState()
-      ├── BugReportModal     → getAppState()  (shown when bugReportOpen)
-      └── ImagePreview       → getAppState()  (shown when lightboxImageUrl is set)
+  ├─ createUIStore()        → setContext()
+  ├─ createAuthStore()      → setContext()
+  ├─ createServerStore()    → setContext()
+  ├─ createChannelStore()   → setContext()
+  ├─ createMessageStore()   → setContext()
+  ├─ createDmStore()        → setContext()
+  ├─ createFriendStore()    → setContext()
+  ├─ createVoiceStore()     → setContext()
+  └─ wires cross-store callbacks, navigation, and SignalR orchestration
+      ├── ServerSidebar      → getServerStore(), getUIStore()
+      ├── ChannelSidebar     → getChannelStore(), getServerStore()
+      │   └── UserPanel      → getAuthStore(), getUIStore()
+      ├── HomeSidebar        → getDmStore(), getFriendStore()
+      ├── FriendsPanel       → getFriendStore()
+      ├── DmChatArea         → getDmStore()
+      ├── ChatArea           → getMessageStore(), getChannelStore()
+      │   ├── MessageFeed    → getMessageStore()
+      │   ├── Composer       → getMessageStore()
+      │   └── TypingIndicator → getMessageStore()
+      ├── MembersSidebar     → getServerStore()
+      ├── UserSettingsModal  → getAuthStore(), getUIStore()
+      └── ImagePreview       → getUIStore()  (shown when lightboxImageUrl is set)
 ```
 
 **Layer Responsibilities:**
@@ -173,7 +193,7 @@ The `AppState` class in `app-state.svelte.ts` uses Svelte 5 runes (`$state`, `$d
 | `api/` | HTTP communication with the REST API; typed methods, `encodeURIComponent` on path params |
 | `auth/` | Token lifecycle (persist, load, expire, clear) and Google SDK setup |
 | `services/` | External service integrations (SignalR hub connection management) |
-| `state/` | Central reactive application state; orchestrates API calls, auth, and hub events |
+| `state/` | Domain-specific reactive stores; each store owns its slice of state, API calls, and SignalR handlers |
 | `data/` | Static datasets (emoji categories, keywords) |
 | `styles/` | Design tokens as CSS custom properties (`[data-theme]` palettes for theming); global base styles |
 | `utils/` | Pure utility functions (formatting, frequency tracking, etc.) |

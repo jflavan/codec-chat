@@ -1,28 +1,30 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
 
-	const app = getAppState();
+	const ui = getUIStore();
+	const servers = getServerStore();
 
 	const categories = $derived.by(() => {
 		const cats: { id: 'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'; label: string }[] = [
 			{ id: 'general', label: 'General' }
 		];
-		if (app.canManageChannels) {
+		if (servers.canManageChannels) {
 			cats.push({ id: 'channels', label: 'Channels' });
 		}
-		if (app.canManageInvites) {
+		if (servers.canManageInvites) {
 			cats.push({ id: 'invites', label: 'Invites' });
 			cats.push({ id: 'webhooks', label: 'Webhooks' });
 		}
-		if (app.canManageEmojis) {
+		if (servers.canManageEmojis) {
 			cats.push({ id: 'emojis', label: 'Emojis' });
 		}
-		if (app.canManageRoles) {
+		if (servers.canManageRoles) {
 			cats.push({ id: 'roles', label: 'Roles' });
 			cats.push({ id: 'members', label: 'Members' });
 			cats.push({ id: 'bans', label: 'Bans' });
 		}
-		if (app.canViewAuditLog) {
+		if (servers.canViewAuditLog) {
 			cats.push({ id: 'audit-log', label: 'Audit Log' });
 		}
 		return cats;
@@ -36,9 +38,9 @@
 				<button
 					role="tab"
 					class="category-item"
-					class:active={app.serverSettingsCategory === cat.id}
-					aria-selected={app.serverSettingsCategory === cat.id}
-					onclick={() => { app.serverSettingsCategory = cat.id; }}
+					class:active={ui.serverSettingsCategory === cat.id}
+					aria-selected={ui.serverSettingsCategory === cat.id}
+					onclick={() => { ui.serverSettingsCategory = cat.id; }}
 				>
 					<span class="category-label">{cat.label}</span>
 				</button>

@@ -1,9 +1,15 @@
 <script lang="ts">
-	import { getAppState } from '$lib/state/app-state.svelte.js';
+	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
+	import { getServerStore } from '$lib/state/server-store.svelte.js';
+	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
+	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import { dndzone } from 'svelte-dnd-action';
 	import type { Channel } from '$lib/types/models.js';
 
-	const app = getAppState();
+	const auth = getAuthStore();
+	const servers = getServerStore();
+	const channelStore = getChannelStore();
+	const msgStore = getMessageStore();
 
 	/* ─── Category creation ─── */
 	let newCategoryName = $state('');
@@ -25,7 +31,7 @@
 	type DndItem = Channel & { id: string };
 
 	const uncategorizedItems = $derived(
-		app.channels
+		channelStore.channels
 			.filter((c) => !c.categoryId)
 			.sort((a, b) => a.position - b.position)
 			.map((c) => ({ ...c, id: c.id })) as DndItem[]
@@ -33,13 +39,13 @@
 
 	type CategoryItems = { categoryId: string; name: string; items: DndItem[] };
 	const categoryGroups = $derived(
-		app.categories
+		servers.categories
 			.slice()
 			.sort((a, b) => a.position - b.position)
 			.map((cat): CategoryItems => ({
 				categoryId: cat.id,
 				name: cat.name,
-				items: app.channels
+				items: channelStore.channels
 					.filter((c) => c.categoryId === cat.id)
 					.sort((a, b) => a.position - b.position)
 					.map((c) => ({ ...c, id: c.id })) as DndItem[]
@@ -89,7 +95,7 @@
 				updates.push({ channelId: ch.id, categoryId: group.categoryId, position: idx });
 			});
 		});
-		await app.saveChannelOrder(updates);
+		await channelStore.saveChannelOrder(updates);
 	}
 
 	/* ─── Channel edit helpers ─── */
@@ -107,20 +113,20 @@
 
 	async function saveChannelEdits(channelId: string) {
 		if (!channelEditName.trim()) return;
-		await app.updateChannelName(channelId, channelEditName);
+		await channelStore.updateChannelName(channelId, channelEditName);
 		if (channelEditDesc !== undefined) {
-			await app.updateChannelDescription(channelId, channelEditDesc);
+			await channelStore.updateChannelDescription(channelId, channelEditDesc);
 		}
 		cancelEditChannel();
 	}
 
 	async function handleDeleteChannel(channelId: string) {
-		await app.deleteChannel(channelId);
+		await channelStore.deleteChannel(channelId);
 		confirmDeleteChannelId = null;
 	}
 
 	async function handlePurgeChannel(channelId: string) {
-		await app.purgeChannel(channelId);
+		await msgStore.purgeChannel(channelId);
 		confirmPurgeChannelId = null;
 	}
 
@@ -129,7 +135,7 @@
 		const name = newCategoryName.trim();
 		if (!name) return;
 		isAddingCategory = true;
-		await app.createCategory(name);
+		await servers.createCategory(name);
 		newCategoryName = '';
 		isAddingCategory = false;
 	}
@@ -141,13 +147,13 @@
 
 	async function saveCategoryName(catId: string) {
 		if (!categoryEditName.trim()) return;
-		await app.renameCategory(catId, categoryEditName);
+		await servers.renameCategory(catId, categoryEditName);
 		categoryEditId = null;
 		categoryEditName = '';
 	}
 
 	async function handleDeleteCategory(catId: string) {
-		await app.deleteCategory(catId);
+		await servers.deleteCategory(catId);
 		confirmDeleteCategoryId = null;
 	}
 </script>
@@ -251,7 +257,7 @@
 						class="input"
 						bind:value={channelEditName}
 						maxlength="100"
-						disabled={app.isUpdatingChannelName}
+						disabled={channelStore.isUpdatingChannelName}
 						onkeydown={(e) => {
 							if (e.key === 'Enter') saveChannelEdits(channel.id);
 							if (e.key === 'Escape') cancelEditChannel();
@@ -274,10 +280,10 @@
 					<button
 						type="button"
 						class="btn-primary"
-						disabled={app.isUpdatingChannelName || !channelEditName.trim()}
+						disabled={channelStore.isUpdatingChannelName || !channelEditName.trim()}
 						onclick={() => saveChannelEdits(channel.id)}
 					>
-						{app.isUpdatingChannelName ? '…' : 'Save'}
+						{channelStore.isUpdatingChannelName ? '…' : 'Save'}
 					</button>
 					<button type="button" class="btn-secondary" onclick={cancelEditChannel}>Cancel</button>
 				</div>
@@ -287,18 +293,18 @@
 				<span class="drag-handle" aria-hidden="true">⠿</span>
 				{@render channelTypeIcon(channel.type)}
 				<span class="channel-name">{channel.name}</span>
-				{#if app.canManageChannels}
+				{#if servers.canManageChannels}
 					<button type="button" class="btn-edit" onclick={() => startEditChannel(channel.id, channel.name, channel.description)}>
 						Edit
 					</button>
 				{/if}
-				{#if app.isGlobalAdmin && channel.type !== 'voice'}
+				{#if auth.isGlobalAdmin && channel.type !== 'voice'}
 					{#if confirmPurgeChannelId === channel.id}
 						<span class="danger-warning-inline">Delete all messages?</span>
-						<button type="button" class="btn-danger-sm" disabled={app.isPurgingChannel} onclick={() => handlePurgeChannel(channel.id)}>
-							{app.isPurgingChannel ? '…' : 'Confirm'}
+						<button type="button" class="btn-danger-sm" disabled={msgStore.isPurgingChannel} onclick={() => handlePurgeChannel(channel.id)}>
+							{msgStore.isPurgingChannel ? '…' : 'Confirm'}
 						</button>
-						<button type="button" class="btn-secondary-sm" disabled={app.isPurgingChannel} onclick={() => (confirmPurgeChannelId = null)}>
+						<button type="button" class="btn-secondary-sm" disabled={msgStore.isPurgingChannel} onclick={() => (confirmPurgeChannelId = null)}>
 							Cancel
 						</button>
 					{:else}
@@ -307,7 +313,7 @@
 						</button>
 					{/if}
 				{/if}
-				{#if app.canDeleteChannel}
+				{#if servers.canDeleteChannel}
 					{#if confirmDeleteChannelId === channel.id}
 						<button type="button" class="btn-danger-sm" onclick={() => handleDeleteChannel(channel.id)}>Confirm</button>
 						<button type="button" class="btn-secondary-sm" onclick={() => (confirmDeleteChannelId = null)}>Cancel</button>
