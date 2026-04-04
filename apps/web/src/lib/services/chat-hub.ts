@@ -354,8 +354,13 @@ export class ChatHubService {
 	async start(accessTokenFactory: () => string | Promise<string>, callbacks: SignalRCallbacks): Promise<void> {
 		const connection = new HubConnectionBuilder()
 			.withUrl(this.hubUrl, { accessTokenFactory })
-			.withAutomaticReconnect()
+			.withAutomaticReconnect([0, 1000, 2000, 5000, 10_000, 30_000, 60_000, 60_000, 60_000, 60_000])
 			.build();
+
+		// Match the server's extended ClientTimeoutInterval (90 s) so the client
+		// doesn't declare the server dead before the server considers the client gone.
+		connection.serverTimeoutInMilliseconds = 120_000;
+		connection.keepAliveIntervalInMilliseconds = 30_000;
 
 		connection.on('ReceiveMessage', callbacks.onMessage);
 		connection.on('UserTyping', callbacks.onUserTyping);

@@ -60,7 +60,6 @@
 	const announcementStore = createAnnouncementStore();
 
 	/* ───── Wire cross-store callbacks ───── */
-	const reconnectTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
 
 	auth.onSignedIn = async () => {
 		await Promise.all([
@@ -68,7 +67,7 @@
 			friends.loadFriends(),
 			friends.loadFriendRequests(),
 			dms.loadDmConversations(),
-			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui, reconnectTimerRef)
+			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui)
 		]);
 
 		// Load channels/members/emojis for the auto-selected first server

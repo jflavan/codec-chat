@@ -24,8 +24,7 @@ export async function setupSignalR(
 	dms: DmStore,
 	friends: FriendStore,
 	voice: VoiceStore,
-	ui: UIStore,
-	reconnectTimerRef: { current: ReturnType<typeof setTimeout> | null }
+	ui: UIStore
 ): Promise<void> {
 	await hub.start(
 		async () => {
@@ -45,19 +44,10 @@ export async function setupSignalR(
 					voice.teardownOnDisconnect();
 					ui.setTransientError('Voice disconnected due to network interruption.');
 				}
-
-				if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-				reconnectTimerRef.current = setTimeout(() => {
-					if (!ui.isHubConnected) window.location.reload();
-				}, 5000);
 			},
 
 			onReconnected: async () => {
 				ui.isHubConnected = true;
-				if (reconnectTimerRef.current) {
-					clearTimeout(reconnectTimerRef.current);
-					reconnectTimerRef.current = null;
-				}
 
 				// Re-join SignalR groups lost during disconnection.
 				if (servers.selectedServerId) {
@@ -75,13 +65,11 @@ export async function setupSignalR(
 
 			onClose: (error) => {
 				ui.isHubConnected = false;
-				if (reconnectTimerRef.current) {
-					clearTimeout(reconnectTimerRef.current);
-					reconnectTimerRef.current = null;
-				}
 				if (voice.activeVoiceChannelId || voice.activeCall) {
 					voice.teardownOnDisconnect();
 				}
+				// All automatic reconnect attempts exhausted — reload to
+				// re-establish the connection from scratch.
 				if (error) window.location.reload();
 			},
 
