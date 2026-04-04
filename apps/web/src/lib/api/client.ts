@@ -1134,6 +1134,31 @@ export class ApiClient {
 		});
 	}
 
+	/* ───── Reports ───── */
+
+	/** Submit an abuse report for a user, message, or server. */
+	submitReport(
+		token: string,
+		data: { reportType: number; targetId: string; reason: string }
+	): Promise<{ id: string }> {
+		return this.request(`${this.baseUrl}/reports`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify(data)
+		});
+	}
+
+	/* ───── Announcements ───── */
+
+	/** Fetch active system announcements. */
+	getActiveAnnouncements(
+		token: string
+	): Promise<Array<{ id: string; title: string; body: string; createdAt: string; expiresAt: string | null }>> {
+		return this.request(`${this.baseUrl}/announcements/active`, {
+			headers: this.headers(token)
+		});
+	}
+
 	/* ───── Message Search ───── */
 
 	/** Search messages within a server. */

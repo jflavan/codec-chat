@@ -47,4 +47,4 @@ export type {
 	WebhookEventType,
 	BannedMember
 } from './models.js';
-export { Permission, hasPermission } from './models.js';
+export { Permission, hasPermission, ReportType } from './models.js';
