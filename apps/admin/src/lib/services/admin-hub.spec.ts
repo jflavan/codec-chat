@@ -167,7 +167,7 @@ describe('AdminHubService', () => {
 
 			// Simulate the SignalR server sending a StatsUpdated event
 			const call = mockConnection.on.mock.calls.find(
-				([event]: [string, unknown]) => event === 'StatsUpdated'
+				(args: unknown[]) => args[0] === 'StatsUpdated'
 			);
 			expect(call).toBeDefined();
 			const handler = call![1] as (payload: unknown) => void;
