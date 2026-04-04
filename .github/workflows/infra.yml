@@ -98,7 +98,17 @@ jobs:
             --resource-group rg-codec-prod \
             --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
           if [ -z "$ADMIN_IMAGE" ]; then
-            ADMIN_IMAGE="$FALLBACK"
+            # App doesn't exist yet — check if an image was pushed to ACR by a prior CD run
+            ACR_SERVER="acrcodecprod.azurecr.io"
+            ADMIN_IMAGE=$(az acr repository show-tags \
+              --name acrcodecprod \
+              --repository codec-admin \
+              --orderby time_desc --top 1 -o tsv 2>/dev/null || echo "")
+            if [ -n "$ADMIN_IMAGE" ]; then
+              ADMIN_IMAGE="${ACR_SERVER}/codec-admin:${ADMIN_IMAGE}"
+            else
+              ADMIN_IMAGE="$FALLBACK"
+            fi
           fi
           echo "admin-image=$ADMIN_IMAGE" >> "$GITHUB_OUTPUT"
           echo "Admin image: $ADMIN_IMAGE"
