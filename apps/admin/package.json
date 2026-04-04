@@ -24,6 +24,7 @@
     "@microsoft/signalr": "^10.0.0"
   },
   "overrides": {
-    "whatwg-url": ">=14.0.0"
+    "whatwg-url": ">=14.0.0",
+    "cookie": ">=0.7.0"
   }
 }
