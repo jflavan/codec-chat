@@ -22,6 +22,10 @@
 	let inputValue = $state('');
 	const canConfirm = $derived(!requireInput || inputValue === requireInput);
 
+	$effect(() => {
+		if (open) inputValue = '';
+	});
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onCancel();
 	}

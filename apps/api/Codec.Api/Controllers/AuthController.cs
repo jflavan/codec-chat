@@ -165,6 +165,9 @@ public class AuthController(
             return Unauthorized(new { error = "Invalid email or password." });
         }
 
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account is disabled." });
+
         // Reset lockout state on successful login
         if (user.FailedLoginAttempts > 0 || user.LockoutEnd is not null)
         {
@@ -172,9 +175,6 @@ public class AuthController(
             user.LockoutEnd = null;
             await db.SaveChangesAsync();
         }
-
-        if (user.IsDisabled)
-            return Unauthorized(new { error = "Account is disabled.", reason = user.DisabledReason });
 
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);

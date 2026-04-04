@@ -16,7 +16,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 		const body = await res.json().catch(() => ({}));
 		throw new Error(body.detail || body.error || `HTTP ${res.status}`);
 	}
-	return res.json();
+	const text = await res.text();
+	return text ? JSON.parse(text) : undefined;
 }
 
 export const adminApi = {
@@ -44,7 +45,7 @@ export const adminApi = {
 	createAnnouncement: (data: { title: string; body: string; expiresAt?: string }) => request<{ id: string }>('/admin/announcements', { method: 'POST', body: JSON.stringify(data) }),
 	updateAnnouncement: (id: string, data: any) => request<void>(`/admin/announcements/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 	deleteAnnouncement: (id: string) => request<void>(`/admin/announcements/${id}`, { method: 'DELETE' }),
-	login: (email: string, password: string) => request<{ accessToken: string; refreshToken: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-	googleAuth: (idToken: string) => request<{ accessToken: string; refreshToken: string }>('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
+	login: (email: string, password: string, recaptchaToken?: string) => request<{ accessToken: string; refreshToken: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, recaptchaToken }) }),
+	googleAuth: (idToken: string) => request<{ accessToken: string; refreshToken: string }>('/auth/google', { method: 'POST', body: JSON.stringify({ credential: idToken }) }),
 	getMe: () => request<any>('/me'),
 };

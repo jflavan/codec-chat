@@ -25,6 +25,7 @@ public class AdminSystemController(CodecDbContext db, IUserService userService, 
         public string? Title { get; init; }
         public string? Body { get; init; }
         public DateTimeOffset? ExpiresAt { get; init; }
+        public bool ClearExpiresAt { get; init; }
         public bool? IsActive { get; init; }
     }
 
@@ -104,10 +105,17 @@ public class AdminSystemController(CodecDbContext db, IUserService userService, 
 
         if (request.Title is not null) announcement.Title = request.Title;
         if (request.Body is not null) announcement.Body = request.Body;
-        if (request.ExpiresAt.HasValue) announcement.ExpiresAt = request.ExpiresAt.Value;
+        if (request.ClearExpiresAt)
+            announcement.ExpiresAt = null;
+        else if (request.ExpiresAt.HasValue)
+            announcement.ExpiresAt = request.ExpiresAt.Value;
         if (request.IsActive.HasValue) announcement.IsActive = request.IsActive.Value;
 
         await db.SaveChangesAsync();
+
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
+        await adminActions.LogAsync(admin.Id, AdminActionType.AnnouncementUpdated, "Announcement", id.ToString());
+
         return Ok();
     }
 

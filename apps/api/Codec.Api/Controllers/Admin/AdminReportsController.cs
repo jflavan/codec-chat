@@ -87,38 +87,15 @@ public class AdminReportsController(CodecDbContext db, IUserService userService,
             var actionType = request.Status == ReportStatus.Resolved ? AdminActionType.ReportResolved : AdminActionType.ReportDismissed;
             await adminActions.LogAsync(admin.Id, actionType, "Report", id.ToString(), request.Resolution);
         }
+        else if (request.Status is ReportStatus.Open or ReportStatus.Reviewing)
+        {
+            report.ResolvedAt = null;
+            report.ResolvedByUserId = null;
+            report.Resolution = null;
+        }
 
         await db.SaveChangesAsync();
         return Ok();
     }
 
-    [HttpGet("/admin/messages/search")]
-    public async Task<IActionResult> SearchMessages([FromQuery] string search, [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
-    {
-        if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
-            return BadRequest(new { error = "Search term must be at least 2 characters." });
-
-        pageSize = Math.Min(pageSize, 100);
-        var term = $"%{search}%";
-
-        var query = db.Messages.AsNoTracking()
-            .Where(m => EF.Functions.ILike(m.Body, term));
-
-        var totalCount = await query.CountAsync();
-        var items = await query
-            .OrderByDescending(m => m.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(m => new
-            {
-                m.Id, Content = m.Body, m.CreatedAt, m.ChannelId,
-                AuthorName = m.AuthorUser!.DisplayName,
-                ChannelName = m.Channel!.Name,
-                ServerName = m.Channel.Server!.Name,
-                ServerId = m.Channel.ServerId
-            })
-            .ToListAsync();
-
-        return Ok(PaginatedResponse<object>.Create(items.Cast<object>().ToList(), totalCount, page, pageSize));
-    }
 }

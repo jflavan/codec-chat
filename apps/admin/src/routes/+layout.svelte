@@ -29,7 +29,7 @@
 			if (!isAdmin) { clearToken(); await goto('/login'); loading = false; return; }
 
 			try {
-				appState.currentUser = await adminApi.getMe();
+				appState.currentUser = (await adminApi.getMe()).user;
 				await hub.start((data) => appState.updateLiveStats(data));
 				authenticated = true;
 			} catch {

@@ -45,7 +45,7 @@ public class DmControllerTests : IDisposable
         _hub.Setup(h => h.Clients).Returns(clients.Object);
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(clientProxy.Object);
 
-        _controller = new DmController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object);
+        _controller = new DmController(_db, _userService.Object, _hub.Object, _avatarService.Object, _scopeFactory.Object, new MetricsCounterService());
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -1617,7 +1617,7 @@ public class DmControllerTests : IDisposable
 
         var controllerWithPush = new DmController(
             _db, _userService.Object, _hub.Object, _avatarService.Object,
-            _scopeFactory.Object, pushService);
+            _scopeFactory.Object, new MetricsCounterService(), pushService);
         controllerWithPush.ControllerContext = _controller.ControllerContext;
 
         var result = await controllerWithPush.SendMessage(channel.Id,
@@ -1647,7 +1647,7 @@ public class DmControllerTests : IDisposable
 
         var controllerWithPush = new DmController(
             _db, _userService.Object, _hub.Object, _avatarService.Object,
-            _scopeFactory.Object, pushService);
+            _scopeFactory.Object, new MetricsCounterService(), pushService);
         controllerWithPush.ControllerContext = _controller.ControllerContext;
 
         var longBody = new string('x', 250);

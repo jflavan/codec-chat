@@ -145,7 +145,7 @@ This document tracks implemented and planned features for Codec.
 - **Moderation queue** — report queue with status (Open/InProgress/Resolved/Dismissed) and type (User/Message/Server) filters; report detail with related report count; actions: assign, resolve, dismiss; full-text message search across all servers
 - **System tools** — paginated admin action audit log; system announcement CRUD (title, content, active flag, optional expiry); live connection count
 - **User reports** — any authenticated user can submit reports (`POST /reports`) for users, messages, or servers
-- **System announcements** — platform-wide announcements with active flag and optional expiry; public endpoint (`GET /announcements`) for active announcements
+- **System announcements** — platform-wide announcements with active flag and optional expiry; authenticated endpoint (`GET /announcements`) for active announcements
 
 ### Moderation
 - **User banning** — ban members with optional message purge; `BannedMember` entity with reason and actor tracking; ban check on invite join (prevents re-entry); real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management UI in server settings (list, ban, unban)

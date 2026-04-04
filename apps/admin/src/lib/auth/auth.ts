@@ -16,7 +16,7 @@ export function clearToken(): void {
 export async function verifyAdmin(): Promise<boolean> {
 	try {
 		const me = await adminApi.getMe();
-		return me.isGlobalAdmin === true;
+		return me.user?.isGlobalAdmin === true;
 	} catch {
 		return false;
 	}

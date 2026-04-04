@@ -20,30 +20,36 @@ public class ReportsController(CodecDbContext db, IUserService userService) : Co
     {
         var (user, _) = await userService.GetOrCreateUserAsync(User);
 
+        if (!Guid.TryParse(request.TargetId, out var targetGuid))
+            return BadRequest(new { error = "Invalid target ID." });
+
         string? snapshot = null;
         if (request.ReportType == ReportType.Message)
         {
             var msg = await db.Messages.AsNoTracking()
-                .Where(m => m.Id.ToString() == request.TargetId)
+                .Where(m => m.Id == targetGuid)
                 .Select(m => new { m.Body, Author = m.AuthorUser!.DisplayName })
                 .FirstOrDefaultAsync();
-            if (msg is not null) snapshot = JsonSerializer.Serialize(msg);
+            if (msg is null) return NotFound(new { error = "Target message not found." });
+            snapshot = JsonSerializer.Serialize(msg);
         }
         else if (request.ReportType == ReportType.User)
         {
             var u = await db.Users.AsNoTracking()
-                .Where(u => u.Id.ToString() == request.TargetId)
+                .Where(u => u.Id == targetGuid)
                 .Select(u => new { u.DisplayName, u.Email })
                 .FirstOrDefaultAsync();
-            if (u is not null) snapshot = JsonSerializer.Serialize(u);
+            if (u is null) return NotFound(new { error = "Target user not found." });
+            snapshot = JsonSerializer.Serialize(u);
         }
         else if (request.ReportType == ReportType.Server)
         {
             var s = await db.Servers.AsNoTracking()
-                .Where(s => s.Id.ToString() == request.TargetId)
+                .Where(s => s.Id == targetGuid)
                 .Select(s => new { s.Name, s.Description })
                 .FirstOrDefaultAsync();
-            if (s is not null) snapshot = JsonSerializer.Serialize(s);
+            if (s is null) return NotFound(new { error = "Target server not found." });
+            snapshot = JsonSerializer.Serialize(s);
         }
 
         var report = new Report

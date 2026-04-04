@@ -524,7 +524,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `POST /admin/servers/{id}/quarantine` - Quarantine a server (hides from discovery)
 - `POST /admin/servers/{id}/unquarantine` - Remove quarantine from a server
 - `DELETE /admin/servers/{id}` - Delete a server (broadcasts `ServerDeleted` via SignalR)
-- `POST /admin/servers/{id}/transfer` - Transfer server ownership to another member
+- `PUT /admin/servers/{id}/transfer-ownership` - Transfer server ownership to another member
 - `GET /admin/reports?page={n}&status={s}&type={t}` - Paginated report list with status/type filters
 - `GET /admin/reports/{id}` - Report detail with related report count
 - `PUT /admin/reports/{id}` - Update report (assign, resolve, dismiss)
@@ -536,7 +536,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `PUT /admin/announcements/{id}` - Update a system announcement
 - `DELETE /admin/announcements/{id}` - Delete a system announcement
 - `POST /reports` - Submit a user report (any authenticated user)
-- `GET /announcements` - Get active system announcements (public)
+- `GET /announcements` - Get active system announcements (authenticated)
 
 #### Admin Authorization
 All `/admin/*` endpoints require the `GlobalAdmin` policy. The `GlobalAdminHandler` checks both `User.IsGlobalAdmin` and `!User.IsDisabled` on every request via a database lookup. Mutating admin endpoints use a separate `admin-writes` rate limit policy.
@@ -919,16 +919,16 @@ DirectMessage ─┘
 
 #### Report
 - User-submitted report for moderation review
-- Fields: Id, ReportType (User/Message/Server), TargetId, ReporterId (FK → User), Reason, Status (Open/InProgress/Resolved/Dismissed), AssignedToUserId (nullable FK → User), Resolution (nullable), ResolvedByUserId (nullable FK → User), ResolvedAt, MessageSnapshot, ServerSnapshot, CreatedAt
+- Fields: Id, ReportType (User/Message/Server), TargetId, ReporterId (FK → User), Reason, Status (Open/Reviewing/Resolved/Dismissed), AssignedToUserId (nullable FK → User), Resolution (nullable), ResolvedByUserId (nullable FK → User), ResolvedAt, TargetSnapshot, CreatedAt
 
 #### AdminAction
 - Immutable audit log entry for admin operations
-- Fields: Id, AdminUserId (FK → User), ActionType (enum, 16 values), TargetType, TargetId, Reason (nullable), Details (nullable), CreatedAt
+- Fields: Id, ActorUserId (FK → User), ActionType (enum, 16 values), TargetType, TargetId, Reason (nullable), Details (nullable), CreatedAt
 - Action types: UserDisabled, UserEnabled, UserGlobalBanned, UserForcedLogout, UserPasswordReset, UserPromotedAdmin, UserDemotedAdmin, ServerQuarantined, ServerUnquarantined, ServerDeleted, ServerOwnershipTransferred, ReportResolved, ReportDismissed, AnnouncementCreated, AnnouncementDeleted, MessagesPurged
 
 #### SystemAnnouncement
 - Platform-wide announcement displayed to all users
-- Fields: Id, Title, Content, IsActive, ExpiresAt (nullable), CreatedByUserId (FK → User), CreatedAt, UpdatedAt
+- Fields: Id, Title, Body, IsActive, ExpiresAt (nullable), CreatedByUserId (FK → User), CreatedAt
 
 ## Configuration
 

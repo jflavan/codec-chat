@@ -84,6 +84,7 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> QuarantineServer(Guid id, [FromBody] ReasonRequest request)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         var server = await db.Servers.FindAsync(id);
         if (server is null) return NotFound();
 
@@ -91,8 +92,6 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
         server.QuarantinedReason = request.Reason;
         server.QuarantinedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
-
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.ServerQuarantined, "Server", id.ToString(), request.Reason);
 
         return Ok();
@@ -102,6 +101,7 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> UnquarantineServer(Guid id)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         var server = await db.Servers.FindAsync(id);
         if (server is null) return NotFound();
 
@@ -109,8 +109,6 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
         server.QuarantinedReason = null;
         server.QuarantinedAt = null;
         await db.SaveChangesAsync();
-
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.ServerUnquarantined, "Server", id.ToString());
 
         return Ok();
@@ -120,16 +118,18 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> DeleteServer(Guid id, [FromBody] ReasonRequest request)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         var server = await db.Servers.FindAsync(id);
         if (server is null) return NotFound();
 
-        await hub.Clients.Group($"server-{id}").SendAsync("ServerDeleted", new { serverId = id });
+        await using var transaction = await db.Database.BeginTransactionAsync();
 
         db.Servers.Remove(server);
-        await db.SaveChangesAsync();
-
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.ServerDeleted, "Server", id.ToString(), request.Reason);
+
+        await transaction.CommitAsync();
+
+        await hub.Clients.Group($"server-{id}").SendAsync("ServerDeleted", new { serverId = id });
 
         return Ok();
     }
@@ -138,6 +138,7 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> TransferOwnership(Guid id, [FromBody] TransferRequest request)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         var server = await db.Servers.Include(s => s.Roles).FirstOrDefaultAsync(s => s.Id == id);
         if (server is null) return NotFound();
 
@@ -147,15 +148,17 @@ public class AdminServersController(CodecDbContext db, IUserService userService,
         var ownerRole = server.Roles.FirstOrDefault(r => r.Position == 0 && r.IsSystemRole);
         if (ownerRole is null) return BadRequest(new { error = "Server has no owner role." });
 
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
         var currentOwnerRoles = await db.ServerMemberRoles.Where(mr => mr.RoleId == ownerRole.Id).ToListAsync();
         db.ServerMemberRoles.RemoveRange(currentOwnerRoles);
 
         db.ServerMemberRoles.Add(new ServerMemberRole { UserId = request.NewOwnerUserId, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
-
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.ServerOwnershipTransferred, "Server", id.ToString(),
             details: System.Text.Json.JsonSerializer.Serialize(new { newOwnerUserId = request.NewOwnerUserId }));
+
+        await transaction.CommitAsync();
 
         return Ok();
     }

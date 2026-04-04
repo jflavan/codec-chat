@@ -31,8 +31,8 @@ public class GlobalAdminHandlerTests : IDisposable
     public async Task Succeeds_WhenUserIsGlobalAdmin()
     {
         var user = new User { Id = Guid.NewGuid(), DisplayName = "Admin", IsGlobalAdmin = true };
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync((user, false));
+        _userService.Setup(u => u.ResolveUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(user);
 
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "test")], "Bearer"));
         var context = new AuthorizationHandlerContext([new GlobalAdminRequirement()], principal, null);
@@ -45,8 +45,8 @@ public class GlobalAdminHandlerTests : IDisposable
     public async Task Fails_WhenUserIsNotGlobalAdmin()
     {
         var user = new User { Id = Guid.NewGuid(), DisplayName = "Regular", IsGlobalAdmin = false };
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync((user, false));
+        _userService.Setup(u => u.ResolveUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(user);
 
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "test")], "Bearer"));
         var context = new AuthorizationHandlerContext([new GlobalAdminRequirement()], principal, null);
@@ -59,8 +59,8 @@ public class GlobalAdminHandlerTests : IDisposable
     public async Task Fails_WhenGlobalAdminIsDisabled()
     {
         var user = new User { Id = Guid.NewGuid(), DisplayName = "Disabled Admin", IsGlobalAdmin = true, IsDisabled = true };
-        _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
-            .ReturnsAsync((user, false));
+        _userService.Setup(u => u.ResolveUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(user);
 
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "test")], "Bearer"));
         var context = new AuthorizationHandlerContext([new GlobalAdminRequirement()], principal, null);

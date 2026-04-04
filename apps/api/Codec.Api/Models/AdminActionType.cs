@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace Codec.Api.Models;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AdminActionType
 {
     UserDisabled,
@@ -16,6 +19,7 @@ public enum AdminActionType
     ReportResolved,
     ReportDismissed,
     AnnouncementCreated,
+    AnnouncementUpdated,
     AnnouncementDeleted,
     MessagesPurged
 }

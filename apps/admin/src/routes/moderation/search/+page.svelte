@@ -12,7 +12,7 @@
 	let hasSearched = $state(false);
 
 	const columns = [
-		{ key: 'body', label: 'Content' },
+		{ key: 'content', label: 'Content' },
 		{ key: 'authorName', label: 'Author' },
 		{ key: 'serverName', label: 'Server' },
 		{ key: 'channelName', label: 'Channel' },
@@ -22,7 +22,7 @@
 	function formatRows(items: any[]) {
 		return items.map((m) => ({
 			...m,
-			body: m.body?.length > 120 ? m.body.slice(0, 120) + '…' : (m.body || '—'),
+			content: m.content?.length > 120 ? m.content.slice(0, 120) + '…' : (m.content || '—'),
 			createdAt: new Date(m.createdAt).toLocaleString()
 		}));
 	}
@@ -34,7 +34,7 @@
 		hasSearched = true;
 		currentPage = page;
 		try {
-			const params = new URLSearchParams({ q: query.trim(), page: String(page), pageSize: '25' });
+			const params = new URLSearchParams({ search: query.trim(), page: String(page), pageSize: '25' });
 			const res = await adminApi.searchMessages(params.toString());
 			results = res.items;
 			totalPages = res.totalPages || 1;

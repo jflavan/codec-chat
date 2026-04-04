@@ -86,9 +86,9 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
                 user.Id, user.DisplayName, user.Nickname, user.Email, user.AvatarUrl,
                 user.IsGlobalAdmin, user.IsDisabled, user.DisabledReason, user.DisabledAt,
                 user.CreatedAt, user.LockoutEnd, user.FailedLoginAttempts, user.EmailVerified,
-                HasGoogle = user.GoogleSubject != null, HasGitHub = user.GitHubSubject != null,
-                HasDiscord = user.DiscordSubject != null, HasSaml = user.SamlNameId != null,
-                HasPassword = user.PasswordHash != null
+                HasGoogle = user.GoogleSubject is not null, HasGitHub = user.GitHubSubject is not null,
+                HasDiscord = user.DiscordSubject is not null, HasSaml = user.SamlNameId is not null,
+                HasPassword = user.PasswordHash is not null
             },
             memberships,
             recentMessages,
@@ -126,6 +126,7 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> EnableUser(Guid id)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
@@ -133,8 +134,6 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
         user.DisabledReason = null;
         user.DisabledAt = null;
         await db.SaveChangesAsync();
-
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.UserEnabled, "User", id.ToString());
 
         return Ok();
@@ -144,14 +143,13 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> ForceLogout(Guid id)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
         var tokens = await db.RefreshTokens.Where(t => t.UserId == id).ToListAsync();
         db.RefreshTokens.RemoveRange(tokens);
         await db.SaveChangesAsync();
-
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
         await adminActions.LogAsync(admin.Id, AdminActionType.UserForcedLogout, "User", id.ToString());
 
         return Ok();
@@ -161,13 +159,19 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
     [EnableRateLimiting("admin-writes")]
     public async Task<IActionResult> ResetPassword(Guid id)
     {
+        var (admin, _) = await userService.GetOrCreateUserAsync(User);
+        if (id == admin.Id)
+            return BadRequest(new { error = "Cannot reset your own password." });
+
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
         user.PasswordHash = null;
-        await db.SaveChangesAsync();
 
-        var (admin, _) = await userService.GetOrCreateUserAsync(User);
+        var tokens = await db.RefreshTokens.Where(t => t.UserId == id).ToListAsync();
+        db.RefreshTokens.RemoveRange(tokens);
+
+        await db.SaveChangesAsync();
         await adminActions.LogAsync(admin.Id, AdminActionType.UserPasswordReset, "User", id.ToString());
 
         return Ok();
@@ -184,18 +188,29 @@ public class AdminUsersController(CodecDbContext db, IUserService userService, A
 
         if (!request.IsGlobalAdmin)
         {
+            await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var adminCount = await db.Users.CountAsync(u => u.IsGlobalAdmin);
             if (adminCount <= 1)
                 return BadRequest(new { error = "Cannot demote the last global admin." });
+
+            var user = await db.Users.FindAsync(id);
+            if (user is null) return NotFound();
+
+            user.IsGlobalAdmin = false;
+            await db.SaveChangesAsync();
+            await adminActions.LogAsync(admin.Id, AdminActionType.UserDemotedAdmin, "User", id.ToString());
+            await transaction.CommitAsync();
+
+            return Ok();
         }
 
-        var user = await db.Users.FindAsync(id);
-        if (user is null) return NotFound();
+        var targetUser = await db.Users.FindAsync(id);
+        if (targetUser is null) return NotFound();
 
-        user.IsGlobalAdmin = request.IsGlobalAdmin;
+        targetUser.IsGlobalAdmin = request.IsGlobalAdmin;
         await db.SaveChangesAsync();
 
-        var actionType = request.IsGlobalAdmin ? AdminActionType.UserPromotedAdmin : AdminActionType.UserDemotedAdmin;
+        var actionType = AdminActionType.UserPromotedAdmin;
         await adminActions.LogAsync(admin.Id, actionType, "User", id.ToString());
 
         return Ok();

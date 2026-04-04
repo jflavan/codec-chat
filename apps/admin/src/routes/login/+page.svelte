@@ -1,18 +1,40 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { env } from '$env/dynamic/public';
+	import { onMount } from 'svelte';
 	import { adminApi } from '$lib/api/client';
 	import { setToken, verifyAdmin, clearToken } from '$lib/auth/auth';
 
+	const siteKey = env.PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 	let email = $state('');
 	let password = $state('');
 	let error = $state('');
 	let submitting = $state(false);
 
+	onMount(() => {
+		if (siteKey) {
+			const script = document.createElement('script');
+			script.src = `https://www.google.com/recaptcha/enterprise.js?render=${siteKey}`;
+			script.async = true;
+			document.head.appendChild(script);
+		}
+	});
+
+	async function getRecaptchaToken(action: string): Promise<string | undefined> {
+		if (!siteKey) return undefined;
+		try {
+			return await (window as any).grecaptcha.enterprise.execute(siteKey, { action });
+		} catch {
+			return undefined;
+		}
+	}
+
 	async function handleLogin() {
 		error = '';
 		submitting = true;
 		try {
-			const result = await adminApi.login(email, password);
+			const recaptchaToken = await getRecaptchaToken('login');
+			const result = await adminApi.login(email, password, recaptchaToken);
 			setToken(result.accessToken);
 			localStorage.setItem('admin_refresh_token', result.refreshToken);
 

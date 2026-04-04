@@ -214,9 +214,17 @@ builder.Services.AddAuthentication("Selector")
 
 builder.Services.AddAuthorization(options =>
 {
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddRequirements(new Codec.Api.Filters.ActiveUserRequirement())
+        .Build();
     options.AddPolicy("GlobalAdmin", policy =>
-        policy.Requirements.Add(new Codec.Api.Filters.GlobalAdminRequirement()));
+    {
+        policy.RequireAuthenticatedUser();
+        policy.Requirements.Add(new Codec.Api.Filters.GlobalAdminRequirement());
+    });
 });
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, Codec.Api.Filters.ActiveUserHandler>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, Codec.Api.Filters.GlobalAdminHandler>();
 builder.Services.AddDbContext<CodecDbContext>(options =>
 {
