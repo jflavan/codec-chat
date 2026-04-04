@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Message, Mention } from '$lib/types/index.js';
+import { ReportType } from '$lib/types/index.js';
 	import { formatTime } from '$lib/utils/format.js';
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
@@ -143,6 +144,7 @@
 		onReact={handleToggleReaction}
 		onEdit={startEdit}
 		onDelete={handleDelete}
+		onReport={() => ui.openReportModal(ReportType.Message, message.id, 'Message by ' + message.authorName)}
 		isReactionPending={(emoji) => ui.isReactionPending(message.id, emoji)}
 	/>
 

@@ -9,6 +9,7 @@
 	import { goHome } from '$lib/state/navigation.svelte.js';
 	import ContextMenu from '$lib/components/channel-sidebar/ContextMenu.svelte';
 	import type { MemberServer } from '$lib/types/index.js';
+import { ReportType } from '$lib/types/index.js';
 
 	const auth = getAuthStore();
 	const ui = getUIStore();
@@ -258,6 +259,13 @@
 			{
 				label: servers.isServerMuted ? 'Unmute Server' : 'Mute Server',
 				onClick: () => servers.toggleServerMute()
+			},
+			{
+				label: 'Report Server',
+				onClick: () => {
+					ui.openReportModal(ReportType.Server, sv.serverId, sv.name);
+					serverContextMenu = null;
+				}
 			}
 		]}
 		onClose={() => { serverContextMenu = null; }}

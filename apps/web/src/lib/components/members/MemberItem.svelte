@@ -3,13 +3,22 @@
 	import type { PresenceStatus } from '$lib/types/models.js';
 	import PresenceDot from '$lib/components/shared/PresenceDot.svelte';
 
-	let { member, presence = 'offline' }: { member: Member; presence?: PresenceStatus } = $props();
+	let { member, presence = 'offline', onReport }: { member: Member; presence?: PresenceStatus; onReport?: () => void } = $props();
 
 	const hoistedRole = $derived(member.roles.find(r => !r.isSystemRole) ?? member.displayRole ?? null);
 	const showBadge = $derived(hoistedRole !== null && hoistedRole.name !== 'Member');
 </script>
 
-<li class="member-item" class:offline={presence === 'offline'}>
+<li
+	class="member-item"
+	class:offline={presence === 'offline'}
+	oncontextmenu={(e) => {
+		if (onReport) {
+			e.preventDefault();
+			onReport();
+		}
+	}}
+>
 	<div class="avatar-wrapper">
 		{#if member.avatarUrl}
 			<img class="member-avatar-img" src={member.avatarUrl} alt="" />

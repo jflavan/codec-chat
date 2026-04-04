@@ -129,6 +129,10 @@ src/
 │   │   │   ├── ServerMembers.svelte       # Members tab — member role management (promote/demote, Owner/Admin)
 │   │   │   ├── ServerBans.svelte          # Bans tab — ban/unban members with reason
 │   │   │   └── ServerWebhooks.svelte      # Webhooks tab — webhook CRUD with event type selection
+│   │   ├── report/
+│   │   │   └── ReportModal.svelte       # User/message/server report submission dialog
+│   │   ├── announcements/
+│   │   │   └── AnnouncementBanner.svelte # Dismissible site-wide announcement banner
 │   │   ├── shared/
 │   │   │   └── PresenceDot.svelte        # Online/idle/offline indicator dot
 │   │   ├── ReloadPrompt.svelte            # PWA update toast (new version available)
@@ -157,6 +161,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 | `MessageStore` | Messages, reactions, pinning, search, replies, link previews |
 | `DmStore` | DM conversations, DM messages, DM typing |
 | `FriendStore` | Friends list, friend requests |
+| `AnnouncementStore` | Announcements: active list, dismissed state (localStorage-persisted) |
 | `VoiceStore` | Voice channels, DM calls, WebRTC, mute/deafen, video, screen sharing |
 
 ```
@@ -204,7 +209,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - **Framework:** SvelteKit 2.x with Svelte 5 runes
 - **Purpose:** Standalone global admin interface for platform management
 - **Key Features:**
-  - Dashboard with live stats (users, servers, messages, reports) via SignalR `AdminHub`
+  - Dashboard with live stats (users, servers, messages, reports) and live activity chart (messages/min, connections) via SignalR `AdminHub`
   - User management (search, disable/enable, force logout, reset password, promote/demote admin)
   - Server management (search, quarantine/unquarantine, delete, transfer ownership)
   - Moderation (report queue with status/type filters, full-text message search)

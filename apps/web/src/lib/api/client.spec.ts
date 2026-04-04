@@ -1303,4 +1303,39 @@ describe('ApiClient', () => {
 			);
 		});
 	});
+
+	// --- Reports ---
+
+	describe('submitReport', () => {
+		it('sends POST with report data', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'r1' }));
+			await client.submitReport(token, { reportType: 1, targetId: 'msg-1', reason: 'spam' });
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/reports`,
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ reportType: 1, targetId: 'msg-1', reason: 'spam' })
+				})
+			);
+		});
+	});
+
+	// --- Announcements ---
+
+	describe('getActiveAnnouncements', () => {
+		it('sends GET', async () => {
+			mockFetch.mockResolvedValueOnce(
+				jsonResponse([
+					{ id: 'a1', title: 'Test', body: 'Hello', createdAt: '2026-01-01', expiresAt: null }
+				])
+			);
+			const result = await client.getActiveAnnouncements(token);
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${baseUrl}/announcements/active`,
+				expect.anything()
+			);
+			expect(result).toHaveLength(1);
+			expect(result[0].title).toBe('Test');
+		});
+	});
 });

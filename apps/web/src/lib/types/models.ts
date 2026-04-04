@@ -500,3 +500,11 @@ export type BannedMember = {
 	bannedAt: string;
 	bannedByUserId: string;
 };
+
+/* ───── Reports ───── */
+
+export enum ReportType {
+	User = 0,
+	Message = 1,
+	Server = 2,
+}

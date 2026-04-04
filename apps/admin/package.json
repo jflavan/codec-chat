@@ -8,20 +8,26 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.3",
     "@sveltejs/kit": "^2.52.2",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "jsdom": "^29.0.1",
     "svelte": "^5.53.0",
     "svelte-check": "^4.4.1",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.2"
   },
   "dependencies": {
-    "@microsoft/signalr": "^10.0.0"
+    "@microsoft/signalr": "^10.0.0",
+    "chart.js": "^4.5.1"
   },
   "overrides": {
     "whatwg-url": ">=14.0.0",

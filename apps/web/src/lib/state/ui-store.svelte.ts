@@ -4,6 +4,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { getTheme, applyTheme, type ThemeId } from '$lib/utils/theme.js';
 import { ApiError } from '$lib/api/client.js';
 import type { PresenceStatus } from '$lib/types/index.js';
+import { ReportType } from '$lib/types/models.js';
 
 const UI_KEY = Symbol('ui-store');
 
@@ -33,6 +34,7 @@ export class UIStore {
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
 	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'>('general');
+	reportModal = $state<{ reportType: ReportType; targetId: string; targetName: string } | null>(null);
 
 	/* ───── mobile ───── */
 	mobileNavOpen = $state(false);
@@ -105,6 +107,14 @@ export class UIStore {
 
 	closeServerSettings(): void {
 		this.serverSettingsOpen = false;
+	}
+
+	openReportModal(reportType: ReportType, targetId: string, targetName: string): void {
+		this.reportModal = { reportType, targetId, targetName };
+	}
+
+	closeReportModal(): void {
+		this.reportModal = null;
 	}
 
 	dismissAlphaNotification(): void {

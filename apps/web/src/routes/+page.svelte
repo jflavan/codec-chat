@@ -10,6 +10,7 @@
 		createDmStore,
 		createFriendStore,
 		createVoiceStore,
+		createAnnouncementStore,
 		setupSignalR,
 		goHome,
 		selectServer
@@ -33,6 +34,8 @@
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
+	import ReportModal from '$lib/components/report/ReportModal.svelte';
+	import AnnouncementBanner from '$lib/components/announcements/AnnouncementBanner.svelte';
 	import NicknameModal from '$lib/components/NicknameModal.svelte';
 	import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
 	import VerificationGate from '$lib/components/VerificationGate.svelte';
@@ -54,6 +57,7 @@
 	const dms = createDmStore(auth, api, ui, hub);
 	const friends = createFriendStore(auth, api, ui);
 	const voice = createVoiceStore(auth, api, ui, hub, new VoiceService());
+	const announcementStore = createAnnouncementStore();
 
 	/* ───── Wire cross-store callbacks ───── */
 	const reconnectTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
@@ -71,6 +75,10 @@
 		if (servers.selectedServerId) {
 			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);
 		}
+
+		api.getActiveAnnouncements(auth.idToken!).then(items => {
+			announcementStore.setAnnouncements(items);
+		}).catch(() => {});
 	};
 
 	auth.onSignedOut = async () => {
@@ -167,20 +175,28 @@
 {/if}
 
 {#if !ui.isInitialLoading}
-<div class="app-shell" class:home-mode={ui.showFriendsPanel} class:dm-active={ui.showFriendsPanel && dms.activeDmChannelId}>
-	<ServerSidebar />
-	{#if ui.showFriendsPanel}
-		<HomeSidebar />
-		{#if dms.activeDmChannelId}
-			<DmChatArea />
-		{:else}
-			<FriendsPanel />
-		{/if}
-	{:else}
-		<ChannelSidebar />
-		<ChatArea />
-		<MembersSidebar />
+<div class="app-layout">
+	{#if announcementStore.activeAnnouncement}
+		<AnnouncementBanner
+			announcement={announcementStore.activeAnnouncement}
+			onDismiss={(id) => announcementStore.dismiss(id)}
+		/>
 	{/if}
+	<div class="app-shell" class:home-mode={ui.showFriendsPanel} class:dm-active={ui.showFriendsPanel && dms.activeDmChannelId}>
+		<ServerSidebar />
+		{#if ui.showFriendsPanel}
+			<HomeSidebar />
+			{#if dms.activeDmChannelId}
+				<DmChatArea />
+			{:else}
+				<FriendsPanel />
+			{/if}
+		{:else}
+			<ChannelSidebar />
+			<ChatArea />
+			<MembersSidebar />
+		{/if}
+	</div>
 </div>
 
 <!-- Mobile navigation drawer -->
@@ -220,6 +236,10 @@
 	<BugReportModal />
 {/if}
 
+{#if ui.reportModal}
+	<ReportModal {api} />
+{/if}
+
 <ImagePreview />
 <AlphaNotification />
 {#if voice.incomingCall}
@@ -244,11 +264,18 @@
 {/if}
 
 <style>
+	.app-layout {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		height: 100dvh;
+	}
+
 	.app-shell {
 		display: grid;
 		grid-template-columns: 72px 240px minmax(0, 1fr) 240px;
-		height: 100vh;
-		height: 100dvh;
+		flex: 1;
+		min-height: 0;
 		overflow: hidden;
 	}
 

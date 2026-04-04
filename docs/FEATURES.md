@@ -139,15 +139,16 @@ This document tracks implemented and planned features for Codec.
 - VAPID key rotation to Azure Key Vault secrets for push notification security
 
 ### Global Admin Panel
-- **Admin dashboard** — standalone SvelteKit app (`apps/admin/`) with live stats (users, servers, messages, open reports, active connections, messages/min) via SignalR `AdminHub`; stats broadcast every 5 seconds
+- **Admin dashboard** — standalone SvelteKit app (`apps/admin/`) with live stats (users, servers, messages, open reports, active connections, messages/min) via SignalR `AdminHub`; stats broadcast every 5 seconds; live activity chart (Chart.js) showing rolling messages/min and active connections
 - **User management** — paginated user list with search; user detail with profile, auth providers, server memberships, recent messages, report history, and admin action log; actions: disable/enable account, force logout, reset password, promote/demote global admin
 - **Server management** — paginated server list with search and quarantine status; server detail with members, channels, roles, and owner; actions: quarantine/unquarantine, delete server, transfer ownership
 - **Moderation queue** — report queue with status (Open/InProgress/Resolved/Dismissed) and type (User/Message/Server) filters; report detail with related report count; actions: assign, resolve, dismiss; full-text message search across all servers
 - **System tools** — paginated admin action audit log; system announcement CRUD (title, content, active flag, optional expiry); live connection count
-- **User reports** — any authenticated user can submit reports (`POST /reports`) for users, messages, or servers
-- **System announcements** — platform-wide announcements with active flag and optional expiry; authenticated endpoint (`GET /announcements`) for active announcements
+- **User reports** — any authenticated user can submit reports (`POST /reports`) for users, messages, or servers; `ReportModal` in web client with right-click context menu on members, report button on message action bar, and rate-limit feedback (429)
+- **System announcements** — platform-wide announcements with active flag and optional expiry; `GET /announcements/active` endpoint for active announcements; dismissible `AnnouncementBanner` in the web client with `localStorage`-persisted dismiss state
 
 ### Moderation
+- **Quarantine enforcement** — quarantined servers block new joins via invite link (HTTP 403); prevents users from entering quarantined servers
 - **User banning** — ban members with optional message purge; `BannedMember` entity with reason and actor tracking; ban check on invite join (prevents re-entry); real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management UI in server settings (list, ban, unban)
 - **Custom roles** — `ServerRoleEntity` with 21 granular permission flags (bitmask); role hierarchy with position-based ordering; system roles (Owner, Admin, Member, @everyone) plus custom roles; full CRUD via `RolesController`; role management UI with permission editor and drag-and-drop reordering; role badges with custom colors on member avatars; `IsMentionable` and `IsHoisted` options
 - **Granular permissions** — `Permission` flags enum covering channel management, server management, roles, emojis, audit log, invites, kick/ban, messaging, voice, and a special `Administrator` flag that bypasses all checks
@@ -166,11 +167,12 @@ This document tracks implemented and planned features for Codec.
 - **OAuth configuration** — `GET /auth/oauth/config` returns enabled provider status (public endpoint)
 
 ### Testing
-- 1,542 automated tests across 3 test suites (1,188 API unit, 177 API integration, 177 web)
+- 1,746 automated tests across 4 test suites (1,308 API unit, 182 API integration, 181 web, 75 admin)
 - API unit tests: xUnit + FluentAssertions + Moq; InMemory EF Core for database tests
 - API integration tests: WebApplicationFactory + Testcontainers (disposable PostgreSQL + Redis); full HTTP pipeline with real migrations; FakeAuthHandler bypasses Google JWT; SignalR hub tests via SignalR client
 - Web unit tests: Vitest + jsdom; localStorage polyfill; mocked fetch for API client
-- Coverage: core services 95%+, web utilities 98%+, combined API 80%+
+- Admin unit tests: Vitest + jsdom; tests for API client, auth, state, and SignalR hub service
+- Coverage: API 85%+ lines, web 85%+ statements, admin 98%+ statements
 - See [TESTING.md](TESTING.md) for full details
 
 ### File Attachments

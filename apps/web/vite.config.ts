@@ -15,8 +15,10 @@ export default defineConfig({
 				'src/lib/types/**',
 				'src/lib/services/voice-service.ts',
 				'src/lib/services/chat-hub.ts',
+				'src/lib/services/push-notifications.ts',
 				'src/lib/state/**',
 				'src/lib/auth/google.ts',
+				'src/lib/auth/oauth.ts',
 				'src/lib/data/**',
 				'src/lib/index.ts',
 				'src/lib/utils/dom.ts'
