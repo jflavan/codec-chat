@@ -33,6 +33,7 @@
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
+import ReportModal from '$lib/components/report/ReportModal.svelte';
 	import NicknameModal from '$lib/components/NicknameModal.svelte';
 	import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
 	import VerificationGate from '$lib/components/VerificationGate.svelte';
@@ -218,6 +219,10 @@
 
 {#if ui.bugReportOpen}
 	<BugReportModal />
+{/if}
+
+{#if ui.reportModal}
+	<ReportModal />
 {/if}
 
 <ImagePreview />

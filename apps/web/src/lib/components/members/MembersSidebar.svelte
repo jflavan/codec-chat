@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Member } from '$lib/types/index.js';
+import { ReportType } from '$lib/types/index.js';
 	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 	import { getServerStore } from '$lib/state/server-store.svelte.js';
@@ -64,7 +65,7 @@
 				<h3 class="member-group-heading">{group.name} — {group.members.length}</h3>
 				<ul class="member-list" role="list">
 					{#each group.members as member (member.userId)}
-						<MemberItem {member} presence={ui.userPresence.get(member.userId) ?? 'offline'} />
+						<MemberItem {member} presence={ui.userPresence.get(member.userId) ?? 'offline'} onReport={() => ui.openReportModal(ReportType.User, member.userId, member.displayName)} />
 					{/each}
 				</ul>
 			{/if}
