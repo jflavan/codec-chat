@@ -17,7 +17,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("dm")]
-public class DmController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, PushNotificationService? pushService = null) : ControllerBase
+public class DmController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MetricsCounterService metricsCounter, PushNotificationService? pushService = null) : ControllerBase
 {
     /// <summary>
     /// Creates a new DM channel between the current user and the specified recipient,
@@ -661,6 +661,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         }
 
         await db.SaveChangesAsync();
+        metricsCounter.IncrementMessages();
 
         var authorAvatarUrl = avatarService.ResolveUrl(appUser.CustomAvatarPath) ?? appUser.AvatarUrl;
 

@@ -345,6 +345,23 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 | Refresh mechanism | Rotating opaque refresh tokens (stored hashed) | Rotating opaque refresh tokens (stored hashed) |
 | Logout | Server-side revocation via `POST /auth/logout` | Server-side revocation via `POST /auth/logout` |
 
+### Account Disabling (Global Admin)
+
+Global admins can disable user accounts via the admin panel (`POST /admin/users/{id}/disable`). Disabled accounts are blocked across all auth flows:
+
+- **Email/password login** (`POST /auth/login`) — returns 401 with `{ error: "Account is disabled.", reason: "..." }`
+- **Token refresh** (`POST /auth/refresh`) — returns 401 with `{ error: "Account is disabled." }`
+- **Google Sign-In** (`POST /auth/google`) — returns 401 after token validation
+- **OAuth callbacks** (GitHub, Discord) — returns 401 after code exchange
+
+When an account is disabled:
+1. `User.IsDisabled` is set to `true` with a reason and timestamp
+2. All refresh tokens for the user are immediately revoked
+3. The `GlobalAdminHandler` authorization policy rejects disabled admins, even if their JWT is still valid
+4. The existing access token remains valid until it naturally expires (up to 1 hour), but only for non-admin endpoints — admin endpoints check `IsDisabled` on every request via the authorization handler
+
+Re-enabling an account (`POST /admin/users/{id}/enable`) clears the disabled flag. The user must sign in again since their refresh tokens were revoked.
+
 ### Current Limitations
 
 ⚠️ **Token Revocation**
@@ -352,7 +369,7 @@ PUBLIC_API_BASE_URL=http://localhost:5050
 - Refresh tokens: invalidated on use (rotation) and on sign-out via the logout endpoint
 
 ⚠️ **Password Reset**
-- Password reset via email is not yet implemented
+- Admin password reset (`POST /admin/users/{id}/reset-password`) removes the user's password credential (sets `PasswordHash` to null). It does not send a reset email. Users must use another auth provider (Google, GitHub, Discord, or SAML) to regain access. Full password reset via email is not yet implemented
 
 ⚠️ **Reverse Account Linking**
 - Google-first users (no password set) cannot yet add an email/password credential; this is deferred

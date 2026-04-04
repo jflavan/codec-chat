@@ -16,6 +16,23 @@ public class Server
     public string? IconUrl { get; set; }
 
     public string? Description { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>
+    /// When true, the server is hidden from discovery and invites. Existing members retain access.
+    /// </summary>
+    public bool IsQuarantined { get; set; }
+
+    /// <summary>
+    /// Reason provided by the admin who quarantined this server. Max 500 chars.
+    /// </summary>
+    public string? QuarantinedReason { get; set; }
+
+    /// <summary>
+    /// When the server was quarantined.
+    /// </summary>
+    public DateTimeOffset? QuarantinedAt { get; set; }
+
     public List<Channel> Channels { get; set; } = [];
     public List<ServerMember> Members { get; set; } = [];
     public List<ServerInvite> Invites { get; set; } = [];

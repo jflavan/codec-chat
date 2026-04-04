@@ -80,6 +80,7 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
 }
 
 builder.Services.AddSingleton<MessageCacheService>();
+builder.Services.AddSingleton<MetricsCounterService>();
 
 builder.Services.AddSingleton<Codec.Api.Filters.HubRateLimitFilter>();
 var signalRBuilder = builder.Services.AddSignalR(options =>
@@ -174,7 +175,7 @@ builder.Services.AddAuthentication("Selector")
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                if (!string.IsNullOrEmpty(accessToken) && (path.StartsWithSegments("/hubs/chat") || path.StartsWithSegments("/hubs/admin")))
                 {
                     context.Token = accessToken;
                 }
@@ -202,7 +203,7 @@ builder.Services.AddAuthentication("Selector")
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                if (!string.IsNullOrEmpty(accessToken) && (path.StartsWithSegments("/hubs/chat") || path.StartsWithSegments("/hubs/admin")))
                 {
                     context.Token = accessToken;
                 }
@@ -211,7 +212,20 @@ builder.Services.AddAuthentication("Selector")
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddRequirements(new Codec.Api.Filters.ActiveUserRequirement())
+        .Build();
+    options.AddPolicy("GlobalAdmin", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.Requirements.Add(new Codec.Api.Filters.GlobalAdminRequirement());
+    });
+});
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, Codec.Api.Filters.ActiveUserHandler>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, Codec.Api.Filters.GlobalAdminHandler>();
 builder.Services.AddDbContext<CodecDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("Default");
@@ -294,6 +308,18 @@ builder.Services.AddRateLimiter(options =>
         limiter.Window = TimeSpan.FromMinutes(1);
         limiter.QueueLimit = 0;
     });
+    options.AddFixedWindowLimiter("admin-writes", limiter =>
+    {
+        limiter.PermitLimit = 30;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+    options.AddFixedWindowLimiter("reports", limiter =>
+    {
+        limiter.PermitLimit = 5;
+        limiter.Window = TimeSpan.FromHours(1);
+        limiter.QueueLimit = 0;
+    });
 });
 
 builder.Services.AddResponseCompression(options =>
@@ -326,6 +352,7 @@ else
 
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<AdminActionService>();
 builder.Services.AddHostedService<AuditLogCleanupService>();
 
 builder.Services.AddSingleton<VoiceCallTimeoutService>();
@@ -333,6 +360,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutSe
 
 builder.Services.AddSingleton<PresenceTracker>();
 builder.Services.AddHostedService<PresenceBackgroundService>();
+builder.Services.AddHostedService<AdminMetricsService>();
 
 // Web Push notification service (VAPID-authenticated).
 var vapidPublicKey = builder.Configuration["Vapid:PublicKey"];
@@ -658,6 +686,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<AdminHub>("/hubs/admin");
 
 app.MapOpenApi();
 if (app.Environment.IsDevelopment())

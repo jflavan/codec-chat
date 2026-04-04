@@ -155,6 +155,9 @@ public class SamlController(
 
         var (user, isNewUser) = result.Value;
 
+        if (user.IsDisabled)
+            return Unauthorized(new { error = "Account is disabled." });
+
         // Issue codec-api JWT tokens
         var accessToken = tokenService.GenerateAccessToken(user);
         var (refreshToken, _) = await tokenService.GenerateRefreshTokenAsync(user);

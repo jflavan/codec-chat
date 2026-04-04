@@ -38,6 +38,9 @@ public class CodecDbContext : DbContext
     public DbSet<ServerRoleEntity> ServerRoles => Set<ServerRoleEntity>();
     public DbSet<ServerMemberRole> ServerMemberRoles => Set<ServerMemberRole>();
     public DbSet<ChannelPermissionOverride> ChannelPermissionOverrides => Set<ChannelPermissionOverride>();
+    public DbSet<Report> Reports => Set<Report>();
+    public DbSet<AdminAction> AdminActions => Set<AdminAction>();
+    public DbSet<SystemAnnouncement> SystemAnnouncements => Set<SystemAnnouncement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +50,7 @@ public class CodecDbContext : DbContext
                 .WithOne(channel => channel.Server)
                 .HasForeignKey(channel => channel.ServerId);
             e.Property(s => s.Description).HasMaxLength(256);
+            e.Property(s => s.QuarantinedReason).HasMaxLength(500);
         });
 
         modelBuilder.Entity<Channel>(e =>
@@ -563,6 +567,36 @@ public class CodecDbContext : DbContext
                 .HasForeignKey(b => b.BannedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.Property(b => b.Reason).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<User>(e =>
+        {
+            e.Property(u => u.DisabledReason).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<Report>(e =>
+        {
+            e.HasOne(r => r.Reporter).WithMany().HasForeignKey(r => r.ReporterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.AssignedToUser).WithMany().HasForeignKey(r => r.AssignedToUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(r => r.ResolvedByUser).WithMany().HasForeignKey(r => r.ResolvedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.Property(r => r.Reason).HasMaxLength(2000);
+            e.Property(r => r.Resolution).HasMaxLength(2000);
+            e.HasIndex(r => r.Status);
+            e.HasIndex(r => new { r.ReportType, r.TargetId });
+        });
+
+        modelBuilder.Entity<AdminAction>(e =>
+        {
+            e.HasOne(a => a.ActorUser).WithMany().HasForeignKey(a => a.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(a => a.ActionType);
+            e.HasIndex(a => a.CreatedAt);
+        });
+
+        modelBuilder.Entity<SystemAnnouncement>(e =>
+        {
+            e.HasOne(a => a.CreatedByUser).WithMany().HasForeignKey(a => a.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(a => a.Title).HasMaxLength(200);
+            e.Property(a => a.Body).HasMaxLength(5000);
         });
     }
 }

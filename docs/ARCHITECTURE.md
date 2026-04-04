@@ -199,6 +199,18 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 | `utils/` | Pure utility functions (formatting, frequency tracking, etc.) |
 | `components/` | Presentational Svelte 5 components grouped by feature area |
 
+### Admin Panel (SvelteKit)
+- **Location:** `apps/admin/`
+- **Framework:** SvelteKit 2.x with Svelte 5 runes
+- **Purpose:** Standalone global admin interface for platform management
+- **Key Features:**
+  - Dashboard with live stats (users, servers, messages, reports) via SignalR `AdminHub`
+  - User management (search, disable/enable, force logout, reset password, promote/demote admin)
+  - Server management (search, quarantine/unquarantine, delete, transfer ownership)
+  - Moderation (report queue with status/type filters, full-text message search)
+  - System tools (admin action audit log, system announcement CRUD, live connection count)
+  - JWT-based auth with `GlobalAdmin` policy enforcement on all API calls
+
 ### API Server (ASP.NET Core)
 - **Location:** `apps/api/Codec.Api/`
 - **Framework:** ASP.NET Core 10 with Controller-based APIs
@@ -498,6 +510,41 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 #### API Documentation
 - `GET /scalar/v1` - Swagger/OpenAPI documentation UI (Scalar)
 
+#### Global Admin Panel
+- `GET /admin/stats` - Aggregate platform stats (user/server/message counts by time window, open reports, live presence and messages/min)
+- `GET /admin/users?page={n}&pageSize={n}&search={q}` - Paginated user list with search (by display name or email)
+- `GET /admin/users/{id}` - User detail (profile, auth providers, server memberships, recent messages, report history, admin action log)
+- `POST /admin/users/{id}/disable` - Disable a user account (revokes refresh tokens; blocks all auth flows)
+- `POST /admin/users/{id}/enable` - Re-enable a disabled user account
+- `POST /admin/users/{id}/force-logout` - Revoke all refresh tokens for a user
+- `POST /admin/users/{id}/reset-password` - Remove password credential (sets `PasswordHash` to null)
+- `PUT /admin/users/{id}/global-admin` - Promote or demote a user to/from global admin
+- `GET /admin/servers?page={n}&pageSize={n}&search={q}` - Paginated server list with search
+- `GET /admin/servers/{id}` - Server detail (members, channels, roles, owner)
+- `POST /admin/servers/{id}/quarantine` - Quarantine a server (hides from discovery)
+- `POST /admin/servers/{id}/unquarantine` - Remove quarantine from a server
+- `DELETE /admin/servers/{id}` - Delete a server (broadcasts `ServerDeleted` via SignalR)
+- `PUT /admin/servers/{id}/transfer-ownership` - Transfer server ownership to another member
+- `GET /admin/reports?page={n}&status={s}&type={t}` - Paginated report list with status/type filters
+- `GET /admin/reports/{id}` - Report detail with related report count
+- `PUT /admin/reports/{id}` - Update report (assign, resolve, dismiss)
+- `GET /admin/messages/search?q={q}` - Full-text message search across all servers
+- `GET /admin/actions?page={n}&pageSize={n}` - Paginated admin action audit log
+- `GET /admin/connections` - Live connection count
+- `GET /admin/announcements` - List system announcements
+- `POST /admin/announcements` - Create a system announcement
+- `PUT /admin/announcements/{id}` - Update a system announcement
+- `DELETE /admin/announcements/{id}` - Delete a system announcement
+- `POST /reports` - Submit a user report (any authenticated user)
+- `GET /announcements` - Get active system announcements (authenticated)
+
+#### Admin Authorization
+All `/admin/*` endpoints require the `GlobalAdmin` policy. The `GlobalAdminHandler` checks both `User.IsGlobalAdmin` and `!User.IsDisabled` on every request via a database lookup. Mutating admin endpoints use a separate `admin-writes` rate limit policy.
+
+#### Admin Real-time (`/hubs/admin`)
+- `AdminHub` SignalR hub at `/hubs/admin` for live admin dashboard stats
+- `AdminMetricsService` background service broadcasts stats (active users, connections, messages/min, open reports) every 5 seconds via the `StatsUpdated` event
+
 ### SignalR Hub (`/hubs/chat`)
 
 The SignalR hub provides real-time communication. Clients connect with their JWT token via query string.
@@ -717,14 +764,15 @@ DirectMessage ─┘
 #### User
 - Internal representation of authenticated users
 - Linked to identity providers via `GoogleSubject`, `GitHubSubject`, `DiscordSubject`, or `SamlNameId`
-- Fields: Id, GoogleSubject, GitHubSubject, DiscordSubject, SamlNameId, SamlIdentityProviderId, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath, IsGlobalAdmin, StatusText (nullable, max 128), StatusEmoji (nullable, max 8)
+- Fields: Id, GoogleSubject, GitHubSubject, DiscordSubject, SamlNameId, SamlIdentityProviderId, DisplayName, Nickname, Email, AvatarUrl, CustomAvatarPath, IsGlobalAdmin, IsDisabled, DisabledReason, DisabledAt, StatusText (nullable, max 128), StatusEmoji (nullable, max 8)
 - Effective display name: `Nickname ?? DisplayName`
 - `IsGlobalAdmin` grants platform-wide privileges (full access to all servers — read, post, react, manage channels/invites, delete any server/channel/message, kick any member)
+- `IsDisabled` blocks all auth flows and admin access; set by global admin via admin panel
 
 #### Server
 - Top-level organizational unit (like Discord servers)
 - Contains channels, members, categories, and custom emojis
-- Fields: Id, Name, Description (nullable, max 256 chars)
+- Fields: Id, Name, Description (nullable, max 256 chars), IsQuarantined, QuarantinedReason, QuarantinedAt
 
 #### ServerMember
 - Join table linking users to servers
@@ -868,6 +916,19 @@ DirectMessage ─┘
 - SAML 2.0 identity provider configuration
 - Fields: Id, EntityId, DisplayName, SingleSignOnUrl, CertificatePem (X.509 cert for signature verification), IsEnabled, AllowJitProvisioning, CreatedAt, UpdatedAt
 - User entity extended with `SamlNameId` and `SamlIdentityProviderId` for SAML user matching
+
+#### Report
+- User-submitted report for moderation review
+- Fields: Id, ReportType (User/Message/Server), TargetId, ReporterId (FK → User), Reason, Status (Open/Reviewing/Resolved/Dismissed), AssignedToUserId (nullable FK → User), Resolution (nullable), ResolvedByUserId (nullable FK → User), ResolvedAt, TargetSnapshot, CreatedAt
+
+#### AdminAction
+- Immutable audit log entry for admin operations
+- Fields: Id, ActorUserId (FK → User), ActionType (enum, 16 values), TargetType, TargetId, Reason (nullable), Details (nullable), CreatedAt
+- Action types: UserDisabled, UserEnabled, UserGlobalBanned, UserForcedLogout, UserPasswordReset, UserPromotedAdmin, UserDemotedAdmin, ServerQuarantined, ServerUnquarantined, ServerDeleted, ServerOwnershipTransferred, ReportResolved, ReportDismissed, AnnouncementCreated, AnnouncementDeleted, MessagesPurged
+
+#### SystemAnnouncement
+- Platform-wide announcement displayed to all users
+- Fields: Id, Title, Body, IsActive, ExpiresAt (nullable), CreatedByUserId (FK → User), CreatedAt
 
 ## Configuration
 

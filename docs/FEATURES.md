@@ -22,6 +22,7 @@ This document tracks implemented and planned features for Codec.
 - Server-specific avatar overrides with fallback chain (server → global → Google → placeholder)
 - User search by name, nickname, or email
 - Global admin role — configurable via `GlobalAdmin:Email`; full access to all servers, channels, and messages regardless of membership
+- Account disabling — global admins can disable user accounts; disabled users are blocked from all auth flows and admin endpoints; refresh tokens revoked immediately
 
 ### Servers & Channels
 - Server creation (creator becomes Owner)
@@ -136,6 +137,15 @@ This document tracks implemented and planned features for Codec.
 - Azure Monitor alerts — container restart, 5xx error rate, and database CPU monitoring via Bicep modules
 - Trivy container vulnerability scanning in CI and CD pipelines (advisory mode)
 - VAPID key rotation to Azure Key Vault secrets for push notification security
+
+### Global Admin Panel
+- **Admin dashboard** — standalone SvelteKit app (`apps/admin/`) with live stats (users, servers, messages, open reports, active connections, messages/min) via SignalR `AdminHub`; stats broadcast every 5 seconds
+- **User management** — paginated user list with search; user detail with profile, auth providers, server memberships, recent messages, report history, and admin action log; actions: disable/enable account, force logout, reset password, promote/demote global admin
+- **Server management** — paginated server list with search and quarantine status; server detail with members, channels, roles, and owner; actions: quarantine/unquarantine, delete server, transfer ownership
+- **Moderation queue** — report queue with status (Open/InProgress/Resolved/Dismissed) and type (User/Message/Server) filters; report detail with related report count; actions: assign, resolve, dismiss; full-text message search across all servers
+- **System tools** — paginated admin action audit log; system announcement CRUD (title, content, active flag, optional expiry); live connection count
+- **User reports** — any authenticated user can submit reports (`POST /reports`) for users, messages, or servers
+- **System announcements** — platform-wide announcements with active flag and optional expiry; authenticated endpoint (`GET /announcements`) for active announcements
 
 ### Moderation
 - **User banning** — ban members with optional message purge; `BannedMember` entity with reason and actor tracking; ban check on invite join (prevents re-entry); real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management UI in server settings (list, ban, unban)

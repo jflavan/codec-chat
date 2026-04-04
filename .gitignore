@@ -95,6 +95,7 @@ docker-compose.dev.yml
 docs/GCP_DEPLOYMENT_PLAN.md
 docs/plans/
 docs/superpowers/
+.superpowers/
 
 # Agent tool data
 .dolt/
