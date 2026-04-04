@@ -34,6 +34,7 @@
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
 import ReportModal from '$lib/components/report/ReportModal.svelte';
+	import AnnouncementBanner from '$lib/components/announcements/AnnouncementBanner.svelte';
 	import NicknameModal from '$lib/components/NicknameModal.svelte';
 	import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
 	import VerificationGate from '$lib/components/VerificationGate.svelte';
@@ -72,6 +73,10 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 		if (servers.selectedServerId) {
 			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);
 		}
+
+		api.getActiveAnnouncements(auth.idToken!).then(items => {
+			announcements = items;
+		}).catch(() => {});
 	};
 
 	auth.onSignedOut = async () => {
@@ -114,6 +119,23 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 	messages.onSelectChannel = (channelId) => channels.selectChannel(channelId);
 	messages.onSelectDmConversation = (channelId) => dms.selectDmConversation(channelId);
 	messages.onSetDmMessages = (msgs) => { dms.dmMessages = msgs; };
+
+	/* ───── Announcements ───── */
+	let announcements = $state<Array<{ id: string; title: string; body: string; createdAt: string; expiresAt: string | null }>>([]);
+	let dismissedIds = $state<Set<string>>(new Set(
+		JSON.parse(localStorage.getItem('dismissed-announcements') ?? '[]')
+	));
+
+	const activeAnnouncement = $derived(
+		announcements.find(a => !dismissedIds.has(a.id)) ?? null
+	);
+
+	function dismissAnnouncement(id: string) {
+		const next = new Set(dismissedIds);
+		next.add(id);
+		dismissedIds = next;
+		localStorage.setItem('dismissed-announcements', JSON.stringify([...next]));
+	}
 
 	/* ───── Lifecycle ───── */
 	onMount(() => {
@@ -168,20 +190,28 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 {/if}
 
 {#if !ui.isInitialLoading}
-<div class="app-shell" class:home-mode={ui.showFriendsPanel} class:dm-active={ui.showFriendsPanel && dms.activeDmChannelId}>
-	<ServerSidebar />
-	{#if ui.showFriendsPanel}
-		<HomeSidebar />
-		{#if dms.activeDmChannelId}
-			<DmChatArea />
-		{:else}
-			<FriendsPanel />
-		{/if}
-	{:else}
-		<ChannelSidebar />
-		<ChatArea />
-		<MembersSidebar />
+<div class="app-layout">
+	{#if activeAnnouncement}
+		<AnnouncementBanner
+			announcement={activeAnnouncement}
+			onDismiss={dismissAnnouncement}
+		/>
 	{/if}
+	<div class="app-shell" class:home-mode={ui.showFriendsPanel} class:dm-active={ui.showFriendsPanel && dms.activeDmChannelId}>
+		<ServerSidebar />
+		{#if ui.showFriendsPanel}
+			<HomeSidebar />
+			{#if dms.activeDmChannelId}
+				<DmChatArea />
+			{:else}
+				<FriendsPanel />
+			{/if}
+		{:else}
+			<ChannelSidebar />
+			<ChatArea />
+			<MembersSidebar />
+		{/if}
+	</div>
 </div>
 
 <!-- Mobile navigation drawer -->
@@ -249,11 +279,18 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 {/if}
 
 <style>
+	.app-layout {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		height: 100dvh;
+	}
+
 	.app-shell {
 		display: grid;
 		grid-template-columns: 72px 240px minmax(0, 1fr) 240px;
-		height: 100vh;
-		height: 100dvh;
+		flex: 1;
+		min-height: 0;
 		overflow: hidden;
 	}
 
