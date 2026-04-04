@@ -161,7 +161,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 | `MessageStore` | Messages, reactions, pinning, search, replies, link previews |
 | `DmStore` | DM conversations, DM messages, DM typing |
 | `FriendStore` | Friends list, friend requests |
-| *(inline in +page.svelte)* | Announcements: active list, dismissed state (localStorage-persisted) |
+| `AnnouncementStore` | Announcements: active list, dismissed state (localStorage-persisted) |
 | `VoiceStore` | Voice channels, DM calls, WebRTC, mute/deafen, video, screen sharing |
 
 ```

@@ -10,6 +10,7 @@
 		createDmStore,
 		createFriendStore,
 		createVoiceStore,
+		createAnnouncementStore,
 		setupSignalR,
 		goHome,
 		selectServer
@@ -33,7 +34,7 @@
 	import AlphaNotification from '$lib/components/AlphaNotification.svelte';
 	import IncomingCallOverlay from '$lib/components/voice/IncomingCallOverlay.svelte';
 	import BugReportModal from '$lib/components/settings/BugReportModal.svelte';
-import ReportModal from '$lib/components/report/ReportModal.svelte';
+	import ReportModal from '$lib/components/report/ReportModal.svelte';
 	import AnnouncementBanner from '$lib/components/announcements/AnnouncementBanner.svelte';
 	import NicknameModal from '$lib/components/NicknameModal.svelte';
 	import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
@@ -56,6 +57,7 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 	const dms = createDmStore(auth, api, ui, hub);
 	const friends = createFriendStore(auth, api, ui);
 	const voice = createVoiceStore(auth, api, ui, hub, new VoiceService());
+	const announcementStore = createAnnouncementStore();
 
 	/* ───── Wire cross-store callbacks ───── */
 	const reconnectTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
@@ -75,7 +77,7 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 		}
 
 		api.getActiveAnnouncements(auth.idToken!).then(items => {
-			announcements = items;
+			announcementStore.setAnnouncements(items);
 		}).catch(() => {});
 	};
 
@@ -119,23 +121,6 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 	messages.onSelectChannel = (channelId) => channels.selectChannel(channelId);
 	messages.onSelectDmConversation = (channelId) => dms.selectDmConversation(channelId);
 	messages.onSetDmMessages = (msgs) => { dms.dmMessages = msgs; };
-
-	/* ───── Announcements ───── */
-	let announcements = $state<Array<{ id: string; title: string; body: string; createdAt: string; expiresAt: string | null }>>([]);
-	let dismissedIds = $state<Set<string>>(new Set(
-		JSON.parse(localStorage.getItem('dismissed-announcements') ?? '[]')
-	));
-
-	const activeAnnouncement = $derived(
-		announcements.find(a => !dismissedIds.has(a.id)) ?? null
-	);
-
-	function dismissAnnouncement(id: string) {
-		const next = new Set(dismissedIds);
-		next.add(id);
-		dismissedIds = next;
-		localStorage.setItem('dismissed-announcements', JSON.stringify([...next]));
-	}
 
 	/* ───── Lifecycle ───── */
 	onMount(() => {
@@ -191,10 +176,10 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 
 {#if !ui.isInitialLoading}
 <div class="app-layout">
-	{#if activeAnnouncement}
+	{#if announcementStore.activeAnnouncement}
 		<AnnouncementBanner
-			announcement={activeAnnouncement}
-			onDismiss={dismissAnnouncement}
+			announcement={announcementStore.activeAnnouncement}
+			onDismiss={(id) => announcementStore.dismiss(id)}
 		/>
 	{/if}
 	<div class="app-shell" class:home-mode={ui.showFriendsPanel} class:dm-active={ui.showFriendsPanel && dms.activeDmChannelId}>
@@ -252,7 +237,7 @@ import ReportModal from '$lib/components/report/ReportModal.svelte';
 {/if}
 
 {#if ui.reportModal}
-	<ReportModal />
+	<ReportModal {api} />
 {/if}
 
 <ImagePreview />

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
-	import { ApiClient } from '$lib/api/client.js';
-	import { env } from '$env/dynamic/public';
+	import type { ApiClient } from '$lib/api/client.js';
 	import { ReportType } from '$lib/types/index.js';
+
+	let { api }: { api: ApiClient } = $props();
 
 	const ui = getUIStore();
 	const auth = getAuthStore();
@@ -21,12 +22,12 @@
 
 	const MAX_REASON = 2000;
 
-	async function handleSubmit() {
+	async function handleSubmit(event: SubmitEvent) {
+		event.preventDefault();
 		if (!modal || !auth.idToken || !reason.trim()) return;
 		submitting = true;
 		error = null;
 		try {
-			const api = new ApiClient(env.PUBLIC_API_BASE_URL ?? '', () => auth.refreshToken());
 			await api.submitReport(auth.idToken, {
 				reportType: modal.reportType,
 				targetId: modal.targetId,
