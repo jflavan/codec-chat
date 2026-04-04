@@ -11,7 +11,7 @@ const config = {
 			mode: 'auto',
 			directives: {
 				'default-src': ['self'],
-				'script-src': ['self', 'strict-dynamic', 'https://accounts.google.com'],
+				'script-src': ['strict-dynamic'],
 				'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com', 'https://accounts.google.com'],
 				'font-src': ['self', 'https://fonts.gstatic.com'],
 				'connect-src': ['self'],
