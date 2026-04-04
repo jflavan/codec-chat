@@ -98,14 +98,13 @@ jobs:
             --resource-group rg-codec-prod \
             --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
           if [ -z "$ADMIN_IMAGE" ]; then
-            # App doesn't exist yet — check if an image was pushed to ACR by a prior CD run
-            ACR_SERVER="acrcodecprod.azurecr.io"
-            ADMIN_IMAGE=$(az acr repository show-tags \
+            # App doesn't exist yet — use latest image from ACR if available,
+            # otherwise fall back to the quickstart placeholder.
+            ACR_CHECK=$(az acr repository show \
               --name acrcodecprod \
-              --repository codec-admin \
-              --orderby time_desc --top 1 -o tsv 2>/dev/null || echo "")
-            if [ -n "$ADMIN_IMAGE" ]; then
-              ADMIN_IMAGE="${ACR_SERVER}/codec-admin:${ADMIN_IMAGE}"
+              --repository codec-admin -o tsv 2>/dev/null || echo "")
+            if [ -n "$ACR_CHECK" ]; then
+              ADMIN_IMAGE="acrcodecprod.azurecr.io/codec-admin:latest"
             else
               ADMIN_IMAGE="$FALLBACK"
             fi
