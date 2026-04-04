@@ -1671,6 +1671,12 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             return BadRequest(new { error = "This invite has reached maximum uses." });
         }
 
+        var server = await db.Servers.FindAsync(invite.ServerId);
+        if (server is not null && server.IsQuarantined)
+        {
+            return StatusCode(403, new { error = "This server is currently unavailable." });
+        }
+
         // Check if the user is banned from this server
         var isBanned = await db.BannedMembers
             .AnyAsync(b => b.ServerId == invite.ServerId && b.UserId == appUser.Id);
