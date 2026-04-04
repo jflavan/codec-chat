@@ -1,11 +1,17 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { adminApi } from '$lib/api/client';
 	import { getAdminState } from '$lib/state/admin-state.svelte';
 	import StatCard from '$lib/components/dashboard/StatCard.svelte';
+	import ActivityChart from '$lib/components/dashboard/ActivityChart.svelte';
+	import { AdminHubService } from '$lib/services/admin-hub';
 
 	const appState = getAdminState();
 	let loading = $state(true);
+
+	const MAX_POINTS = 60;
+	let dataPoints = $state<Array<{ time: Date; messagesPerMinute: number; activeConnections: number }>>([]);
+	const adminHub = new AdminHubService();
 
 	onMount(async () => {
 		try {
@@ -14,6 +20,22 @@
 			console.error('Failed to load stats:', e);
 		}
 		loading = false;
+
+		await adminHub.start((data) => {
+			appState.updateLiveStats(data);
+			dataPoints = [
+				...dataPoints.slice(-(MAX_POINTS - 1)),
+				{
+					time: new Date(),
+					messagesPerMinute: data.messagesPerMinute,
+					activeConnections: data.activeConnections
+				}
+			];
+		});
+	});
+
+	onDestroy(() => {
+		adminHub.stop();
 	});
 
 	const stats = $derived(appState.stats);
@@ -48,6 +70,8 @@
 			<a href="/servers" class="link-card">View All Servers</a>
 		</div>
 	</section>
+
+	<ActivityChart {dataPoints} />
 {/if}
 
 <style>
