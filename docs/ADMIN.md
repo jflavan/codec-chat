@@ -230,7 +230,8 @@ apps/admin/src/
     styles/global.css          # CSS variables and base styles
     components/
       layout/Sidebar.svelte    # Fixed sidebar with nav + report badge
-      dashboard/StatCard.svelte # Metric display card
+      dashboard/StatCard.svelte      # Metric display card
+      dashboard/ActivityChart.svelte # Real-time line chart (Chart.js)
       shared/
         DataTable.svelte       # Reusable sortable table
         Pagination.svelte      # Page controls
@@ -286,15 +287,20 @@ cd apps/admin && npm run build
 
 The admin app runs on port 5175 by default (configurable via `PORT` env var).
 
+## Main App Integration
+
+These features connect the admin panel's backend to the user-facing chat app:
+
+- **Report submission UI** — `ReportModal` component triggered via message action bar (report button), member right-click context menu, and server context menu. Submits to `POST /reports` with rate-limit feedback (429 → "5 reports per hour").
+- **Announcement banner** — `AnnouncementBanner` component fetches `GET /announcements/active` on sign-in. Displays the most recent active announcement above the app shell. Dismiss state persisted per-announcement in `localStorage` (`dismissed-announcements` key).
+- **Quarantine enforcement** — `JoinViaInvite` (`POST /invites/{code}`) checks `server.IsQuarantined` and returns 403 ("This server is currently unavailable.") before the ban check.
+- **Live activity chart** — `ActivityChart` component on the admin dashboard renders a Chart.js dual-axis line chart (messages/min + active connections) from the SignalR `StatsUpdated` feed with a 60-point rolling window (~5 minutes).
+
 ## Not Yet Implemented
 
-These items are designed in the spec but deferred from v1:
+These items are designed in the spec but deferred:
 
 - Aspire AppHost integration for the admin app
 - CI/CD pipeline for the admin app
-- Report submission UI in the main app (context menu buttons)
-- Announcement banner display in the main app
-- Invite quarantine check (`IsQuarantined` on join)
-- Dashboard activity chart (Chart.js dependency installed, component not wired)
 - Global ban / message purge bulk actions
 - Read replica for heavy admin queries

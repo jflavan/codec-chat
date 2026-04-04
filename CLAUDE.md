@@ -52,6 +52,11 @@ dotnet test apps/api/Codec.Api.IntegrationTests/Codec.Api.IntegrationTests.cspro
 
 # All API tests
 dotnet test Codec.sln
+
+# Admin tests (Vitest)
+cd apps/admin
+npm test                # Run all tests
+npm run test:coverage   # Run with coverage
 ```
 
 ### Database migrations (EF Core)
@@ -91,6 +96,8 @@ apps/
       utils/         # Pure helpers (format.ts)
       components/    # Svelte 5 components grouped by feature area
         server-settings/  # ServerSettings, ServerChannels, ServerRoles, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerBans, ServerWebhooks, ServerSettingsSidebar, ServerSettingsModal
+        report/        # ReportModal (user/message/server abuse reports)
+        announcements/ # AnnouncementBanner (dismissible site-wide announcements)
     routes/
       +layout.svelte  # Root layout
       +page.svelte    # Root shell; creates stores, wires cross-store callbacks, sets context
