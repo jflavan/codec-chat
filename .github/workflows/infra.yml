@@ -93,6 +93,16 @@ jobs:
           echo "web-image=$WEB_IMAGE" >> "$GITHUB_OUTPUT"
           echo "Web image: $WEB_IMAGE"
 
+          ADMIN_IMAGE=$(az containerapp show \
+            --name ca-codec-prod-admin \
+            --resource-group rg-codec-prod \
+            --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
+          if [ -z "$ADMIN_IMAGE" ]; then
+            ADMIN_IMAGE="$FALLBACK"
+          fi
+          echo "admin-image=$ADMIN_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "Admin image: $ADMIN_IMAGE"
+
       - name: Check if managed certificates exist
         id: certs
         run: |
@@ -101,7 +111,7 @@ jobs:
             --resource-group rg-codec-prod \
             --query "[].name" -o tsv 2>/dev/null || echo "")
 
-          if echo "$CERT_LIST" | grep -q "cert-api" && echo "$CERT_LIST" | grep -q "cert-web"; then
+          if echo "$CERT_LIST" | grep -q "cert-api" && echo "$CERT_LIST" | grep -q "cert-web" && echo "$CERT_LIST" | grep -q "cert-admin"; then
             echo "certs-exist=true" >> "$GITHUB_OUTPUT"
             echo "Both managed certificates exist"
           else
@@ -125,6 +135,8 @@ jobs:
               bindCertificates=true \
               apiContainerImage='${{ steps.images.outputs.api-image }}' \
               webContainerImage='${{ steps.images.outputs.web-image }}' \
+              adminContainerImage='${{ steps.images.outputs.admin-image }}' \
+              adminCustomDomain='admin.codec-chat.com' \
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
@@ -159,6 +171,8 @@ jobs:
               bindCertificates=false \
               apiContainerImage='${{ steps.images.outputs.api-image }}' \
               webContainerImage='${{ steps.images.outputs.web-image }}' \
+              adminContainerImage='${{ steps.images.outputs.admin-image }}' \
+              adminCustomDomain='admin.codec-chat.com' \
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
@@ -192,6 +206,8 @@ jobs:
               bindCertificates=true \
               apiContainerImage='${{ steps.images.outputs.api-image }}' \
               webContainerImage='${{ steps.images.outputs.web-image }}' \
+              adminContainerImage='${{ steps.images.outputs.admin-image }}' \
+              adminCustomDomain='admin.codec-chat.com' \
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \

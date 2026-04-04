@@ -11,7 +11,8 @@ param keyVaultUri string
 param storageAccountName string
 param storageBlobEndpoint string
 
-param corsAllowedOrigins string
+@description('Allowed CORS origins (e.g., [https://codec-chat.com, https://admin.codec-chat.com]).')
+param corsAllowedOrigins array
 param apiBaseUrl string
 
 @description('URL of the mediasoup SFU (e.g., https://sfu.codec-chat.com).')
@@ -78,6 +79,12 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing 
   name: storageAccountName
 }
 
+// .NET configuration binds indexed env vars (Cors__AllowedOrigins__0, __1, ...) to string[]
+var corsEnvVars = [ for (origin, i) in corsAllowedOrigins: {
+  name: 'Cors__AllowedOrigins__${i}'
+  value: origin
+}]
+
 resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
@@ -105,7 +112,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ] : []
         corsPolicy: {
-          allowedOrigins: [corsAllowedOrigins]
+          allowedOrigins: corsAllowedOrigins
           allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
           allowedHeaders: ['*']
           allowCredentials: true
@@ -214,10 +221,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'Api__BaseUrl'
               value: apiBaseUrl
             }
-            {
-              name: 'Cors__AllowedOrigins'
-              value: corsAllowedOrigins
-            }
+          ], corsEnvVars, [
             {
               name: 'Storage__Provider'
               value: 'AzureBlob'

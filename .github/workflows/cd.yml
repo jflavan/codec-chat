@@ -20,6 +20,7 @@ env:
   ACR_NAME: acrcodecprod
   API_APP_NAME: ca-codec-prod-api
   WEB_APP_NAME: ca-codec-prod-web
+  ADMIN_APP_NAME: ca-codec-prod-admin
   VOICE_VM_NAME: vm-codec-prod-voice
 
 jobs:
@@ -114,6 +115,27 @@ jobs:
         run: |
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-web:latest
+
+      - name: Build Admin image
+        run: |
+          docker build \
+            --build-arg PUBLIC_API_BASE_URL=${{ secrets.PUBLIC_API_BASE_URL }} \
+            -t ${{ env.ACR_NAME }}.azurecr.io/codec-admin:${{ github.sha }} \
+            -t ${{ env.ACR_NAME }}.azurecr.io/codec-admin:latest \
+            ./apps/admin
+
+      - name: Scan Admin image for vulnerabilities
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ env.ACR_NAME }}.azurecr.io/codec-admin:${{ github.sha }}
+          format: table
+          exit-code: '0'  # Advisory — don't block deploys on CVEs
+          severity: CRITICAL,HIGH
+
+      - name: Push Admin image
+        run: |
+          docker push ${{ env.ACR_NAME }}.azurecr.io/codec-admin:${{ github.sha }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/codec-admin:latest
 
       - name: Build SFU image
         run: |
@@ -387,6 +409,7 @@ jobs:
     outputs:
       api-revision: ${{ steps.deploy-api.outputs.revision }}
       web-revision: ${{ steps.deploy-web.outputs.revision }}
+      admin-revision: ${{ steps.deploy-admin.outputs.revision }}
     steps:
       - name: Login to Azure
         uses: azure/login@v2
@@ -405,10 +428,14 @@ jobs:
             --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --mode multiple
+          az containerapp revision set-mode \
+            --name ${{ env.ADMIN_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --mode multiple
 
       - name: Ensure container app registries
         run: |
-          for APP in "${{ env.API_APP_NAME }}" "${{ env.WEB_APP_NAME }}"; do
+          for APP in "${{ env.API_APP_NAME }}" "${{ env.WEB_APP_NAME }}" "${{ env.ADMIN_APP_NAME }}"; do
             echo "Ensuring ACR registry on $APP..."
             az containerapp registry set \
               --name "$APP" \
@@ -447,9 +474,24 @@ jobs:
           echo "Created revision: $REVISION_NAME"
           echo "revision=$REVISION_NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Deploy Admin staging revision
+        id: deploy-admin
+        run: |
+          SUFFIX="gh$(echo $GITHUB_SHA | cut -c1-7)n${{ github.run_number }}"
+          RESULT=$(az containerapp update \
+            --name ${{ env.ADMIN_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_NAME }}.azurecr.io/codec-admin:${{ github.sha }} \
+            --revision-suffix "$SUFFIX" \
+            --min-replicas 1 \
+            -o json)
+          REVISION_NAME=$(echo "$RESULT" | jq -r '.properties.latestRevisionName')
+          echo "Created revision: $REVISION_NAME"
+          echo "revision=$REVISION_NAME" >> "$GITHUB_OUTPUT"
+
       - name: Wait for staging revisions to be ready
         run: |
-          for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}"; do
+          for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}" "${{ steps.deploy-admin.outputs.revision }}"; do
             APP_NAME=$(echo "$APP_REVISION" | sed 's/--.*$//')
             echo "Waiting for revision $APP_REVISION..."
             for i in $(seq 1 60); do
@@ -504,7 +546,7 @@ jobs:
 
       - name: Verify staging revisions are healthy
         run: |
-          for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}"; do
+          for APP_REVISION in "${{ steps.deploy-api.outputs.revision }}" "${{ steps.deploy-web.outputs.revision }}" "${{ steps.deploy-admin.outputs.revision }}"; do
             APP_NAME=$(echo "$APP_REVISION" | sed 's/--.*$//')
             DETAIL=$(az containerapp revision show \
               --name "$APP_NAME" \
@@ -538,6 +580,11 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --revision-weight "${{ steps.deploy-web.outputs.revision }}=100"
 
+          az containerapp ingress traffic set \
+            --name ${{ env.ADMIN_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision-weight "${{ steps.deploy-admin.outputs.revision }}=100"
+
       - name: Deactivate old revisions
         run: |
           OLD_API=$(az containerapp revision list \
@@ -564,6 +611,18 @@ jobs:
               --revision "$rev"
           done
 
+          OLD_ADMIN=$(az containerapp revision list \
+            --name ${{ env.ADMIN_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[?name!='${{ steps.deploy-admin.outputs.revision }}' && properties.active].name" -o tsv)
+          for rev in $OLD_ADMIN; do
+            echo "Deactivating Admin revision: $rev"
+            az containerapp revision deactivate \
+              --name ${{ env.ADMIN_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --revision "$rev"
+          done
+
       - name: Rollback — deactivate failed staging revisions
         if: failure()
         run: |
@@ -575,6 +634,10 @@ jobs:
             --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --revision "${{ steps.deploy-web.outputs.revision }}" 2>/dev/null || true
+          az containerapp revision deactivate \
+            --name ${{ env.ADMIN_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision "${{ steps.deploy-admin.outputs.revision }}" 2>/dev/null || true
 
   smoke-test:
     runs-on: ubuntu-latest
@@ -598,8 +661,13 @@ jobs:
             --name ${{ env.WEB_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query properties.configuration.ingress.fqdn -o tsv)
+          ADMIN_FQDN=$(az containerapp show \
+            --name ${{ env.ADMIN_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
           echo "api-fqdn=$API_FQDN" >> "$GITHUB_OUTPUT"
           echo "web-fqdn=$WEB_FQDN" >> "$GITHUB_OUTPUT"
+          echo "admin-fqdn=$ADMIN_FQDN" >> "$GITHUB_OUTPUT"
 
       - name: Smoke test API health
         run: |
@@ -618,3 +686,12 @@ jobs:
             exit 1
           fi
           echo "Web health check passed (HTTP $STATUS)"
+
+      - name: Smoke test Admin health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ steps.fqdns.outputs.admin-fqdn }}/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "Admin health check failed with status $STATUS"
+            exit 1
+          fi
+          echo "Admin health check passed (HTTP $STATUS)"

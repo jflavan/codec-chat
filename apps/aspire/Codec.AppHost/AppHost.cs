@@ -34,4 +34,9 @@ var web = builder.AddViteApp("web", "../../web")
     .WithReference(api)
     .WaitFor(api);
 
+var admin = builder.AddViteApp("admin", "../../admin")
+    .WithEndpoint("http", e => { e.Port = 5175; e.IsProxied = false; })
+    .WithReference(api)
+    .WaitFor(api);
+
 builder.Build().Run();

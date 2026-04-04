@@ -28,11 +28,17 @@ param apiContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Web container image (defaults to quickstart placeholder).')
 param webContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Admin container image (defaults to quickstart placeholder).')
+param adminContainerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 @description('Custom domain for the web app (e.g., codec-chat.com). Leave empty to skip custom domain binding.')
 param webCustomDomain string = ''
 
 @description('Custom domain for the API (e.g., api.codec-chat.com). Leave empty to skip custom domain binding.')
 param apiCustomDomain string = ''
+
+@description('Custom domain for the admin app (e.g., admin.codec-chat.com). Leave empty to skip custom domain binding.')
+param adminCustomDomain string = ''
 
 @description('Set to true on a second deployment pass to bind managed TLS certificates to custom domains. Requires a prior deployment with this set to false so that hostnames are registered first.')
 param bindCertificates bool = false
@@ -112,6 +118,7 @@ var keyVaultName = 'kv-${baseName}'
 var containerAppsEnvName = 'cae-${baseName}'
 var apiAppName = 'ca-${baseName}-api'
 var webAppName = 'ca-${baseName}-web'
+var adminAppName = 'ca-${baseName}-admin'
 var redisCacheName = 'redis-${baseName}'
 var voiceVmName = 'vm-${baseName}-voice'
 var appInsightsName = 'appi-${baseName}'
@@ -121,6 +128,7 @@ var actionGroupName = 'ag-${baseName}'
 // Use custom domains for URLs when provided, otherwise fall back to default Container Apps domain
 var effectiveApiUrl = apiCustomDomain != '' ? 'https://${apiCustomDomain}' : 'https://${apiAppName}.${containerAppsEnv.outputs.defaultDomain}'
 var effectiveWebUrl = webCustomDomain != '' ? 'https://${webCustomDomain}' : 'https://${webAppName}.${containerAppsEnv.outputs.defaultDomain}'
+var effectiveAdminUrl = adminCustomDomain != '' ? 'https://${adminCustomDomain}' : 'https://${adminAppName}.${containerAppsEnv.outputs.defaultDomain}'
 
 // --- Modules ---
 
@@ -353,6 +361,17 @@ module apiCert 'modules/managed-certificate.bicep' = if (apiCustomDomain != '') 
   }
 }
 
+module adminCert 'modules/managed-certificate.bicep' = if (adminCustomDomain != '') {
+  name: 'admin-managed-cert'
+  dependsOn: [adminApp]
+  params: {
+    environmentName: containerAppsEnv.outputs.name
+    location: location
+    domainName: adminCustomDomain
+    certificateName: 'cert-admin'
+  }
+}
+
 module webCert 'modules/managed-certificate.bicep' = if (webCustomDomain != '') {
   name: 'web-managed-cert'
   dependsOn: [webApp]
@@ -368,6 +387,7 @@ module webCert 'modules/managed-certificate.bicep' = if (webCustomDomain != '') 
 // (which would create a circular dependency with the cert → app dependsOn above).
 var apiCertId = bindCertificates && apiCustomDomain != '' ? '${containerAppsEnv.outputs.id}/managedCertificates/cert-api' : ''
 var webCertId = bindCertificates && webCustomDomain != '' ? '${containerAppsEnv.outputs.id}/managedCertificates/cert-web' : ''
+var adminCertId = bindCertificates && adminCustomDomain != '' ? '${containerAppsEnv.outputs.id}/managedCertificates/cert-admin' : ''
 
 module apiApp 'modules/container-app-api.bicep' = {
   name: 'container-app-api'
@@ -383,7 +403,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     storageAccountName: storageAccount.outputs.name
     storageBlobEndpoint: storageAccount.outputs.blobEndpoint
     apiBaseUrl: effectiveApiUrl
-    corsAllowedOrigins: effectiveWebUrl
+    corsAllowedOrigins: [effectiveWebUrl, effectiveAdminUrl]
     customDomainName: apiCustomDomain
     managedCertificateId: apiCertId
     sfuApiUrl: voiceVm.?outputs.sfuApiUrl ?? ''
@@ -421,6 +441,21 @@ module webApp 'modules/container-app-web.bicep' = {
   }
 }
 
+module adminApp 'modules/container-app-admin.bicep' = {
+  name: 'container-app-admin'
+  params: {
+    name: adminAppName
+    location: location
+    environmentId: containerAppsEnv.outputs.id
+    containerRegistryLoginServer: containerRegistry.outputs.loginServer
+    containerRegistryName: containerRegistry.outputs.name
+    containerImage: adminContainerImage
+    publicApiBaseUrl: effectiveApiUrl
+    customDomainName: adminCustomDomain
+    managedCertificateId: adminCertId
+  }
+}
+
 // ── Azure Monitor alerts ────────────────────────────────────────────────────────
 
 module monitorActionGroup 'modules/monitor-action-group.bicep' = {
@@ -447,6 +482,7 @@ module monitorAlerts 'modules/monitor-alerts.bicep' = {
 
 output apiAppFqdn string = apiApp.outputs.fqdn
 output webAppFqdn string = webApp.outputs.fqdn
+output adminAppFqdn string = adminApp.outputs.fqdn
 output containerRegistryLoginServer string = containerRegistry.outputs.loginServer
 output postgresqlFqdn string = postgresql.outputs.fqdn
 output storageBlobEndpoint string = storageAccount.outputs.blobEndpoint
