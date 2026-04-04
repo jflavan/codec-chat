@@ -66,8 +66,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - Mention parsing cached per message batch to eliminate redundant regex execution
 - **Redis distributed cache** — message history pages cached with 5-minute TTL via `MessageCacheService`; channel-level invalidation on all mutations; link preview metadata cached with 1-hour TTL by URL hash in `LinkPreviewService`; SignalR Redis backplane for multi-instance scale-out; graceful degradation when Redis is unavailable
 - DM messages endpoint returns paginated `{ hasMore, messages }` response (matching channel pagination)
-- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect; auto-refreshes the page on persistent WebSocket failure
-- SignalR reconnection lifecycle tracked via `isHubConnected` reactive state
+- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects; restores on reconnect; graceful reconnection with exponential backoff replaces page reload on persistent failure
+- SignalR reconnection lifecycle tracked via `isHubConnected` reactive state; inactive tab tolerance via extended server-side KeepAlive/ClientTimeout intervals
 - Both apps containerized with optimized multi-stage Dockerfiles
 - Infrastructure as Code via Bicep modules under `infra/`
 - CI pipeline: build, lint, test (web unit, API unit, API integration), Docker image validation on every push/PR
@@ -700,8 +700,8 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - [x] Add `isHubConnected = $state(false)` reactive field to `UIStore`
 - [x] Set `isHubConnected` to `true` after successful `hub.start()` and on `onReconnected`
 - [x] Set `isHubConnected` to `false` on `signOut()`, `onReconnecting`, and `onClose`
-- [x] Auto-refresh page via `window.location.reload()` if WebSocket cannot reconnect within 5 seconds (reconnect timer in `onReconnecting`, cleared in `onReconnected`)
-- [x] Immediate page refresh on `onClose` with error (e.g. WebSocket status code 1006)
+- [x] Graceful reconnection — hub rebuilds connection with exponential backoff (2 s → 30 s cap) when automatic reconnect attempts are exhausted; visibility change triggers immediate retry when tab becomes active
+- [x] Inactive tab tolerance — server KeepAliveInterval (30 s) and ClientTimeoutInterval (90 s) prevent false disconnects from throttled WebSocket pings
 
 ### Web — Composer disconnected state
 - [x] Update `Composer.svelte` — when `!app.isHubConnected`, show "Codec connecting..." with animated CSS ellipsis instead of composer input

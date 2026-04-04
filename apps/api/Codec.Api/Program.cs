@@ -86,6 +86,12 @@ builder.Services.AddSingleton<Codec.Api.Filters.HubRateLimitFilter>();
 var signalRBuilder = builder.Services.AddSignalR(options =>
 {
     options.AddFilter<Codec.Api.Filters.HubRateLimitFilter>();
+    // Tolerate inactive browser tabs that throttle WebSocket pings.
+    // KeepAliveInterval sends pings every 30 s (default: 15 s).
+    // ClientTimeoutInterval allows 90 s of silence before disconnecting
+    // (default: 30 s), giving throttled tabs time to respond.
+    options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(90);
 })
     .AddJsonProtocol(options =>
     {

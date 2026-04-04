@@ -1,4 +1,4 @@
-import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
+import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import type { HubConnection } from '@microsoft/signalr';
 import type { Message, Reaction, FriendUser, DirectMessage, DmParticipant, LinkPreview, MessagePinnedEvent, MessageUnpinnedEvent } from '$lib/types/index.js';
 
@@ -342,8 +342,15 @@ export class ChatHubService {
 	private connection: HubConnection | null = null;
 	private typingTimeout: ReturnType<typeof setTimeout> | null = null;
 	private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+	private restartTimer: ReturnType<typeof setTimeout> | null = null;
+	private restartAttempt = 0;
 	private isUserActive = false;
+	private isStopped = false;
+	private isRestarting = false;
 	private activityHandler = () => { this.isUserActive = true; };
+	private savedAccessTokenFactory: (() => string | Promise<string>) | null = null;
+	private savedCallbacks: SignalRCallbacks | null = null;
+	private visibilityHandler: (() => void) | null = null;
 
 	constructor(private readonly hubUrl: string) {}
 
@@ -352,10 +359,25 @@ export class ChatHubService {
 	}
 
 	async start(accessTokenFactory: () => string | Promise<string>, callbacks: SignalRCallbacks): Promise<void> {
+		this.savedAccessTokenFactory = accessTokenFactory;
+		this.savedCallbacks = callbacks;
+		this.isStopped = false;
+		this.restartAttempt = 0;
+		await this.buildAndStart(accessTokenFactory, callbacks);
+		this.listenForVisibility();
+	}
+
+	private async buildAndStart(accessTokenFactory: () => string | Promise<string>, callbacks: SignalRCallbacks): Promise<void> {
 		const connection = new HubConnectionBuilder()
 			.withUrl(this.hubUrl, { accessTokenFactory })
-			.withAutomaticReconnect()
+			.withAutomaticReconnect([0, 1000, 2000, 5000, 10_000, 30_000, 60_000, 60_000, 60_000, 60_000])
+			.configureLogging(LogLevel.Warning)
 			.build();
+
+		// Match the server's extended ClientTimeoutInterval (90 s) so the client
+		// doesn't declare the server dead before the server considers the client gone.
+		connection.serverTimeoutInMilliseconds = 120_000;
+		connection.keepAliveIntervalInMilliseconds = 30_000;
 
 		connection.on('ReceiveMessage', callbacks.onMessage);
 		connection.on('UserTyping', callbacks.onUserTyping);
@@ -546,28 +568,36 @@ export class ChatHubService {
 				this.startHeartbeat();
 			});
 		}
-		if (callbacks.onClose) {
-			connection.onclose((error) => {
-				this.stopHeartbeat();
-				callbacks.onClose!(error);
-			});
-		} else {
-			connection.onclose(() => {
-				this.stopHeartbeat();
-			});
-		}
+		connection.onclose((error) => {
+			this.stopHeartbeat();
+			callbacks.onClose?.(error);
+			// All automatic reconnect attempts exhausted — schedule a fresh restart
+			// instead of forcing a page reload.  Skip if scheduleRestart already
+			// initiated this stop to avoid re-entrant scheduling.
+			if (!this.isStopped && !this.isRestarting) this.scheduleRestart();
+		});
 
 		try {
 			await connection.start();
 			this.connection = connection;
+			this.restartAttempt = 0;
 			this.startHeartbeat();
 		} catch {
-			// SignalR unavailable; real-time features will be disabled.
+			// SignalR unavailable — schedule a restart so we keep trying in the
+			// background rather than permanently giving up.
+			if (!this.isStopped) this.scheduleRestart();
 		}
 	}
 
+	/** Permanently tear down the connection and stop all reconnection attempts. */
 	async stop(): Promise<void> {
+		this.isStopped = true;
 		this.stopHeartbeat();
+		this.stopVisibilityListener();
+		if (this.restartTimer) {
+			clearTimeout(this.restartTimer);
+			this.restartTimer = null;
+		}
 		if (this.typingTimeout) clearTimeout(this.typingTimeout);
 		if (this.connection) {
 			try {
@@ -576,6 +606,50 @@ export class ChatHubService {
 				// ignore errors during disconnect
 			}
 			this.connection = null;
+		}
+	}
+
+	/** Schedule a full connection rebuild with exponential backoff. */
+	private scheduleRestart(): void {
+		if (this.isStopped || !this.savedAccessTokenFactory || !this.savedCallbacks) return;
+		if (this.restartTimer) clearTimeout(this.restartTimer);
+
+		// Exponential backoff: 2s, 4s, 8s, 16s, 30s (capped)
+		const delay = Math.min(2000 * Math.pow(2, this.restartAttempt), 30_000);
+		this.restartAttempt++;
+
+		this.restartTimer = setTimeout(async () => {
+			if (this.isStopped) return;
+			// Tear down the old connection before building a new one.
+			// Set isRestarting so the onclose handler doesn't re-enter scheduleRestart.
+			if (this.connection) {
+				this.isRestarting = true;
+				try { await this.connection.stop(); } catch { /* ignore */ }
+				this.connection = null;
+				this.isRestarting = false;
+			}
+			await this.buildAndStart(this.savedAccessTokenFactory!, this.savedCallbacks!);
+		}, delay);
+	}
+
+	private listenForVisibility(): void {
+		if (typeof document === 'undefined') return;
+		this.visibilityHandler = () => {
+			if (document.visibilityState !== 'visible') return;
+			if (this.isStopped) return;
+			// Tab became visible — if the connection is dead, restart immediately
+			if (!this.isConnected && this.connection?.state !== HubConnectionState.Reconnecting) {
+				this.restartAttempt = 0;
+				this.scheduleRestart();
+			}
+		};
+		document.addEventListener('visibilitychange', this.visibilityHandler);
+	}
+
+	private stopVisibilityListener(): void {
+		if (this.visibilityHandler && typeof document !== 'undefined') {
+			document.removeEventListener('visibilitychange', this.visibilityHandler);
+			this.visibilityHandler = null;
 		}
 	}
 
