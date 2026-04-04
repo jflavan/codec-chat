@@ -1124,6 +1124,22 @@ public class ServersControllerTests : IDisposable
             .Which.StatusCode.Should().Be(403);
     }
 
+    // --- JoinViaInvite Quarantined Server ---
+
+    [Fact]
+    public async Task JoinViaInvite_QuarantinedServer_ReturnsForbidden()
+    {
+        var server = new Server { Name = "Quarantined", IsQuarantined = true, QuarantinedReason = "TOS violation" };
+        _db.Servers.Add(server);
+        _db.ServerInvites.Add(new ServerInvite { Code = "quarantined-test", Server = server, CreatedByUserId = _testUser.Id });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.JoinViaInvite("quarantined-test");
+
+        var objResult = result.Should().BeOfType<ObjectResult>().Subject;
+        objResult.StatusCode.Should().Be(403);
+    }
+
     // Note: DeleteServer tests are skipped because ExecuteDeleteAsync is not supported by the InMemory provider.
     // These are covered by integration tests instead.
 
