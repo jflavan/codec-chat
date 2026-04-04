@@ -63,14 +63,12 @@ export async function setupSignalR(
 				}
 			},
 
-			onClose: (error) => {
+			onClose: () => {
 				ui.isHubConnected = false;
 				if (voice.activeVoiceChannelId || voice.activeCall) {
 					voice.teardownOnDisconnect();
 				}
-				// All automatic reconnect attempts exhausted — reload to
-				// re-establish the connection from scratch.
-				if (error) window.location.reload();
+				// The hub service handles restart internally — no page reload needed.
 			},
 
 			/* ─── Channel messages ─── */
