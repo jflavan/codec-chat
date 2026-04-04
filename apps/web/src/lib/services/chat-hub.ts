@@ -346,6 +346,7 @@ export class ChatHubService {
 	private restartAttempt = 0;
 	private isUserActive = false;
 	private isStopped = false;
+	private isRestarting = false;
 	private activityHandler = () => { this.isUserActive = true; };
 	private savedAccessTokenFactory: (() => string | Promise<string>) | null = null;
 	private savedCallbacks: SignalRCallbacks | null = null;
@@ -571,8 +572,9 @@ export class ChatHubService {
 			this.stopHeartbeat();
 			callbacks.onClose?.(error);
 			// All automatic reconnect attempts exhausted — schedule a fresh restart
-			// instead of forcing a page reload.
-			if (!this.isStopped) this.scheduleRestart();
+			// instead of forcing a page reload.  Skip if scheduleRestart already
+			// initiated this stop to avoid re-entrant scheduling.
+			if (!this.isStopped && !this.isRestarting) this.scheduleRestart();
 		});
 
 		try {
@@ -618,10 +620,13 @@ export class ChatHubService {
 
 		this.restartTimer = setTimeout(async () => {
 			if (this.isStopped) return;
-			// Tear down the old connection before building a new one
+			// Tear down the old connection before building a new one.
+			// Set isRestarting so the onclose handler doesn't re-enter scheduleRestart.
 			if (this.connection) {
+				this.isRestarting = true;
 				try { await this.connection.stop(); } catch { /* ignore */ }
 				this.connection = null;
+				this.isRestarting = false;
 			}
 			await this.buildAndStart(this.savedAccessTokenFactory!, this.savedCallbacks!);
 		}, delay);

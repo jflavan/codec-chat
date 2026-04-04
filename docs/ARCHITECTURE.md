@@ -261,8 +261,10 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
   - Typing indicators (`UserTyping` / `UserStoppedTyping` events)
   - DM typing indicators (`DmTyping` / `DmStoppedTyping` events)
   - Friend-related event delivery (request received/accepted/declined/cancelled, friend removed)
-  - Automatic reconnect via `withAutomaticReconnect()`
-  - Auto-refresh fallback — page reloads if reconnection fails within 5 seconds or WebSocket closes with an error
+  - Automatic reconnect via `withAutomaticReconnect()` with explicit retry schedule
+  - Graceful restart with exponential backoff (2 s → 30 s cap) when all automatic reconnect attempts are exhausted — no page reload
+  - Visibility-aware recovery — immediate reconnect attempt when a backgrounded tab becomes active
+  - Inactive tab tolerance — server KeepAliveInterval (30 s) and ClientTimeoutInterval (90 s) prevent false disconnects from throttled pings
 
 ### Data Layer
 - **ORM:** Entity Framework Core 10
@@ -1080,7 +1082,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions, rollback pr
 - PWA with Workbox service worker — precaches static assets (HTML, JS, CSS, images) for faster repeat visits and offline-capable shell; runtime caching for Google Fonts; offline fallback page when network is unavailable
 - SignalR for real-time message delivery and typing indicators (eliminates polling)
 - Channel-scoped SignalR groups (targeted broadcasts, not global fan-out)
-- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends; auto-refreshes on persistent failure
+- Connection status awareness — composer disables with "Codec connecting..." when SignalR disconnects, preventing failed sends; graceful reconnection with exponential backoff on persistent failure (no page reload)
 
 ### Future Improvements
 - Database indexing strategy

@@ -115,7 +115,8 @@ This document tracks implemented and planned features for Codec.
 - ✅ `isHubConnected` reactive state in `UIStore` — tracks real-time connection health
 - ✅ Composer disconnected state — shows "Codec connecting..." with animated ellipsis when SignalR is not connected (both server channels and DMs)
 - ✅ Automatic restoration of full composer input on reconnection
-- ✅ Auto-refresh on persistent disconnect — if SignalR cannot reconnect within 5 seconds, or if the WebSocket closes with an error (e.g. status code 1006), the page refreshes automatically
+- ✅ Graceful reconnection — when all automatic reconnect attempts are exhausted, the hub rebuilds the connection with exponential backoff (2 s → 30 s cap) instead of forcing a page reload; tab visibility changes trigger an immediate reconnect attempt when the connection is dead
+- ✅ Inactive tab tolerance — server KeepAliveInterval (30 s) and ClientTimeoutInterval (90 s) prevent false disconnects when browser tabs throttle WebSocket pings
 
 ### API & Infrastructure
 - Controller-based RESTful API with `[Authorize]` on all endpoints
