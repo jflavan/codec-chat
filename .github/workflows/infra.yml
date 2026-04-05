@@ -97,15 +97,14 @@ jobs:
             --name ca-codec-prod-admin \
             --resource-group rg-codec-prod \
             --query "properties.template.containers[0].image" -o tsv 2>/dev/null || echo "")
-          if [ -z "$ADMIN_IMAGE" ]; then
-            # App doesn't exist yet — use latest image from ACR if available,
-            # otherwise fall back to the quickstart placeholder.
-            ACR_CHECK=$(az acr repository show \
-              --name acrcodecprod \
-              --repository codec-admin -o tsv 2>/dev/null || echo "")
-            if [ -n "$ACR_CHECK" ]; then
-              ADMIN_IMAGE="acrcodecprod.azurecr.io/codec-admin:latest"
-            else
+          # If the app doesn't exist or is stuck on the quickstart placeholder,
+          # try to use the latest image from ACR (pushed by a prior CD run).
+          if [ -z "$ADMIN_IMAGE" ] || [ "$ADMIN_IMAGE" = "$FALLBACK" ]; then
+            ACR_LATEST="acrcodecprod.azurecr.io/codec-admin:latest"
+            if az acr manifest list-metadata --registry acrcodecprod --name codec-admin --top 1 -o tsv 2>/dev/null | grep -q .; then
+              ADMIN_IMAGE="$ACR_LATEST"
+              echo "Using ACR image for admin: $ACR_LATEST"
+            elif [ -z "$ADMIN_IMAGE" ]; then
               ADMIN_IMAGE="$FALLBACK"
             fi
           fi
