@@ -215,6 +215,20 @@ export class ApiClient {
 		});
 	}
 
+	/** Permanently delete the authenticated user's account. */
+	async deleteAccount(
+		token: string,
+		confirmationText: string,
+		password?: string,
+		googleCredential?: string
+	): Promise<{ message: string }> {
+		return this.request(`${this.baseUrl}/me`, {
+			method: 'DELETE',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ confirmationText, password, googleCredential })
+		});
+	}
+
 	/** Remove the custom global avatar, reverting to the Google profile picture. */
 	async deleteAvatar(token: string): Promise<{ avatarUrl: string }> {
 		return this.request(`${this.baseUrl}/me/avatar`, {

@@ -224,6 +224,7 @@ export type UserProfile = {
 		emailVerified?: boolean;
 		statusText?: string | null;
 		statusEmoji?: string | null;
+		googleSubject?: string | null;
 	};
 	isNewUser?: boolean;
 	needsLinking?: boolean;

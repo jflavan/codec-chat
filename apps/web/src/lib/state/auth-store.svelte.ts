@@ -72,7 +72,7 @@ export class AuthStore {
 	constructor(
 		private readonly api: ApiClient,
 		private readonly ui: UIStore,
-		private readonly googleClientId: string
+		readonly googleClientId: string
 	) {
 		this.pushManager = new PushNotificationManager(this.api, () => this.idToken);
 		this.pushNotificationsSupported = this.pushManager.isSupported;
@@ -351,6 +351,26 @@ export class AuthStore {
 
 		clearStoredSession();
 
+		this.ui.isInitialLoading = false;
+		this.ui.isHubConnected = false;
+		this.idToken = null;
+		this.me = null;
+		this.status = 'Signed out';
+
+		await tick();
+		renderGoogleButton('google-button');
+		renderGoogleButton('login-google-button');
+	}
+
+	async deleteAccount(password?: string, googleCredential?: string): Promise<void> {
+		if (!this.idToken) return;
+		await this.api.deleteAccount(this.idToken, 'DELETE', password, googleCredential);
+
+		// Clean up same as sign-out
+		if (this.onSignedOut) {
+			await this.onSignedOut();
+		}
+		clearStoredSession();
 		this.ui.isInitialLoading = false;
 		this.ui.isHubConnected = false;
 		this.idToken = null;
