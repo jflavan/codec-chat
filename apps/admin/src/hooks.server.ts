@@ -7,16 +7,25 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const apiBase = env.PUBLIC_API_BASE_URL ?? '';
 	const wsBase = apiBase.replace(/^http/, 'ws');
 
-	const csp = [
-		"default-src 'self'",
-		`script-src 'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
-		`style-src 'self' 'unsafe-inline'`,
-		`img-src 'self' data: blob: https://lh3.googleusercontent.com ${apiBase}`,
-		`connect-src 'self' ${apiBase} ${wsBase} https://www.google.com`,
-		`frame-src https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`,
-		`object-src 'none'`,
-		`base-uri 'self'`
-	].join('; ');
+	// SvelteKit manages the core CSP header (including nonces for inline scripts)
+	// via svelte.config.js. Here we append the dynamic directives that depend on
+	// runtime environment variables.
+	const existing = response.headers.get('Content-Security-Policy') ?? '';
+	const dynamicDirectives: Record<string, string> = {
+		'img-src': `'self' data: blob: https://lh3.googleusercontent.com ${apiBase}`,
+		'connect-src': `'self' ${apiBase} ${wsBase} https://www.google.com`,
+		'frame-src': 'https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/',
+		'script-src-elem': `'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`
+	};
+
+	let csp = existing;
+	for (const [directive, value] of Object.entries(dynamicDirectives)) {
+		if (csp.includes(directive)) {
+			csp = csp.replace(new RegExp(`${directive}\\s[^;]*`), `${directive} ${value}`);
+		} else {
+			csp = csp ? `${csp}; ${directive} ${value}` : `${directive} ${value}`;
+		}
+	}
 
 	response.headers.set('Content-Security-Policy', csp);
 	response.headers.set('X-Content-Type-Options', 'nosniff');
