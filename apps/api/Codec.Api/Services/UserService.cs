@@ -286,4 +286,86 @@ public class UserService(CodecDbContext db, IPermissionResolverService permissio
 
         return (ownerRole, adminRole, memberRole);
     }
+
+    /// <inheritdoc />
+    public async Task<List<(Guid ServerId, string ServerName)>> GetOwnedServersAsync(Guid userId)
+    {
+        // Owner = position-0 system role
+        var ownedServers = await db.ServerMemberRoles
+            .AsNoTracking()
+            .Where(mr => mr.UserId == userId)
+            .Join(db.ServerRoles.Where(r => r.IsSystemRole && r.Position == 0),
+                mr => mr.RoleId, r => r.Id, (mr, r) => r.ServerId)
+            .Join(db.Servers, sid => sid, s => s.Id, (sid, s) => new { s.Id, s.Name })
+            .ToListAsync();
+
+        return ownedServers.Select(s => (s.Id, s.Name)).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteAccountAsync(Guid userId)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        // 1. Revoke all refresh tokens
+        await db.RefreshTokens.Where(rt => rt.UserId == userId).ExecuteDeleteAsync();
+
+        // 2. Clean up Restrict-FK entities that would block user deletion
+        await db.Friendships
+            .Where(f => f.RequesterId == userId || f.RecipientId == userId)
+            .ExecuteDeleteAsync();
+
+        await db.VoiceCalls
+            .Where(vc => vc.CallerUserId == userId || vc.RecipientUserId == userId)
+            .ExecuteDeleteAsync();
+
+        await db.CustomEmojis
+            .Where(e => e.UploadedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.UploadedByUserId, (Guid?)null));
+
+        await db.Webhooks
+            .Where(w => w.CreatedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.CreatedByUserId, (Guid?)null));
+
+        await db.ServerInvites
+            .Where(i => i.CreatedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.CreatedByUserId, (Guid?)null));
+
+        await db.AdminActions
+            .Where(a => a.ActorUserId == userId)
+            .ExecuteDeleteAsync();
+
+        await db.SystemAnnouncements
+            .Where(a => a.CreatedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.CreatedByUserId, (Guid?)null));
+
+        await db.Reports
+            .Where(r => r.ReporterId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.ReporterId, (Guid?)null));
+
+        await db.BannedMembers
+            .Where(b => b.BannedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.BannedByUserId, (Guid?)null));
+
+        // 3. Anonymize messages (set AuthorUserId to null)
+        await db.Messages
+            .Where(m => m.AuthorUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.AuthorUserId, (Guid?)null));
+
+        await db.DirectMessages
+            .Where(dm => dm.AuthorUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(dm => dm.AuthorUserId, (Guid?)null));
+
+        // 4. Delete reactions by this user
+        await db.Reactions
+            .Where(r => r.UserId == userId)
+            .ExecuteDeleteAsync();
+
+        // 5. Delete the user row (cascades: ServerMember, ServerMemberRole,
+        //    DmChannelMember, PresenceState, VoiceState, PushSubscription,
+        //    ChannelNotificationOverride, BannedMember)
+        await db.Users.Where(u => u.Id == userId).ExecuteDeleteAsync();
+
+        await transaction.CommitAsync();
+    }
 }

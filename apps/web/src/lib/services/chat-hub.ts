@@ -327,6 +327,7 @@ export type SignalRCallbacks = {
 	onMessagePinned?: (event: MessagePinnedEvent) => void;
 	onMessageUnpinned?: (event: MessageUnpinnedEvent) => void;
 	onChannelOverrideUpdated?: (event: ChannelOverrideUpdatedEvent) => void;
+	onAccountDeleted?: () => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -546,6 +547,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onChannelOverrideUpdated) {
 			connection.on('ChannelOverrideUpdated', callbacks.onChannelOverrideUpdated);
+		}
+		if (callbacks.onAccountDeleted) {
+			connection.on('AccountDeleted', callbacks.onAccountDeleted);
 		}
 
 		if (callbacks.onReconnecting) {

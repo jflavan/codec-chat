@@ -388,6 +388,12 @@ export async function setupSignalR(
 			onCallMissed: (event) => {
 				voice.handleCallMissed(event);
 			},
+
+			/* ─── Account deletion ─── */
+
+			onAccountDeleted: () => {
+				auth.signOut();
+			},
 		}
 	);
 

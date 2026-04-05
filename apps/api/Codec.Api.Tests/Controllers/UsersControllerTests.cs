@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Moq;
 
 namespace Codec.Api.Tests.Controllers;
@@ -19,6 +20,7 @@ public class UsersControllerTests : IDisposable
     private readonly Mock<IUserService> _userService = new();
     private readonly Mock<IAvatarService> _avatarService = new();
     private readonly Mock<IHubContext<ChatHub>> _hub = new();
+    private readonly Mock<IConfiguration> _config = new();
     private readonly UsersController _controller;
     private readonly User _testUser;
 
@@ -38,7 +40,7 @@ public class UsersControllerTests : IDisposable
             AvatarUrl = "https://google.com/pic.jpg"
         };
 
-        _controller = new UsersController(_userService.Object, _avatarService.Object, _db, _hub.Object);
+        _controller = new UsersController(_userService.Object, _avatarService.Object, _db, _hub.Object, _config.Object);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext

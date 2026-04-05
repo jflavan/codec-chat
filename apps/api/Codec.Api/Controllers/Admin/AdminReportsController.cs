@@ -36,7 +36,7 @@ public class AdminReportsController(CodecDbContext db, IUserService userService,
             .Select(r => new
             {
                 r.Id, r.ReportType, r.TargetId, r.Reason, r.Status, r.CreatedAt,
-                ReporterName = r.Reporter!.DisplayName,
+                ReporterName = r.Reporter != null ? r.Reporter.DisplayName : null,
                 r.AssignedToUserId,
                 RelatedCount = db.Reports.Count(r2 => r2.ReportType == r.ReportType && r2.TargetId == r.TargetId && r2.Id != r.Id)
             })
@@ -55,7 +55,7 @@ public class AdminReportsController(CodecDbContext db, IUserService userService,
                 r.Id, r.ReportType, r.TargetId, r.TargetSnapshot,
                 r.Reason, r.Status, r.CreatedAt,
                 r.AssignedToUserId, r.Resolution, r.ResolvedAt,
-                ReporterName = r.Reporter!.DisplayName,
+                ReporterName = r.Reporter != null ? r.Reporter.DisplayName : null,
                 AssignedToName = r.AssignedToUser != null ? r.AssignedToUser.DisplayName : null,
                 ResolvedByName = r.ResolvedByUser != null ? r.ResolvedByUser.DisplayName : null,
                 RelatedCount = db.Reports.Count(r2 => r2.ReportType == r.ReportType && r2.TargetId == r.TargetId && r2.Id != r.Id)

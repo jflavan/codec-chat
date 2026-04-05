@@ -3,7 +3,7 @@ namespace Codec.Api.Models;
 public class Report
 {
     public Guid Id { get; set; }
-    public Guid ReporterId { get; set; }
+    public Guid? ReporterId { get; set; }
     public User? Reporter { get; set; }
     public ReportType ReportType { get; set; }
     public string TargetId { get; set; } = string.Empty;

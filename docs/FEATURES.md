@@ -23,6 +23,7 @@ This document tracks implemented and planned features for Codec.
 - User search by name, nickname, or email
 - Global admin role — configurable via `GlobalAdmin:Email`; full access to all servers, channels, and messages regardless of membership
 - Account disabling — global admins can disable user accounts; disabled users are blocked from all auth flows and admin endpoints; refresh tokens revoked immediately
+- Account deletion — users can permanently delete their own accounts via `DELETE /me`; requires password re-authentication (or Google re-auth for Google-only accounts) and typing "DELETE" to confirm; server ownership must be transferred first; messages are anonymized (shown as "Deleted User"); friendships, memberships, and reactions are removed; real-time `AccountDeleted` SignalR event forces all sessions to sign out
 
 ### Servers & Channels
 - Server creation (creator becomes Owner)
@@ -75,7 +76,7 @@ This document tracks implemented and planned features for Codec.
 ### User Settings
 - Full-screen modal with category sidebar
 - My Profile: nickname editing, avatar upload/remove, preview
-- My Account: read-only info, sign-out
+- My Account: read-only info, sign-out, account deletion with confirmation modal
 - Appearance: 4 themes (Phosphor Green, Midnight, Ember, Light) with live preview and `localStorage` persistence
 - Voice & Audio: input mode (voice activity / push-to-talk), PTT keybind configuration
 

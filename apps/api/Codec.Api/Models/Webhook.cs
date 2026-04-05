@@ -36,7 +36,7 @@ public class Webhook
     /// </summary>
     public bool IsActive { get; set; } = true;
 
-    public Guid CreatedByUserId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Server? Server { get; set; }

@@ -13,7 +13,7 @@ public class ServerInvite
     /// </summary>
     public string Code { get; set; } = string.Empty;
 
-    public Guid CreatedByUserId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
 
     /// <summary>
     /// When the invite expires. Null means it never expires.

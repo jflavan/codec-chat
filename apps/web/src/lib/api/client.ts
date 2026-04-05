@@ -35,7 +35,8 @@ import type {
 export class ApiError extends Error {
 	constructor(
 		public readonly status: number,
-		message?: string
+		message?: string,
+		public readonly data?: Record<string, unknown>
 	) {
 		super(message ?? `API error: ${status}`);
 		this.name = 'ApiError';
@@ -84,7 +85,7 @@ export class ApiClient {
 			const message = body?.error
 				?? body?.detail
 				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
-			throw new ApiError(response.status, message ?? undefined);
+			throw new ApiError(response.status, message ?? undefined, body ?? undefined);
 		}
 		return response.json() as Promise<T>;
 	}
@@ -107,7 +108,7 @@ export class ApiClient {
 			const message = body?.error
 				?? body?.detail
 				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
-			throw new ApiError(response.status, message ?? undefined);
+			throw new ApiError(response.status, message ?? undefined, body ?? undefined);
 		}
 	}
 
@@ -120,7 +121,7 @@ export class ApiClient {
 			const message = body?.error
 				?? body?.detail
 				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
-			throw new ApiError(response.status, message ?? undefined);
+			throw new ApiError(response.status, message ?? undefined, body ?? undefined);
 		}
 		return response.json() as Promise<T>;
 	}
@@ -212,6 +213,20 @@ export class ApiClient {
 			method: 'POST',
 			headers: { Authorization: `Bearer ${token}` },
 			body: form
+		});
+	}
+
+	/** Permanently delete the authenticated user's account. */
+	async deleteAccount(
+		token: string,
+		confirmationText: string,
+		password?: string,
+		googleCredential?: string
+	): Promise<{ message: string }> {
+		return this.request(`${this.baseUrl}/me`, {
+			method: 'DELETE',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ confirmationText, password, googleCredential })
 		});
 	}
 
@@ -1104,7 +1119,7 @@ export class ApiClient {
 			const message = body?.error
 				?? body?.detail
 				?? (body?.errors ? Object.values(body.errors).flat().join('; ') : null);
-			throw new ApiError(response.status, message ?? undefined);
+			throw new ApiError(response.status, message ?? undefined, body ?? undefined);
 		}
 		return response.json() as Promise<ActiveCallResponse>;
 	}
