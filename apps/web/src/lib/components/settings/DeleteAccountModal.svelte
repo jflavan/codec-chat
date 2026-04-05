@@ -20,14 +20,18 @@
 	let ownedServers = $state<{ id: string; name: string }[]>([]);
 	let googleCredential = $state<string | null>(null);
 
-	const isGoogleOnly = $derived(
-		auth.authType === 'google' && !!auth.me?.user.googleSubject
-	);
+	const hasPassword = $derived(auth.authType === 'local');
+	const hasGoogle = $derived(!!auth.me?.user.googleSubject);
+	const isOAuthOnly = $derived(!hasPassword && !hasGoogle);
+
+	const needsPassword = $derived(hasPassword);
+	const needsGoogle = $derived(hasGoogle && !hasPassword);
 
 	const canSubmit = $derived(
 		confirmationText === 'DELETE' &&
-		(isGoogleOnly ? googleCredential !== null : password.length > 0) &&
-		!isDeleting
+		!isDeleting &&
+		(needsPassword ? password.length > 0 : true) &&
+		(needsGoogle ? googleCredential !== null : true)
 	);
 
 	function handleGoogleCredential(credential: string) {
@@ -35,7 +39,7 @@
 	}
 
 	$effect(() => {
-		if (isGoogleOnly) {
+		if (needsGoogle) {
 			initGoogleIdentity(
 				auth.googleClientId,
 				(token) => handleGoogleCredential(token),
@@ -50,16 +54,18 @@
 		ownedServers = [];
 
 		try {
-			if (isGoogleOnly) {
-				await auth.deleteAccount(undefined, googleCredential ?? undefined);
-			} else {
-				await auth.deleteAccount(password);
-			}
+			await auth.deleteAccount(
+				needsPassword ? password : undefined,
+				needsGoogle ? (googleCredential ?? undefined) : undefined
+			);
 			onclose();
 			ui.closeSettings();
 		} catch (e) {
 			if (e instanceof ApiError) {
 				error = e.message ?? 'Failed to delete account.';
+				if (Array.isArray(e.data?.ownedServers)) {
+					ownedServers = e.data.ownedServers as { id: string; name: string }[];
+				}
 			} else {
 				error = 'An unexpected error occurred.';
 			}
@@ -93,16 +99,7 @@
 				</ul>
 			</div>
 		{:else}
-			{#if isGoogleOnly}
-				<div class="field">
-					<span class="field-label">Re-authenticate with Google</span>
-					{#if googleCredential}
-						<p class="google-verified">Google identity verified</p>
-					{:else}
-						<div id="delete-google-button"></div>
-					{/if}
-				</div>
-			{:else}
+			{#if needsPassword}
 				<label class="field">
 					<span class="field-label">Password</span>
 					<input
@@ -112,6 +109,15 @@
 						autocomplete="current-password"
 					/>
 				</label>
+			{:else if needsGoogle}
+				<div class="field">
+					<span class="field-label">Re-authenticate with Google</span>
+					{#if googleCredential}
+						<p class="google-verified">Google identity verified</p>
+					{:else}
+						<div id="delete-google-button"></div>
+					{/if}
+				</div>
 			{/if}
 
 			<label class="field">

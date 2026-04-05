@@ -82,26 +82,22 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             });
         }
 
-        // Verify identity: password for users with a password, Google credential for Google-only
-        if (appUser.PasswordHash is not null)
-        {
-            if (string.IsNullOrWhiteSpace(request.Password))
-            {
-                return BadRequest(new { error = "Password is required to delete your account." });
-            }
+        // Verify identity based on the credentials the user has.
+        // Password users must supply their password. Google-only users re-authenticate with Google.
+        // OAuth-only users (GitHub, Discord, SAML) are already JWT-authenticated; confirmation text suffices.
+        var verified = false;
 
+        if (appUser.PasswordHash is not null && !string.IsNullOrWhiteSpace(request.Password))
+        {
             if (!BCrypt.Net.BCrypt.Verify(request.Password, appUser.PasswordHash))
             {
                 return Unauthorized(new { error = "Incorrect password." });
             }
+            verified = true;
         }
-        else if (appUser.GoogleSubject is not null)
-        {
-            if (string.IsNullOrWhiteSpace(request.GoogleCredential))
-            {
-                return BadRequest(new { error = "Google re-authentication is required to delete your account." });
-            }
 
+        if (!verified && appUser.GoogleSubject is not null && !string.IsNullOrWhiteSpace(request.GoogleCredential))
+        {
             var googleClientId = configuration["Google:ClientId"];
             var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                 "https://accounts.google.com/.well-known/openid-configuration",
@@ -128,21 +124,34 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
                 {
                     return Unauthorized(new { error = "Google account does not match." });
                 }
+                verified = true;
             }
             catch (Exception ex) when (ex is SecurityTokenException or ArgumentException)
             {
                 return Unauthorized(new { error = "Invalid or expired Google credential." });
             }
         }
-        else
+
+        if (!verified)
         {
-            return BadRequest(new { error = "Unable to verify identity for account deletion." });
+            // Determine what credential is needed based on the user's account type
+            if (appUser.PasswordHash is not null)
+            {
+                return BadRequest(new { error = "Password is required to delete your account." });
+            }
+            if (appUser.GoogleSubject is not null)
+            {
+                return BadRequest(new { error = "Google re-authentication is required to delete your account." });
+            }
+
+            // OAuth-only users (GitHub, Discord, SAML) — already authenticated via JWT
+            verified = true;
         }
 
-        // Force-disconnect SignalR connections
-        await hub.Clients.Group($"user-{appUser.Id}").SendAsync("AccountDeleted");
-
         await userService.DeleteAccountAsync(appUser.Id);
+
+        // Force-disconnect SignalR connections after successful deletion
+        await hub.Clients.Group($"user-{appUser.Id}").SendAsync("AccountDeleted");
 
         return Ok(new { message = "Account deleted successfully." });
     }
