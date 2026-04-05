@@ -275,7 +275,8 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<ServerInvite>()
             .HasOne(invite => invite.CreatedByUser)
             .WithMany(user => user.CreatedInvites)
-            .HasForeignKey(invite => invite.CreatedByUserId);
+            .HasForeignKey(invite => invite.CreatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<ServerInvite>()
             .HasIndex(invite => invite.Code)
@@ -404,7 +405,7 @@ public class CodecDbContext : DbContext
             .HasOne(e => e.UploadedByUser)
             .WithMany()
             .HasForeignKey(e => e.UploadedByUserId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<CustomEmoji>()
             .HasIndex(e => new { e.ServerId, e.Name })
@@ -523,7 +524,7 @@ public class CodecDbContext : DbContext
             e.HasOne(w => w.CreatedByUser)
                 .WithMany()
                 .HasForeignKey(w => w.CreatedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(w => w.ServerId);
             e.Property(w => w.Name).HasMaxLength(100);
             e.Property(w => w.Url).HasMaxLength(2048);
@@ -565,7 +566,7 @@ public class CodecDbContext : DbContext
             e.HasOne(b => b.BannedByUser)
                 .WithMany()
                 .HasForeignKey(b => b.BannedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
             e.Property(b => b.Reason).HasMaxLength(512);
         });
 
@@ -576,7 +577,7 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<Report>(e =>
         {
-            e.HasOne(r => r.Reporter).WithMany().HasForeignKey(r => r.ReporterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Reporter).WithMany().HasForeignKey(r => r.ReporterId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(r => r.AssignedToUser).WithMany().HasForeignKey(r => r.AssignedToUserId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(r => r.ResolvedByUser).WithMany().HasForeignKey(r => r.ResolvedByUserId).OnDelete(DeleteBehavior.SetNull);
             e.Property(r => r.Reason).HasMaxLength(2000);
@@ -594,7 +595,7 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<SystemAnnouncement>(e =>
         {
-            e.HasOne(a => a.CreatedByUser).WithMany().HasForeignKey(a => a.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(a => a.CreatedByUser).WithMany().HasForeignKey(a => a.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
             e.Property(a => a.Title).HasMaxLength(200);
             e.Property(a => a.Body).HasMaxLength(5000);
         });

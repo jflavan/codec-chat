@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260404000000_AllowNullableDeletedUserFks")]
+    partial class AllowNullableDeletedUserFks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
