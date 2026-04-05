@@ -118,12 +118,19 @@ At the top of the My Profile section, a preview card shows how the user appears 
 
 ### My Account Section
 
-A read-only section displaying account information.
+A read-only section displaying account information, with sign-out and account deletion.
 
 - **Email:** displays the user's email address (from Google, not editable)
 - **Display Name:** displays the Google-provided display name (not editable — this comes from Google)
 - **Account Created:** displays the user's account creation date
-- **Sign Out** button (`--danger` style) at the bottom of the section (reuses existing sign-out logic)
+- **Sign Out** button (`--danger` style) — signs out and redirects to the sign-in screen
+- **Delete Account** danger zone — bordered section at the bottom with a warning and a "Delete Account" button that opens a confirmation modal:
+  - Warning text explaining consequences (messages anonymized, memberships removed, friendships removed, irreversible)
+  - If user owns servers: shows a blocking message listing servers that need ownership transferred
+  - Password input (or Google re-auth button for Google-only accounts)
+  - "Type DELETE to confirm" text input
+  - "Delete My Account" submit button — disabled until password and confirmation text are provided
+  - On success: clears auth state, redirects to sign-in screen
 
 ### Responsive Behavior
 

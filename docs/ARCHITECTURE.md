@@ -261,6 +261,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
   - Typing indicators (`UserTyping` / `UserStoppedTyping` events)
   - DM typing indicators (`DmTyping` / `DmStoppedTyping` events)
   - Friend-related event delivery (request received/accepted/declined/cancelled, friend removed)
+  - `AccountDeleted` — sent to `user-{userId}` group when account is deleted; forces all client sessions to sign out
   - Automatic reconnect via `withAutomaticReconnect()` with explicit retry schedule
   - Graceful restart with exponential backoff (2 s → 30 s cap) when all automatic reconnect attempts are exhausted — no page reload
   - Visibility-aware recovery — immediate reconnect attempt when a backgrounded tab becomes active
@@ -375,6 +376,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `DELETE /me/nickname` - Remove nickname, revert to Google display name
 - `POST /me/avatar` - Upload a custom global avatar (multipart/form-data, 10 MB max; JPG, JPEG, PNG, WebP, GIF)
 - `DELETE /me/avatar` - Remove custom avatar, revert to Google profile picture
+- `DELETE /me` - Permanently delete authenticated user's account (requires password or Google re-auth + typed "DELETE" confirmation; blocked if user owns servers)
 
 #### Server Management
 - `GET /servers` - List servers user is a member of (global admin sees all servers; `role` is `null` for non-member servers; includes `description`)

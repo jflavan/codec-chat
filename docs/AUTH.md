@@ -362,6 +362,54 @@ When an account is disabled:
 
 Re-enabling an account (`POST /admin/users/{id}/enable`) clears the disabled flag. The user must sign in again since their refresh tokens were revoked.
 
+### Account Deletion (Self-Service)
+
+Users can permanently delete their own accounts via `DELETE /me`. This is a hard delete — the user row is removed from the database and cannot be recovered.
+
+#### Prerequisites
+
+- **Server ownership transfer required** — users who own servers must transfer ownership before deletion. The endpoint returns 400 with a list of owned servers if any exist.
+- **Identity re-authentication** — users must prove their identity before deletion:
+  - Email/password users: provide their current password
+  - Google-only users (no password): re-authenticate with a Google credential
+  - GitHub/Discord OAuth users: provide their password (OAuth linking requires a password)
+- **Typed confirmation** — the request must include `confirmationText: "DELETE"` (case-sensitive)
+
+#### Deletion Flow (`DELETE /me`)
+
+1. Client sends `{ confirmationText, password?, googleCredential? }`.
+2. API validates `confirmationText == "DELETE"` (400 if not).
+3. API checks server ownership via `GetOwnedServersAsync` (400 if user owns servers).
+4. API verifies identity via password (bcrypt) or Google credential (OIDC JWT validation).
+5. API broadcasts `AccountDeleted` SignalR event to `user-{userId}` group (forces all sessions to sign out).
+6. API calls `DeleteAccountAsync` which runs in a single transaction:
+   - Revokes all refresh tokens
+   - Deletes friendships and voice calls
+   - Nulls user references on custom emojis, webhooks, server invites, system announcements, reports, and banned member records
+   - Sets `AuthorUserId = null` on all server messages and direct messages (anonymization)
+   - Deletes reactions by the user
+   - Deletes the user row (EF cascade handles server memberships, DM channel memberships, presence state, voice state, push subscriptions, notification overrides)
+7. Returns 200 with `{ message: "Account deleted successfully." }`.
+
+#### Data Handling
+
+- **Messages preserved** — server and DM messages remain in place but with `AuthorUserId` set to null. The frontend displays these as "Deleted User" with dimmed styling.
+- **Friendships removed** — all friend requests (sent and received) are deleted.
+- **Server memberships removed** — the user is removed from all servers via cascade delete.
+- **Audit trail** — audit log entries retain `ActorUserId = null` (SetNull behavior) so logs are preserved but de-identified.
+- **Admin actions deleted** — `AdminAction` rows where the user was the actor are deleted.
+
+#### Frontend UX
+
+- Account Settings page includes a "Delete Account" danger zone section
+- Clicking "Delete Account" opens a confirmation modal with:
+  - Warning about irreversible consequences
+  - Password input (or Google re-auth button for Google-only users)
+  - "Type DELETE to confirm" text input
+  - Disabled submit button until both fields are filled
+- On successful deletion, the client clears auth state and redirects to the sign-in screen
+- Active SignalR connections receive an `AccountDeleted` event that triggers sign-out
+
 ### Current Limitations
 
 ⚠️ **Token Revocation**
