@@ -431,8 +431,8 @@
 							{#if message.authorAvatarUrl}
 								<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
 							{:else}
-								<div class="message-avatar" aria-hidden="true">
-									{message.authorName.slice(0, 1).toUpperCase()}
+								<div class="message-avatar" class:deleted-avatar={!message.authorUserId} aria-hidden="true">
+									{message.authorUserId ? message.authorName.slice(0, 1).toUpperCase() : '?'}
 								</div>
 							{/if}
 						</div>
@@ -441,7 +441,7 @@
 								<ReplyReference replyContext={message.replyContext} onClickGoToOriginal={() => scrollToMessage(message.replyContext!.messageId)} />
 							{/if}
 								<div class="message-header">
-									<strong class="message-author">{message.authorName}</strong>
+									<strong class="message-author" class:deleted-user={!message.authorUserId}>{message.authorUserId ? message.authorName : 'Deleted User'}</strong>
 									<time class="message-time">{formatTime(message.createdAt)}</time>
 									{#if message.editedAt}
 										<span class="edited-label">(edited)</span>
@@ -904,6 +904,15 @@
 		font-size: 16px;
 		font-weight: 600;
 		color: var(--text-header);
+	}
+
+	.message-author.deleted-user {
+		color: var(--text-muted);
+		font-style: italic;
+	}
+
+	.deleted-avatar {
+		opacity: 0.5;
 	}
 
 	.message-time {
