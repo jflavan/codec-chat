@@ -14,8 +14,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const dynamicDirectives: Record<string, string> = {
 		'img-src': `'self' data: blob: https://lh3.googleusercontent.com ${apiBase}`,
 		'connect-src': `'self' ${apiBase} ${wsBase} https://www.google.com`,
-		'frame-src': 'https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/',
-		'script-src-elem': `'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/`
+		'frame-src': 'https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/'
 	};
 
 	let csp = existing;

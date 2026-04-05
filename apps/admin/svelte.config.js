@@ -8,7 +8,7 @@ const config = {
 			mode: 'auto',
 			directives: {
 				'default-src': ['self'],
-				'script-src': ['strict-dynamic'],
+				'script-src': ['strict-dynamic', 'https://www.google.com/recaptcha/', 'https://www.gstatic.com/recaptcha/'],
 				'style-src': ['self', 'unsafe-inline'],
 				'connect-src': ['self'],
 				'object-src': ['none'],
