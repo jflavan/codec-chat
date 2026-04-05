@@ -32,6 +32,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.headers.set('Permissions-Policy', 'microphone=(), camera=(), geolocation=(), payment=()');
 	response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
 
 	return response;
 };
