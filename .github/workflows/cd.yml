@@ -120,6 +120,7 @@ jobs:
         run: |
           docker build \
             --build-arg PUBLIC_API_BASE_URL=${{ secrets.PUBLIC_API_BASE_URL }} \
+            --build-arg PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.PUBLIC_GOOGLE_CLIENT_ID }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-admin:${{ github.sha }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-admin:latest \
             ./apps/admin

@@ -217,6 +217,7 @@ jobs:
         run: |
           docker build \
             --build-arg PUBLIC_API_BASE_URL=https://placeholder.example.com \
+            --build-arg PUBLIC_GOOGLE_CLIENT_ID=placeholder \
             -t codec-admin:${{ github.sha }} \
             ./apps/admin
       - name: Scan Admin image for vulnerabilities

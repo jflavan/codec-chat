@@ -451,6 +451,7 @@ module adminApp 'modules/container-app-admin.bicep' = {
     containerRegistryName: containerRegistry.outputs.name
     containerImage: adminContainerImage
     publicApiBaseUrl: effectiveApiUrl
+    publicGoogleClientId: googleClientId
     customDomainName: adminCustomDomain
     managedCertificateId: adminCertId
   }

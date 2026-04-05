@@ -7,6 +7,7 @@ param containerRegistryName string
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 param publicApiBaseUrl string
+param publicGoogleClientId string
 
 @description('Custom domain name for the admin app (e.g., admin.codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
@@ -69,6 +70,10 @@ resource adminApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'PUBLIC_API_BASE_URL'
               value: publicApiBaseUrl
+            }
+            {
+              name: 'PUBLIC_GOOGLE_CLIENT_ID'
+              value: publicGoogleClientId
             }
           ]
           probes: [

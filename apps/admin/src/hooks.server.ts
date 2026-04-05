@@ -13,8 +13,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const existing = response.headers.get('Content-Security-Policy') ?? '';
 	const dynamicDirectives: Record<string, string> = {
 		'img-src': `'self' data: blob: https://lh3.googleusercontent.com ${apiBase}`,
-		'connect-src': `'self' ${apiBase} ${wsBase} https://www.google.com`,
-		'frame-src': 'https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/'
+		'connect-src': `'self' ${apiBase} ${wsBase} https://accounts.google.com https://www.google.com`,
+		'frame-src': 'https://accounts.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/'
 	};
 
 	let csp = existing;
