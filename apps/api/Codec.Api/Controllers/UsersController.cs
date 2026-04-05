@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using Codec.Api.Data;
 using Codec.Api.Filters;
 using Codec.Api.Hubs;
@@ -7,6 +8,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Codec.Api.Controllers;
 
@@ -16,7 +20,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("")]
-public class UsersController(IUserService userService, IAvatarService avatarService, CodecDbContext db, IHubContext<ChatHub> hub) : ControllerBase
+public class UsersController(IUserService userService, IAvatarService avatarService, CodecDbContext db, IHubContext<ChatHub> hub, IConfiguration configuration) : ControllerBase
 {
     /// <summary>
     /// Returns the authenticated user's profile and JWT claims.
@@ -50,6 +54,97 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
             isNewUser,
             claims
         });
+    }
+
+    /// <summary>
+    /// Permanently deletes the authenticated user's account.
+    /// Requires password re-authentication (or Google credential for Google-only accounts)
+    /// and typing "DELETE" to confirm.
+    /// </summary>
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountRequest request)
+    {
+        if (request.ConfirmationText != "DELETE")
+        {
+            return BadRequest(new { error = "You must type DELETE to confirm account deletion." });
+        }
+
+        var (appUser, _) = await userService.GetOrCreateUserAsync(User);
+
+        // Check server ownership
+        var ownedServers = await userService.GetOwnedServersAsync(appUser.Id);
+        if (ownedServers.Count > 0)
+        {
+            return BadRequest(new
+            {
+                error = "You must transfer ownership of all servers before deleting your account.",
+                ownedServers = ownedServers.Select(s => new { id = s.ServerId, name = s.ServerName })
+            });
+        }
+
+        // Verify identity: password for users with a password, Google credential for Google-only
+        if (appUser.PasswordHash is not null)
+        {
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest(new { error = "Password is required to delete your account." });
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(request.Password, appUser.PasswordHash))
+            {
+                return Unauthorized(new { error = "Incorrect password." });
+            }
+        }
+        else if (appUser.GoogleSubject is not null)
+        {
+            if (string.IsNullOrWhiteSpace(request.GoogleCredential))
+            {
+                return BadRequest(new { error = "Google re-authentication is required to delete your account." });
+            }
+
+            var googleClientId = configuration["Google:ClientId"];
+            var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+                "https://accounts.google.com/.well-known/openid-configuration",
+                new OpenIdConnectConfigurationRetriever());
+
+            try
+            {
+                var openIdConfig = await configManager.GetConfigurationAsync();
+                var validationParams = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuers = new[] { "https://accounts.google.com", "accounts.google.com" },
+                    ValidateAudience = true,
+                    ValidAudience = googleClientId,
+                    ValidateLifetime = true,
+                    IssuerSigningKeys = openIdConfig.SigningKeys
+                };
+
+                var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+                var principal = handler.ValidateToken(request.GoogleCredential, validationParams, out _);
+                var googleSubject = principal.FindFirst("sub")?.Value;
+
+                if (googleSubject != appUser.GoogleSubject)
+                {
+                    return Unauthorized(new { error = "Google account does not match." });
+                }
+            }
+            catch (Exception ex) when (ex is SecurityTokenException or ArgumentException)
+            {
+                return Unauthorized(new { error = "Invalid or expired Google credential." });
+            }
+        }
+        else
+        {
+            return BadRequest(new { error = "Unable to verify identity for account deletion." });
+        }
+
+        // Force-disconnect SignalR connections
+        await hub.Clients.Group($"user-{appUser.Id}").SendAsync("AccountDeleted");
+
+        await userService.DeleteAccountAsync(appUser.Id);
+
+        return Ok(new { message = "Account deleted successfully." });
     }
 
     /// <summary>
