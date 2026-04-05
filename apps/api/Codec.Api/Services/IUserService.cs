@@ -80,4 +80,17 @@ public interface IUserService
     /// Returns the three roles.
     /// </summary>
     Task<(ServerRoleEntity owner, ServerRoleEntity admin, ServerRoleEntity member)> CreateDefaultRolesAsync(Guid serverId);
+
+    /// <summary>
+    /// Returns the list of servers the user owns (position-0 role).
+    /// Used to block account deletion until ownership is transferred.
+    /// </summary>
+    Task<List<(Guid ServerId, string ServerName)>> GetOwnedServersAsync(Guid userId);
+
+    /// <summary>
+    /// Permanently deletes a user account within a single transaction.
+    /// Anonymizes messages, cleans up Restrict-FK entities, then removes the user row.
+    /// Caller must verify authentication and server-ownership preconditions first.
+    /// </summary>
+    Task DeleteAccountAsync(Guid userId);
 }
