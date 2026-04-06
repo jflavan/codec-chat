@@ -281,6 +281,7 @@ import { ReportType } from '$lib/types/index.js';
 		padding: 12px 0 12px;
 		box-sizing: border-box;
 		z-index: 1;
+		overflow: hidden;
 	}
 
 	.server-list {
@@ -461,42 +462,25 @@ import { ReportType } from '$lib/types/index.js';
 	}
 
 	.server-create-popover {
-		position: absolute;
-		left: 76px;
-		bottom: 0;
-		z-index: 40;
+		position: fixed;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 70;
 		background: var(--bg-secondary);
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		padding: 12px;
-		width: 220px;
+		width: calc(100vw - 32px);
+		max-width: 320px;
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 	}
 
-	/* Mobile: Reposition popover to be visible on narrow screens */
-	@media (max-width: 899px) {
-		.server-create-popover {
-			position: fixed;
-			left: 50%;
-			top: 50%;
-			transform: translate(-50%, -50%);
-			width: calc(100vw - 32px);
-			max-width: 320px;
-			z-index: 70;
-		}
-	}
-
 	.popover-mobile-backdrop {
-		display: none;
-	}
-
-	@media (max-width: 899px) {
-		.popover-mobile-backdrop {
-			display: block;
-			position: fixed;
-			inset: 0;
-			z-index: 65;
-		}
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 65;
 	}
 
 	/* ── shared form styles (scoped) ── */
