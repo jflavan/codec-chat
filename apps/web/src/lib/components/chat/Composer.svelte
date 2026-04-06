@@ -7,6 +7,7 @@
 	import ReplyComposerBar from './ReplyComposerBar.svelte';
 	import ComposerOverlay from './ComposerOverlay.svelte';
 	import EmojiPicker from './EmojiPicker.svelte';
+	import GifPicker from './GifPicker.svelte';
 	import { recordEmojiUse } from '$lib/utils/emoji-frequency.js';
 
 	const ui = getUIStore();
@@ -19,7 +20,8 @@
 
 	const LINE_HEIGHT = 20;
 	const MAX_LINES = 5;
-	let showEmojiPicker = $state(false);
+	let showPicker = $state(false);
+	let pickerTab = $state<'emoji' | 'gif'>('emoji');
 
 	/* ───── Mention autocomplete state ───── */
 	let showMentionPicker = $state(false);
@@ -94,6 +96,12 @@
 			inputEl.focus();
 			inputEl.setSelectionRange(newPos, newPos);
 		});
+	}
+
+	function handleGifSelect(gifUrl: string) {
+		showPicker = false;
+		pickerTab = 'emoji';
+		msgStore.sendGifMessage(gifUrl);
 	}
 
 	function handleKeydown(e: KeyboardEvent): void {
@@ -307,10 +315,10 @@
 			<button
 				class="composer-emoji"
 				type="button"
-				onclick={() => (showEmojiPicker = !showEmojiPicker)}
+				onclick={() => { showPicker = !showPicker; if (showPicker) pickerTab = 'emoji'; }}
 				disabled={!channelStore.selectedChannelId || msgStore.isSending}
-				aria-label="Add emoji"
-				title="Add emoji"
+				aria-label="Add emoji or GIF"
+				title="Add emoji or GIF"
 			>
 				<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 					<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"/>
@@ -327,14 +335,42 @@
 				</svg>
 			</button>
 		</div>
-		{#if showEmojiPicker}
-			<div class="composer-emoji-picker-wrapper">
-				<EmojiPicker
-					mode="insert"
-					onSelect={handleEmojiInsert}
-					onClose={() => { showEmojiPicker = false; }}
-					customEmojis={servers.customEmojis}
-				/>
+		{#if showPicker}
+			<div class="composer-picker-wrapper">
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="picker-backdrop" onclick={() => { showPicker = false; }}></div>
+				<div class="picker-container" role="dialog" aria-label="Emoji and GIF picker">
+					<div class="picker-tab-bar">
+						<button
+							class="picker-tab"
+							class:active={pickerTab === 'emoji'}
+							type="button"
+							onclick={() => (pickerTab = 'emoji')}
+						>Emoji</button>
+						<button
+							class="picker-tab"
+							class:active={pickerTab === 'gif'}
+							type="button"
+							onclick={() => (pickerTab = 'gif')}
+						>GIFs</button>
+					</div>
+					<div class="picker-body">
+						{#if pickerTab === 'emoji'}
+							<EmojiPicker
+								mode="insert"
+								embedded={true}
+								onSelect={handleEmojiInsert}
+								onClose={() => { showPicker = false; }}
+								customEmojis={servers.customEmojis}
+							/>
+						{:else}
+							<GifPicker
+								onSelect={handleGifSelect}
+								onClose={() => { showPicker = false; }}
+							/>
+						{/if}
+					</div>
+				</div>
 			</div>
 		{/if}
 	{/if}
@@ -484,9 +520,66 @@
 		cursor: not-allowed;
 	}
 
-	.composer-emoji-picker-wrapper {
+	.composer-picker-wrapper {
 		position: relative;
-		/* The EmojiPicker itself has position: absolute and will float above */
+	}
+
+	.picker-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 99;
+	}
+
+	.picker-container {
+		position: absolute;
+		z-index: 100;
+		bottom: calc(100% + 4px);
+		right: 0;
+		width: 352px;
+		max-height: 420px;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		overflow: hidden;
+	}
+
+	.picker-tab-bar {
+		display: flex;
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
+	}
+
+	.picker-tab {
+		flex: 1;
+		padding: 8px 12px;
+		background: none;
+		border: none;
+		border-bottom: 2px solid transparent;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: color 0.15s, border-color 0.15s;
+	}
+
+	.picker-tab:hover {
+		color: var(--text-primary);
+	}
+
+	.picker-tab.active {
+		color: var(--accent);
+		border-bottom-color: var(--accent);
+	}
+
+	.picker-body {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
 	}
 
 	/* ───── Disconnected state ───── */

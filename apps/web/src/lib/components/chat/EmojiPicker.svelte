@@ -8,13 +8,15 @@
 		mode,
 		onClose,
 		customEmojis = [],
-		flipped = false
+		flipped = false,
+		embedded = false
 	}: {
 		onSelect: (emoji: string) => void;
 		mode: 'reaction' | 'insert';
 		onClose: () => void;
 		customEmojis?: CustomEmoji[];
 		flipped?: boolean;
+		embedded?: boolean;
 	} = $props();
 
 	let search = $state('');
@@ -114,16 +116,19 @@
 	});
 </script>
 
+{#if !embedded}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="picker-backdrop" onclick={onClose}></div>
+{/if}
 
 <div
 	bind:this={containerEl}
 	class="emoji-picker-container"
 	class:flipped
+	class:embedded
 	style:max-height={flipped ? getMaxHeight() : undefined}
-	role="dialog"
-	aria-label="Emoji picker"
+	role={embedded ? undefined : 'dialog'}
+	aria-label={embedded ? undefined : 'Emoji picker'}
 >
 	<div class="picker-search">
 		<input
@@ -198,6 +203,16 @@
 	.emoji-picker-container.flipped {
 		bottom: unset;
 		top: calc(100% + 4px);
+	}
+
+	.emoji-picker-container.embedded {
+		position: static;
+		width: 100%;
+		border: none;
+		border-radius: 0;
+		box-shadow: none;
+		background: transparent;
+		max-height: none;
 	}
 
 	.picker-search {
