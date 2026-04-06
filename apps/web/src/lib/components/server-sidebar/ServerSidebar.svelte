@@ -188,7 +188,7 @@ import { ReportType } from '$lib/types/index.js';
 					</svg>
 				</button>
 				{#if ui.showCreateServer}
-					<div class="popover-mobile-backdrop" role="presentation" onclick={() => { ui.showCreateServer = false; ui.newServerName = ''; }}></div>
+					<div class="popover-backdrop" role="presentation" onclick={() => { ui.showCreateServer = false; ui.newServerName = ''; }}></div>
 					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); servers.createServer(); }}>
 							<input
@@ -226,7 +226,7 @@ import { ReportType } from '$lib/types/index.js';
 					</svg>
 				</button>
 				{#if showJoinByCode}
-					<div class="popover-mobile-backdrop" role="presentation" onclick={() => { showJoinByCode = false; inviteCode = ''; }}></div>
+					<div class="popover-backdrop" role="presentation" onclick={() => { showJoinByCode = false; inviteCode = ''; }}></div>
 					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); handleJoinByCode(); }}>
 							<input
@@ -476,11 +476,12 @@ import { ReportType } from '$lib/types/index.js';
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 	}
 
-	.popover-mobile-backdrop {
+	.popover-backdrop {
 		display: block;
 		position: fixed;
 		inset: 0;
 		z-index: 65;
+		background: rgba(0, 0, 0, 0.4);
 	}
 
 	/* ── shared form styles (scoped) ── */
