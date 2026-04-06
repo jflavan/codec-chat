@@ -27,9 +27,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			'https://*.wp.com',
 			'https://cdn.discordapp.com',
 			'https://avatars.githubusercontent.com',
+			'https://*.giphy.com',
 			apiBase
 		].join(' '),
-		'connect-src': `'self' ${apiBase} ${wsBase} https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com`,
+		'connect-src': `'self' ${apiBase} ${wsBase} https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com https://api.giphy.com`,
 		'frame-src': 'https://accounts.google.com https://www.google.com https://www.youtube-nocookie.com https://github.com https://discord.com'
 	};
 
