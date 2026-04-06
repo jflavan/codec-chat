@@ -188,7 +188,7 @@ import { ReportType } from '$lib/types/index.js';
 					</svg>
 				</button>
 				{#if ui.showCreateServer}
-					<div class="popover-mobile-backdrop" aria-hidden="true"></div>
+					<div class="popover-mobile-backdrop" role="presentation" onclick={() => { ui.showCreateServer = false; ui.newServerName = ''; }}></div>
 					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); servers.createServer(); }}>
 							<input
@@ -226,7 +226,7 @@ import { ReportType } from '$lib/types/index.js';
 					</svg>
 				</button>
 				{#if showJoinByCode}
-					<div class="popover-mobile-backdrop" aria-hidden="true"></div>
+					<div class="popover-mobile-backdrop" role="presentation" onclick={() => { showJoinByCode = false; inviteCode = ''; }}></div>
 					<div class="server-create-popover">
 						<form class="inline-form" onsubmit={(e) => { e.preventDefault(); handleJoinByCode(); }}>
 							<input
