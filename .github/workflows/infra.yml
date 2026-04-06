@@ -169,7 +169,8 @@ jobs:
               recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
               recaptchaProjectId='${{ secrets.RECAPTCHA_PROJECT_ID }}' \
               vapidPublicKey='${{ secrets.VAPID_PUBLIC_KEY }}' \
-              vapidPrivateKey='${{ secrets.VAPID_PRIVATE_KEY }}'
+              vapidPrivateKey='${{ secrets.VAPID_PRIVATE_KEY }}' \
+              giphyApiKey='${{ secrets.GIPHY_API_KEY }}'
 
       - name: Deploy infrastructure (register hostnames and create certificates)
         if: steps.certs.outputs.certs-exist != 'true'
@@ -205,7 +206,8 @@ jobs:
               recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
               recaptchaProjectId='${{ secrets.RECAPTCHA_PROJECT_ID }}' \
               vapidPublicKey='${{ secrets.VAPID_PUBLIC_KEY }}' \
-              vapidPrivateKey='${{ secrets.VAPID_PRIVATE_KEY }}'
+              vapidPrivateKey='${{ secrets.VAPID_PRIVATE_KEY }}' \
+              giphyApiKey='${{ secrets.GIPHY_API_KEY }}'
 
       - name: Deploy infrastructure (bind certificates to custom domains)
         run: |
@@ -240,7 +242,8 @@ jobs:
               recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
               recaptchaProjectId='${{ secrets.RECAPTCHA_PROJECT_ID }}' \
               vapidPublicKey='${{ secrets.VAPID_PUBLIC_KEY }}' \
-              vapidPrivateKey='${{ secrets.VAPID_PRIVATE_KEY }}'
+              vapidPrivateKey='${{ secrets.VAPID_PRIVATE_KEY }}' \
+              giphyApiKey='${{ secrets.GIPHY_API_KEY }}'
 
       - name: Show deployment outputs
         run: |
