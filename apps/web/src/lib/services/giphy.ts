@@ -14,10 +14,13 @@ export interface GiphyGif {
 	originalUrl: string;
 }
 
+let warnedMissingKey = false;
+
 function getApiKey(): string {
 	const key = env.PUBLIC_GIPHY_API_KEY ?? '';
-	if (!key) {
+	if (!key && !warnedMissingKey) {
 		console.warn('PUBLIC_GIPHY_API_KEY is not set — GIF search will not work.');
+		warnedMissingKey = true;
 	}
 	return key;
 }
@@ -46,7 +49,10 @@ export async function getTrendingGifs(limit = 25, offset = 0): Promise<GiphyGif[
 	});
 
 	const res = await fetch(`${GIPHY_API_BASE}/trending?${params}`);
-	if (!res.ok) return [];
+	if (!res.ok) {
+		console.error(`GIPHY trending request failed: ${res.status}`);
+		return [];
+	}
 
 	const json: GiphyApiResponse = await res.json();
 	return mapGifs(json.data);
@@ -69,7 +75,10 @@ export async function searchGifs(query: string, limit = 25, offset = 0): Promise
 	});
 
 	const res = await fetch(`${GIPHY_API_BASE}/search?${params}`);
-	if (!res.ok) return [];
+	if (!res.ok) {
+		console.error(`GIPHY search request failed: ${res.status}`);
+		return [];
+	}
 
 	const json: GiphyApiResponse = await res.json();
 	return mapGifs(json.data);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import { searchGifs, getTrendingGifs, type GiphyGif } from '$lib/services/giphy.js';
 
 	let {
@@ -43,14 +44,12 @@
 		onClose();
 	}
 
-	$effect(() => {
+	onMount(() => {
 		loadTrending();
-		return () => clearTimeout(debounceTimer);
-	});
-
-	$effect(() => {
 		searchInput?.focus();
 	});
+
+	onDestroy(() => clearTimeout(debounceTimer));
 </script>
 
 <div class="gif-picker">
@@ -91,9 +90,10 @@
 			</div>
 		{/if}
 
-		<div class="giphy-attribution">
-			<span class="giphy-text">Powered by GIPHY</span>
-		</div>
+		<a class="giphy-attribution" href="https://giphy.com" target="_blank" rel="noopener noreferrer">
+			<span class="giphy-powered-by">Powered by</span>
+			<span class="giphy-logo">GIPHY</span>
+		</a>
 	</div>
 </div>
 
@@ -183,12 +183,29 @@
 		align-items: center;
 		justify-content: center;
 		padding: 8px;
-		gap: 6px;
+		gap: 5px;
+		text-decoration: none;
 	}
 
-	.giphy-text {
+	.giphy-attribution:hover .giphy-logo {
+		opacity: 0.8;
+	}
+
+	.giphy-powered-by {
 		font-size: 11px;
 		color: var(--text-muted);
 		letter-spacing: 0.02em;
+	}
+
+	.giphy-logo {
+		font-size: 13px;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		background: linear-gradient(90deg, #00ccff, #9933ff, #ff6666);
+		background-clip: text;
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		transition: opacity 0.12s;
 	}
 </style>
