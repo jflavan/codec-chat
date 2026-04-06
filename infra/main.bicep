@@ -102,6 +102,9 @@ param vapidPublicKey string = ''
 @secure()
 param vapidPrivateKey string = ''
 
+@description('GIPHY API key for GIF search integration in the web client.')
+param giphyApiKey string = ''
+
 @description('Email address for Azure Monitor alert notifications. Leave empty to skip email alerts.')
 param alertEmailAddress string = ''
 
@@ -277,6 +280,17 @@ module recaptchaSecretKv 'modules/key-vault-secret.bicep' = {
   }
 }
 
+// ── GIPHY API key for GIF search ──────────────────────────────────────────────
+
+module giphyApiKeyKv 'modules/key-vault-secret.bicep' = if (giphyApiKey != '') {
+  name: 'giphy-api-key-secret'
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secretName: 'Giphy--ApiKey'
+    secretValue: giphyApiKey
+  }
+}
+
 // ── Azure Communication Services (transactional email) ────────────────────────
 
 module communicationServices 'modules/communication-services.bicep' = if (emailEnabled) {
@@ -436,6 +450,7 @@ module webApp 'modules/container-app-web.bicep' = {
     publicApiBaseUrl: effectiveApiUrl
     publicGoogleClientId: googleClientId
     publicRecaptchaSiteKey: recaptchaSiteKey
+    publicGiphyApiKey: giphyApiKey
     customDomainName: webCustomDomain
     managedCertificateId: webCertId
   }

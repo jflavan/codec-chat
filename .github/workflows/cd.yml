@@ -99,6 +99,7 @@ jobs:
             --build-arg PUBLIC_API_BASE_URL=${{ secrets.PUBLIC_API_BASE_URL }} \
             --build-arg PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.PUBLIC_GOOGLE_CLIENT_ID }} \
             --build-arg PUBLIC_RECAPTCHA_SITE_KEY=${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }} \
+            --build-arg PUBLIC_GIPHY_API_KEY=${{ secrets.GIPHY_API_KEY }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-web:latest \
             ./apps/web

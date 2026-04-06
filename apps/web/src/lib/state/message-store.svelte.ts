@@ -252,6 +252,44 @@ export class MessageStore {
 		this.hub.emitTyping(this.channels.selectedChannelId, this.auth.effectiveDisplayName);
 	}
 
+	/* ═══════════════════ GIF Messages ═══════════════════ */
+
+	/** Send a GIF as a message using the GIPHY URL as the image attachment. */
+	async sendGifMessage(gifUrl: string): Promise<void> {
+		if (!this.auth.idToken || !this.channels.selectedChannelId) return;
+
+		const replyToMessageId =
+			this.replyingTo?.context === 'channel' ? this.replyingTo.messageId : null;
+
+		this.isSending = true;
+		try {
+			await this.api.sendMessage(
+				this.auth.idToken,
+				this.channels.selectedChannelId,
+				'',
+				gifUrl,
+				replyToMessageId,
+				null
+			);
+			this.replyingTo = null;
+
+			if (this.auth.me) {
+				this.hub.clearTyping(
+					this.channels.selectedChannelId,
+					this.auth.effectiveDisplayName
+				);
+			}
+
+			if (!this.hub.isConnected) {
+				await this.loadMessages(this.channels.selectedChannelId);
+			}
+		} catch (e) {
+			this.ui.setError(e);
+		} finally {
+			this.isSending = false;
+		}
+	}
+
 	/* ═══════════════════ Image Attachments ═══════════════════ */
 
 	attachImage(file: File): void {
