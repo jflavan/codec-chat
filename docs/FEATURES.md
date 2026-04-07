@@ -58,6 +58,7 @@ This document tracks implemented and planned features for Codec.
 - Message pinning — Owner/Admin can pin up to 50 messages per channel; pin indicator on messages; slide-in pinned messages panel; system notification messages on pin; real-time sync via SignalR; audit logged
 - Progressive loading — cursor-based pagination with scroll position preservation
 - Message search — full-text search with PostgreSQL trigram indexes; filters by scope, date range, and content type; jump-to-message with highlight animation
+- GIF picker — GIPHY-powered GIF picker accessible via the emoji button in the composer; tabbed Emoji / GIFs picker with shared backdrop; browse trending GIFs or search by keyword; selected GIF is sent as an image message; 2-column grid with lazy-loaded previews; branded GIPHY attribution link; requires `PUBLIC_GIPHY_API_KEY`
 
 ### Friends & Direct Messages
 - Friend requests (send, accept, decline, cancel) with real-time SignalR notifications

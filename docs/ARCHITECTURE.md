@@ -50,6 +50,7 @@ src/
 │   │   └── oauth.ts        # GitHub/Discord OAuth redirect helpers
 │   ├── services/
 │   │   ├── chat-hub.ts     # SignalR hub connection lifecycle (ChatHubService)
+│   │   ├── giphy.ts        # GIPHY REST API client — getTrendingGifs() and searchGifs(); maps API response to GiphyGif shape
 │   │   └── push-notifications.ts  # Web Push subscription management
 │   ├── state/
 │   │   ├── ui-store.svelte.ts       # UIStore: modals, theme, errors, navigation flags, presence
@@ -81,8 +82,9 @@ src/
 │   │   │   └── UserPanel.svelte          # User avatar/name/role & sign-out
 │   │   ├── chat/
 │   │   │   ├── ChatArea.svelte           # Chat shell (header, feed, composer)
-│   │   │   ├── Composer.svelte           # Message input with send button
+│   │   │   ├── Composer.svelte           # Message input with send button; hosts tabbed Emoji / GIFs picker
 │   │   │   ├── EmojiPicker.svelte        # Full emoji picker (search, categories, custom emojis, frequent)
+│   │   │   ├── GifPicker.svelte          # GIPHY GIF picker (trending & search, 2-column grid, GIPHY attribution)
 │   │   │   ├── ImagePreview.svelte       # Full-screen image lightbox overlay
 │   │   │   ├── LinkPreviewCard.svelte    # Open Graph link preview embed card
 │   │   │   ├── LinkifiedText.svelte      # Auto-linked URLs in message body (+ custom emoji rendering)
@@ -197,7 +199,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 | `types/` | Shared TypeScript interfaces for domain models |
 | `api/` | HTTP communication with the REST API; typed methods, `encodeURIComponent` on path params |
 | `auth/` | Token lifecycle (persist, load, expire, clear) and Google SDK setup |
-| `services/` | External service integrations (SignalR hub connection management) |
+| `services/` | External service integrations (SignalR hub connection management, GIPHY REST API client) |
 | `state/` | Domain-specific reactive stores; each store owns its slice of state, API calls, and SignalR handlers |
 | `data/` | Static datasets (emoji categories, keywords) |
 | `styles/` | Design tokens as CSS custom properties (`[data-theme]` palettes for theming); global base styles |
