@@ -45,7 +45,10 @@ Edit `.env`:
 ```env
 PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID_HERE
+PUBLIC_GIPHY_API_KEY=YOUR_GIPHY_API_KEY_HERE
 ```
+
+> **Optional:** `PUBLIC_GIPHY_API_KEY` enables the GIF picker in the message composer. Obtain a free key at [developers.giphy.com](https://developers.giphy.com/). Leave it empty to disable GIF picking.
 
 ### 3. Run
 
@@ -125,7 +128,10 @@ Edit `.env`:
 ```env
 PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID_HERE
+PUBLIC_GIPHY_API_KEY=YOUR_GIPHY_API_KEY_HERE
 ```
+
+> **Optional:** `PUBLIC_GIPHY_API_KEY` enables the GIF picker in the message composer. Obtain a free key at [developers.giphy.com](https://developers.giphy.com/). Leave it empty to disable GIF picking.
 
 ```bash
 npm install
@@ -186,6 +192,7 @@ dotnet ef migrations script
 9. Test additional features:
    - **Emoji reactions:** hover over a message to see the reaction action bar, click an emoji
    - **Image uploads:** use the `+` button, paste from clipboard, or drag-and-drop an image into the composer
+   - **GIF picker:** click the emoji button in the composer, switch to the **GIFs** tab, browse trending GIFs or search by keyword, and click a GIF to send it (requires `PUBLIC_GIPHY_API_KEY`)
    - **@mentions:** type `@` in the composer to see the member autocomplete picker
    - **Message replies:** hover over a message and click the reply button
    - **Text formatting:** use `*bold*` or `_italic_` in a message

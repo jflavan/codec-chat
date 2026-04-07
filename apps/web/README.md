@@ -52,7 +52,10 @@ cp .env.example .env
 ```env
 PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=YOUR_DEV_CLIENT_ID
+PUBLIC_GIPHY_API_KEY=YOUR_GIPHY_API_KEY_HERE
 ```
+
+> **Optional:** `PUBLIC_GIPHY_API_KEY` enables the GIF picker in the message composer. Obtain a free key at [developers.giphy.com](https://developers.giphy.com/). Leave it empty to disable the feature.
 
 2. Install dependencies and start the dev server:
 
