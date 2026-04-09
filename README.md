@@ -2,7 +2,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjflavan%2Fcodec-chat.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjflavan%2Fcodec-chat?ref=badge_shield)
 
-Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core Web API. Users authenticate via Google Sign-In; the web client obtains an ID token and the API validates it on each request.
+Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core Web API. It supports multiple authentication methods (Google Sign-In, email/password, GitHub OAuth, Discord OAuth, and SAML 2.0 SSO), all backed by API-issued JWTs with rotating refresh tokens.
 
 > ⚠️ **Alpha status:** Codec is in active alpha development. APIs, data models, and UI may change without notice. Not recommended for production use. Found a bug? [Report it here](https://github.com/jflavan/codec-chat/issues/new?template=bug-report.yml).
 
@@ -10,6 +10,7 @@ Codec is a Discord-like chat application built with SvelteKit and ASP.NET Core W
 ```
 codec/
 ├── apps/
+│   ├── admin/                         # SvelteKit admin panel (platform management)
 │   ├── api/
 │   │   ├── Codec.Api/                 # ASP.NET Core 10 Web API
 │   │   ├── Codec.Api.Tests/           # xUnit unit tests (services, controllers)
@@ -32,6 +33,7 @@ codec/
 - **.NET SDK** 10.x — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **Docker** — for containers (PostgreSQL, Redis, Azurite)
 - **Google Cloud Console** project with an OAuth 2.0 Client ID ([setup](https://console.cloud.google.com/apis/credentials) — add `http://localhost:5174` as an authorized JavaScript origin)
+- **GIPHY API Key** *(optional)* — for the GIF picker ([get one](https://developers.giphy.com/dashboard/))
 
 ### Start with Aspire (recommended)
 
@@ -74,26 +76,31 @@ For full setup details, see [Development Setup](docs/DEV_SETUP.md).
 
 ## Features
 
-- **Servers & channels** — create servers, invite members, custom roles with granular permissions, organize conversations into channels with categories
+- **Servers & channels** — create servers, invite members, custom roles with granular permissions and channel overrides, organize conversations into channels with categories
 - **Real-time messaging** — instant delivery via SignalR WebSockets with typing indicators, @mentions, message replies, editing, deletion, text formatting, and message search
 - **Direct messages** — 1:1 private conversations with unread badges
 - **Voice & video** — voice channels in servers (mediasoup SFU), 1:1 DM calls with ringing/accept/decline flow, video chat, and screen sharing
-- **Rich media** — image uploads, file attachments, emoji reactions, custom server emojis, link previews with Open Graph metadata, inline YouTube embeds, image proxying
+- **Rich media** — image uploads, file attachments, emoji reactions, custom server emojis, GIPHY GIF picker, link previews with Open Graph metadata, inline YouTube embeds, image proxying
 - **User profiles** — nicknames, custom status messages, custom avatars with server-specific overrides, friends system with real-time notifications
-- **Moderation** — user banning with message purge, custom roles with 21 granular permissions, audit log with 90-day retention
+- **Moderation** — user banning with message purge, content reporting, custom roles with 21 granular permissions, audit log with 90-day retention
+- **Admin panel** — standalone admin site for platform-wide management: live dashboard, user/server management, moderation queue, system announcements, audit log
 - **Integrations** — outgoing webhooks with HMAC-SHA256 signing, web push notifications
 - **PWA** — installable on desktop and mobile with offline fallback, app shortcuts, and share target
-- **Authentication** — Google Sign-In, email/password, GitHub OAuth, Discord OAuth, and SAML 2.0 SSO
+- **Authentication** — Google Sign-In, email/password, GitHub OAuth, Discord OAuth, and SAML 2.0 SSO — all backed by API-issued JWTs with rotating refresh tokens
+- **Account management** — account deletion with data anonymization, account linking across providers, email verification
 
 For a full feature list, see [Features](docs/FEATURES.md). For API endpoints and system design, see [Architecture](docs/ARCHITECTURE.md).
 
 ## Testing
 
-Codec has 1,542 automated tests across three test suites — see [Testing](docs/TESTING.md) for the full strategy.
+Codec has 1,746 automated tests across four test suites — see [Testing](docs/TESTING.md) for the full strategy.
 
 ```bash
 # Web tests (Vitest)
 cd apps/web && npm test
+
+# Admin tests (Vitest)
+cd apps/admin && npm test
 
 # API unit + integration tests (requires Docker for integration tests)
 dotnet test Codec.sln
@@ -101,9 +108,10 @@ dotnet test Codec.sln
 
 | Suite | Tests | Coverage |
 |-------|-------|----------|
-| Web (Vitest) | 177 | 98% line (unit-testable code) |
-| API Unit (xUnit) | 1,188 | 95% line (core services) |
-| API Integration (Testcontainers) | 177 | 80% line (full pipeline) |
+| API Unit (xUnit) | 1,308 | 95% line (core services) |
+| API Integration (Testcontainers) | 182 | 80% line (full pipeline) |
+| Web (Vitest) | 181 | 85% statement (utilities + API client) |
+| Admin (Vitest) | 75 | 98% statement (API client + services) |
 
 ## Self-Hosting
 
@@ -129,9 +137,11 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - [Deployment (Azure)](docs/DEPLOYMENT.md) - Azure Container Apps deployment, rollback, and operations
 - [Infrastructure](docs/INFRA.md) - Azure Bicep modules, resource configuration, and zero-downtime deploys
 - [Development Setup](docs/DEV_SETUP.md) - Detailed development environment setup
-- [Authentication](docs/AUTH.md) - How Google ID token validation works
+- [Authentication](docs/AUTH.md) - Multi-provider auth: Google, email/password, GitHub, Discord, SAML 2.0
 - [Architecture](docs/ARCHITECTURE.md) - System design and API endpoints
 - [Features](docs/FEATURES.md) - Current and planned features
+- [Admin Panel](docs/ADMIN.md) - Global admin panel for platform management
+- [Roles & Permissions](docs/ROLES.md) - Custom roles, granular permissions, and channel overrides
 - [Design](docs/DESIGN.md) - UI/UX design specification and theme
 - [Friends](docs/FRIENDS.md) - Friends feature specification
 - [Direct Messages](docs/DIRECT_MESSAGES.md) - Direct messages feature specification
@@ -150,16 +160,17 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - [Security Policy](SECURITY.md) - How to report vulnerabilities responsibly
 
 ## Technology Stack
-- **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular layered architecture with context-based state management; installable PWA via `@vite-pwa/sveltekit` with offline fallback, runtime font caching, and OS integration (shortcuts, share target)
+- **Frontend:** SvelteKit 2.x, Svelte 5 runes, TypeScript, Vite — modular domain-store architecture (auth, servers, channels, messages, DMs, friends, voice, UI) with context-based state management; installable PWA via `@vite-pwa/sveltekit` with offline fallback, runtime font caching, and OS integration (shortcuts, share target)
+- **Admin:** Standalone SvelteKit app with Chart.js dashboards and SignalR real-time stats
 - **Backend:** ASP.NET Core 10, Controller-based APIs
 - **Caching:** Redis 8 distributed cache (message history) + SignalR backplane (multi-instance scale-out)
 - **Real-time:** SignalR (WebSockets) for messaging and signaling; mediasoup-client + WebRTC for voice audio
 - **Voice SFU:** Node.js + mediasoup v3 on a dedicated Azure VM (UDP media plane requires native sockets)
 - **Database:** PostgreSQL with Entity Framework Core 10 (Npgsql)
-- **Authentication:** Google Identity Services (ID tokens)
+- **Authentication:** API-issued JWTs with rotating refresh tokens; Google Sign-In, email/password (bcrypt), GitHub OAuth, Discord OAuth, SAML 2.0 SSO
 - **Observability:** OpenTelemetry (traces, metrics, logs) via `Codec.ServiceDefaults`; Azure Monitor / Application Insights in production; OTLP export to local Aspire dashboard in dev
-- **Local Dev:** .NET Aspire AppHost for single-command orchestration (Postgres, Redis, Azurite, API, Web) with developer dashboard
-- **Testing:** xUnit + FluentAssertions + Moq (API unit), Testcontainers + WebApplicationFactory (API integration), Vitest + jsdom (web)
+- **Local Dev:** .NET Aspire AppHost for single-command orchestration (Postgres, Redis, Azurite, API, Web, Admin) with developer dashboard
+- **Testing:** xUnit + FluentAssertions + Moq (API unit), Testcontainers + WebApplicationFactory (API integration), Vitest + jsdom (web and admin)
 - **Infrastructure:** Azure Container Apps + dedicated VM (voice SFU), Bicep IaC, GitHub Actions CI/CD
 
 ## License & Quality Checks
