@@ -324,7 +324,7 @@
 	}
 
 	@media (max-width: 768px) {
-		.emoji-picker-container {
+		.emoji-picker-container:not(.embedded) {
 			position: fixed;
 			bottom: 0;
 			left: 0;

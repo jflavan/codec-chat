@@ -104,10 +104,6 @@
 		});
 	}
 
-	function handleQuickEmoji(emoji: string) {
-		handleEmojiInsert(emoji);
-	}
-
 	function handleGifSelect(gifUrl: string) {
 		showPicker = false;
 		pickerTab = 'emoji';
@@ -291,7 +287,7 @@
 				<button
 					type="button"
 					class="quick-emoji-btn"
-					onmousedown={(e) => { e.preventDefault(); handleQuickEmoji(emoji); }}
+					onmousedown={(e) => { e.preventDefault(); handleEmojiInsert(emoji); }}
 				>{emoji}</button>
 			{/each}
 			<button
