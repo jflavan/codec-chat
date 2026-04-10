@@ -111,8 +111,12 @@
 		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
 
+	/** Skip auto-focus on touch devices to avoid summoning the virtual keyboard
+	 *  when the user just wants to browse/tap emojis. */
+	const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
 	$effect(() => {
-		searchInput?.focus();
+		if (!isTouchDevice) searchInput?.focus();
 	});
 </script>
 
@@ -336,6 +340,20 @@
 
 		.picker-backdrop {
 			background: rgba(0, 0, 0, 0.5);
+		}
+
+		.picker-search input {
+			font-size: 16px;
+			padding: 10px 12px;
+			min-height: 44px;
+			box-sizing: border-box;
+		}
+
+		.category-tab {
+			min-width: 44px;
+			min-height: 44px;
+			display: grid;
+			place-items: center;
 		}
 	}
 

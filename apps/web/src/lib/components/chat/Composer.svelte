@@ -8,7 +8,7 @@
 	import ComposerOverlay from './ComposerOverlay.svelte';
 	import EmojiPicker from './EmojiPicker.svelte';
 	import GifPicker from './GifPicker.svelte';
-	import { recordEmojiUse } from '$lib/utils/emoji-frequency.js';
+	import { recordEmojiUse, getFrequentEmojis } from '$lib/utils/emoji-frequency.js';
 
 	const ui = getUIStore();
 	const servers = getServerStore();
@@ -22,6 +22,11 @@
 	const MAX_LINES = 5;
 	let showPicker = $state(false);
 	let pickerTab = $state<'emoji' | 'gif'>('emoji');
+	let inputFocused = $state(false);
+
+	/** Show quick emoji bar only on coarse-pointer (touch) devices. */
+	const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+	let quickEmojis = $state(getFrequentEmojis(8));
 
 	/* ───── Mention autocomplete state ───── */
 	let showMentionPicker = $state(false);
@@ -84,6 +89,7 @@
 
 	function handleEmojiInsert(emoji: string) {
 		recordEmojiUse(emoji);
+		quickEmojis = getFrequentEmojis(8);
 		if (!inputEl) return;
 		const start = inputEl.selectionStart ?? msgStore.messageBody.length;
 		const end = inputEl.selectionEnd ?? start;
@@ -96,6 +102,10 @@
 			inputEl.focus();
 			inputEl.setSelectionRange(newPos, newPos);
 		});
+	}
+
+	function handleQuickEmoji(emoji: string) {
+		handleEmojiInsert(emoji);
 	}
 
 	function handleGifSelect(gifUrl: string) {
@@ -275,6 +285,29 @@
 		<ReplyComposerBar authorName={msgStore.replyingTo.authorName} bodyPreview={msgStore.replyingTo.bodyPreview} onCancel={() => msgStore.cancelReply()} />
 	{/if}
 
+	{#if isTouchDevice && inputFocused && !showPicker && channelStore.selectedChannelId}
+		<div class="quick-emoji-bar" role="toolbar" aria-label="Quick emoji">
+			{#each quickEmojis as emoji (emoji)}
+				<button
+					type="button"
+					class="quick-emoji-btn"
+					onmousedown={(e) => { e.preventDefault(); handleQuickEmoji(emoji); }}
+				>{emoji}</button>
+			{/each}
+			<button
+				type="button"
+				class="quick-emoji-btn quick-emoji-more"
+				onmousedown={(e) => { e.preventDefault(); showPicker = true; pickerTab = 'emoji'; }}
+				aria-label="Open emoji picker"
+				title="More emojis"
+			>
+				<svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+					<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"/>
+				</svg>
+			</button>
+		</div>
+	{/if}
+
 	{#if !ui.isHubConnected}
 		<div class="composer-row">
 			<div class="composer-input-wrapper composer-disconnected">
@@ -310,6 +343,8 @@
 					onkeydown={handleKeydown}
 					onscroll={syncOverlayScroll}
 					onpaste={handlePaste}
+					onfocus={() => { inputFocused = true; }}
+					onblur={() => { inputFocused = false; }}
 				></textarea>
 			</div>
 			<button
@@ -767,6 +802,54 @@
 		font-size: 14px;
 	}
 
+	/* ───── Quick emoji bar (mobile) ───── */
+
+	.quick-emoji-bar {
+		display: none;
+	}
+
+	@media (max-width: 768px) {
+		.quick-emoji-bar {
+			display: flex;
+			align-items: center;
+			gap: 2px;
+			padding: 6px 8px;
+			overflow-x: auto;
+			-webkit-overflow-scrolling: touch;
+			scrollbar-width: none;
+		}
+
+		.quick-emoji-bar::-webkit-scrollbar {
+			display: none;
+		}
+
+		.quick-emoji-btn {
+			flex-shrink: 0;
+			display: grid;
+			place-items: center;
+			width: 40px;
+			height: 36px;
+			background: var(--bg-tertiary);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			cursor: pointer;
+			font-size: 20px;
+			line-height: 1;
+			padding: 0;
+			transition: background 0.12s, transform 0.1s;
+		}
+
+		.quick-emoji-btn:active {
+			transform: scale(0.92);
+			background: var(--bg-message-hover);
+		}
+
+		.quick-emoji-more {
+			color: var(--text-muted);
+			font-size: 16px;
+		}
+	}
+
 	/* ───── Mobile adjustments ───── */
 
 	@media (max-width: 768px) {
@@ -799,5 +882,33 @@
 			padding: 10px 8px;
 			min-height: 44px;
 		}
+
+		.picker-container {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			top: unset;
+			width: 100%;
+			max-height: 55vh;
+			border-radius: 12px 12px 0 0;
+			padding-bottom: env(safe-area-inset-bottom);
+			animation: slide-up 200ms ease;
+		}
+
+		.picker-backdrop {
+			background: rgba(0, 0, 0, 0.5);
+		}
+
+		.picker-tab {
+			padding: 12px 16px;
+			font-size: 0.95rem;
+			min-height: 44px;
+		}
+	}
+
+	@keyframes slide-up {
+		from { transform: translateY(100%); }
+		to { transform: translateY(0); }
 	}
 </style>
