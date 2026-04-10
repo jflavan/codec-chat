@@ -209,6 +209,39 @@ export class DmStore {
 		}
 	}
 
+	/** Send a GIF as a DM using the GIPHY URL as the image attachment. */
+	async sendDmGifMessage(gifUrl: string): Promise<void> {
+		if (!this.auth.idToken || !this.activeDmChannelId) return;
+
+		const replyToDirectMessageId =
+			this.replyingTo?.context === 'dm' ? this.replyingTo.messageId : null;
+
+		this.isSendingDm = true;
+		try {
+			await this.api.sendDm(
+				this.auth.idToken,
+				this.activeDmChannelId,
+				'',
+				gifUrl,
+				replyToDirectMessageId,
+				null
+			);
+			this.replyingTo = null;
+
+			if (this.auth.me) {
+				this.hub.clearDmTyping(this.activeDmChannelId, this.auth.effectiveDisplayName);
+			}
+
+			if (!this.hub.isConnected) {
+				await this.loadDmMessages(this.activeDmChannelId);
+			}
+		} catch (e) {
+			this.ui.setError(e);
+		} finally {
+			this.isSendingDm = false;
+		}
+	}
+
 	/** Open or create a DM conversation with a friend. */
 	async openDmWithUser(userId: string): Promise<void> {
 		if (!this.auth.idToken) return;
