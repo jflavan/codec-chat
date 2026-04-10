@@ -1,3 +1,7 @@
+/** Whether the primary pointer is coarse (touch device). Evaluated once at module load. */
+export const isTouchDevice =
+	typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
 /** Find the nearest ancestor with overflow-y: auto or scroll (the clipping boundary). */
 export function findScrollParent(el: HTMLElement): HTMLElement | null {
 	let parent = el.parentElement;

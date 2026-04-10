@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { searchGifs, getTrendingGifs, type GiphyGif } from '$lib/services/giphy.js';
+	import { isTouchDevice } from '$lib/utils/dom.js';
 
 	let {
 		onSelect,
@@ -46,7 +47,7 @@
 
 	onMount(() => {
 		loadTrending();
-		searchInput?.focus();
+		if (!isTouchDevice) searchInput?.focus();
 	});
 
 	onDestroy(() => clearTimeout(debounceTimer));
@@ -207,5 +208,18 @@
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 		transition: opacity 0.12s;
+	}
+
+	@media (max-width: 768px) {
+		.gif-search input {
+			font-size: 16px;
+			padding: 10px 12px;
+			min-height: 44px;
+			box-sizing: border-box;
+		}
+
+		.gif-item {
+			min-height: 44px;
+		}
 	}
 </style>

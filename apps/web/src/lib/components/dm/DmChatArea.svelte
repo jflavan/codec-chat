@@ -17,9 +17,13 @@
 	import MessageActionBar from '$lib/components/chat/MessageActionBar.svelte';
 	import ReactionBar from '$lib/components/chat/ReactionBar.svelte';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
+	import EmojiPicker from '$lib/components/chat/EmojiPicker.svelte';
+	import GifPicker from '$lib/components/chat/GifPicker.svelte';
 	import DmCallHeader from '$lib/components/voice/DmCallHeader.svelte';
 	import VideoGrid from '$lib/components/voice/VideoGrid.svelte';
 	import SearchPanel from '$lib/components/search/SearchPanel.svelte';
+	import { recordEmojiUse, getFrequentEmojis } from '$lib/utils/emoji-frequency.js';
+	import { isTouchDevice } from '$lib/utils/dom.js';
 
 	const auth = getAuthStore();
 	const ui = getUIStore();
@@ -263,6 +267,33 @@
 		if (dmOverlayEl && dmInputEl) {
 			dmOverlayEl.scrollLeft = dmInputEl.scrollLeft;
 		}
+	}
+
+	/* ───── Emoji / GIF picker ───── */
+	let showDmPicker = $state(false);
+	let dmPickerTab = $state<'emoji' | 'gif'>('emoji');
+	let dmQuickEmojis = $state(getFrequentEmojis(8));
+
+	function handleDmEmojiInsert(emoji: string) {
+		recordEmojiUse(emoji);
+		dmQuickEmojis = getFrequentEmojis(8);
+		if (!dmInputEl) return;
+		const start = dmInputEl.selectionStart ?? dms.dmMessageBody.length;
+		const end = dmInputEl.selectionEnd ?? start;
+		const before = dms.dmMessageBody.slice(0, start);
+		const after = dms.dmMessageBody.slice(end);
+		dms.dmMessageBody = before + emoji + after;
+		const newPos = start + emoji.length;
+		requestAnimationFrame(() => {
+			dmInputEl.focus();
+			dmInputEl.setSelectionRange(newPos, newPos);
+		});
+	}
+
+	function handleDmGifSelect(gifUrl: string) {
+		showDmPicker = false;
+		dmPickerTab = 'emoji';
+		dms.sendDmGifMessage(gifUrl);
 	}
 
 	/* ───── Drag-and-drop image ───── */
@@ -625,6 +656,32 @@
 				</button>
 			</div>
 		{/if}
+		{#if isTouchDevice && ui.isHubConnected && !showDmPicker && !dms.replyingTo && dms.activeDmChannelId}
+			<div class="quick-emoji-bar" role="toolbar" aria-label="Quick emoji">
+				{#each dmQuickEmojis as emoji (emoji)}
+					{@const customMatch = emoji.startsWith(':') && emoji.endsWith(':')
+						? servers.customEmojis.find((c) => `:${c.name}:` === emoji)
+						: undefined}
+					<button
+						type="button"
+						class="quick-emoji-btn"
+						onclick={() => handleDmEmojiInsert(emoji)}
+					>{#if customMatch}<img src={customMatch.imageUrl} alt={customMatch.name} width="22" height="22" class="quick-emoji-img" />{:else}{emoji}{/if}</button>
+				{/each}
+				<button
+					type="button"
+					class="quick-emoji-btn quick-emoji-more"
+					onclick={() => { showDmPicker = true; dmPickerTab = 'emoji'; }}
+					aria-label="Open emoji picker"
+					title="More emojis"
+				>
+					<svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+						<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"/>
+					</svg>
+				</button>
+			</div>
+		{/if}
+
 		{#if !ui.isHubConnected}
 			<div class="composer-row">
 				<div class="composer-input-wrapper composer-disconnected">
@@ -662,6 +719,18 @@
 				/>
 			</div>
 			<button
+				class="composer-emoji"
+				type="button"
+				onclick={() => { showDmPicker = !showDmPicker; if (showDmPicker) dmPickerTab = 'emoji'; }}
+				disabled={!dms.activeDmChannelId || dms.isSendingDm}
+				aria-label="Add emoji or GIF"
+				title="Add emoji or GIF"
+			>
+				<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+					<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"/>
+				</svg>
+			</button>
+			<button
 				class="composer-send"
 				type="submit"
 				disabled={!dms.activeDmChannelId || (!dms.dmMessageBody.trim() && !dms.pendingDmImage && !dms.pendingDmFile) || dms.isSendingDm}
@@ -672,6 +741,44 @@
 				</svg>
 			</button>
 			</div>
+			{#if showDmPicker}
+				<div class="composer-picker-wrapper">
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="picker-backdrop" onclick={() => { showDmPicker = false; }}></div>
+					<div class="picker-container" role="dialog" aria-label="Emoji and GIF picker">
+						<div class="picker-tab-bar">
+							<button
+								class="picker-tab"
+								class:active={dmPickerTab === 'emoji'}
+								type="button"
+								onclick={() => (dmPickerTab = 'emoji')}
+							>Emoji</button>
+							<button
+								class="picker-tab"
+								class:active={dmPickerTab === 'gif'}
+								type="button"
+								onclick={() => (dmPickerTab = 'gif')}
+							>GIFs</button>
+						</div>
+						<div class="picker-body">
+							{#if dmPickerTab === 'emoji'}
+								<EmojiPicker
+									mode="insert"
+									embedded={true}
+									onSelect={handleDmEmojiInsert}
+									onClose={() => { showDmPicker = false; }}
+									customEmojis={servers.customEmojis}
+								/>
+							{:else}
+								<GifPicker
+									onSelect={handleDmGifSelect}
+									onClose={() => { showDmPicker = false; }}
+								/>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{/if}
 		{/if}
 		</form>
 	</div>
@@ -1131,6 +1238,86 @@
 		cursor: not-allowed;
 	}
 
+	.composer-emoji {
+		background: var(--input-bg);
+		border: none;
+		box-sizing: border-box;
+		padding: 9px 6px;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		transition: color 150ms ease;
+	}
+
+	.composer-emoji:hover:not(:disabled) { color: var(--accent); }
+
+	.composer-emoji:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	.composer-picker-wrapper {
+		position: relative;
+	}
+
+	.picker-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 99;
+	}
+
+	.picker-container {
+		position: absolute;
+		z-index: 100;
+		bottom: calc(100% + 4px);
+		right: 0;
+		width: 352px;
+		max-height: 420px;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		overflow: hidden;
+	}
+
+	.picker-tab-bar {
+		display: flex;
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
+	}
+
+	.picker-tab {
+		flex: 1;
+		padding: 8px 12px;
+		background: none;
+		border: none;
+		border-bottom: 2px solid transparent;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: color 0.15s, border-color 0.15s;
+	}
+
+	.picker-tab:hover { color: var(--text-primary); }
+
+	.picker-tab.active {
+		color: var(--accent);
+		border-bottom-color: var(--accent);
+	}
+
+	.picker-body {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
 	/* ───── Disconnected state ───── */
 
 	.composer-disconnected {
@@ -1436,6 +1623,10 @@
 
 	/* ───── Mobile adjustments ───── */
 
+	.quick-emoji-bar {
+		display: none;
+	}
+
 	@media (max-width: 768px) {
 		.system-message.voice-call-event {
 			background: var(--bg-secondary);
@@ -1456,8 +1647,87 @@
 			min-height: 44px;
 		}
 
+		.composer-emoji {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
 		.dm-chat .composer {
 			padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0));
 		}
+
+		/* Quick emoji bar */
+		.quick-emoji-bar {
+			display: flex;
+			align-items: center;
+			gap: 2px;
+			padding: 6px 8px;
+			overflow-x: auto;
+			-webkit-overflow-scrolling: touch;
+			scrollbar-width: none;
+		}
+
+		.quick-emoji-bar::-webkit-scrollbar {
+			display: none;
+		}
+
+		.quick-emoji-btn {
+			flex-shrink: 0;
+			display: grid;
+			place-items: center;
+			width: 40px;
+			height: 36px;
+			background: var(--bg-tertiary);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			cursor: pointer;
+			font-size: 20px;
+			line-height: 1;
+			padding: 0;
+			transition: background 0.12s, transform 0.1s;
+		}
+
+		.quick-emoji-btn:active {
+			transform: scale(0.92);
+			background: var(--bg-message-hover);
+		}
+
+		.quick-emoji-more {
+			color: var(--text-muted);
+			font-size: 16px;
+		}
+
+		.quick-emoji-img {
+			object-fit: contain;
+		}
+
+		/* Bottom sheet picker */
+		.picker-container {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			top: unset;
+			width: 100%;
+			max-height: 60vh;
+			border-radius: 12px 12px 0 0;
+			padding-bottom: env(safe-area-inset-bottom);
+			animation: slide-up 200ms ease;
+		}
+
+		.picker-backdrop {
+			background: rgba(0, 0, 0, 0.5);
+		}
+
+		.picker-tab {
+			padding: 12px 16px;
+			font-size: 0.95rem;
+			min-height: 44px;
+		}
+	}
+
+	@keyframes slide-up {
+		from { transform: translateY(100%); }
+		to { transform: translateY(0); }
 	}
 </style>

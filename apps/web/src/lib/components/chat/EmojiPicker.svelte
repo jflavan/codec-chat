@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { emojiCategories } from '$lib/data/emojis';
 	import { getFrequentEmojis } from '$lib/utils/emoji-frequency';
+	import { isTouchDevice } from '$lib/utils/dom';
 	import type { CustomEmoji } from '$lib/types/models';
 
 	let {
@@ -112,7 +113,7 @@
 	}
 
 	$effect(() => {
-		searchInput?.focus();
+		if (!isTouchDevice) searchInput?.focus();
 	});
 </script>
 
@@ -320,7 +321,7 @@
 	}
 
 	@media (max-width: 768px) {
-		.emoji-picker-container {
+		.emoji-picker-container:not(.embedded) {
 			position: fixed;
 			bottom: 0;
 			left: 0;
@@ -336,6 +337,20 @@
 
 		.picker-backdrop {
 			background: rgba(0, 0, 0, 0.5);
+		}
+
+		.picker-search input {
+			font-size: 16px;
+			padding: 10px 12px;
+			min-height: 44px;
+			box-sizing: border-box;
+		}
+
+		.category-tab {
+			min-width: 44px;
+			min-height: 44px;
+			display: grid;
+			place-items: center;
 		}
 	}
 
