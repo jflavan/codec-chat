@@ -278,7 +278,7 @@
 		<ReplyComposerBar authorName={msgStore.replyingTo.authorName} bodyPreview={msgStore.replyingTo.bodyPreview} onCancel={() => msgStore.cancelReply()} />
 	{/if}
 
-	{#if isTouchDevice && !showPicker && !msgStore.replyingTo && channelStore.selectedChannelId}
+	{#if isTouchDevice && ui.isHubConnected && !showPicker && !msgStore.replyingTo && channelStore.selectedChannelId}
 		<div class="quick-emoji-bar" role="toolbar" aria-label="Quick emoji">
 			{#each quickEmojis as emoji (emoji)}
 				{@const customMatch = emoji.startsWith(':') && emoji.endsWith(':')
