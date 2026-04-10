@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { searchGifs, getTrendingGifs, type GiphyGif } from '$lib/services/giphy.js';
+	import { isTouchDevice } from '$lib/utils/dom.js';
 
 	let {
 		onSelect,
@@ -43,8 +44,6 @@
 		onSelect(gif.originalUrl);
 		onClose();
 	}
-
-	const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 	onMount(() => {
 		loadTrending();

@@ -9,6 +9,7 @@
 	import EmojiPicker from './EmojiPicker.svelte';
 	import GifPicker from './GifPicker.svelte';
 	import { recordEmojiUse, getFrequentEmojis } from '$lib/utils/emoji-frequency.js';
+	import { isTouchDevice } from '$lib/utils/dom.js';
 
 	const ui = getUIStore();
 	const servers = getServerStore();
@@ -22,10 +23,6 @@
 	const MAX_LINES = 5;
 	let showPicker = $state(false);
 	let pickerTab = $state<'emoji' | 'gif'>('emoji');
-	let inputFocused = $state(false);
-
-	/** Show quick emoji bar only on coarse-pointer (touch) devices. */
-	const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 	let quickEmojis = $state(getFrequentEmojis(8));
 
 	/* ───── Mention autocomplete state ───── */
@@ -281,19 +278,22 @@
 		<ReplyComposerBar authorName={msgStore.replyingTo.authorName} bodyPreview={msgStore.replyingTo.bodyPreview} onCancel={() => msgStore.cancelReply()} />
 	{/if}
 
-	{#if isTouchDevice && inputFocused && !showPicker && channelStore.selectedChannelId}
+	{#if isTouchDevice && !showPicker && !msgStore.replyingTo && channelStore.selectedChannelId}
 		<div class="quick-emoji-bar" role="toolbar" aria-label="Quick emoji">
 			{#each quickEmojis as emoji (emoji)}
+				{@const customMatch = emoji.startsWith(':') && emoji.endsWith(':')
+					? servers.customEmojis.find((c) => `:${c.name}:` === emoji)
+					: undefined}
 				<button
 					type="button"
 					class="quick-emoji-btn"
-					onmousedown={(e) => { e.preventDefault(); handleEmojiInsert(emoji); }}
-				>{emoji}</button>
+					onclick={() => handleEmojiInsert(emoji)}
+				>{#if customMatch}<img src={customMatch.imageUrl} alt={customMatch.name} width="22" height="22" class="quick-emoji-img" />{:else}{emoji}{/if}</button>
 			{/each}
 			<button
 				type="button"
 				class="quick-emoji-btn quick-emoji-more"
-				onmousedown={(e) => { e.preventDefault(); showPicker = true; pickerTab = 'emoji'; }}
+				onclick={() => { showPicker = true; pickerTab = 'emoji'; }}
 				aria-label="Open emoji picker"
 				title="More emojis"
 			>
@@ -339,8 +339,6 @@
 					onkeydown={handleKeydown}
 					onscroll={syncOverlayScroll}
 					onpaste={handlePaste}
-					onfocus={() => { inputFocused = true; }}
-					onblur={() => { inputFocused = false; }}
 				></textarea>
 			</div>
 			<button
@@ -798,13 +796,14 @@
 		font-size: 14px;
 	}
 
-	/* ───── Quick emoji bar (mobile) ───── */
+	/* ───── Mobile adjustments ───── */
 
 	.quick-emoji-bar {
 		display: none;
 	}
 
 	@media (max-width: 768px) {
+		/* Quick emoji bar */
 		.quick-emoji-bar {
 			display: flex;
 			align-items: center;
@@ -844,11 +843,12 @@
 			color: var(--text-muted);
 			font-size: 16px;
 		}
-	}
 
-	/* ───── Mobile adjustments ───── */
+		.quick-emoji-img {
+			object-fit: contain;
+		}
 
-	@media (max-width: 768px) {
+		/* Composer layout */
 		.composer {
 			padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0));
 		}
@@ -886,7 +886,7 @@
 			right: 0;
 			top: unset;
 			width: 100%;
-			max-height: 55vh;
+			max-height: 60vh;
 			border-radius: 12px 12px 0 0;
 			padding-bottom: env(safe-area-inset-bottom);
 			animation: slide-up 200ms ease;

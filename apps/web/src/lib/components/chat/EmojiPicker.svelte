@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { emojiCategories } from '$lib/data/emojis';
 	import { getFrequentEmojis } from '$lib/utils/emoji-frequency';
+	import { isTouchDevice } from '$lib/utils/dom';
 	import type { CustomEmoji } from '$lib/types/models';
 
 	let {
@@ -110,10 +111,6 @@
 		const el = scrollContainer?.querySelector(`[data-category="${id}"]`);
 		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
-
-	/** Skip auto-focus on touch devices to avoid summoning the virtual keyboard
-	 *  when the user just wants to browse/tap emojis. */
-	const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 	$effect(() => {
 		if (!isTouchDevice) searchInput?.focus();
