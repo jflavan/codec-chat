@@ -1702,21 +1702,33 @@
 		}
 
 		/* Bottom sheet picker */
-		.picker-container {
+		.composer-picker-wrapper {
 			position: fixed;
-			bottom: 0;
-			left: 0;
-			right: 0;
-			top: unset;
-			width: 100%;
-			max-height: 60vh;
-			border-radius: 12px 12px 0 0;
-			padding-bottom: env(safe-area-inset-bottom);
-			animation: slide-up 200ms ease;
+			inset: 0;
+			z-index: 99;
+			display: flex;
+			flex-direction: column;
+			justify-content: flex-end;
 		}
 
 		.picker-backdrop {
+			position: absolute;
+			inset: 0;
+			z-index: auto;
 			background: rgba(0, 0, 0, 0.5);
+		}
+
+		.picker-container {
+			position: relative;
+			z-index: 1;
+			bottom: auto;
+			right: auto;
+			width: 100%;
+			max-height: 60vh;
+			max-height: 60dvh;
+			border-radius: 12px 12px 0 0;
+			padding-bottom: env(safe-area-inset-bottom);
+			animation: slide-up 200ms ease;
 		}
 
 		.picker-tab {
