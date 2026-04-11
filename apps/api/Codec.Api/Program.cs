@@ -16,6 +16,7 @@ using Serilog;
 using Serilog.Formatting.Compact;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Channels;
 using System.Threading.RateLimiting;
 using StackExchange.Redis;
 using Lib.Net.Http.WebPush;
@@ -367,6 +368,15 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceCallTimeoutSe
 builder.Services.AddSingleton<PresenceTracker>();
 builder.Services.AddHostedService<PresenceBackgroundService>();
 builder.Services.AddHostedService<AdminMetricsService>();
+
+// Discord import
+builder.Services.AddSingleton(Channel.CreateUnbounded<Guid>(
+    new UnboundedChannelOptions { SingleReader = true }));
+builder.Services.AddScoped<DiscordImportService>();
+builder.Services.AddHostedService<DiscordImportWorker>();
+builder.Services.AddHttpClient<DiscordApiClient>()
+    .AddHttpMessageHandler<DiscordRateLimitHandler>();
+builder.Services.AddTransient<DiscordRateLimitHandler>();
 
 // Web Push notification service (VAPID-authenticated).
 var vapidPublicKey = builder.Configuration["Vapid:PublicKey"];
