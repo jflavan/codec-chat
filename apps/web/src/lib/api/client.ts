@@ -29,7 +29,9 @@ import type {
 	Webhook,
 	WebhookDelivery,
 	BannedMember,
-	ChannelPermissionOverride
+	ChannelPermissionOverride,
+	DiscordImport,
+	DiscordUserMapping
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -1319,5 +1321,68 @@ export class ApiClient {
 			`${this.baseUrl}/channels/${encodeURIComponent(channelId)}/overrides/${encodeURIComponent(roleId)}`,
 			{ method: 'DELETE', headers: this.headers(token) }
 		);
+	}
+
+	/* ───── Discord Import ───── */
+
+	/** Start a new Discord import job for a server. */
+	startDiscordImport(
+		token: string,
+		serverId: string,
+		botToken: string,
+		discordGuildId: string
+	): Promise<{ id: string }> {
+		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/discord-import`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ botToken, discordGuildId })
+		});
+	}
+
+	/** Get the current Discord import job status for a server. */
+	getDiscordImportStatus(token: string, serverId: string): Promise<DiscordImport> {
+		return this.request<DiscordImport>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/discord-import`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Resync (re-run) a Discord import for a server. */
+	resyncDiscordImport(
+		token: string,
+		serverId: string,
+		botToken: string,
+		discordGuildId: string
+	): Promise<{ id: string }> {
+		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/discord-import/resync`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ botToken, discordGuildId })
+		});
+	}
+
+	/** Cancel an in-progress Discord import job. */
+	cancelDiscordImport(token: string, serverId: string): Promise<void> {
+		return this.requestVoid(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/discord-import`,
+			{ method: 'DELETE', headers: this.headers(token) }
+		);
+	}
+
+	/** Get Discord user mappings for identity claiming within a server. */
+	getDiscordUserMappings(token: string, serverId: string): Promise<DiscordUserMapping[]> {
+		return this.request<DiscordUserMapping[]>(
+			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/discord-import/mappings`,
+			{ headers: this.headers(token) }
+		);
+	}
+
+	/** Claim a Discord identity for the current user within a server. */
+	claimDiscordIdentity(token: string, serverId: string, discordUserId: string): Promise<{ claimed: boolean }> {
+		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/discord-import/claim`, {
+			method: 'POST',
+			headers: this.headers(token, true),
+			body: JSON.stringify({ discordUserId })
+		});
 	}
 }

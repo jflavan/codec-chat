@@ -203,6 +203,8 @@ export type Message = {
 	mentions: Mention[];
 	replyContext: ReplyContext | null;
 	messageType?: number;
+	importedAuthorName?: string | null;
+	importedAuthorAvatarUrl?: string | null;
 };
 
 /** Paginated message response from the API. */
@@ -525,3 +527,28 @@ export enum ReportType {
 	Message = 1,
 	Server = 2,
 }
+
+/** Discord import job status. */
+export type DiscordImportStatus = 'Pending' | 'InProgress' | 'Completed' | 'Failed' | 'Cancelled';
+
+/** Discord import job. */
+export type DiscordImport = {
+	id: string;
+	status: DiscordImportStatus;
+	importedChannels: number;
+	importedMessages: number;
+	importedMembers: number;
+	startedAt?: string | null;
+	completedAt?: string | null;
+	errorMessage?: string | null;
+	discordGuildId: string;
+};
+
+/** Discord user mapping for identity claiming. */
+export type DiscordUserMapping = {
+	discordUserId: string;
+	discordUsername: string;
+	discordAvatarUrl?: string | null;
+	codecUserId?: string | null;
+	claimedAt?: string | null;
+};

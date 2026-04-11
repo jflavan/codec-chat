@@ -45,6 +45,9 @@ export type {
 	Webhook,
 	WebhookDelivery,
 	WebhookEventType,
-	BannedMember
+	BannedMember,
+	DiscordImportStatus,
+	DiscordImport,
+	DiscordUserMapping
 } from './models.js';
 export { Permission, hasPermission, ReportType } from './models.js';
