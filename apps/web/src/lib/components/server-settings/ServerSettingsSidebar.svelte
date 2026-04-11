@@ -6,7 +6,7 @@
 	const servers = getServerStore();
 
 	const categories = $derived.by(() => {
-		const cats: { id: 'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'; label: string }[] = [
+		const cats: { id: 'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log' | 'discord-import'; label: string }[] = [
 			{ id: 'general', label: 'General' }
 		];
 		if (servers.canManageChannels) {
@@ -26,6 +26,9 @@
 		}
 		if (servers.canViewAuditLog) {
 			cats.push({ id: 'audit-log', label: 'Audit Log' });
+		}
+		if (servers.canManageServer) {
+			cats.push({ id: 'discord-import', label: 'Discord Import' });
 		}
 		return cats;
 	});
