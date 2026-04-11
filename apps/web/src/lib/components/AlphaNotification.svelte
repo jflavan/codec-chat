@@ -15,7 +15,7 @@
 </script>
 
 {#if ui.showAlphaNotification}
-<div class="overlay" role="dialog" aria-modal="true" aria-label="Alpha notice" onkeydown={handleKeydown}>
+<div class="overlay" role="dialog" aria-modal="true" aria-label="Alpha notice" tabindex="-1" onkeydown={handleKeydown}>
 	<div class="banner">
 		<div class="badge">ALPHA</div>
 		<h2>Welcome to Codec Alpha</h2>

@@ -61,6 +61,8 @@ export class VoiceStore {
 	localVideoTrack = $state<MediaStreamTrack | null>(null);
 	/** Local screen share track for self-preview. */
 	localScreenTrack = $state<MediaStreamTrack | null>(null);
+	/** Handler for screen share 'ended' event, stored for cleanup. */
+	private _screenEndedHandler: (() => void) | null = null;
 	/** Remote video tracks: participantId -> { track, label } */
 	remoteVideoTracks = $state<Map<string, { track: MediaStreamTrack; label: string }>>(new Map());
 
@@ -515,6 +517,7 @@ export class VoiceStore {
 		if (!this.activeVoiceChannelId && !this.activeCall) return;
 
 		if (this.isScreenSharing) {
+			this._cleanupScreenEndedHandler();
 			await this.voice.stopScreenShare();
 			this.isScreenSharing = false;
 			this.localScreenTrack = null;
@@ -524,11 +527,16 @@ export class VoiceStore {
 				this.isScreenSharing = true;
 				this.localScreenTrack = track;
 
+				// Clean up any previous handler
+				this._cleanupScreenEndedHandler();
+
 				// When user stops via browser "Stop sharing" button
-				track.addEventListener('ended', () => {
+				this._screenEndedHandler = () => {
 					this.isScreenSharing = false;
 					this.localScreenTrack = null;
-				});
+					this._screenEndedHandler = null;
+				};
+				track.addEventListener('ended', this._screenEndedHandler);
 			} catch (e) {
 				// User cancelled the picker -- not an error
 				if (e instanceof DOMException && e.name === 'NotAllowedError') return;
@@ -536,6 +544,13 @@ export class VoiceStore {
 				this.ui.setError(e);
 			}
 		}
+	}
+
+	private _cleanupScreenEndedHandler(): void {
+		if (this._screenEndedHandler && this.localScreenTrack) {
+			this.localScreenTrack.removeEventListener('ended', this._screenEndedHandler);
+		}
+		this._screenEndedHandler = null;
 	}
 
 	private _attachRemoteVideo(participantId: string, track: MediaStreamTrack, label: string): void {

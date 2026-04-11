@@ -1,3 +1,18 @@
+/** Message type enum matching C# MessageType. */
+export enum MessageType {
+	Regular = 0,
+	VoiceCallEvent = 1,
+	PinNotification = 2
+}
+
+/** Report status enum matching C# ReportStatus. */
+export enum ReportStatus {
+	Open = 0,
+	Reviewing = 1,
+	Resolved = 2,
+	Dismissed = 3
+}
+
 /** User presence status. */
 export type PresenceStatus = 'online' | 'idle' | 'offline';
 
@@ -149,7 +164,7 @@ export type CustomEmoji = {
 	contentType: string;
 	isAnimated: boolean;
 	createdAt: string;
-	uploadedByUserId: string;
+	uploadedByUserId: string | null;
 };
 
 /** Resolved user mention in a message. */
@@ -364,7 +379,7 @@ export type ServerInvite = {
 	maxUses: number | null;
 	useCount: number;
 	createdAt: string;
-	createdByUserId: string;
+	createdByUserId: string | null;
 };
 
 /** A message search result, extending Message with context info. */
@@ -464,6 +479,7 @@ export type WebhookEventType =
 	| 'MemberJoined'
 	| 'MemberLeft'
 	| 'MemberRoleChanged'
+	| 'MemberRolesUpdated'
 	| 'ChannelCreated'
 	| 'ChannelUpdated'
 	| 'ChannelDeleted';

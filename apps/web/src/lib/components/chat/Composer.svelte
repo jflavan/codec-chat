@@ -15,9 +15,9 @@
 	const servers = getServerStore();
 	const channelStore = getChannelStore();
 	const msgStore = getMessageStore();
-	let inputEl: HTMLTextAreaElement;
-	let fileInputEl: HTMLInputElement;
-	let overlayEl: HTMLDivElement;
+	let inputEl = $state<HTMLTextAreaElement>(undefined!);
+	let fileInputEl = $state<HTMLInputElement>(undefined!);
+	let overlayEl = $state<HTMLDivElement>(undefined!);
 
 	const LINE_HEIGHT = 20;
 	const MAX_LINES = 5;
@@ -366,8 +366,7 @@
 		</div>
 		{#if showPicker}
 			<div class="composer-picker-wrapper">
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="picker-backdrop" onclick={() => { showPicker = false; }}></div>
+					<div class="picker-backdrop" role="presentation" onclick={() => { showPicker = false; }} onkeydown={(e) => { if (e.key === 'Escape') showPicker = false; }}></div>
 				<div class="picker-container" role="dialog" aria-label="Emoji and GIF picker">
 					<div class="picker-tab-bar">
 						<button

@@ -25,6 +25,8 @@
 		if (sheetEl) sheetEl.focus();
 	});
 
+	// userId/x/y props are stable for the lifetime of this action sheet
+	// svelte-ignore state_referenced_locally
 	let sliderValue = $state(Math.round((voice.userVolumes.get(userId) ?? 1.0) * 100));
 
 	function handleVolumeChange(e: Event) {
@@ -48,10 +50,12 @@
 		if (e.key === 'Escape') onclose();
 	}
 
-	// Desktop positioning — clamp to viewport
+	// Desktop positioning — clamp to viewport (x/y are stable props, captured once)
 	const menuWidth = 220;
 	const menuHeight = 180;
+	// svelte-ignore state_referenced_locally
 	const clampedX = Math.min(x ?? 0, window.innerWidth - menuWidth - 8);
+	// svelte-ignore state_referenced_locally
 	const clampedY = Math.min(y ?? 0, window.innerHeight - menuHeight - 8);
 </script>
 
@@ -126,7 +130,7 @@
 	}
 
 	.action-sheet__section {
-		/* volume control wrapper */
+		padding: 0;
 	}
 
 	.volume-label {

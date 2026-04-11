@@ -180,7 +180,9 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="popover-backdrop"
+			role="presentation"
 			onclick={handleBackdropTap}
+			onkeydown={(e) => { if (e.key === 'Escape') handleBackdropTap(); }}
 			ontouchstart={handleBackdropTap}
 		></div>
 	{/if}

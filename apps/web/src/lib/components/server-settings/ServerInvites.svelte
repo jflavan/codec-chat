@@ -113,7 +113,7 @@
 						<span class="col-code">
 							<code class="invite-code">{invite.code}</code>
 						</span>
-						<span class="col-creator muted">{invite.createdByUserId.slice(0, 8)}…</span>
+						<span class="col-creator muted">{invite.createdByUserId?.slice(0, 8) ?? 'unknown'}…</span>
 						<span class="col-uses muted">
 							{invite.useCount}{invite.maxUses != null ? `/${invite.maxUses}` : ''}
 						</span>

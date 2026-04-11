@@ -118,8 +118,7 @@
 </script>
 
 {#if !embedded}
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="picker-backdrop" onclick={onClose}></div>
+<div class="picker-backdrop" role="presentation" onclick={onClose} onkeydown={(e) => { if (e.key === 'Escape') onClose(); }}></div>
 {/if}
 
 <div

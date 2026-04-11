@@ -120,6 +120,16 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             .GroupBy(r => r.ServerId)
             .ToDictionary(g => g.Key, g => g.OrderBy(r => r.Position).ToList());
 
+        // Batch-load ownership to avoid N+1 queries (one IsOwnerAsync per server)
+        var memberServerIds = memberships.Select(m => m.ServerId).ToList();
+        var ownedServerIds = await db.ServerMemberRoles.AsNoTracking()
+            .Where(mr => mr.UserId == appUser.Id
+                && memberServerIds.Contains(mr.Role!.ServerId)
+                && mr.Role.IsSystemRole
+                && mr.Role.Position == 0)
+            .Select(mr => mr.Role!.ServerId)
+            .ToHashSetAsync();
+
         var servers = new List<object>();
         foreach (var m in memberships)
         {
@@ -127,7 +137,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             var permissions = (long)(roles.Count > 0
                 ? roles.Aggregate(Permission.None, (acc, role) => acc | role.Permissions)
                 : Permission.None);
-            var isOwner = await permissionResolver.IsOwnerAsync(m.ServerId, appUser.Id);
             servers.Add(new
             {
                 m.ServerId,
@@ -137,7 +146,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 m.SortOrder,
                 Roles = roles.Select(r2 => new { Id = r2.RoleId, r2.Name, r2.Color, r2.Position, r2.IsSystemRole }).ToList(),
                 Permissions = permissions,
-                IsOwner = isOwner
+                IsOwner = ownedServerIds.Contains(m.ServerId)
             });
         }
 

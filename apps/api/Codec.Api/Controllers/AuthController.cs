@@ -610,9 +610,8 @@ public class AuthController(
                 // OAuth provider through the authenticated link-google / link-oauth endpoint.
                 return Conflict(new
                 {
-                    error = "An account with this email already exists. Please sign in to that account and link your " + provider + " account from settings.",
-                    code = "OAUTH_LINK_REQUIRED",
-                    provider
+                    error = "An account with this email already exists. Please sign in with your existing account.",
+                    code = "OAUTH_LINK_REQUIRED"
                 });
             }
         }
