@@ -1,68 +1,22 @@
-# Production voice services — mediasoup SFU + coturn TURN server.
+# Production voice service — LiveKit server.
 # Deployed to /opt/voice/docker-compose.yml on the voice VM by CI/CD.
 # CI/CD substitutes the ${...} variables before writing the file to the VM.
 #
 # Required substitutions (set as env vars before running envsubst):
-#   ACR_SERVER        — e.g. acrcodecprod.azurecr.io
-#   IMAGE_TAG         — Docker image tag (git SHA)
-#   ANNOUNCED_IP      — VM's public IP address (for mediasoup ICE candidates)
-#   TURN_SECRET       — HMAC-SHA256 shared secret for coturn time-limited credentials
-#   SFU_INTERNAL_KEY  — shared secret checked by the SFU /rooms/* auth middleware
-#   APPLICATIONINSIGHTS_CONNECTION_STRING — App Insights connection string for OTel export
+#   LIVEKIT_API_KEY     — LiveKit API key for client/server authentication
+#   LIVEKIT_API_SECRET  — LiveKit API secret for signing tokens
 
 services:
-  sfu:
-    image: ${ACR_SERVER}/codec-sfu:${IMAGE_TAG}
+  livekit:
+    image: livekit/livekit-server:v1.10.1
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3001"
-      - "40000-40100:40000-40100/udp"
+      - "7880:7880"          # Signal (WebSocket)
+      - "7881:7881"          # RTC TCP fallback
+      - "3478:3478/udp"      # Built-in TURN
+      - "50000-60000:50000-60000/udp"  # WebRTC media
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    command: ["--config", "/etc/livekit.yaml"]
     environment:
-      ANNOUNCED_IP: "${ANNOUNCED_IP}"
-      RTC_MIN_PORT: "40000"
-      RTC_MAX_PORT: "40100"
-      SFU_PORT: "3001"
-      SFU_INTERNAL_KEY: "${SFU_INTERNAL_KEY}"
-      APPLICATIONINSIGHTS_CONNECTION_STRING: "${APPLICATIONINSIGHTS_CONNECTION_STRING}"
-      OTEL_SERVICE_NAME: "codec-sfu"
-
-  coturn:
-    # Pinned to a specific version tag (4.6.2). Note: this is a mutable tag, not a digest pin.
-    # For stronger supply-chain guarantees, pin by digest (@sha256:...) instead.
-    image: coturn/coturn:4.6.2
-    restart: unless-stopped
-    # network_mode: host is required so coturn can bind UDP relay ports
-    # directly on the host NIC without NAT, which would break relay address
-    # advertisement. The SFU uses explicit port mapping instead.
-    network_mode: host
-    environment:
-      TURN_SECRET: "${TURN_SECRET}"
-      ANNOUNCED_IP: "${ANNOUNCED_IP}"
-    # Write the coturn config to /tmp (tmpfs inside the container) so the secret does not
-    # appear in process listings (ps aux). Note: CI/CD envsubst substitutes ${TURN_SECRET}
-    # into this docker-compose.yml before writing it to /opt/voice/docker-compose.yml on
-    # the VM — the secret is therefore present in that file on disk. Ensure the VM's
-    # /opt/voice directory has restricted permissions (e.g. chmod 600 .../docker-compose.yml).
-    # HMAC-SHA256 requires coturn 4.6.0+ and must match the API's credential generation algorithm.
-    tmpfs:
-      - /tmp
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        set -e
-        printf '%s\n' \
-          'lt-cred-mech' \
-          'use-auth-secret' \
-          "static-auth-secret=${TURN_SECRET}" \
-          'realm=codec-chat.com' \
-          'listening-port=3478' \
-          "external-ip=${ANNOUNCED_IP}" \
-          'min-port=49152' \
-          'max-port=49200' \
-          'no-tls' \
-          'no-dtls' \
-          'log-file=stdout' \
-          'sha256' \
-          > /tmp/turnserver.conf
-        exec turnserver -c /tmp/turnserver.conf
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY}:${LIVEKIT_API_SECRET}

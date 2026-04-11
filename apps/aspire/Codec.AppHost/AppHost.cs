@@ -12,11 +12,10 @@ var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator();
 var blobs = storage.AddBlobs("blobs");
 
-var sfu = builder.AddNodeApp("sfu", "../../sfu", "src/index.ts")
-    .WithNpm()
-    .WithRunScript("dev")
-    .WithEndpoint("http", e => { e.Port = 3001; e.Transport = "http"; e.UriScheme = "http"; e.IsProxied = false; })
-    .WithHttpHealthCheck("/health");
+var livekit = builder.AddContainer("livekit", "livekit/livekit-server", "v1.10.1")
+    .WithArgs("--dev", "--bind", "0.0.0.0")
+    .WithEndpoint("signal", e => { e.Port = 7880; e.TargetPort = 7880; e.Transport = "http"; e.IsProxied = false; })
+    .WithLifetime(ContainerLifetime.Persistent);
 
 var api = builder.AddProject<Projects.Codec_Api>("api")
     .WithEndpoint("http", e => { e.Port = 5050; e.IsProxied = false; })
@@ -26,7 +25,7 @@ var api = builder.AddProject<Projects.Codec_Api>("api")
     .WaitFor(postgres)
     .WaitFor(redis)
     .WaitFor(storage)
-    .WaitFor(sfu)
+    .WaitFor(livekit)
     .WithHttpHealthCheck("/health/ready");
 
 var web = builder.AddViteApp("web", "../../web")

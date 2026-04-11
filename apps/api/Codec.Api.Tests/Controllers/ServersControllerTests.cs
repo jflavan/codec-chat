@@ -23,8 +23,6 @@ public class ServersControllerTests : IDisposable
     private readonly Mock<IAvatarService> _avatarService = new();
     private readonly Mock<ICustomEmojiService> _emojiService = new();
     private readonly Mock<IHubContext<ChatHub>> _hub = new();
-    private readonly Mock<IHttpClientFactory> _httpFactory = new();
-    private readonly Mock<IConfiguration> _config = new();
     private readonly MessageCacheService _messageCache;
     private readonly AuditService _auditService;
     private readonly ServersController _controller;
@@ -52,7 +50,7 @@ public class ServersControllerTests : IDisposable
 
         var webhookService = new WebhookService(new Mock<IServiceScopeFactory>().Object, new Mock<IHttpClientFactory>().Object, new Mock<ILogger<WebhookService>>().Object);
         var permissionResolver = new PermissionResolverService(_db);
-        _controller = new ServersController(_db, _userService.Object, _avatarService.Object, _emojiService.Object, _hub.Object, _httpFactory.Object, _config.Object, _messageCache, webhookService, permissionResolver);
+        _controller = new ServersController(_db, _userService.Object, _avatarService.Object, _emojiService.Object, _hub.Object, _messageCache, webhookService, permissionResolver);
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -2321,16 +2319,12 @@ public class ServersControllerTests : IDisposable
         _db.VoiceStates.Add(new VoiceState
         {
             Id = Guid.NewGuid(), UserId = _testUser.Id, ChannelId = voiceCh.Id,
-            ConnectionId = "conn-1", ParticipantId = "p-1", JoinedAt = DateTimeOffset.UtcNow
+            ConnectionId = "conn-1", JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
         _userService.Setup(u => u.EnsureAdminAsync(server.Id, _testUser.Id, false))
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
-
-        var mockClient = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockClient.Object) { BaseAddress = new Uri("http://localhost:3001") };
-        _httpFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var result = await _controller.DeleteChannel(server.Id, voiceCh.Id, _auditService);
 

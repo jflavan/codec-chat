@@ -1124,13 +1124,14 @@ export class ApiClient {
 		return response.json() as Promise<ActiveCallResponse>;
 	}
 
-	/** Get short-lived TURN credentials for WebRTC. */
-	getTurnCredentials(
-		token: string
-	): Promise<{ urls: string[]; username: string; credential: string }> {
-		return this.request(`${this.baseUrl}/voice/turn-credentials`, {
-			headers: this.headers(token)
-		});
+	/** Get a LiveKit access token for a voice room. */
+	getLiveKitToken(token: string, roomName: string): Promise<{ token: string }> {
+		return this.request(
+			`${this.baseUrl}/voice/token?roomName=${encodeURIComponent(roomName)}`,
+			{
+				headers: this.headers(token)
+			}
+		);
 	}
 
 	/* ───── Bug Reports ───── */

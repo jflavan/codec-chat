@@ -9,14 +9,21 @@ namespace Codec.Api.IntegrationTests.Tests;
 public class VoiceStateTests(CodecWebFactory factory) : IntegrationTestBase(factory)
 {
     [Fact]
-    public async Task GetTurnCredentials_ReturnsCredentials()
+    public async Task GetToken_ReturnsLiveKitToken()
     {
-        var client = CreateClient("vs-turn", "TurnUser");
-        var response = await client.GetFromJsonAsync<JsonElement>("/voice/turn-credentials");
+        var client = CreateClient("vs-token", "TokenUser");
+        var response = await client.GetFromJsonAsync<JsonElement>("/voice/token?roomName=test-room");
 
-        response.GetProperty("urls").EnumerateArray().Should().NotBeEmpty();
-        response.GetProperty("username").GetString().Should().NotBeNullOrEmpty();
-        response.GetProperty("credential").GetString().Should().NotBeNullOrEmpty();
+        response.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task GetToken_MissingRoomName_ReturnsBadRequest()
+    {
+        var client = CreateClient("vs-token-bad", "TokenBadUser");
+        var response = await client.GetAsync("/voice/token");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

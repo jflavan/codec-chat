@@ -256,35 +256,13 @@ builder.Services.Configure<Codec.Api.Models.SamlSettings>(builder.Configuration.
 builder.Services.AddScoped<SamlService>();
 builder.Services.AddMemoryCache();
 
-// Named HTTP client for SFU internal API calls.
-// Attaches the shared internal key header when configured.
-// Accepts self-signed TLS certs because the SFU VM uses a snakeoil cert
-// until DNS delegation is complete and certbot provisions a real one.
-// Authentication is handled by the X-Internal-Key header, not the certificate.
-builder.Services.AddHttpClient("sfu", (sp, client) =>
-{
-    client.Timeout = TimeSpan.FromSeconds(10);
-    var sfuKey = sp.GetRequiredService<IConfiguration>()["Voice:SfuInternalKey"];
-    if (!string.IsNullOrEmpty(sfuKey))
-        client.DefaultRequestHeaders.Add("X-Internal-Key", sfuKey);
-    else
-        sp.GetRequiredService<ILogger<Program>>()
-          .LogWarning("SFU security configuration incomplete: Voice:SfuInternalKey is not configured.");
-// TODO: Remove DangerousAcceptAnyServerCertificateValidator once DNS delegation
-// for sfu.codec-chat.com is complete and the Bicep sfuApiUrl output is switched
-// back to the domain name. Certbot will then have a valid cert.
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-});
-
-// Validate voice configuration at startup in non-development environments.
+// Validate LiveKit configuration at startup in non-development environments.
 if (!builder.Environment.IsDevelopment())
 {
-    if (string.IsNullOrWhiteSpace(builder.Configuration["Voice:TurnSecret"]))
-        throw new InvalidOperationException("Voice:TurnSecret must be configured in production.");
-    if (string.IsNullOrWhiteSpace(builder.Configuration["Voice:SfuInternalKey"]))
-        throw new InvalidOperationException("Voice:SfuInternalKey must be configured in production.");
+    if (string.IsNullOrWhiteSpace(builder.Configuration["LiveKit:ApiKey"]))
+        throw new InvalidOperationException("LiveKit:ApiKey must be configured in production.");
+    if (string.IsNullOrWhiteSpace(builder.Configuration["LiveKit:ApiSecret"]))
+        throw new InvalidOperationException("LiveKit:ApiSecret must be configured in production.");
 }
 
 var healthChecks = builder.Services.AddHealthChecks()

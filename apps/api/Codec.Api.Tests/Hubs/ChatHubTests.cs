@@ -1,6 +1,4 @@
-using System.Net;
 using System.Security.Claims;
-using System.Text.Json;
 using Codec.Api.Data;
 using Codec.Api.Hubs;
 using Codec.Api.Models;
@@ -20,7 +18,6 @@ public class ChatHubTests : IDisposable
     private readonly CodecDbContext _db;
     private readonly Mock<IUserService> _userService = new();
     private readonly Mock<IConfiguration> _config = new();
-    private readonly Mock<IHttpClientFactory> _httpClientFactory = new();
     private readonly Mock<ILogger<ChatHub>> _logger = new();
     private readonly Mock<VoiceCallTimeoutService> _callTimeoutService;
     private readonly PresenceTracker _presenceTracker = new();
@@ -133,6 +130,8 @@ public class ChatHubTests : IDisposable
         _mockClients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(_mockOthersProxy.Object);
 
         _config.Setup(c => c[It.IsAny<string>()]).Returns((string?)null);
+        _config.Setup(c => c["LiveKit:ApiKey"]).Returns("testkey");
+        _config.Setup(c => c["LiveKit:ApiSecret"]).Returns("testsecretmustbe32charslong12345");
 
         // Default: all permission checks pass.
         _permissionResolver
@@ -167,7 +166,6 @@ public class ChatHubTests : IDisposable
             _userService.Object,
             _db,
             _config.Object,
-            _httpClientFactory.Object,
             _logger.Object,
             _callTimeoutService.Object,
             _presenceTracker,
@@ -198,7 +196,6 @@ public class ChatHubTests : IDisposable
             _userService.Object,
             _db,
             _config.Object,
-            _httpClientFactory.Object,
             _logger.Object,
             _callTimeoutService.Object,
             _presenceTracker,
@@ -664,7 +661,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1058,158 +1055,11 @@ public class ChatHubTests : IDisposable
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))
             .ReturnsAsync((adminUser, false));
 
-        // SFU call will fail, but we can verify the membership check was bypassed
+        // Global admin should be able to join without being a server member
         var hub = CreateHub(adminUser);
-        var act = () => hub.JoinVoiceChannel(_voiceChannel.Id.ToString());
+        var result = await hub.JoinVoiceChannel(_voiceChannel.Id.ToString());
 
-        // Will throw because the SFU is not running, but NOT "Not a member" error
-        var ex = await act.Should().ThrowAsync<HubException>();
-        ex.Which.Message.Should().NotBe("Not a member of this server.");
-    }
-
-    // ── ConnectTransport ──
-
-    [Fact]
-    public async Task ConnectTransport_NotInVoice_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.ConnectTransport("some-transport", JsonDocument.Parse("{}").RootElement);
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Not currently in a voice session.");
-    }
-
-    // ── Produce ──
-
-    [Fact]
-    public async Task Produce_InvalidLabel_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.Produce("transport-id", JsonDocument.Parse("{}").RootElement, "invalid-label");
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Invalid producer label. Must be 'audio', 'video', or 'screen'.");
-    }
-
-    [Fact]
-    public async Task Produce_NotInVoice_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.Produce("transport-id", JsonDocument.Parse("{}").RootElement, "audio");
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Not currently in a voice session.");
-    }
-
-    [Fact]
-    public async Task Produce_DefaultLabel_IsAudio()
-    {
-        var hub = CreateHub();
-
-        // null label should not throw for invalid label
-        var act = () => hub.Produce("transport-id", JsonDocument.Parse("{}").RootElement, null);
-
-        // Will fail on "not in voice session" not "invalid label"
-        var ex = await act.Should().ThrowAsync<HubException>();
-        ex.Which.Message.Should().Be("Not currently in a voice session.");
-    }
-
-    // ── StopProducing ──
-
-    [Fact]
-    public async Task StopProducing_InvalidLabel_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.StopProducing("audio");
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Can only stop 'video' or 'screen' producers.");
-    }
-
-    [Fact]
-    public async Task StopProducing_NotInVoice_ReturnsWithoutError()
-    {
-        var hub = CreateHub();
-
-        // Should not throw when no voice state exists
-        await hub.StopProducing("video");
-    }
-
-    [Fact]
-    public async Task StopProducing_VideoLabel_ClearsVideoState()
-    {
-        // Set up voice state with a video producer
-        var voiceState = new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            VideoProducerId = "video-producer-123",
-            IsVideoEnabled = true,
-            JoinedAt = DateTimeOffset.UtcNow
-        };
-        _db.VoiceStates.Add(voiceState);
-        await _db.SaveChangesAsync();
-
-        // Mock HTTP client for SFU delete call
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.StopProducing("video");
-
-        var updated = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        updated.VideoProducerId.Should().BeNull();
-        updated.IsVideoEnabled.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task StopProducing_ScreenLabel_ClearsScreenState()
-    {
-        var voiceState = new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            ScreenProducerId = "screen-producer-456",
-            IsScreenSharing = true,
-            JoinedAt = DateTimeOffset.UtcNow
-        };
-        _db.VoiceStates.Add(voiceState);
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.StopProducing("screen");
-
-        var updated = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        updated.ScreenProducerId.Should().BeNull();
-        updated.IsScreenSharing.Should().BeFalse();
-    }
-
-    // ── Consume ──
-
-    [Fact]
-    public async Task Consume_NotInVoice_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.Consume("producer-id", "transport-id", JsonDocument.Parse("{}").RootElement);
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Not currently in a voice session.");
+        result.Should().NotBeNull();
     }
 
     // ── UpdateVoiceState ──
@@ -1232,7 +1082,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1272,7 +1122,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1305,14 +1155,11 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.LeaveVoiceChannel();
@@ -1362,14 +1209,11 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.OnDisconnectedAsync(null);
@@ -1402,7 +1246,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1428,7 +1272,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1538,14 +1382,11 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.LeaveVoiceChannel();
@@ -1578,7 +1419,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         _db.VoiceStates.Add(new VoiceState
@@ -1587,78 +1428,17 @@ public class ChatHubTests : IDisposable
             UserId = _testUser2.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = "test-connection-id-2",
-            ParticipantId = "test-connection-id-2",
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.EndCall();
 
         var remainingStates = await _db.VoiceStates.Where(v => v.DmChannelId == _dmChannel.Id).ToListAsync();
         remainingStates.Should().BeEmpty();
-    }
-
-    // ── StopProducing with notification ──
-
-    [Fact]
-    public async Task StopProducing_WithProducerId_NotifiesOthers()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            VideoProducerId = "video-producer-abc",
-            IsVideoEnabled = true,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.StopProducing("video");
-
-        _mockOthersProxy.Verify(
-            p => p.SendCoreAsync("ProducerClosed", It.IsAny<object?[]>(), default),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task StopProducing_WithNullProducerId_DoesNotNotify()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            VideoProducerId = null, // No video producer
-            IsVideoEnabled = false,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.StopProducing("video");
-
-        _mockOthersProxy.Verify(
-            p => p.SendCoreAsync("ProducerClosed", It.IsAny<object?[]>(), default),
-            Times.Never);
     }
 
     // ── OnDisconnectedAsync fallback cleanup ──
@@ -1676,7 +1456,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1716,7 +1496,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1750,7 +1530,7 @@ public class ChatHubTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = _testUser.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1810,7 +1590,7 @@ public class ChatHubTests : IDisposable
             ChannelId = null,
             DmChannelId = null,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -1850,7 +1630,6 @@ public class ChatHubTests : IDisposable
             _userService.Object,
             _db,
             _config.Object,
-            _httpClientFactory.Object,
             _logger.Object,
             _callTimeoutService.Object,
             _presenceTracker,
@@ -1893,7 +1672,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -2024,20 +1803,9 @@ public class ChatHubTests : IDisposable
         _db.VoiceCalls.Add(call);
         await _db.SaveChangesAsync();
 
-        // Setup SFU HTTP mock that returns valid JSON
-        var mockHandler = new MockHttpMessageHandler("""{"routerRtpCapabilities":{"codecs":[]}}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
         var hub = CreateHubForUser2();
+        await hub.AcceptCall(call.Id.ToString());
 
-        try
-        {
-            await hub.AcceptCall(call.Id.ToString());
-        }
-        catch { /* SFU errors are expected in test */ }
-
-        // Verify the call status was changed (either to Active or still updated)
         var updatedCall = await _db.VoiceCalls.FirstAsync(c => c.Id == call.Id);
         updatedCall.Status.Should().Be(VoiceCallStatus.Active);
     }
@@ -2052,7 +1820,6 @@ public class ChatHubTests : IDisposable
             UserId = _testUser2.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = "test-connection-id-2",
-            ParticipantId = "test-connection-id-2",
             JoinedAt = DateTimeOffset.UtcNow
         });
 
@@ -2068,17 +1835,8 @@ public class ChatHubTests : IDisposable
         _db.VoiceCalls.Add(call);
         await _db.SaveChangesAsync();
 
-        var mockHandler = new MockHttpMessageHandler("""{"routerRtpCapabilities":{"codecs":[]}}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
         var hub = CreateHubForUser2();
-
-        try
-        {
-            await hub.AcceptCall(call.Id.ToString());
-        }
-        catch { /* SFU error expected */ }
+        await hub.AcceptCall(call.Id.ToString());
 
         // Previous voice state should have been removed
         var voiceStates = await _db.VoiceStates.Where(vs => vs.UserId == _testUser2.Id && vs.ChannelId == _voiceChannel.Id).ToListAsync();
@@ -2140,7 +1898,6 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
             JoinedAt = DateTimeOffset.UtcNow
         });
 
@@ -2157,17 +1914,8 @@ public class ChatHubTests : IDisposable
         _db.VoiceCalls.Add(call);
         await _db.SaveChangesAsync();
 
-        var mockHandler = new MockHttpMessageHandler("""{"routerRtpCapabilities":{"codecs":[]}}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
         var hub = CreateHub();
-
-        try
-        {
-            await hub.SetupCallTransports(call.Id.ToString());
-        }
-        catch { /* SFU error expected */ }
+        await hub.SetupCallTransports(call.Id.ToString());
 
         // Existing server voice state should be cleaned up
         var serverVoiceStates = await _db.VoiceStates.Where(vs => vs.UserId == _testUser.Id && vs.ChannelId == _voiceChannel.Id).ToListAsync();
@@ -2218,7 +1966,6 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
             JoinedAt = DateTimeOffset.UtcNow
         };
         _db.VoiceStates.Add(existingState);
@@ -2235,254 +1982,12 @@ public class ChatHubTests : IDisposable
         _db.Channels.Add(voiceChannel2);
         await _db.SaveChangesAsync();
 
-        var mockHandler = new MockHttpMessageHandler("""{"routerRtpCapabilities":{"codecs":[]}}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
         var hub = CreateHub();
-
-        try
-        {
-            await hub.JoinVoiceChannel(voiceChannel2.Id.ToString());
-        }
-        catch { /* SFU errors expected in test */ }
+        await hub.JoinVoiceChannel(voiceChannel2.Id.ToString());
 
         // Old voice state should be removed
         var oldStates = await _db.VoiceStates.Where(vs => vs.ChannelId == _voiceChannel.Id).ToListAsync();
         oldStates.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task JoinVoiceChannel_HttpRequestException_ThrowsHubException()
-    {
-        var mockHandler = new MockHttpMessageHandler(new HttpRequestException("Connection refused"));
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-
-        await hub.Invoking(h => h.JoinVoiceChannel(_voiceChannel.Id.ToString()))
-            .Should().ThrowAsync<HubException>().WithMessage("*unavailable*");
-    }
-
-    [Fact]
-    public async Task JoinVoiceChannel_GenericException_ThrowsHubException()
-    {
-        var mockHandler = new MockHttpMessageHandler(new InvalidOperationException("Unexpected error"));
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-
-        await hub.Invoking(h => h.JoinVoiceChannel(_voiceChannel.Id.ToString()))
-            .Should().ThrowAsync<HubException>().WithMessage("*Failed to set up voice*");
-    }
-
-    // ===== ConnectTransport additional tests =====
-
-    [Fact]
-    public async Task ConnectTransport_InVoice_CallsSfu()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("{}");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var dtlsParams = JsonDocument.Parse("""{"fingerprints":[]}""").RootElement;
-
-        await hub.ConnectTransport("transport-1", dtlsParams);
-
-        mockHandler.RequestCount.Should().BeGreaterThan(0);
-    }
-
-    [Fact]
-    public async Task ConnectTransport_InDmCall_UsesDmRoomId()
-    {
-        var call = new VoiceCall
-        {
-            Id = Guid.NewGuid(),
-            DmChannelId = _dmChannel.Id,
-            CallerUserId = _testUser.Id,
-            RecipientUserId = _testUser2.Id,
-            Status = VoiceCallStatus.Active,
-            StartedAt = DateTimeOffset.UtcNow,
-            AnsweredAt = DateTimeOffset.UtcNow
-        };
-        _db.VoiceCalls.Add(call);
-
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            DmChannelId = _dmChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("{}");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var dtlsParams = JsonDocument.Parse("""{"fingerprints":[]}""").RootElement;
-
-        await hub.ConnectTransport("transport-1", dtlsParams);
-
-        // Verify that the SFU was called with call-{callId} room ID
-        mockHandler.LastRequestUri.Should().Contain($"call-{call.Id}");
-    }
-
-    // ===== Produce additional tests =====
-
-    [Fact]
-    public async Task Produce_VideoLabel_SetsVideoProducerId()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"producerId":"video-producer-123"}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var rtpParams = JsonDocument.Parse("{}").RootElement;
-
-        var result = await hub.Produce("transport-1", rtpParams, "video");
-
-        var vs = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        vs.VideoProducerId.Should().Be("video-producer-123");
-        vs.IsVideoEnabled.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Produce_ScreenLabel_SetsScreenProducerId()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"producerId":"screen-producer-456"}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var rtpParams = JsonDocument.Parse("{}").RootElement;
-
-        var result = await hub.Produce("transport-1", rtpParams, "screen");
-
-        var vs = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        vs.ScreenProducerId.Should().Be("screen-producer-456");
-        vs.IsScreenSharing.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Produce_AudioLabel_SetsProducerId()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"producerId":"audio-producer-789"}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var rtpParams = JsonDocument.Parse("{}").RootElement;
-
-        var result = await hub.Produce("transport-1", rtpParams, "audio");
-
-        var vs = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        vs.ProducerId.Should().Be("audio-producer-789");
-    }
-
-    [Fact]
-    public async Task Produce_NotifiesOthersInVoiceGroup()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"producerId":"prod-1"}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var rtpParams = JsonDocument.Parse("{}").RootElement;
-
-        await hub.Produce("transport-1", rtpParams, "audio");
-
-        _mockOthersProxy.Verify(p => p.SendCoreAsync("NewProducer",
-            It.IsAny<object?[]>(), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    // ===== Consume additional tests =====
-
-    [Fact]
-    public async Task Consume_InVoice_CallsSfu()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"consumerId":"consumer-1","producerId":"prod-1","kind":"audio","rtpParameters":{}}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var rtpCapabilities = JsonDocument.Parse("""{"codecs":[]}""").RootElement;
-
-        var result = await hub.Consume("prod-1", "recv-transport-1", rtpCapabilities);
-
-        mockHandler.RequestCount.Should().BeGreaterThan(0);
     }
 
     // ===== Heartbeat additional tests =====
@@ -2631,7 +2136,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
 
@@ -2713,7 +2218,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         _db.VoiceStates.Add(new VoiceState
@@ -2722,13 +2227,8 @@ public class ChatHubTests : IDisposable
             UserId = _testUser2.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = "conn-2",
-            ParticipantId = "conn-2",
             JoinedAt = DateTimeOffset.UtcNow
         });
-
-        var mockHandler = new MockHttpMessageHandler("{}");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         await _db.SaveChangesAsync();
 
@@ -2764,17 +2264,6 @@ public class ChatHubTests : IDisposable
         sysMsg!.Body.Should().Be("missed");
     }
 
-    // ===== StopProducing additional tests =====
-
-    [Fact]
-    public async Task StopProducing_AudioLabel_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        await hub.Invoking(h => h.StopProducing("audio"))
-            .Should().ThrowAsync<HubException>().WithMessage("*'video' or 'screen'*");
-    }
-
     // ===== LeaveVoiceChannel internal - DM call path =====
 
     [Fact]
@@ -2798,14 +2287,8 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
             JoinedAt = DateTimeOffset.UtcNow
         });
-
-        var mockHandler = new MockHttpMessageHandler("{}");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
         await _db.SaveChangesAsync();
 
         var hub = CreateHub();
@@ -2816,7 +2299,7 @@ public class ChatHubTests : IDisposable
         states.Should().BeEmpty();
     }
 
-    // ===== GetSfuRoomIdAsync - error paths =====
+    // ===== Voice room ID resolution - error paths =====
 
     [Fact]
     public async Task UpdateVoiceState_InDmCallWithNoActiveCall_ThrowsHubException()
@@ -2828,7 +2311,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -2953,11 +2436,6 @@ public class ChatHubTests : IDisposable
     [Fact]
     public async Task StartCall_WithExistingVoiceState_LeavesOldChannel()
     {
-        var sfuResponse = "{\"routerRtpCapabilities\":{}}";
-        var handler = new MockHttpMessageHandler(sfuResponse);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:3001") };
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
         // Add existing voice state for a server voice channel
         _db.VoiceStates.Add(new VoiceState
         {
@@ -2965,7 +2443,6 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = _voiceChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -2996,11 +2473,6 @@ public class ChatHubTests : IDisposable
         };
         _db.VoiceCalls.Add(call);
         await _db.SaveChangesAsync();
-
-        var sfuResponse = "{\"routerRtpCapabilities\":{}}";
-        var handler = new MockHttpMessageHandler(sfuResponse);
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:3001") };
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.EndCall();
@@ -3184,7 +2656,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = "p-1",
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         _db.VoiceStates.Add(new VoiceState
@@ -3193,14 +2665,10 @@ public class ChatHubTests : IDisposable
             UserId = _testUser2.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = "conn-2",
-            ParticipantId = "p-2",
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"ok":true}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.EndCall();
@@ -3208,43 +2676,6 @@ public class ChatHubTests : IDisposable
         // Both voice states should be cleaned up
         var remaining = await _db.VoiceStates.Where(v => v.DmChannelId == _dmChannel.Id).ToListAsync();
         remaining.Should().BeEmpty();
-
-        // SFU cleanup calls should have been made (at least one per voice state)
-        mockHandler.RequestCount.Should().BeGreaterThanOrEqualTo(1);
-    }
-
-    // ═══════════════════ StopProducing — screen with notification ═══════════════════
-
-    [Fact]
-    public async Task StopProducing_ScreenLabel_WithProducerId_NotifiesOthers()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            ScreenProducerId = "screen-producer-xyz",
-            IsScreenSharing = true,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"ok":true}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.StopProducing("screen");
-
-        _mockOthersProxy.Verify(
-            p => p.SendCoreAsync("ProducerClosed", It.IsAny<object?[]>(), default),
-            Times.Once);
-
-        var updated = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        updated.ScreenProducerId.Should().BeNull();
-        updated.IsScreenSharing.Should().BeFalse();
     }
 
     // ═══════════════════ OnDisconnectedAsync — fallback with DmChannelId ═══════════════════
@@ -3263,7 +2694,7 @@ public class ChatHubTests : IDisposable
             DmChannelId = _dmChannel.Id,
             ChannelId = null,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -3305,7 +2736,7 @@ public class ChatHubTests : IDisposable
             DmChannelId = _dmChannel.Id,
             ChannelId = null,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -3330,7 +2761,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = deletedChannelId,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -3434,16 +2865,12 @@ public class ChatHubTests : IDisposable
             DmChannelId = _dmChannel.Id,
             ChannelId = null,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
         var hub = CreateHub();
-
-        // Will fail on SFU but the cleanup of existing state should happen first
-        var act = () => hub.JoinVoiceChannel(_voiceChannel.Id.ToString());
-        var ex = await act.Should().ThrowAsync<HubException>();
+        await hub.JoinVoiceChannel(_voiceChannel.Id.ToString());
 
         // The existing DM voice state should have been removed
         var remaining = await _db.VoiceStates.Where(v => v.UserId == _testUser.Id && v.DmChannelId == _dmChannel.Id).ToListAsync();
@@ -3584,14 +3011,10 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"ok":true}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.EndCall();
@@ -3603,58 +3026,6 @@ public class ChatHubTests : IDisposable
 
         var sysMsg = await _db.DirectMessages.FirstAsync(m => m.DmChannelId == _dmChannel.Id);
         sysMsg.Body.Should().Be("missed");
-    }
-
-    // ═══════════════════ Produce — label defaults and kind mapping ═══════════════════
-
-    [Fact]
-    public async Task Produce_NullLabel_DefaultsToAudio_NotInVoice()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.Produce("transport-id", JsonDocument.Parse("{}").RootElement);
-
-        var ex = await act.Should().ThrowAsync<HubException>();
-        ex.Which.Message.Should().Be("Not currently in a voice session.");
-    }
-
-    // ═══════════════════ Consume — not in voice ═══════════════════
-
-    [Fact]
-    public async Task Consume_NoVoiceState_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.Consume("producer", "recv-transport", JsonDocument.Parse("{}").RootElement);
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Not currently in a voice session.");
-    }
-
-    // ═══════════════════ ConnectTransport — not in voice ═══════════════════
-
-    [Fact]
-    public async Task ConnectTransport_NoVoiceSession_ThrowsCorrectMessage()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.ConnectTransport("transport-123", JsonDocument.Parse("{}").RootElement);
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Not currently in a voice session.");
-    }
-
-    // ═══════════════════ StopProducing — invalid labels ═══════════════════
-
-    [Fact]
-    public async Task StopProducing_WebcamLabel_ThrowsHubException()
-    {
-        var hub = CreateHub();
-
-        var act = () => hub.StopProducing("webcam");
-
-        await act.Should().ThrowAsync<HubException>()
-            .WithMessage("Can only stop 'video' or 'screen' producers.");
     }
 
     // ═══════════════════ OnDisconnectedAsync — fallback DM voice state ═══════════════════
@@ -3672,7 +3043,7 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
@@ -3754,14 +3125,11 @@ public class ChatHubTests : IDisposable
             UserId = _testUser.Id,
             ChannelId = deletedChannelId,
             ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
+
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
 
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
 
         var hub = CreateHub();
         await hub.LeaveVoiceChannel();
@@ -3770,153 +3138,4 @@ public class ChatHubTests : IDisposable
         remaining.Should().BeEmpty();
     }
 
-    // ═══════════════════ StopProducing — screen with no producer ═══════════════════
-
-    [Fact]
-    public async Task StopProducing_ScreenWithNullProducerId_DoesNotNotify()
-    {
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            ChannelId = _voiceChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            ScreenProducerId = null,
-            IsScreenSharing = false,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new Mock<HttpMessageHandler>();
-        var httpClient = new HttpClient(mockHandler.Object);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.StopProducing("screen");
-
-        _mockOthersProxy.Verify(
-            p => p.SendCoreAsync("ProducerClosed", It.IsAny<object?[]>(), default),
-            Times.Never);
-    }
-
-    // ═══════════════════ EndCall — with voiceStates cleanup for SFU ═══════════════════
-
-    [Fact]
-    public async Task EndCall_ActiveCallWithVoiceStates_CleansUpSfuParticipants()
-    {
-        var call = new VoiceCall
-        {
-            Id = Guid.NewGuid(),
-            DmChannelId = _dmChannel.Id,
-            CallerUserId = _testUser.Id,
-            RecipientUserId = _testUser2.Id,
-            Status = VoiceCallStatus.Active,
-            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
-            AnsweredAt = DateTimeOffset.UtcNow.AddMinutes(-4)
-        };
-        _db.VoiceCalls.Add(call);
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            DmChannelId = _dmChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = "participant-1",
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("{}");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        await hub.EndCall();
-
-        // Voice states should be cleaned up
-        var remaining = await _db.VoiceStates.Where(v => v.DmChannelId == _dmChannel.Id).ToListAsync();
-        remaining.Should().BeEmpty();
-
-        // SFU was called for cleanup
-        mockHandler.RequestCount.Should().BeGreaterThan(0);
-    }
-
-    // ═══════════════════ Produce — DM call room ID ═══════════════════
-
-    [Fact]
-    public async Task Produce_InDmCall_UsesDmCallRoomId()
-    {
-        var call = new VoiceCall
-        {
-            Id = Guid.NewGuid(),
-            DmChannelId = _dmChannel.Id,
-            CallerUserId = _testUser.Id,
-            RecipientUserId = _testUser2.Id,
-            Status = VoiceCallStatus.Active,
-            StartedAt = DateTimeOffset.UtcNow,
-            AnsweredAt = DateTimeOffset.UtcNow
-        };
-        _db.VoiceCalls.Add(call);
-        _db.VoiceStates.Add(new VoiceState
-        {
-            Id = Guid.NewGuid(),
-            UserId = _testUser.Id,
-            DmChannelId = _dmChannel.Id,
-            ConnectionId = _connectionId,
-            ParticipantId = _connectionId,
-            JoinedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync();
-
-        var mockHandler = new MockHttpMessageHandler("""{"producerId":"prod-dm-1"}""");
-        var httpClient = new HttpClient(mockHandler);
-        _httpClientFactory.Setup(f => f.CreateClient("sfu")).Returns(httpClient);
-
-        var hub = CreateHub();
-        var rtpParams = JsonDocument.Parse("{}").RootElement;
-
-        var result = await hub.Produce("transport-1", rtpParams, "audio");
-
-        var vs = await _db.VoiceStates.FirstAsync(v => v.UserId == _testUser.Id);
-        vs.ProducerId.Should().Be("prod-dm-1");
-
-        mockHandler.LastRequestUri.Should().Contain($"call-{call.Id}");
-    }
-}
-
-/// <summary>
-/// Simple mock HTTP handler for testing SFU API calls.
-/// </summary>
-internal class MockHttpMessageHandler : HttpMessageHandler
-{
-    private readonly string? _response;
-    private readonly Exception? _exception;
-
-    public int RequestCount { get; private set; }
-    public string? LastRequestUri { get; private set; }
-
-    public MockHttpMessageHandler(string response)
-    {
-        _response = response;
-    }
-
-    public MockHttpMessageHandler(Exception exception)
-    {
-        _exception = exception;
-    }
-
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        RequestCount++;
-        LastRequestUri = request.RequestUri?.ToString();
-
-        if (_exception is not null)
-            throw _exception;
-
-        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-        {
-            Content = new StringContent(_response!, System.Text.Encoding.UTF8, "application/json")
-        });
-    }
 }

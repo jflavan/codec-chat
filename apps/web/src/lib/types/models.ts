@@ -136,7 +136,6 @@ export type VoiceChannelMember = {
 	isDeafened: boolean;
 	isVideoEnabled?: boolean;
 	isScreenSharing?: boolean;
-	participantId: string;
 };
 
 /** Aggregated emoji reaction on a message. */

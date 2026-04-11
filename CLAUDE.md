@@ -89,7 +89,7 @@ apps/
     lib/
       api/           # ApiClient class (typed HTTP client)
       auth/          # Token persistence (localStorage) + Google SDK init + OAuth helpers
-      services/      # ChatHubService (SignalR lifecycle), push-notifications.ts
+      services/      # ChatHubService (SignalR lifecycle), VoiceService (LiveKit client), push-notifications.ts
       state/         # Domain-specific stores (auth, channel, dm, friend, message, server, ui, voice) + SignalR + navigation
       types/         # Domain models (models.ts)
       styles/        # CSS design tokens (tokens.css) + global.css
@@ -123,6 +123,9 @@ Hub at `/hubs/chat`. Clients subscribe to:
 - `user-{userId}` groups for friend/DM/kick notifications
 - `dm-{dmChannelId}` groups for DM events
 
+### Voice (LiveKit)
+Voice channels use a self-hosted LiveKit server (`livekit/livekit-server`). The API generates LiveKit access tokens (`Livekit.Server.Sdk.Dotnet`) and manages `VoiceState` records. The frontend connects directly to LiveKit using `livekit-client`. SignalR is used only for join/leave/mute notifications to update the sidebar. LiveKit handles all WebRTC signaling, SFU, and TURN internally.
+
 ### Authentication Flow
 
 Two methods are supported, both resulting in a JWT access token sent as `Authorization: Bearer <token>`:
@@ -150,6 +153,7 @@ Both methods use the same `[Authorize]` middleware and produce identical claims 
 PUBLIC_API_BASE_URL=http://localhost:5050
 PUBLIC_GOOGLE_CLIENT_ID=<your google oauth client id>
 PUBLIC_RECAPTCHA_SITE_KEY=<your recaptcha enterprise site key, optional for local dev>
+PUBLIC_LIVEKIT_URL=ws://localhost:7880
 ```
 
 ### API (`appsettings.Development.json`)

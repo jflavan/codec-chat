@@ -1193,21 +1193,8 @@ namespace Codec.Api.Migrations
                     b.Property<DateTimeOffset>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ParticipantId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ProducerId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ScreenProducerId")
-                        .HasColumnType("text");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("VideoProducerId")
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

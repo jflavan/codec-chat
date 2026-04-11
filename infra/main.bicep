@@ -43,7 +43,7 @@ param adminCustomDomain string = ''
 @description('Set to true on a second deployment pass to bind managed TLS certificates to custom domains. Requires a prior deployment with this set to false so that hostnames are registered first.')
 param bindCertificates bool = false
 
-@description('Deploy the voice VM (mediasoup SFU + coturn). Set to false to skip voice infrastructure.')
+@description('Deploy the voice VM (LiveKit server). Set to false to skip voice infrastructure.')
 param voiceVmEnabled bool = false
 
 @description('SSH public key for the voice VM admin user. Required when voiceVmEnabled is true.')
@@ -64,19 +64,13 @@ param jwtSecret string
 @description('Deploy Azure Cache for Redis for distributed caching and SignalR backplane.')
 param redisEnabled bool = true
 
-@description('HMAC-SHA256 shared secret for coturn time-limited credentials. Required when voiceVmEnabled is true.')
+@description('LiveKit API key for client/server authentication. Required when voiceVmEnabled is true.')
 @secure()
-param voiceTurnSecret string = ''
+param livekitApiKey string = ''
 
-@description('Shared secret for the SFU internal API. Required when voiceVmEnabled is true.')
+@description('LiveKit API secret for signing tokens. Required when voiceVmEnabled is true.')
 @secure()
-param voiceSfuInternalKey string = ''
-
-@description('FQDN for the SFU API TLS endpoint (e.g., sfu.codec-chat.com). Required when voiceVmEnabled is true.')
-param sfuDomainName string = ''
-
-@description('Email for Let\'s Encrypt certificate notifications. Required when voiceVmEnabled is true.')
-param certbotEmail string = ''
+param livekitApiSecret string = ''
 
 @description('Deploy Azure Communication Services for transactional email. Requires the Microsoft.Communication resource provider to be registered on the subscription.')
 param emailEnabled bool = true
@@ -301,9 +295,9 @@ module communicationServices 'modules/communication-services.bicep' = if (emailE
   }
 }
 
-// ── Voice VM (mediasoup SFU + coturn) ────────────────────────────────────────────
-// Deployed only when voiceVmEnabled = true. Both services require UDP port exposure
-// that Azure Container Apps cannot provide, so they run on a dedicated VM instead.
+// ── Voice VM (LiveKit server) ────────────────────────────────────────────────────
+// Deployed only when voiceVmEnabled = true. LiveKit requires UDP port exposure
+// that Azure Container Apps cannot provide, so it runs on a dedicated VM instead.
 
 module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
   name: 'voice-vm'
@@ -313,51 +307,26 @@ module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
     adminSshPublicKey: voiceAdminSshPublicKey
     containerRegistryName: containerRegistryName
     sshAllowedSourcePrefix: voiceSshAllowedSourcePrefix
-    sfuDomainName: sfuDomainName
-    certbotEmail: certbotEmail
   }
 }
 
-// ── DNS zone + A record for the SFU TLS endpoint ──────────────────────────────
-// Extract zone name (e.g., 'codec-chat.com') and record name (e.g., 'sfu') from the FQDN.
-var sfuDomainParts = split(sfuDomainName != '' ? sfuDomainName : 'placeholder.invalid', '.')
-var sfuDnsZoneName = '${sfuDomainParts[1]}.${sfuDomainParts[2]}'
-var sfuDnsRecordName = sfuDomainParts[0]
-
-module sfuDnsZone 'modules/dns-zone.bicep' = if (voiceVmEnabled && sfuDomainName != '') {
-  name: 'sfu-dns-zone'
-  params: {
-    zoneName: sfuDnsZoneName
-  }
-}
-
-module sfuDnsRecord 'modules/dns-record.bicep' = if (voiceVmEnabled && sfuDomainName != '') {
-  name: 'sfu-dns-record'
-  dependsOn: [sfuDnsZone]
-  params: {
-    zoneName: sfuDnsZoneName
-    recordName: sfuDnsRecordName
-    ipAddress: voiceVm.outputs.publicIpAddress
-  }
-}
-
-// Store the TURN secret in Key Vault so the API Container App can reference it securely.
-module voiceTurnSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
-  name: 'voice-turn-secret'
+// Store the LiveKit API key in Key Vault so the API Container App can reference it securely.
+module livekitApiKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
+  name: 'livekit-api-key'
   params: {
     keyVaultName: keyVault.outputs.name
-    secretName: 'Voice--TurnSecret'
-    secretValue: voiceTurnSecret
+    secretName: 'LiveKit--ApiKey'
+    secretValue: livekitApiKey
   }
 }
 
-// Store the SFU internal API key in Key Vault.
-module voiceSfuInternalKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
-  name: 'voice-sfu-internal-key'
+// Store the LiveKit API secret in Key Vault.
+module livekitApiSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
+  name: 'livekit-api-secret'
   params: {
     keyVaultName: keyVault.outputs.name
-    secretName: 'Voice--SfuInternalKey'
-    secretValue: voiceSfuInternalKey
+    secretName: 'LiveKit--ApiSecret'
+    secretValue: livekitApiSecret
   }
 }
 
@@ -420,10 +389,9 @@ module apiApp 'modules/container-app-api.bicep' = {
     corsAllowedOrigins: [effectiveWebUrl, effectiveAdminUrl]
     customDomainName: apiCustomDomain
     managedCertificateId: apiCertId
-    sfuApiUrl: voiceVm.?outputs.sfuApiUrl ?? ''
-    turnServerUrl: voiceVm.?outputs.turnServerUrl ?? ''
-    voiceTurnKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--TurnSecret' : ''
-    voiceSfuInternalKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/Voice--SfuInternalKey' : ''
+    livekitServerUrl: voiceVm.?outputs.livekitUrl ?? ''
+    livekitApiKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiKey' : ''
+    livekitApiSecretKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiSecret' : ''
     jwtSecretKvUrl: '${keyVault.outputs.uri}secrets/Jwt--Secret'
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
@@ -451,6 +419,7 @@ module webApp 'modules/container-app-web.bicep' = {
     publicGoogleClientId: googleClientId
     publicRecaptchaSiteKey: recaptchaSiteKey
     publicGiphyApiKey: giphyApiKey
+    publicLivekitUrl: voiceVmEnabled ? 'wss://${voiceVm.outputs.fqdn}:7880' : ''
     customDomainName: webCustomDomain
     managedCertificateId: webCertId
   }
@@ -505,5 +474,4 @@ output storageBlobEndpoint string = storageAccount.outputs.blobEndpoint
 output keyVaultUri string = keyVault.outputs.uri
 output voiceVmPublicIp string = voiceVm.?outputs.publicIpAddress ?? ''
 output voiceVmFqdn string = voiceVm.?outputs.fqdn ?? ''
-output sfuApiUrl string = voiceVm.?outputs.sfuApiUrl ?? ''
-output turnServerUrl string = voiceVm.?outputs.turnServerUrl ?? ''
+output livekitUrl string = voiceVm.?outputs.livekitUrl ?? ''

@@ -47,12 +47,12 @@
 
 		// Remote tracks
 		for (const [key, { track, label }] of voice.remoteVideoTracks) {
-			const participantId = key.split(':')[0];
+			const userId = key.split(':')[0];
 			const channelId = voice.activeVoiceChannelId;
 			let displayName = 'Unknown';
 			if (channelId) {
 				const members = voice.voiceChannelMembers.get(channelId) ?? [];
-				const member = members.find((m) => m.participantId === participantId);
+				const member = members.find((m) => m.userId === userId);
 				if (member) displayName = member.displayName;
 			} else if (voice.activeCall) {
 				displayName = voice.activeCall.otherDisplayName;

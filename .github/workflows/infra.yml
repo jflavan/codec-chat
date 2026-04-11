@@ -157,13 +157,11 @@ jobs:
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
-              voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
-              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              livekitApiKey='${{ secrets.LIVEKIT_API_KEY }}' \
+              livekitApiSecret='${{ secrets.LIVEKIT_API_SECRET }}' \
               jwtSecret='${{ secrets.JWT_SECRET }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
-              sfuDomainName='sfu.codec-chat.com' \
-              certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
               emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }} \
               recaptchaSecretKey='${{ secrets.RECAPTCHA_SECRET_KEY }}' \
               recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
@@ -194,13 +192,11 @@ jobs:
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
-              voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
-              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              livekitApiKey='${{ secrets.LIVEKIT_API_KEY }}' \
+              livekitApiSecret='${{ secrets.LIVEKIT_API_SECRET }}' \
               jwtSecret='${{ secrets.JWT_SECRET }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
-              sfuDomainName='sfu.codec-chat.com' \
-              certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
               emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }} \
               recaptchaSecretKey='${{ secrets.RECAPTCHA_SECRET_KEY }}' \
               recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \
@@ -230,13 +226,11 @@ jobs:
               voiceVmEnabled=${{ vars.VOICE_VM_ENABLED == 'true' }} \
               voiceAdminSshPublicKey='${{ secrets.VOICE_ADMIN_SSH_PUBLIC_KEY }}' \
               voiceSshAllowedSourcePrefix='${{ vars.VOICE_SSH_ALLOWED_SOURCE_PREFIX }}' \
-              voiceTurnSecret='${{ secrets.VOICE_TURN_SECRET }}' \
-              voiceSfuInternalKey='${{ secrets.VOICE_SFU_INTERNAL_KEY }}' \
+              livekitApiKey='${{ secrets.LIVEKIT_API_KEY }}' \
+              livekitApiSecret='${{ secrets.LIVEKIT_API_SECRET }}' \
               jwtSecret='${{ secrets.JWT_SECRET }}' \
               gitHubToken='${{ secrets.GH_ISSUE_TOKEN }}' \
               redisEnabled=true \
-              sfuDomainName='sfu.codec-chat.com' \
-              certbotEmail='${{ secrets.CERTBOT_EMAIL }}' \
               emailEnabled=${{ vars.EMAIL_ENABLED == 'true' }} \
               recaptchaSecretKey='${{ secrets.RECAPTCHA_SECRET_KEY }}' \
               recaptchaSiteKey='${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }}' \

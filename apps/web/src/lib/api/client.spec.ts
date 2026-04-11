@@ -291,11 +291,15 @@ describe('ApiClient', () => {
 		});
 	});
 
-	describe('getTurnCredentials', () => {
-		it('sends GET', async () => {
-			mockFetch.mockResolvedValueOnce(jsonResponse({ urls: ['turn:localhost'], username: 'u', credential: 'c' }));
-			const result = await client.getTurnCredentials(token);
-			expect(result.urls).toEqual(['turn:localhost']);
+	describe('getLiveKitToken', () => {
+		it('sends GET with roomName', async () => {
+			mockFetch.mockResolvedValueOnce(jsonResponse({ token: 'lk_test_token' }));
+			const result = await client.getLiveKitToken(token, 'test-room');
+			expect(result.token).toBe('lk_test_token');
+			expect(mockFetch).toHaveBeenCalledWith(
+				expect.stringContaining('/voice/token?roomName=test-room'),
+				expect.any(Object)
+			);
 		});
 	});
 

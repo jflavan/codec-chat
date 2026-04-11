@@ -49,8 +49,8 @@ public class CodecWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Api:BaseUrl", "http://localhost");
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost");
         builder.UseSetting("Storage:Provider", "Local");
-        builder.UseSetting("Voice:TurnSecret", "test-turn-secret");
-        builder.UseSetting("Voice:TurnServerUrl", "turn:localhost:3478");
+        builder.UseSetting("LiveKit:ApiKey", "testkey");
+        builder.UseSetting("LiveKit:ApiSecret", "testsecretmustbe32charslong12345");
         builder.UseSetting("Recaptcha:Enabled", "false");
         builder.UseSetting("Saml:Enabled", "true");
         builder.UseSetting("Saml:EntityId", "https://test-sp.example.com/saml/metadata");

@@ -278,7 +278,6 @@ public class VoiceCallTimeoutServiceTests : IDisposable
             UserId = _caller.Id,
             DmChannelId = _dmChannel.Id,
             ConnectionId = "conn-1",
-            ParticipantId = "p-1",
             JoinedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();

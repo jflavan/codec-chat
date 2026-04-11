@@ -29,31 +29,6 @@ public class VoiceState
     /// </summary>
     public string ConnectionId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// mediasoup participant ID (equals ConnectionId) used by the SFU to
-    /// identify this participant's transports and producers.
-    /// </summary>
-    public string ParticipantId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// mediasoup producer ID set after the participant calls Produce.
-    /// Null until the participant starts sending audio.
-    /// Returned to late joiners so they can immediately consume this participant's audio.
-    /// </summary>
-    public string? ProducerId { get; set; }
-
-    /// <summary>
-    /// mediasoup producer ID for the participant's video track.
-    /// Null when the camera is off.
-    /// </summary>
-    public string? VideoProducerId { get; set; }
-
-    /// <summary>
-    /// mediasoup producer ID for the participant's screen share track.
-    /// Null when not screen sharing.
-    /// </summary>
-    public string? ScreenProducerId { get; set; }
-
     public bool IsVideoEnabled { get; set; }
     public bool IsScreenSharing { get; set; }
 
