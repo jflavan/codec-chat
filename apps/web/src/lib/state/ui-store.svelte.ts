@@ -33,7 +33,7 @@ export class UIStore {
 	settingsCategory = $state<'profile' | 'account' | 'voice-audio' | 'appearance' | 'notifications'>('profile');
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'>('general');
+	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log' | 'discord-import'>('general');
 	reportModal = $state<{ reportType: ReportType; targetId: string; targetName: string } | null>(null);
 
 	/* ───── mobile ───── */
