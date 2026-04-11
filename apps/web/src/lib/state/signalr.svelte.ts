@@ -394,6 +394,38 @@ export async function setupSignalR(
 			onAccountDeleted: () => {
 				auth.signOut();
 			},
+
+			/* ─── Discord import ─── */
+
+			onImportProgress: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'InProgress',
+					};
+				}
+			},
+			onImportCompleted: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'Completed',
+						importedChannels: event.importedChannels,
+						importedMessages: event.importedMessages,
+						importedMembers: event.importedMembers,
+						completedAt: new Date().toISOString()
+					};
+				}
+			},
+			onImportFailed: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'Failed',
+						errorMessage: event.errorMessage
+					};
+				}
+			},
 		}
 	);
 
