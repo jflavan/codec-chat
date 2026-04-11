@@ -4,7 +4,7 @@
 	const voice = getVoiceStore();
 
 	let isRecordingKey = $state(false);
-	let recorderEl: HTMLDivElement;
+	let recorderEl = $state<HTMLDivElement>(undefined!);
 
 	$effect(() => {
 		if (isRecordingKey && recorderEl) {

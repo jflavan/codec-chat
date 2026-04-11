@@ -149,25 +149,27 @@
 								{#if members.length > 0}
 									<ul class="voice-members" aria-label="Connected members">
 										{#each members as member}
+											{@const isOtherUser = member.userId !== auth.me?.user.id}
+											<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 											<li
 												class="voice-member"
-												class:voice-member--interactive={member.userId !== auth.me?.user.id}
-												role={member.userId !== auth.me?.user.id ? 'button' : undefined}
-												tabindex={member.userId !== auth.me?.user.id ? 0 : undefined}
-												aria-label={member.userId !== auth.me?.user.id ? `${member.displayName} volume controls` : undefined}
+												class:voice-member--interactive={isOtherUser}
+												role={isOtherUser ? 'button' : undefined}
+												tabindex={isOtherUser ? 0 : undefined}
+												aria-label={isOtherUser ? `${member.displayName} volume controls` : undefined}
 												onclick={(e) => {
-													if (member.userId !== auth.me?.user.id) {
+													if (isOtherUser) {
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 													}
 												}}
 												oncontextmenu={(e) => {
-													if (member.userId !== auth.me?.user.id) {
+													if (isOtherUser) {
 														e.preventDefault();
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 													}
 												}}
 												onkeydown={(e) => {
-													if (member.userId !== auth.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+													if (isOtherUser && (e.key === 'Enter' || e.key === ' ')) {
 														e.preventDefault();
 														const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
@@ -257,25 +259,27 @@
 									{#if members.length > 0}
 										<ul class="voice-members" aria-label="Connected members">
 											{#each members as member}
+												{@const isOtherUser = member.userId !== auth.me?.user.id}
+												<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 												<li
 													class="voice-member"
-													class:voice-member--interactive={member.userId !== auth.me?.user.id}
-													role={member.userId !== auth.me?.user.id ? 'button' : undefined}
-													tabindex={member.userId !== auth.me?.user.id ? 0 : undefined}
-													aria-label={member.userId !== auth.me?.user.id ? `${member.displayName} volume controls` : undefined}
+													class:voice-member--interactive={isOtherUser}
+													role={isOtherUser ? 'button' : undefined}
+													tabindex={isOtherUser ? 0 : undefined}
+													aria-label={isOtherUser ? `${member.displayName} volume controls` : undefined}
 													onclick={(e) => {
-														if (member.userId !== auth.me?.user.id) {
+														if (isOtherUser) {
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 														}
 													}}
 													oncontextmenu={(e) => {
-														if (member.userId !== auth.me?.user.id) {
+														if (isOtherUser) {
 															e.preventDefault();
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
 														}
 													}}
 													onkeydown={(e) => {
-														if (member.userId !== auth.me?.user.id && (e.key === 'Enter' || e.key === ' ')) {
+														if (isOtherUser && (e.key === 'Enter' || e.key === ' ')) {
 															e.preventDefault();
 															const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };

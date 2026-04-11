@@ -6,6 +6,7 @@ using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols;
@@ -302,11 +303,17 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
     /// </summary>
     [HttpGet("users/search")]
     [RequireEmailVerified]
+    [EnableRateLimiting("fixed")]
     public async Task<IActionResult> SearchUsers([FromQuery] string? q)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
         {
             return Ok(Array.Empty<object>());
+        }
+
+        if (q.Length > 100)
+        {
+            return BadRequest(new { error = "Search query must not exceed 100 characters." });
         }
 
         var term = q.Trim();

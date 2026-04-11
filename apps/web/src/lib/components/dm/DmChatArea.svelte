@@ -34,9 +34,9 @@
 	const BOTTOM_THRESHOLD = 50;
 
 	let container: HTMLDivElement;
-	let dmInputEl: HTMLInputElement;
-	let dmFileInputEl: HTMLInputElement;
-	let dmOverlayEl: HTMLDivElement;
+	let dmInputEl = $state<HTMLInputElement>(undefined!);
+	let dmFileInputEl = $state<HTMLInputElement>(undefined!);
+	let dmOverlayEl = $state<HTMLDivElement>(undefined!);
 	let isLockedToBottom = $state(true);
 	let unreadCount = $state(0);
 
@@ -743,8 +743,7 @@
 			</div>
 			{#if showDmPicker}
 				<div class="composer-picker-wrapper">
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="picker-backdrop" onclick={() => { showDmPicker = false; }}></div>
+					<div class="picker-backdrop" role="presentation" onclick={() => { showDmPicker = false; }} onkeydown={(e) => { if (e.key === 'Escape') showDmPicker = false; }}></div>
 					<div class="picker-container" role="dialog" aria-label="Emoji and GIF picker">
 						<div class="picker-tab-bar">
 							<button

@@ -9,6 +9,11 @@
 	let nickname = $state(auth.me?.user.displayName ?? '');
 	let isSubmitting = $state(false);
 	let error = $state('');
+	let nicknameInput = $state<HTMLInputElement>(undefined!);
+
+	$effect(() => {
+		if (nicknameInput) nicknameInput.focus();
+	});
 
 	const trimmed = $derived(nickname.trim());
 	const isValid = $derived(trimmed.length >= MIN_LEN && trimmed.length <= MAX_LEN);
@@ -41,6 +46,7 @@
 	role="dialog"
 	aria-modal="true"
 	aria-label="Choose your nickname"
+	tabindex="-1"
 	onkeydown={handleKeydown}
 >
 	<div class="modal">
@@ -68,11 +74,11 @@
 				<input
 					type="text"
 					bind:value={nickname}
+					bind:this={nicknameInput}
 					placeholder="2–32 characters"
 					minlength={MIN_LEN}
 					maxlength={MAX_LEN}
 					autocomplete="username"
-					autofocus
 					required
 				/>
 			</label>

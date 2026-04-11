@@ -75,8 +75,8 @@
 	}
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={onclose}>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" onclick={(e) => e.stopPropagation()}>
+<div class="modal-backdrop" role="presentation" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
 		<h2 id="delete-title" class="modal-title">Delete Account</h2>
 
 		<div class="warning">

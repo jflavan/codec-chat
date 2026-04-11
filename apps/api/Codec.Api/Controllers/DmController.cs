@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Codec.Api.Filters;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codec.Api.Controllers;
@@ -24,6 +25,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
     /// or returns the existing channel if one already exists. Requires an accepted friendship.
     /// </summary>
     [HttpPost("channels")]
+    [EnableRateLimiting("fixed")]
     public async Task<IActionResult> CreateOrResumeChannel([FromBody] CreateDmChannelRequest request)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);

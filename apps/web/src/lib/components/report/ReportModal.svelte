@@ -67,8 +67,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if modal}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal-backdrop" onclick={handleBackdrop}>
+	<div class="modal-backdrop" role="presentation" onclick={handleBackdrop}>
 		<div class="modal" role="dialog" aria-labelledby="report-title" aria-modal="true">
 			<h2 id="report-title">Report {typeLabel}</h2>
 			<p class="context">{modal.targetName}</p>

@@ -6,6 +6,11 @@
 	let password = $state('');
 	let isSubmitting = $state(false);
 	let error = $state('');
+	let passwordInput = $state<HTMLInputElement>(undefined!);
+
+	$effect(() => {
+		if (passwordInput) passwordInput.focus();
+	});
 
 	async function handleSubmit(e: Event): Promise<void> {
 		e.preventDefault();
@@ -59,9 +64,9 @@
 				<input
 					type="password"
 					bind:value={password}
+					bind:this={passwordInput}
 					placeholder="Your password"
 					autocomplete="current-password"
-					autofocus
 					required
 				/>
 			</label>

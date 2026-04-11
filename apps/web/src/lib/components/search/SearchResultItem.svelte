@@ -145,6 +145,7 @@
 		overflow: hidden;
 		display: -webkit-box;
 		-webkit-line-clamp: 3;
+		line-clamp: 3;
 		-webkit-box-orient: vertical;
 		word-break: break-word;
 	}
