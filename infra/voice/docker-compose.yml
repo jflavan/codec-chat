@@ -16,7 +16,7 @@ services:
       - ./livekit.yaml:/etc/livekit.yaml
     command: ["--config", "/etc/livekit.yaml"]
     environment:
-      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}:${LIVEKIT_API_SECRET}"
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
 
   caddy:
     image: caddy:2
