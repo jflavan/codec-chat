@@ -261,14 +261,16 @@ jobs:
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
             --scripts "
-              sleep 15
-              echo '=== Listening ports ==='
-              ss -tlnp 2>/dev/null | grep -E ':(80|443|7880|7881)\s' || echo 'No matching ports'
-              echo '=== LiveKit logs (last 5) ==='
-              docker logs voice-livekit-1 --tail 5 2>&1 || echo 'No LiveKit logs'
-              echo '=== Caddy logs (last 10) ==='
-              docker logs voice-caddy-1 --tail 10 2>&1 || echo 'No Caddy logs'
-              echo '=== HEALTH CHECK RESULTS ==='
+              sleep 20
+              echo '=== LiveKit container restarts ==='
+              docker inspect --format='{{.RestartCount}}' voice-livekit-1 2>/dev/null || echo 'N/A'
+              echo '=== LiveKit logs (last 15) ==='
+              docker logs voice-livekit-1 --tail 15 2>&1 || echo 'No LiveKit logs'
+              echo '=== Ports 7880/443 ==='
+              ss -tlnp 2>/dev/null | grep -E ':(443|7880)\s' || echo 'No matching ports'
+              echo '=== Caddy logs (last 3) ==='
+              docker logs voice-caddy-1 --tail 3 2>&1 || echo 'No Caddy logs'
+              echo '=== HEALTH CHECK ==='
               docker inspect --format='{{.State.Running}}' voice-livekit-1 2>/dev/null && echo LIVEKIT_OK || echo LIVEKIT_FAIL
               docker inspect --format='{{.State.Running}}' voice-caddy-1 2>/dev/null && echo CADDY_OK || echo CADDY_FAIL
             " \
