@@ -4,6 +4,7 @@ using Codec.Api.Services;
 using Livekit.Server.Sdk.Dotnet;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Codec.Api.Filters;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ namespace Codec.Api.Controllers;
 [ApiController]
 [Authorize]
 [RequireEmailVerified]
+[EnableRateLimiting("fixed")]
 [Route("voice")]
 public class VoiceController(CodecDbContext db, IUserService userService, IConfiguration config) : ControllerBase
 {
@@ -144,6 +146,14 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
         if (string.IsNullOrWhiteSpace(roomName))
             return BadRequest(new { error = "roomName is required." });
 
+        // Validate roomName format: must be a GUID (channel) or "call-{GUID}" (DM call).
+        Guid callId = default;
+        var isChannelRoom = Guid.TryParse(roomName, out var channelGuid);
+        var isCallRoom = !isChannelRoom && roomName.StartsWith("call-")
+            && Guid.TryParse(roomName["call-".Length..], out callId);
+        if (!isChannelRoom && !isCallRoom)
+            return BadRequest(new { error = "roomName must be a channel GUID or 'call-{callId}'." });
+
         var apiKey = config["LiveKit:ApiKey"];
         var apiSecret = config["LiveKit:ApiSecret"];
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
@@ -152,17 +162,21 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Authorize: the user must have an active VoiceState for this room.
-        // Server voice channels use channelId as roomName; DM calls use "call-{callId}".
         var hasVoiceState = false;
-        if (Guid.TryParse(roomName, out var channelGuid))
+        if (isChannelRoom)
         {
             hasVoiceState = await db.VoiceStates.AsNoTracking()
                 .AnyAsync(vs => vs.UserId == appUser.Id && vs.ChannelId == channelGuid);
         }
-        else if (roomName.StartsWith("call-") && Guid.TryParse(roomName["call-".Length..], out _))
+        else
         {
-            hasVoiceState = await db.VoiceStates.AsNoTracking()
-                .AnyAsync(vs => vs.UserId == appUser.Id && vs.DmChannelId != null);
+            var call = await db.VoiceCalls.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == callId && c.Status == VoiceCallStatus.Active);
+            if (call is not null)
+            {
+                hasVoiceState = await db.VoiceStates.AsNoTracking()
+                    .AnyAsync(vs => vs.UserId == appUser.Id && vs.DmChannelId == call.DmChannelId);
+            }
         }
 
         if (!hasVoiceState && !appUser.IsGlobalAdmin)
@@ -178,7 +192,7 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
                 CanPublish = true,
                 CanSubscribe = true
             })
-            .WithTtl(TimeSpan.FromHours(1));
+            .WithTtl(TimeSpan.FromMinutes(15));
 
         return Ok(new { token = token.ToJwt() });
     }

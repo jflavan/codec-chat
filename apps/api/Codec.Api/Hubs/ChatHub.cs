@@ -991,8 +991,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /// </summary>
     private string GenerateLiveKitToken(string userId, string displayName, string roomName)
     {
-        var apiKey = config["LiveKit:ApiKey"] ?? "devkey";
-        var apiSecret = config["LiveKit:ApiSecret"] ?? "secret";
+        var apiKey = config["LiveKit:ApiKey"]
+            ?? throw new InvalidOperationException("LiveKit:ApiKey must be configured.");
+        var apiSecret = config["LiveKit:ApiSecret"]
+            ?? throw new InvalidOperationException("LiveKit:ApiSecret must be configured.");
 
         var token = new AccessToken(apiKey, apiSecret)
             .WithIdentity(userId)
@@ -1004,7 +1006,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 CanPublish = true,
                 CanSubscribe = true
             })
-            .WithTtl(TimeSpan.FromHours(1));
+            .WithTtl(TimeSpan.FromMinutes(15));
 
         return token.ToJwt();
     }

@@ -82,7 +82,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **Server admin role management** — PATCH endpoint to promote/demote members; Owner can promote Members to Admin and demote Admins to Member; Admins can promote Members but not demote other Admins; Members tab in server settings with promote/demote UI; Owner/Admin role badges in member sidebar; real-time `MemberRoleChanged` SignalR event
 - **DM reactions** — Reaction entity extended with nullable DirectMessageId (mutual exclusivity constraint with MessageId) to support emoji reactions on direct messages
 - **.NET Aspire AppHost** — single-command local dev orchestration (Postgres, Redis, Azurite, API, Web) with dashboard at `https://localhost:17222`
-- **OpenTelemetry observability** — `Codec.ServiceDefaults` shared project with distributed traces, metrics, and structured logs; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard; SFU instrumented with custom spans on room/transport/producer/consumer operations; Application Insights Bicep module wired to API container app; CD pipeline passes connection string to voice VM
+- **OpenTelemetry observability** — `Codec.ServiceDefaults` shared project with distributed traces, metrics, and structured logs; Azure Monitor / Application Insights in production; OTLP export for local Aspire dashboard; Application Insights Bicep module wired to API container app
 - **Testing** — 1,542 automated tests (1,188 API unit, 177 API integration, 177 web); API core services at 95%+ coverage; web unit-testable code at 98%+ coverage; combined API coverage at 80%+; integration tests use Testcontainers for disposable Postgres/Redis; see [TESTING.md](docs/TESTING.md)
 - All health checks passing (API `/health/ready` 200, Web `/health` 200)
 - Custom domain (`codec-chat.com`) with managed TLS certificates via two-phase Bicep deployment (HTTP validation)
@@ -90,7 +90,7 @@ Create a Discord-like app called Codec with a SvelteKit web front-end and an ASP
 - **Message pinning** — `PinnedMessage` entity with unique `(ChannelId, MessageId)` index; pin/unpin/list endpoints in `ChannelsController` (Owner/Admin/GlobalAdmin, 50-pin limit); `PinNotification` system messages; `MessagePinned`/`MessageUnpinned` SignalR events; audit logging (`MessagePinned`/`MessageUnpinned` actions); frontend pin button in action bar, pin indicator on messages, slide-in pinned messages panel with unpin controls, reactive pin state in `MessageStore`
 - **Custom roles and granular permissions** — `ServerRoleEntity` with 21 `Permission` flags (bitmask); role hierarchy with position ordering; system roles (Owner, Admin, Member, @everyone) + custom roles; full CRUD via `RolesController`; role management UI with permission editor; role badges with custom colors; `IsMentionable` and `IsHoisted` options
 - **User banning** — `BannedMember` entity with reason and actor tracking; ban/unban/list endpoints; ban check on invite join; optional message purge on ban; real-time `BannedFromServer` and `MemberBanned` SignalR events; ban management tab in server settings
-- **Video chat and screen sharing** — Voice Phase 5 complete; webcam video and screen sharing via mediasoup video/screen producers; `IsVideoEnabled` and `IsScreenSharing` state per participant; `VideoTile` and `VideoGrid` components; `getDisplayMedia()` for screen capture
+- **Video chat and screen sharing** — Voice Phase 5 complete; webcam video and screen sharing via LiveKit video/screen tracks; `IsVideoEnabled` and `IsScreenSharing` state per participant; `VideoTile` and `VideoGrid` components; `getDisplayMedia()` for screen capture
 - **Outgoing webhooks** — `Webhook` entity with per-server config (name, URL, secret, event types); `WebhookDeliveryLog` for delivery tracking; background dispatch with exponential backoff retry (5s, 30s, 5m); HMAC-SHA256 payload signing; 9 event types
 - **Web push notifications** — `PushSubscription` entity with VAPID keys; subscribe/unsubscribe endpoints; notifications for DMs, @mentions, and friend requests; auto-deactivation on 410 Gone
 - **SAML 2.0 SSO** — `SamlIdentityProvider` entity; SP-initiated login with HTTP-Redirect binding; XML signature verification; JIT user provisioning; admin CRUD for IdP management; metadata import
@@ -1247,7 +1247,7 @@ Add email/password registration as a second auth method alongside Google Sign-In
 - ~~Comprehensive unit and integration tests~~ (implemented: 1,542 tests across 3 suites; CI pipeline runs all tests on every PR)
 - ~~Voice Phase 2~~ (completed: deafen, per-user volume, push-to-talk, responsive UserActionSheet)
 - ~~Voice Phase 3~~ (completed: 1:1 DM voice calls with ringing, timeout, system messages)
-- ~~Voice Phase 5~~ (completed: video chat and screen sharing via mediasoup)
+- ~~Voice Phase 5~~ (completed: video chat and screen sharing; migrated from mediasoup to LiveKit)
 - ~~Server settings/configuration~~ (implemented: descriptions, channel categories, invite management tab, audit log, notification preferences)
 - ~~Message search~~ (completed: PostgreSQL trigram indexes, server/DM search endpoints, jump-to-message)
 - ~~Custom roles and granular permissions~~ (implemented: ServerRoleEntity with 21 Permission flags, role hierarchy, CRUD endpoints, management UI)

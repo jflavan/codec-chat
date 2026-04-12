@@ -9,7 +9,8 @@
 ///   2. cloud-init installs Docker on first boot.
 ///   3. CI/CD writes /opt/voice/docker-compose.yml and /opt/voice/livekit.yaml
 ///      (with secrets injected), then runs `docker compose up -d` to start LiveKit.
-///   4. LiveKit handles its own WebSocket signaling on port 7880 (no nginx needed).
+///   4. Caddy reverse-proxies port 443 (wss://) → LiveKit port 7880 (ws://) and
+///      auto-provisions TLS certificates via Let's Encrypt.
 
 param name string
 param location string
@@ -39,6 +40,8 @@ var signalPort      = 7880
 var rtcTcpPort      = 7881
 var rtcMinPort      = 50000
 var rtcMaxPort      = 60000
+var httpsPort       = 443
+var httpPort        = 80
 
 // ── Static public IP ────────────────────────────────────────────────────────────
 resource publicIp 'Microsoft.Network/publicIPAddresses@2023-09-01' = {
@@ -57,15 +60,17 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
   location: location
   properties: {
     securityRules: [
-      // SSH — restrict to operator IPs via sshAllowedSourcePrefix
+      // SSH — only allow when an explicit operator CIDR is provided.
+      // When sshAllowedSourcePrefix is empty, SSH is denied from all sources
+      // (the rule is still present but uses a deny-all placeholder).
       {
         name: 'allow-ssh'
         properties: {
           priority: 100
           protocol: 'Tcp'
-          access: 'Allow'
+          access: !empty(sshAllowedSourcePrefix) ? 'Allow' : 'Deny'
           direction: 'Inbound'
-          sourceAddressPrefix: !empty(sshAllowedSourcePrefix) ? sshAllowedSourcePrefix : 'AzureCloud'
+          sourceAddressPrefix: !empty(sshAllowedSourcePrefix) ? sshAllowedSourcePrefix : '*'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '22'
@@ -99,18 +104,32 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           destinationPortRange: '${rtcMinPort}-${rtcMaxPort}'
         }
       }
-      // LiveKit signal port (WebSocket) — must be reachable by all clients
+      // HTTPS — Caddy TLS reverse proxy for LiveKit WebSocket signaling
       {
-        name: 'allow-livekit-signal'
+        name: 'allow-https'
         properties: {
-          priority: 300
+          priority: 250
           protocol: 'Tcp'
           access: 'Allow'
           direction: 'Inbound'
           sourceAddressPrefix: '*'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
-          destinationPortRange: string(signalPort)
+          destinationPortRange: string(httpsPort)
+        }
+      }
+      // HTTP — Caddy ACME challenge (Let's Encrypt) + redirect to HTTPS
+      {
+        name: 'allow-http'
+        properties: {
+          priority: 260
+          protocol: 'Tcp'
+          access: 'Allow'
+          direction: 'Inbound'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: string(httpPort)
         }
       }
       // LiveKit RTC TCP fallback
@@ -252,4 +271,4 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // ── Outputs ─────────────────────────────────────────────────────────────────────
 output publicIpAddress string = publicIp.properties.ipAddress
 output fqdn string = publicIp.properties.dnsSettings.fqdn
-output livekitUrl string = 'ws://${publicIp.properties.ipAddress}:${signalPort}'
+output livekitUrl string = 'wss://${publicIp.properties.dnsSettings.fqdn}'

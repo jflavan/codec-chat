@@ -163,6 +163,7 @@ PUBLIC_LIVEKIT_URL=ws://localhost:7880
   "ConnectionStrings": { "Default": "Host=localhost;Port=5433;Database=codec_dev;Username=codec;Password=codec_dev_password" },
   "Cors": { "AllowedOrigins": ["http://localhost:5174"] },
   "Api": { "BaseUrl": "http://localhost:5050" },
+  "LiveKit": { "ApiKey": "devkey", "ApiSecret": "secret", "ServerUrl": "ws://localhost:7880" },
   "GlobalAdmin": { "Email": "<optional global admin email>" }
 }
 ```

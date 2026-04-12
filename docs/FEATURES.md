@@ -69,10 +69,10 @@ This document tracks implemented and planned features for Codec.
 - DMs support all messaging features (replies, reactions, images, formatting, search)
 
 ### Voice & Video
-- **Voice channels** — persistent voice channel type in servers; join/leave freely; real-time audio via mediasoup v3 SFU (Opus/WebRTC); mute/unmute with broadcast; participant list with avatars and mute indicators; per-user volume control; push-to-talk with configurable keybind
+- **Voice channels** — persistent voice channel type in servers; join/leave freely; real-time audio via LiveKit SFU (Opus/WebRTC); mute/unmute with broadcast; participant list with avatars and mute indicators; per-user volume control; push-to-talk with configurable keybind
 - **DM voice calls** — 1:1 calls from DM chat header; incoming call overlay with ring tone; 30-second ringing timeout; system messages for call events (missed, duration); call state recovery on reconnect; collision detection prevents concurrent calls
-- **Video chat** — webcam video via mediasoup video producers; `VideoTile` and `VideoGrid` components; `IsVideoEnabled` state tracked per participant; toggle on/off during voice sessions
-- **Screen sharing** — `getDisplayMedia()` screen capture; separate screen producer track; `IsScreenSharing` state broadcast via SignalR; viewers consume screen track alongside audio
+- **Video chat** — webcam video via LiveKit video tracks; `VideoTile` and `VideoGrid` components; `IsVideoEnabled` state tracked per participant; toggle on/off during voice sessions
+- **Screen sharing** — `getDisplayMedia()` screen capture via LiveKit screen share tracks; `IsScreenSharing` state broadcast via SignalR; viewers subscribe to screen track alongside audio
 
 ### User Settings
 - Full-screen modal with category sidebar

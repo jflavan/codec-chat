@@ -419,7 +419,7 @@ module webApp 'modules/container-app-web.bicep' = {
     publicGoogleClientId: googleClientId
     publicRecaptchaSiteKey: recaptchaSiteKey
     publicGiphyApiKey: giphyApiKey
-    publicLivekitUrl: voiceVmEnabled ? 'wss://${voiceVm.outputs.fqdn}:7880' : ''
+    publicLivekitUrl: voiceVmEnabled ? voiceVm.outputs.livekitUrl : ''
     customDomainName: webCustomDomain
     managedCertificateId: webCertId
   }

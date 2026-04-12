@@ -24,6 +24,10 @@ export class VoiceService {
 	private callbacks: VoiceServiceCallbacks | null = null;
 
 	async join(token: string, serverUrl: string, callbacks: VoiceServiceCallbacks): Promise<void> {
+		// Null callbacks before leaving so the old room's Disconnected event
+		// doesn't fire _cleanupVoiceState and corrupt state for the new session.
+		this.callbacks = null;
+		await this.leave();
 		this.callbacks = callbacks;
 
 		this.room = new Room({
@@ -36,7 +40,7 @@ export class VoiceService {
 			(track, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
 				const userId = participant.identity;
 				const label = this._trackLabel(track, publication);
-				callbacks.onTrackSubscribed(userId, track.mediaStreamTrack, label);
+				this.callbacks?.onTrackSubscribed(userId, track.mediaStreamTrack, label);
 			}
 		);
 
@@ -45,12 +49,12 @@ export class VoiceService {
 			(track, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
 				const userId = participant.identity;
 				const label = this._trackLabel(track, publication);
-				callbacks.onTrackUnsubscribed(userId, label);
+				this.callbacks?.onTrackUnsubscribed(userId, label);
 			}
 		);
 
 		this.room.on(RoomEvent.Disconnected, () => {
-			callbacks.onDisconnected();
+			this.callbacks?.onDisconnected();
 		});
 
 		await this.room.connect(serverUrl, token);
@@ -101,20 +105,20 @@ export class VoiceService {
 	}
 
 	async leave(): Promise<void> {
+		this.callbacks = null;
 		if (this.room) {
 			await this.room.disconnect();
 			this.room = null;
 		}
-		this.callbacks = null;
 	}
 
 	/** Synchronous cleanup for beforeunload — disconnects immediately. */
 	teardownSync(): void {
+		this.callbacks = null;
 		if (this.room) {
 			this.room.disconnect();
 			this.room = null;
 		}
-		this.callbacks = null;
 	}
 
 	/** Get the local participant for volume/audio manipulation. */

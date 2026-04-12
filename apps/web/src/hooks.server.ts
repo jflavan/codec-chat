@@ -31,7 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			'https://*.giphy.com',
 			apiBase
 		].join(' '),
-		'connect-src': `'self' ${apiBase} ${wsBase} ${livekitUrl} https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com https://api.giphy.com`,
+		'connect-src': `'self' ${apiBase} ${wsBase} ${livekitUrl ? livekitUrl + ' ' : ''}https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com https://api.giphy.com`,
 		'frame-src': 'https://accounts.google.com https://www.google.com https://www.youtube-nocookie.com https://github.com https://discord.com'
 	};
 

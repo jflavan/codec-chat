@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Codec.Api.IntegrationTests.Infrastructure;
+using Codec.Api.Models;
 using FluentAssertions;
 
 namespace Codec.Api.IntegrationTests.Tests;
@@ -12,7 +13,24 @@ public class VoiceStateTests(CodecWebFactory factory) : IntegrationTestBase(fact
     public async Task GetToken_ReturnsLiveKitToken()
     {
         var client = CreateClient("vs-token", "TokenUser");
-        var response = await client.GetFromJsonAsync<JsonElement>("/voice/token?roomName=test-room");
+        var (serverId, _) = await CreateServerAsync(client);
+        var channelId = await CreateChannelAsync(client, serverId, "voice-token-test", "voice");
+
+        // Seed a VoiceState so the user is authorized for this room
+        await WithDbAsync(async db =>
+        {
+            var user = db.Users.First(u => u.GoogleSubject == "vs-token");
+            db.VoiceStates.Add(new VoiceState
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                ChannelId = channelId,
+                JoinedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        });
+
+        var response = await client.GetFromJsonAsync<JsonElement>($"/voice/token?roomName={channelId}");
 
         response.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
     }

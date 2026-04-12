@@ -422,20 +422,20 @@ export class VoiceStore {
 		);
 	}
 
-	setVoiceInputMode(mode: 'voice-activity' | 'push-to-talk'): void {
+	async setVoiceInputMode(mode: 'voice-activity' | 'push-to-talk'): Promise<void> {
 		this.voiceInputMode = mode;
 		this._saveVoicePreferences();
 
 		if (this.activeVoiceChannelId) {
 			if (mode === 'push-to-talk') {
-				this.voice.setMuted(true);
+				await this.voice.setMuted(true);
 				this.isPttActive = false;
 				this._registerPttListeners();
 			} else {
 				this._removePttListeners();
 				this.isPttActive = false;
 				if (!this.isMuted) {
-					this.voice.setMuted(false);
+					await this.voice.setMuted(false);
 				}
 			}
 		}
@@ -451,7 +451,7 @@ export class VoiceStore {
 	private _registerPttListeners(): void {
 		this._removePttListeners();
 
-		this.pttKeydownHandler = (e: KeyboardEvent) => {
+		this.pttKeydownHandler = async (e: KeyboardEvent) => {
 			if (e.code !== this.pttKey || e.repeat) return;
 			const tag = (document.activeElement as HTMLElement)?.tagName;
 			if (
@@ -462,14 +462,14 @@ export class VoiceStore {
 				return;
 
 			this.isPttActive = true;
-			this.voice.setMuted(false);
+			await this.voice.setMuted(false);
 		};
 
-		this.pttKeyupHandler = (e: KeyboardEvent) => {
+		this.pttKeyupHandler = async (e: KeyboardEvent) => {
 			if (e.code !== this.pttKey) return;
 
 			this.isPttActive = false;
-			this.voice.setMuted(true);
+			await this.voice.setMuted(true);
 		};
 
 		window.addEventListener('keydown', this.pttKeydownHandler);
@@ -873,7 +873,20 @@ export class VoiceStore {
 
 	/* ═══════════════════ Internal Cleanup ═══════════════════ */
 
-	private _cleanupVoiceState(): void {
+	private async _cleanupVoiceState(): Promise<void> {
+		// Notify the server so the VoiceState row is removed and other users
+		// see this user leave. Without this, a LiveKit disconnect while SignalR
+		// stays connected would leave a ghost entry in the voice channel sidebar.
+		try {
+			if (this.activeCall) {
+				await this.hub.endCall();
+			} else if (this.activeVoiceChannelId) {
+				await this.hub.leaveVoiceChannel();
+			}
+		} catch {
+			/* SignalR may also be disconnected — ignore */
+		}
+
 		this._cleanupRemoteAudio();
 		this._cleanupRemoteVideo();
 		this._removePttListeners();

@@ -60,6 +60,8 @@ jobs:
     if: needs.check-skip.outputs.should-run == 'true'
     outputs:
       image-tag: ${{ github.sha }}
+      voice-enabled: ${{ steps.voice-detect.outputs.enabled }}
+      voice-fqdn: ${{ steps.voice-detect.outputs.fqdn }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,6 +72,23 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Detect voice VM
+        id: voice-detect
+        run: |
+          FQDN=$(az network public-ip show \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VOICE_VM_NAME }}-pip \
+            --query "dnsSettings.fqdn" -o tsv 2>/dev/null || true)
+          if [ -n "$FQDN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "fqdn=$FQDN" >> "$GITHUB_OUTPUT"
+            echo "Voice VM detected: $FQDN"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "fqdn=" >> "$GITHUB_OUTPUT"
+            echo "No voice VM found — voice features will be disabled"
+          fi
 
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
@@ -94,13 +113,15 @@ jobs:
           docker push ${{ env.ACR_NAME }}.azurecr.io/codec-api:latest
 
       - name: Build Web image
+        env:
+          LIVEKIT_URL: ${{ steps.voice-detect.outputs.enabled == 'true' && format('wss://{0}', steps.voice-detect.outputs.fqdn) || '' }}
         run: |
           docker build \
             --build-arg PUBLIC_API_BASE_URL=${{ secrets.PUBLIC_API_BASE_URL }} \
             --build-arg PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.PUBLIC_GOOGLE_CLIENT_ID }} \
             --build-arg PUBLIC_RECAPTCHA_SITE_KEY=${{ secrets.PUBLIC_RECAPTCHA_SITE_KEY }} \
             --build-arg PUBLIC_GIPHY_API_KEY=${{ secrets.GIPHY_API_KEY }} \
-            --build-arg PUBLIC_LIVEKIT_URL=${{ secrets.PUBLIC_LIVEKIT_URL }} \
+            --build-arg PUBLIC_LIVEKIT_URL=${{ env.LIVEKIT_URL }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-web:${{ github.sha }} \
             -t ${{ env.ACR_NAME }}.azurecr.io/codec-web:latest \
             ./apps/web
@@ -143,9 +164,7 @@ jobs:
   deploy-voice:
     runs-on: ubuntu-latest
     needs: build-and-push
-    # Only runs when the voice VM is enabled. Set the VOICE_VM_ENABLED repository
-    # variable to 'true' once the VM has been provisioned via infra/main.bicep.
-    if: vars.VOICE_VM_ENABLED == 'true'
+    if: needs.build-and-push.outputs.voice-enabled == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -157,31 +176,59 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Substitute variables in docker-compose template
-        env:
-          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
-          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+      - name: Read LiveKit secrets from Key Vault
+        id: livekit-secrets
         run: |
-          envsubst '${LIVEKIT_API_KEY} ${LIVEKIT_API_SECRET}' \
+          API_KEY=$(az keyvault secret show \
+            --vault-name kv-codec-prod \
+            --name LiveKit--ApiKey \
+            --query value -o tsv)
+          API_SECRET=$(az keyvault secret show \
+            --vault-name kv-codec-prod \
+            --name LiveKit--ApiSecret \
+            --query value -o tsv)
+          echo "::add-mask::$API_KEY"
+          echo "::add-mask::$API_SECRET"
+          echo "api-key=$API_KEY" >> "$GITHUB_OUTPUT"
+          echo "api-secret=$API_SECRET" >> "$GITHUB_OUTPUT"
+
+      - name: Substitute variables in templates
+        env:
+          LIVEKIT_API_KEY: ${{ steps.livekit-secrets.outputs.api-key }}
+          LIVEKIT_API_SECRET: ${{ steps.livekit-secrets.outputs.api-secret }}
+          VOICE_DOMAIN: ${{ needs.build-and-push.outputs.voice-fqdn }}
+        run: |
+          envsubst '${LIVEKIT_API_KEY} ${LIVEKIT_API_SECRET} ${VOICE_DOMAIN}' \
             < infra/voice/docker-compose.yml \
             | base64 -w 0 > /tmp/compose-b64.txt
+          envsubst '${VOICE_DOMAIN}' \
+            < infra/voice/Caddyfile \
+            | base64 -w 0 > /tmp/caddyfile-b64.txt
 
-      - name: Write docker-compose.yml and livekit.yaml to VM
+      - name: Write config files to VM
         run: |
+          # Build a self-contained script that embeds base64 payloads as heredocs
+          # to avoid shell injection via variable interpolation.
           COMPOSE_B64=$(cat /tmp/compose-b64.txt)
           LIVEKIT_YAML_B64=$(base64 -w 0 < infra/voice/livekit.yaml)
+          CADDYFILE_B64=$(cat /tmp/caddyfile-b64.txt)
+          cat > /tmp/deploy-voice.sh <<DEPLOY_EOF
+          #!/bin/bash
+          set -e
+          echo "$COMPOSE_B64" | base64 -d > /opt/voice/docker-compose.yml
+          chmod 600 /opt/voice/docker-compose.yml
+          echo "$LIVEKIT_YAML_B64" | base64 -d > /opt/voice/livekit.yaml
+          chmod 600 /opt/voice/livekit.yaml
+          echo "$CADDYFILE_B64" | base64 -d > /opt/voice/Caddyfile
+          chmod 600 /opt/voice/Caddyfile
+          DEPLOY_EOF
           az vm run-command invoke \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "
-              echo '${COMPOSE_B64}' | base64 -d > /opt/voice/docker-compose.yml
-              chmod 600 /opt/voice/docker-compose.yml
-              echo '${LIVEKIT_YAML_B64}' | base64 -d > /opt/voice/livekit.yaml
-              chmod 644 /opt/voice/livekit.yaml
-            "
+            --scripts @/tmp/deploy-voice.sh
 
-      - name: Pull and start LiveKit
+      - name: Pull and start voice services
         run: |
           az vm run-command invoke \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -193,7 +240,7 @@ jobs:
               docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
             "
 
-      - name: Verify LiveKit health
+      - name: Verify LiveKit health (internal)
         run: |
           STATUS=$(az vm run-command invoke \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -205,7 +252,22 @@ jobs:
             echo "::error::LiveKit health check failed: $STATUS"
             exit 1
           fi
-          echo "LiveKit health check passed"
+          echo "LiveKit internal health check passed"
+
+      - name: Verify LiveKit TLS (external)
+        run: |
+          VOICE_FQDN="${{ needs.build-and-push.outputs.voice-fqdn }}"
+          # Allow up to 60s for Caddy to provision the TLS certificate on first deploy
+          for i in $(seq 1 6); do
+            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "https://${VOICE_FQDN}" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "LiveKit TLS health check passed (HTTPS $HTTP_CODE)"
+              exit 0
+            fi
+            echo "  Attempt $i/6 — HTTP $HTTP_CODE, retrying in 10s..."
+            sleep 10
+          done
+          echo "::warning::LiveKit TLS health check did not return 200 (last: $HTTP_CODE). Caddy may still be provisioning the certificate."
 
   migrate-database:
     runs-on: ubuntu-latest
