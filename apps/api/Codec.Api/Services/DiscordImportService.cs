@@ -504,7 +504,9 @@ public class DiscordImportService
                 }, ct);
             }
 
-            after = messages[^1].Id;
+            // Discord returns messages in descending order (newest first) even with `after`.
+            // Use msgs[0] (the newest in the page) as the cursor for the next page.
+            after = messages[0].Id;
             if (messages.Count < 100) break;
         }
 
