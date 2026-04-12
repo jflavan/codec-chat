@@ -44,7 +44,7 @@ public class DiscordMediaRehostServiceTests
     }
 
     [Fact]
-    public async Task RehostImageAsync_ReturnsNull_ForUnsupportedContentType()
+    public async Task RehostImageAsync_ReturnsEmptyString_ForUnsupportedContentType()
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -53,11 +53,12 @@ public class DiscordMediaRehostServiceTests
         response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
 
         var service = CreateService(response);
+        // Unsupported content types are intentional skips (empty string), not failures (null)
         var result = await service.RehostImageAsync(
             "https://cdn.discordapp.com/attachments/123/file.pdf",
             "images", 10 * 1024 * 1024, 4096, CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal("", result);
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public class DiscordMediaRehostServiceTests
     }
 
     [Fact]
-    public async Task RehostImageAsync_ReturnsNull_ForGifOverMaxSize()
+    public async Task RehostImageAsync_ReturnsEmptyString_ForGifOverMaxSize()
     {
         var gifBytes = CreateTestGif();
 
@@ -110,10 +111,11 @@ public class DiscordMediaRehostServiceTests
         response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/gif");
 
         var service = CreateService(response);
+        // Oversized GIFs are intentional skips (empty string), not failures (null)
         var result = await service.RehostImageAsync(
             "https://cdn.discordapp.com/emojis/123.gif",
             "emojis", 1, null, CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal("", result);
     }
 }

@@ -42,20 +42,25 @@ public class DiscordMediaRehostService
             return null;
         }
 
-        if (!response.IsSuccessStatusCode)
+        byte[] originalBytes;
+        string contentType;
+        using (response)
         {
-            _logger.LogWarning("Discord CDN returned {StatusCode} for {Url}", response.StatusCode, discordCdnUrl);
-            return null;
-        }
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Discord CDN returned {StatusCode} for {Url}", response.StatusCode, discordCdnUrl);
+                return null;
+            }
 
-        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-        if (!SupportedContentTypes.Contains(contentType))
-        {
-            _logger.LogDebug("Skipping unsupported content type {ContentType} for {Url}", contentType, discordCdnUrl);
-            return null;
-        }
+            contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+            if (!SupportedContentTypes.Contains(contentType))
+            {
+                _logger.LogDebug("Skipping unsupported content type {ContentType} for {Url}", contentType, discordCdnUrl);
+                return "";
+            }
 
-        var originalBytes = await response.Content.ReadAsByteArrayAsync(ct);
+            originalBytes = await response.Content.ReadAsByteArrayAsync(ct);
+        }
 
         byte[] finalBytes;
         string finalContentType;
@@ -70,6 +75,13 @@ public class DiscordMediaRehostService
         {
             _logger.LogWarning(ex, "Failed to process image from {Url}", discordCdnUrl);
             return null;
+        }
+
+        // "skip" sentinel means the image was intentionally skipped (e.g., oversized GIF)
+        if (finalContentType == "skip")
+        {
+            _logger.LogDebug("Skipping oversized GIF from {Url}", discordCdnUrl);
+            return "";
         }
 
         var hashPrefix = Convert.ToHexString(SHA256.HashData(finalBytes))[..16].ToLowerInvariant();
@@ -88,7 +100,7 @@ public class DiscordMediaRehostService
         if (isGif)
         {
             if (imageBytes.Length > maxFileSize)
-                throw new InvalidOperationException("GIF exceeds max file size");
+                return (Array.Empty<byte>(), "skip", ".gif");
             return (imageBytes, "image/gif", ".gif");
         }
 

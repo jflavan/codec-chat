@@ -677,18 +677,20 @@ public class DiscordImportService
             var newUrl = await rehostService.RehostImageAsync(
                 emoji.ImageUrl, "emojis", 512 * 1024, null, ct);
 
-            if (newUrl is not null)
+            if (newUrl is not null && newUrl.Length > 0)
             {
                 emoji.ImageUrl = newUrl;
                 consecutiveFailures = 0;
             }
-            else
+            else if (newUrl is null)
             {
+                // Real failure (HTTP error, decode error) — track for systemic failure detection
                 consecutiveFailures++;
                 _logger.LogWarning("Failed to re-host emoji {EmojiId} from {Url}", emoji.Id, emoji.ImageUrl);
                 if (consecutiveFailures >= maxConsecutiveFailures)
                     throw new InvalidOperationException("Too many consecutive emoji re-host failures. Aborting media re-hosting.");
             }
+            // else: empty string = intentional skip (e.g., oversized GIF), not a failure
 
             completed++;
             if (completed % 10 == 0)
@@ -703,6 +705,9 @@ public class DiscordImportService
                 }, ct);
             }
         }
+
+        // Save any remaining changes from the final partial batch
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task RehostAttachmentsAsync(
@@ -746,19 +751,25 @@ public class DiscordImportService
                 var newUrl = await rehostService.RehostImageAsync(
                     message.ImageUrl!, "images", 10 * 1024 * 1024, 4096, ct);
 
-                if (newUrl is not null)
+                if (newUrl is not null && newUrl.Length > 0)
                 {
                     message.ImageUrl = newUrl;
                     consecutiveFailures = 0;
                 }
-                else
+                else if (newUrl is null)
                 {
+                    // Real failure — clear the URL and track for systemic failure detection
                     message.ImageUrl = null;
                     consecutiveFailures++;
                     _logger.LogWarning("Failed to re-host image for message {MessageId}, clearing ImageUrl", message.Id);
 
                     if (consecutiveFailures >= maxConsecutiveFailures)
                         throw new InvalidOperationException("Too many consecutive attachment re-host failures. Aborting media re-hosting.");
+                }
+                else
+                {
+                    // Empty string = intentional skip (e.g., oversized GIF) — clear URL but don't count as failure
+                    message.ImageUrl = null;
                 }
 
                 completed++;
