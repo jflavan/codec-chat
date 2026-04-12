@@ -288,7 +288,18 @@ public class VoiceControllerTests : IDisposable
         var controller = new VoiceController(_db, _userService.Object, emptyConfig);
         controller.ControllerContext = _controller.ControllerContext;
 
-        await FluentActions.Invoking(() => controller.GetToken(roomName: "test-room"))
+        // Use a valid GUID roomName so format validation passes and the config check is reached.
+        var channel = CreateVoiceChannel();
+        _db.VoiceStates.Add(new VoiceState
+        {
+            UserId = _testUser.Id,
+            ChannelId = channel.Id,
+            ConnectionId = "conn-cfg",
+            JoinedAt = DateTimeOffset.UtcNow
+        });
+        _db.SaveChanges();
+
+        await FluentActions.Invoking(() => controller.GetToken(roomName: channel.Id.ToString()))
             .Should().ThrowAsync<InvalidOperationException>();
     }
 }
