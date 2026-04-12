@@ -378,6 +378,8 @@ builder.Services.AddHostedService<DiscordImportWorker>();
 builder.Services.AddHttpClient<DiscordApiClient>()
     .AddHttpMessageHandler<DiscordRateLimitHandler>();
 builder.Services.AddTransient<DiscordRateLimitHandler>();
+builder.Services.AddHttpClient<DiscordMediaRehostService>()
+    .AddHttpMessageHandler<DiscordRateLimitHandler>();
 
 // Web Push notification service (VAPID-authenticated).
 var vapidPublicKey = builder.Configuration["Vapid:PublicKey"];
