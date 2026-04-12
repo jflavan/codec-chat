@@ -56,9 +56,10 @@ public class DiscordApiClient
     }
 
     public Task<List<DiscordMessage>> GetChannelMessagesAsync(
-        string channelId, int limit = 100, string? after = null, CancellationToken ct = default)
+        string channelId, int limit = 100, string? before = null, string? after = null, CancellationToken ct = default)
     {
         var url = $"channels/{channelId}/messages?limit={limit}";
+        if (before is not null) url += $"&before={before}";
         if (after is not null) url += $"&after={after}";
         return SendAsync<List<DiscordMessage>>(url, ct);
     }

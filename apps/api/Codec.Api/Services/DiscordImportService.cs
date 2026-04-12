@@ -160,7 +160,7 @@ public class DiscordImportService
         {
             _logger.LogError(ex, "Discord import {ImportId} failed", importId);
             import.Status = DiscordImportStatus.Failed;
-            import.ErrorMessage = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message;
+            import.ErrorMessage = "Import failed unexpectedly. Check server logs for details.";
             import.EncryptedBotToken = null;
             await db.SaveChangesAsync(CancellationToken.None);
 
@@ -414,20 +414,23 @@ public class DiscordImportService
 
     private async Task<int> ImportChannelMessagesAsync(
         CodecDbContext db, DiscordApiClient discord, Guid serverId, Guid codecChannelId, string discordChannelId,
-        Guid importId, IClientProxy group, CancellationToken ct)
+        Guid importId, IClientProxy serverGroup, CancellationToken ct)
     {
         var count = 0;
-        // Start from snowflake "0" to get the oldest messages first.
-        // Discord's `after` param returns messages newer than the given ID in ascending order.
-        // Without `after`, Discord returns the newest messages (descending), which breaks pagination.
-        string? after = "0";
+        // Import newest messages first using `before` pagination (no cursor = newest page).
+        // This lets users see their most recent messages while history backfills.
+        // Discord returns messages in descending order (newest first).
+        // Each page: msgs[0] = newest, msgs[^1] = oldest. Use msgs[^1].Id as `before` cursor.
+        string? before = null;
+
+        var channelGroup = _hub.Clients.Group($"channel-{codecChannelId}");
 
         while (true)
         {
             List<DiscordMessage> messages;
             try
             {
-                messages = await discord.GetChannelMessagesAsync(discordChannelId, 100, after, ct);
+                messages = await discord.GetChannelMessagesAsync(discordChannelId, 100, before: before, ct: ct);
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
@@ -437,6 +440,7 @@ public class DiscordImportService
 
             if (messages.Count == 0) break;
 
+            var batchCount = 0;
             foreach (var dm in messages)
             {
                 if (dm.Type is not (0 or 19)) continue;
@@ -492,21 +496,31 @@ public class DiscordImportService
                     DiscordEntityId = dm.Id, EntityType = DiscordEntityType.Message, CodecEntityId = message.Id
                 });
                 count++;
+                batchCount++;
             }
 
             await db.SaveChangesAsync(ct);
 
-            if (count % 100 == 0)
+            // Notify channel subscribers that new messages are available
+            if (batchCount > 0)
             {
-                await group.SendAsync("ImportProgress", new
+                await channelGroup.SendAsync("ImportMessagesAvailable", new
+                {
+                    channelId = codecChannelId,
+                    count = batchCount
+                }, ct);
+            }
+
+            if (count % 500 == 0)
+            {
+                await serverGroup.SendAsync("ImportProgress", new
                 {
                     stage = "Messages", completed = count, total = 0, percentComplete = 0f
                 }, ct);
             }
 
-            // Discord returns messages in descending order (newest first) even with `after`.
-            // Use msgs[0] (the newest in the page) as the cursor for the next page.
-            after = messages[0].Id;
+            // Use oldest message in page as `before` cursor to get the next older page
+            before = messages[^1].Id;
             if (messages.Count < 100) break;
         }
 

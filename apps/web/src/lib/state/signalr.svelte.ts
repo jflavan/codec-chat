@@ -426,6 +426,12 @@ export async function setupSignalR(
 					};
 				}
 			},
+			onImportMessagesAvailable: (event) => {
+				// Reload messages if the user is viewing the channel that just got new imports
+				if (channels.selectedChannelId === event.channelId) {
+					messages.loadMessages(event.channelId);
+				}
+			},
 		}
 	);
 

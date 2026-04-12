@@ -285,6 +285,11 @@ export type ImportFailedEvent = {
 	errorMessage: string;
 };
 
+export type ImportMessagesAvailableEvent = {
+	channelId: string;
+	count: number;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -348,6 +353,7 @@ export type SignalRCallbacks = {
 	onImportProgress?: (event: ImportProgressEvent) => void;
 	onImportCompleted?: (event: ImportCompletedEvent) => void;
 	onImportFailed?: (event: ImportFailedEvent) => void;
+	onImportMessagesAvailable?: (event: ImportMessagesAvailableEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -579,6 +585,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onImportFailed) {
 			connection.on('ImportFailed', callbacks.onImportFailed);
+		}
+		if (callbacks.onImportMessagesAvailable) {
+			connection.on('ImportMessagesAvailable', callbacks.onImportMessagesAvailable);
 		}
 
 		if (callbacks.onReconnecting) {
