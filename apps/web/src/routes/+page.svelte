@@ -56,7 +56,7 @@
 	const messages = createMessageStore(auth, channels, api, ui, hub);
 	const dms = createDmStore(auth, api, ui, hub);
 	const friends = createFriendStore(auth, api, ui);
-	const voice = createVoiceStore(auth, api, ui, hub, new VoiceService());
+	const voice = createVoiceStore(auth, api, ui, hub, new VoiceService(), env.PUBLIC_LIVEKIT_URL ?? '');
 	const announcementStore = createAnnouncementStore();
 
 	/* ───── Wire cross-store callbacks ───── */

@@ -1,6 +1,5 @@
 // apps/web/src/lib/state/voice-store.svelte.ts
 import { getContext, setContext } from 'svelte';
-import { env } from '$env/dynamic/public';
 import type { VoiceChannelMember, Channel } from '$lib/types/index.js';
 import type { ApiClient } from '$lib/api/client.js';
 import type { ChatHubService } from '$lib/services/chat-hub.js';
@@ -25,9 +24,10 @@ export function createVoiceStore(
 	api: ApiClient,
 	ui: UIStore,
 	hub: ChatHubService,
-	voice: VoiceService
+	voice: VoiceService,
+	liveKitUrl: string
 ): VoiceStore {
-	const store = new VoiceStore(auth, api, ui, hub, voice);
+	const store = new VoiceStore(auth, api, ui, hub, voice, liveKitUrl);
 	setContext(VOICE_KEY, store);
 	return store;
 }
@@ -101,11 +101,12 @@ export class VoiceStore {
 		private readonly api: ApiClient,
 		private readonly ui: UIStore,
 		private readonly hub: ChatHubService,
-		private readonly voice: VoiceService
+		private readonly voice: VoiceService,
+		liveKitUrl: string
 	) {
 		this._loadUserVolumes();
 		this._loadVoicePreferences();
-		this.liveKitUrl = env.PUBLIC_LIVEKIT_URL || 'ws://localhost:7880';
+		this.liveKitUrl = liveKitUrl || 'ws://localhost:7880';
 	}
 
 	/* ��══════════════════ Core Voice ═══════════════════ */
