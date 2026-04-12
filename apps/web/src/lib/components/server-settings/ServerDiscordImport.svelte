@@ -161,25 +161,15 @@
 			</div>
 		{/if}
 	{:else}
-		<div class="import-form">
-			<h3>Start Import</h3>
+		<div class="no-import">
 			<p class="description">
-				Create a Discord bot, add it to your server with read permissions, then paste its token below.
+				No import has been started for this server. Use the wizard to set up a Discord bot and import channels, messages, roles, emojis, and members.
 			</p>
-			<label class="form-label">
-				Bot Token
-				<input type="password" bind:value={botToken} placeholder="Paste your Discord bot token" class="form-input" />
-			</label>
-			<label class="form-label">
-				Discord Guild ID
-				<input type="text" bind:value={guildId} placeholder="e.g. 123456789012345678" class="form-input" />
-			</label>
 			<button
 				class="start-btn"
-				disabled={servers.isStartingImport || !botToken.trim() || !guildId.trim()}
-				onclick={handleStart}
+				onclick={() => { if (serverId) ui.openDiscordWizard('existing', serverId); }}
 			>
-				{servers.isStartingImport ? 'Starting...' : 'Start Import'}
+				Import from Discord
 			</button>
 		</div>
 	{/if}
@@ -329,6 +319,15 @@
 
 	.cancel-btn:hover {
 		background: var(--bg-message-hover);
+	}
+
+	.no-import {
+		text-align: center;
+		padding: 32px 0;
+	}
+
+	.no-import .description {
+		margin-bottom: 16px;
 	}
 
 	.claim-section {

@@ -64,6 +64,11 @@ export class UIStore {
 	/* ───── presence (shared across stores) ───── */
 	userPresence = new SvelteMap<string, PresenceStatus>();
 
+	/* ───── discord import wizard ───── */
+	discordWizardOpen = $state(false);
+	discordWizardMode = $state<'create' | 'existing'>('create');
+	discordWizardServerId = $state<string | null>(null);
+
 	/* ───── reaction tracking (shared by MessageStore and DmStore) ───── */
 	pendingReactionKeys = $state<Set<string>>(new Set());
 	ignoredReactionUpdates = $state<Map<string, string[]>>(new Map());
@@ -115,6 +120,16 @@ export class UIStore {
 
 	closeReportModal(): void {
 		this.reportModal = null;
+	}
+
+	openDiscordWizard(mode: 'create' | 'existing' = 'create', serverId?: string): void {
+		this.discordWizardMode = mode;
+		this.discordWizardServerId = serverId ?? null;
+		this.discordWizardOpen = true;
+	}
+
+	closeDiscordWizard(): void {
+		this.discordWizardOpen = false;
 	}
 
 	dismissAlphaNotification(): void {
