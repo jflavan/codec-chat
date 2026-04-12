@@ -106,18 +106,21 @@ public class DiscordImportService
                         channelDb, channelDiscord, serverId, codecChannelId, discordChannelId,
                         importId, group, ct);
 
+                    int localTotal, localCompleted;
                     lock (messageLock)
                     {
                         totalMessages += count;
                         completedChannels++;
+                        localTotal = totalMessages;
+                        localCompleted = completedChannels;
                     }
 
                     await group.SendAsync("ImportProgress", new
                     {
-                        stage = $"Messages ({completedChannels}/{textChannelIds.Count})",
-                        completed = totalMessages,
+                        stage = $"Messages ({localCompleted}/{textChannelIds.Count})",
+                        completed = localTotal,
                         total = 0,
-                        percentComplete = 40f + ((float)completedChannels / textChannelIds.Count * 50f)
+                        percentComplete = 40f + ((float)localCompleted / textChannelIds.Count * 50f)
                     }, ct);
                 }
                 finally
