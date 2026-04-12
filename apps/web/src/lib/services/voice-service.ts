@@ -321,6 +321,14 @@ export class VoiceService {
 		}
 	}
 
+	get isVideoActive(): boolean {
+		return this.videoProducer !== null && !this.videoProducer.closed;
+	}
+
+	get isScreenShareActive(): boolean {
+		return this.screenProducer !== null && !this.screenProducer.closed;
+	}
+
 	async leave(): Promise<void> {
 		this.consumedProducerIds.clear();
 		this.consumerLabels.clear();
