@@ -419,6 +419,17 @@ export async function setupSignalR(
 					};
 				}
 			},
+			onImportRehostCompleted: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'Completed',
+						importedChannels: event.importedChannels,
+						importedMessages: event.importedMessages,
+						importedMembers: event.importedMembers,
+					};
+				}
+			},
 			onImportFailed: (event) => {
 				if (servers.discordImport) {
 					servers.discordImport = {

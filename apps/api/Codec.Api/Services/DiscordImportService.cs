@@ -168,6 +168,14 @@ public class DiscordImportService
             import.LastSyncedAt = DateTimeOffset.UtcNow;
             import.EncryptedBotToken = null;
             await db.SaveChangesAsync(ct);
+
+            // Notify clients that re-hosting is done and import is fully complete
+            await group.SendAsync("ImportRehostCompleted", new
+            {
+                importedChannels = import.ImportedChannels,
+                importedMessages = import.ImportedMessages,
+                importedMembers = import.ImportedMembers
+            }, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

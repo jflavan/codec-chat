@@ -379,7 +379,57 @@ builder.Services.AddHttpClient<DiscordApiClient>()
     .AddHttpMessageHandler<DiscordRateLimitHandler>();
 builder.Services.AddTransient<DiscordRateLimitHandler>();
 builder.Services.AddHttpClient<DiscordMediaRehostService>()
-    .AddHttpMessageHandler<DiscordRateLimitHandler>();
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        UseCookies = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        ConnectCallback = async (context, cancellationToken) =>
+        {
+            // DNS rebinding protection: resolve and validate before connecting.
+            var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+            foreach (var ip in entries)
+            {
+                if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
+                    throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
+
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    var bytes = ip.GetAddressBytes();
+                    var isPrivate = bytes[0] switch
+                    {
+                        10 => true,
+                        172 => bytes[1] >= 16 && bytes[1] <= 31,
+                        192 => bytes[1] == 168,
+                        169 => bytes[1] == 254,
+                        127 => true,
+                        0 => true,
+                        _ => false
+                    };
+                    if (isPrivate)
+                        throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
+                }
+                else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+                {
+                    var bytes = ip.GetAddressBytes();
+                    if (bytes[0] is 0xFC or 0xFD)
+                        throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
+                }
+            }
+
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            try
+            {
+                await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+    });
 
 // Web Push notification service (VAPID-authenticated).
 var vapidPublicKey = builder.Configuration["Vapid:PublicKey"];

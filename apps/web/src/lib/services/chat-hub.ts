@@ -281,6 +281,12 @@ export type ImportCompletedEvent = {
 	importedMembers: number;
 };
 
+export type ImportRehostCompletedEvent = {
+	importedChannels: number;
+	importedMessages: number;
+	importedMembers: number;
+};
+
 export type ImportFailedEvent = {
 	errorMessage: string;
 };
@@ -352,6 +358,7 @@ export type SignalRCallbacks = {
 	onAccountDeleted?: () => void;
 	onImportProgress?: (event: ImportProgressEvent) => void;
 	onImportCompleted?: (event: ImportCompletedEvent) => void;
+	onImportRehostCompleted?: (event: ImportRehostCompletedEvent) => void;
 	onImportFailed?: (event: ImportFailedEvent) => void;
 	onImportMessagesAvailable?: (event: ImportMessagesAvailableEvent) => void;
 	onReconnecting?: () => void;
@@ -582,6 +589,9 @@ export class ChatHubService {
 		}
 		if (callbacks.onImportCompleted) {
 			connection.on('ImportCompleted', callbacks.onImportCompleted);
+		}
+		if (callbacks.onImportRehostCompleted) {
+			connection.on('ImportRehostCompleted', callbacks.onImportRehostCompleted);
 		}
 		if (callbacks.onImportFailed) {
 			connection.on('ImportFailed', callbacks.onImportFailed);

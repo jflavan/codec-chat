@@ -43,7 +43,7 @@ public class DiscordMediaRehostService
         HttpResponseMessage response;
         try
         {
-            response = await _http.GetAsync(discordCdnUrl, ct);
+            response = await _http.GetAsync(discordCdnUrl, HttpCompletionOption.ResponseHeadersRead, ct);
         }
         catch (Exception ex)
         {
@@ -68,7 +68,30 @@ public class DiscordMediaRehostService
                 return RehostResult.Skipped;
             }
 
-            originalBytes = await response.Content.ReadAsByteArrayAsync(ct);
+            // Reject responses that declare a size beyond the limit before downloading
+            if (response.Content.Headers.ContentLength is > 0 and var declaredSize && declaredSize > maxFileSize)
+            {
+                _logger.LogDebug("Skipping oversized download ({Size} bytes) from {Url}", declaredSize, discordCdnUrl);
+                return RehostResult.Skipped;
+            }
+
+            // Stream the body with a hard size cap to prevent OOM from huge responses
+            using var bodyStream = await response.Content.ReadAsStreamAsync(ct);
+            using var memoryStream = new MemoryStream();
+            var buffer = new byte[81920];
+            long totalRead = 0;
+            int bytesRead;
+            while ((bytesRead = await bodyStream.ReadAsync(buffer, ct)) > 0)
+            {
+                totalRead += bytesRead;
+                if (totalRead > maxFileSize)
+                {
+                    _logger.LogDebug("Download exceeded max size ({Max} bytes) from {Url}", maxFileSize, discordCdnUrl);
+                    return RehostResult.Skipped;
+                }
+                memoryStream.Write(buffer, 0, bytesRead);
+            }
+            originalBytes = memoryStream.ToArray();
         }
 
         byte[] finalBytes;
