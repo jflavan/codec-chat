@@ -141,19 +141,33 @@ public class DiscordImportService
             await BackfillReplyReferencesAsync(db, serverId, importId, ct);
             await db.SaveChangesAsync(ct);
 
-            // Complete
-            import.Status = DiscordImportStatus.Completed;
-            import.CompletedAt = DateTimeOffset.UtcNow;
-            import.LastSyncedAt = DateTimeOffset.UtcNow;
-            import.EncryptedBotToken = null;
-            await db.SaveChangesAsync(ct);
-
+            // Milestone: text import complete — fire ImportCompleted so UI shows success
             await group.SendAsync("ImportCompleted", new
             {
                 importedChannels = import.ImportedChannels,
                 importedMessages = import.ImportedMessages,
                 importedMembers = import.ImportedMembers
             }, ct);
+
+            // Transition to media re-hosting phase
+            import.Status = DiscordImportStatus.RehostingMedia;
+            await db.SaveChangesAsync(ct);
+
+            // 10. Re-host emoji images
+            await group.SendAsync("ImportProgress", new { stage = "Re-hosting emojis", completed = 0, total = 0, percentComplete = 96f }, ct);
+            await RehostEmojisAsync(db, serverId, importId, group, ct);
+            await db.SaveChangesAsync(ct);
+
+            // 11. Re-host message image attachments (newest first)
+            await group.SendAsync("ImportProgress", new { stage = "Re-hosting images", completed = 0, total = 0, percentComplete = 97f }, ct);
+            await RehostAttachmentsAsync(db, serverId, group, ct);
+
+            // Complete
+            import.Status = DiscordImportStatus.Completed;
+            import.CompletedAt = DateTimeOffset.UtcNow;
+            import.LastSyncedAt = DateTimeOffset.UtcNow;
+            import.EncryptedBotToken = null;
+            await db.SaveChangesAsync(ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -633,5 +647,132 @@ public class DiscordImportService
 
         _logger.LogInformation("Backfilled {Resolved}/{Total} reply references for import {ImportId}",
             resolvedCount, pendingReplies.Count, importId);
+    }
+
+    private async Task RehostEmojisAsync(
+        CodecDbContext db, Guid serverId, Guid importId, IClientProxy group, CancellationToken ct)
+    {
+        var emojiMappings = await db.DiscordEntityMappings
+            .Where(m => m.DiscordImportId == importId && m.EntityType == DiscordEntityType.Emoji)
+            .Select(m => m.CodecEntityId)
+            .ToListAsync(ct);
+
+        var emojis = await db.CustomEmojis
+            .Where(e => emojiMappings.Contains(e.Id) && e.ImageUrl.Contains("cdn.discordapp.com"))
+            .ToListAsync(ct);
+
+        if (emojis.Count == 0) return;
+
+        using var scope = _scopeFactory.CreateScope();
+        var rehostService = scope.ServiceProvider.GetRequiredService<DiscordMediaRehostService>();
+
+        var completed = 0;
+        var consecutiveFailures = 0;
+        const int maxConsecutiveFailures = 10;
+
+        foreach (var emoji in emojis)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var newUrl = await rehostService.RehostImageAsync(
+                emoji.ImageUrl, "emojis", 512 * 1024, null, ct);
+
+            if (newUrl is not null)
+            {
+                emoji.ImageUrl = newUrl;
+                consecutiveFailures = 0;
+            }
+            else
+            {
+                consecutiveFailures++;
+                _logger.LogWarning("Failed to re-host emoji {EmojiId} from {Url}", emoji.Id, emoji.ImageUrl);
+                if (consecutiveFailures >= maxConsecutiveFailures)
+                    throw new InvalidOperationException("Too many consecutive emoji re-host failures. Aborting media re-hosting.");
+            }
+
+            completed++;
+            if (completed % 10 == 0)
+            {
+                await db.SaveChangesAsync(ct);
+                await group.SendAsync("ImportProgress", new
+                {
+                    stage = "Re-hosting emojis",
+                    completed,
+                    total = emojis.Count,
+                    percentComplete = 96f + ((float)completed / emojis.Count * 1f)
+                }, ct);
+            }
+        }
+    }
+
+    private async Task RehostAttachmentsAsync(
+        CodecDbContext db, Guid serverId, IClientProxy group, CancellationToken ct)
+    {
+        var channelIds = await db.Channels
+            .Where(c => c.ServerId == serverId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+
+        var totalCount = await db.Messages
+            .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl != null && m.ImageUrl.Contains("cdn.discordapp.com"))
+            .CountAsync(ct);
+
+        if (totalCount == 0) return;
+
+        using var scope = _scopeFactory.CreateScope();
+        var rehostService = scope.ServiceProvider.GetRequiredService<DiscordMediaRehostService>();
+
+        var completed = 0;
+        var consecutiveFailures = 0;
+        const int maxConsecutiveFailures = 10;
+        const int batchSize = 50;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var messages = await db.Messages
+                .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl != null && m.ImageUrl.Contains("cdn.discordapp.com"))
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(batchSize)
+                .ToListAsync(ct);
+
+            if (messages.Count == 0) break;
+
+            foreach (var message in messages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var newUrl = await rehostService.RehostImageAsync(
+                    message.ImageUrl!, "images", 10 * 1024 * 1024, 4096, ct);
+
+                if (newUrl is not null)
+                {
+                    message.ImageUrl = newUrl;
+                    consecutiveFailures = 0;
+                }
+                else
+                {
+                    message.ImageUrl = null;
+                    consecutiveFailures++;
+                    _logger.LogWarning("Failed to re-host image for message {MessageId}, clearing ImageUrl", message.Id);
+
+                    if (consecutiveFailures >= maxConsecutiveFailures)
+                        throw new InvalidOperationException("Too many consecutive attachment re-host failures. Aborting media re-hosting.");
+                }
+
+                completed++;
+            }
+
+            await db.SaveChangesAsync(ct);
+
+            await group.SendAsync("ImportProgress", new
+            {
+                stage = $"Re-hosting images ({completed}/{totalCount})",
+                completed,
+                total = totalCount,
+                percentComplete = 97f + ((float)completed / totalCount * 3f)
+            }, ct);
+        }
     }
 }
