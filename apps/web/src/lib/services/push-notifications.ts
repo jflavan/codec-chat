@@ -24,11 +24,6 @@ export class PushNotificationManager {
 		return this.isSupported ? Notification.permission : 'denied';
 	}
 
-	/** Whether the user has granted notification permission. */
-	get isPermissionGranted(): boolean {
-		return this.permission === 'granted';
-	}
-
 	/** Request notification permission from the user. */
 	async requestPermission(): Promise<NotificationPermission> {
 		if (!this.isSupported) return 'denied';
