@@ -65,13 +65,15 @@
 	{:else if isInProgress}
 		<div class="status-card in-progress">
 			<h3>Import in Progress</h3>
-			<div class="progress-stats">
-				<span>{importStatus?.importedChannels ?? 0} channels</span>
-				<span>{importStatus?.importedMessages ?? 0} messages</span>
-				<span>{importStatus?.importedMembers ?? 0} members</span>
-			</div>
+			{#if importStatus?.stage}
+				<p class="stage-label">{importStatus.stage}</p>
+			{/if}
 			<div class="progress-bar">
-				<div class="progress-fill" style="width: 50%"></div>
+				{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
+					<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
+				{:else}
+					<div class="progress-fill pulse"></div>
+				{/if}
 			</div>
 			<button class="cancel-btn" onclick={handleCancel}>Cancel Import</button>
 		</div>
@@ -235,6 +237,21 @@
 		background: var(--accent);
 		border-radius: 4px;
 		transition: width 300ms ease;
+	}
+
+	.progress-fill.pulse {
+		animation: pulse 1.5s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { width: 20%; margin-left: 0; }
+		50% { width: 50%; margin-left: 25%; }
+	}
+
+	.stage-label {
+		color: var(--text-muted);
+		font-size: 13px;
+		margin: 4px 0 8px;
 	}
 
 	.error-msg {

@@ -30,23 +30,16 @@
 		<h2>Importing...</h2>
 		<p class="subtitle">Your Discord server is being imported. You can close this window — the import will continue in the background.</p>
 
-		<div class="stats">
-			<div class="stat">
-				<span class="stat-value">{importStatus?.importedChannels ?? 0}</span>
-				<span class="stat-label">Channels</span>
-			</div>
-			<div class="stat">
-				<span class="stat-value">{importStatus?.importedMessages ?? 0}</span>
-				<span class="stat-label">Messages</span>
-			</div>
-			<div class="stat">
-				<span class="stat-value">{importStatus?.importedMembers ?? 0}</span>
-				<span class="stat-label">Members</span>
-			</div>
-		</div>
+		{#if importStatus?.stage}
+			<p class="stage-label">{importStatus.stage}</p>
+		{/if}
 
 		<div class="progress-bar">
-			<div class="progress-fill pulse"></div>
+			{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
+				<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
+			{:else}
+				<div class="progress-fill pulse"></div>
+			{/if}
 		</div>
 
 	{:else if isCompleted}
@@ -149,6 +142,12 @@
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
+	}
+
+	.stage-label {
+		color: var(--text-muted);
+		font-size: 13px;
+		margin: 0 0 12px;
 	}
 
 	.progress-bar {

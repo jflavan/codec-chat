@@ -542,6 +542,8 @@ export type DiscordImport = {
 	completedAt?: string | null;
 	errorMessage?: string | null;
 	discordGuildId: string;
+	stage?: string | null;
+	percentComplete?: number | null;
 };
 
 /** Discord user mapping for identity claiming. */

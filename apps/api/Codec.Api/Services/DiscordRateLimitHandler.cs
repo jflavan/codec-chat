@@ -26,11 +26,17 @@ public class DiscordRateLimitHandler : DelegatingHandler
 
     // Per-bucket: tracks when each bucket's limit resets
     private static readonly ConcurrentDictionary<string, DateTimeOffset> _bucketResetTimes = new();
+    private static long _requestCount;
+    private const int EvictionInterval = 100;
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
         HttpResponseMessage response = null!;
+
+        // Periodically evict expired entries to prevent unbounded growth
+        if (Interlocked.Increment(ref _requestCount) % EvictionInterval == 0)
+            EvictExpiredEntries();
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -41,8 +47,6 @@ public class DiscordRateLimitHandler : DelegatingHandler
                 var delay = resetTime - DateTimeOffset.UtcNow;
                 if (delay > TimeSpan.Zero)
                     await Task.Delay(delay, cancellationToken);
-                // Don't remove — expired entries are harmless (delay <= 0 skips them),
-                // and removing can evict a newer reset written by a concurrent request.
             }
 
             // Wait for global rate limit token, retrying until a lease is acquired
@@ -128,6 +132,16 @@ public class DiscordRateLimitHandler : DelegatingHandler
                     _bucketResetTimes[key] = DateTimeOffset.UtcNow.AddSeconds(resetAfterSecs);
                 }
             }
+        }
+    }
+
+    private static void EvictExpiredEntries()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var kvp in _bucketResetTimes)
+        {
+            if (kvp.Value < now)
+                _bucketResetTimes.TryRemove(kvp);
         }
     }
 

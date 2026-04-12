@@ -9,5 +9,6 @@ public class StartDiscordImportRequest
 
     [Required]
     [MaxLength(20)]
+    [RegularExpression(@"^\d+$", ErrorMessage = "Discord guild ID must contain only digits.")]
     public string DiscordGuildId { get; set; } = string.Empty;
 }

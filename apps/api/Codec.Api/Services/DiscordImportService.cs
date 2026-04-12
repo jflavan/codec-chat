@@ -31,14 +31,17 @@ public class DiscordImportService
         var discordClient = scope.ServiceProvider.GetRequiredService<DiscordApiClient>();
         discordClient.SetBotToken(botToken);
 
+        // Atomically transition Pending → InProgress to avoid race with CancelImport
+        var updated = await db.DiscordImports
+            .Where(i => i.Id == importId && i.Status == DiscordImportStatus.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.Status, DiscordImportStatus.InProgress)
+                .SetProperty(i => i.StartedAt, DateTimeOffset.UtcNow), ct);
+
+        if (updated == 0) return;
+
         var import = await db.DiscordImports.FindAsync([importId], ct);
         if (import is null) return;
-
-        if (import.Status == DiscordImportStatus.Cancelled) return;
-
-        import.Status = DiscordImportStatus.InProgress;
-        import.StartedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
 
         try
         {

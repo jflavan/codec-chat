@@ -133,9 +133,9 @@ src/
 │   │   │   └── ServerWebhooks.svelte      # Webhooks tab — webhook CRUD with event type selection
 │   │   ├── discord-import/
 │   │   │   ├── DiscordImportWizard.svelte  # 4-step import wizard container
-│   │   │   ├── WizardStepBotSetup.svelte   # Step 1: Discord bot creation instructions
-│   │   │   ├── WizardStepConnect.svelte     # Step 2: Bot token + guild ID entry
-│   │   │   ├── WizardStepDestination.svelte # Step 3: Confirm target server
+│   │   │   ├── WizardStepBotSetup.svelte   # Step 2: Discord bot creation instructions
+│   │   │   ├── WizardStepConnect.svelte     # Step 3: Bot token + guild ID entry
+│   │   │   ├── WizardStepDestination.svelte # Step 1: Choose target server
 │   │   │   └── WizardStepProgress.svelte    # Step 4: Real-time import progress
 │   │   ├── report/
 │   │   │   └── ReportModal.svelte       # User/message/server report submission dialog

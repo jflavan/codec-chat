@@ -402,6 +402,8 @@ export async function setupSignalR(
 					servers.discordImport = {
 						...servers.discordImport,
 						status: 'InProgress',
+						stage: event.stage,
+						percentComplete: event.percentComplete,
 					};
 				}
 			},
