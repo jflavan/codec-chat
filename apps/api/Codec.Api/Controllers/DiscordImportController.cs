@@ -242,10 +242,9 @@ public class DiscordImportController : ControllerBase
         if (!isMember)
             return Forbid();
 
-        if (currentUser.DiscordSubject is null)
-            return BadRequest(new { error = "You must link your Discord account before claiming an identity. Go to Account Settings to connect Discord." });
-
-        if (currentUser.DiscordSubject != request.DiscordUserId)
+        // If the user has linked their Discord account, verify it matches the claimed identity.
+        // If not linked, allow trust-based claiming (admins can revoke if needed).
+        if (currentUser.DiscordSubject is not null && currentUser.DiscordSubject != request.DiscordUserId)
             return BadRequest(new { error = "Your linked Discord account doesn't match this identity." });
 
         var mapping = await _db.DiscordUserMappings
