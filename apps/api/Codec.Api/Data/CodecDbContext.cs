@@ -615,7 +615,7 @@ public class CodecDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(d => d.ServerId);
             e.HasIndex(d => d.ServerId)
-                .HasFilter("\"Status\" IN ('Pending', 'InProgress')")
+                .HasFilter("\"Status\" IN ('Pending', 'InProgress', 'RehostingMedia')")
                 .IsUnique()
                 .HasDatabaseName("IX_DiscordImports_ServerId_ActiveImport");
             e.Property(d => d.DiscordGuildId).HasMaxLength(20);
