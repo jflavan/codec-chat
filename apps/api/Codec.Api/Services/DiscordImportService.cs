@@ -674,23 +674,24 @@ public class DiscordImportService
         {
             ct.ThrowIfCancellationRequested();
 
-            var newUrl = await rehostService.RehostImageAsync(
+            var result = await rehostService.RehostImageAsync(
                 emoji.ImageUrl, "emojis", 512 * 1024, null, ct);
 
-            if (newUrl is not null && newUrl.Length > 0)
+            switch (result.Outcome)
             {
-                emoji.ImageUrl = newUrl;
-                consecutiveFailures = 0;
+                case RehostOutcome.Success:
+                    emoji.ImageUrl = result.Url!;
+                    consecutiveFailures = 0;
+                    break;
+                case RehostOutcome.Failed:
+                    consecutiveFailures++;
+                    _logger.LogWarning("Failed to re-host emoji {EmojiId} from {Url}", emoji.Id, emoji.ImageUrl);
+                    if (consecutiveFailures >= maxConsecutiveFailures)
+                        throw new InvalidOperationException("Too many consecutive emoji re-host failures. Aborting media re-hosting.");
+                    break;
+                case RehostOutcome.Skipped:
+                    break;
             }
-            else if (newUrl is null)
-            {
-                // Real failure (HTTP error, decode error) — track for systemic failure detection
-                consecutiveFailures++;
-                _logger.LogWarning("Failed to re-host emoji {EmojiId} from {Url}", emoji.Id, emoji.ImageUrl);
-                if (consecutiveFailures >= maxConsecutiveFailures)
-                    throw new InvalidOperationException("Too many consecutive emoji re-host failures. Aborting media re-hosting.");
-            }
-            // else: empty string = intentional skip (e.g., oversized GIF), not a failure
 
             completed++;
             if (completed % 10 == 0)
@@ -748,28 +749,25 @@ public class DiscordImportService
             {
                 ct.ThrowIfCancellationRequested();
 
-                var newUrl = await rehostService.RehostImageAsync(
+                var result = await rehostService.RehostImageAsync(
                     message.ImageUrl!, "images", 10 * 1024 * 1024, 4096, ct);
 
-                if (newUrl is not null && newUrl.Length > 0)
+                switch (result.Outcome)
                 {
-                    message.ImageUrl = newUrl;
-                    consecutiveFailures = 0;
-                }
-                else if (newUrl is null)
-                {
-                    // Real failure — clear the URL and track for systemic failure detection
-                    message.ImageUrl = null;
-                    consecutiveFailures++;
-                    _logger.LogWarning("Failed to re-host image for message {MessageId}, clearing ImageUrl", message.Id);
-
-                    if (consecutiveFailures >= maxConsecutiveFailures)
-                        throw new InvalidOperationException("Too many consecutive attachment re-host failures. Aborting media re-hosting.");
-                }
-                else
-                {
-                    // Empty string = intentional skip (e.g., oversized GIF) — clear URL but don't count as failure
-                    message.ImageUrl = null;
+                    case RehostOutcome.Success:
+                        message.ImageUrl = result.Url!;
+                        consecutiveFailures = 0;
+                        break;
+                    case RehostOutcome.Failed:
+                        message.ImageUrl = null;
+                        consecutiveFailures++;
+                        _logger.LogWarning("Failed to re-host image for message {MessageId}, clearing ImageUrl", message.Id);
+                        if (consecutiveFailures >= maxConsecutiveFailures)
+                            throw new InvalidOperationException("Too many consecutive attachment re-host failures. Aborting media re-hosting.");
+                        break;
+                    case RehostOutcome.Skipped:
+                        message.ImageUrl = null;
+                        break;
                 }
 
                 completed++;

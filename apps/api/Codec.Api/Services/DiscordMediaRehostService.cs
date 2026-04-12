@@ -3,6 +3,15 @@ using SkiaSharp;
 
 namespace Codec.Api.Services;
 
+public enum RehostOutcome { Success, Skipped, Failed }
+
+public record RehostResult(RehostOutcome Outcome, string? Url = null)
+{
+    public static RehostResult Success(string url) => new(RehostOutcome.Success, url);
+    public static RehostResult Skipped => new(RehostOutcome.Skipped);
+    public static RehostResult Failed => new(RehostOutcome.Failed);
+}
+
 public class DiscordMediaRehostService
 {
     private static readonly HashSet<string> SupportedContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -24,7 +33,7 @@ public class DiscordMediaRehostService
         _logger = logger;
     }
 
-    public async Task<string?> RehostImageAsync(
+    public async Task<RehostResult> RehostImageAsync(
         string discordCdnUrl,
         string storageContainer,
         long maxFileSize,
@@ -39,7 +48,7 @@ public class DiscordMediaRehostService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to download image from {Url}", discordCdnUrl);
-            return null;
+            return RehostResult.Failed;
         }
 
         byte[] originalBytes;
@@ -49,14 +58,14 @@ public class DiscordMediaRehostService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Discord CDN returned {StatusCode} for {Url}", response.StatusCode, discordCdnUrl);
-                return null;
+                return RehostResult.Failed;
             }
 
             contentType = response.Content.Headers.ContentType?.MediaType ?? "";
             if (!SupportedContentTypes.Contains(contentType))
             {
                 _logger.LogDebug("Skipping unsupported content type {ContentType} for {Url}", contentType, discordCdnUrl);
-                return "";
+                return RehostResult.Skipped;
             }
 
             originalBytes = await response.Content.ReadAsByteArrayAsync(ct);
@@ -68,20 +77,18 @@ public class DiscordMediaRehostService
 
         try
         {
-            (finalBytes, finalContentType, extension) = ProcessImage(
-                originalBytes, contentType, maxFileSize, maxDimensionPx);
+            var result = ProcessImage(originalBytes, contentType, maxFileSize, maxDimensionPx);
+            if (result is null)
+            {
+                _logger.LogDebug("Skipping oversized GIF from {Url}", discordCdnUrl);
+                return RehostResult.Skipped;
+            }
+            (finalBytes, finalContentType, extension) = result.Value;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to process image from {Url}", discordCdnUrl);
-            return null;
-        }
-
-        // "skip" sentinel means the image was intentionally skipped (e.g., oversized GIF)
-        if (finalContentType == "skip")
-        {
-            _logger.LogDebug("Skipping oversized GIF from {Url}", discordCdnUrl);
-            return "";
+            return RehostResult.Failed;
         }
 
         var hashPrefix = Convert.ToHexString(SHA256.HashData(finalBytes))[..16].ToLowerInvariant();
@@ -89,10 +96,10 @@ public class DiscordMediaRehostService
 
         using var uploadStream = new MemoryStream(finalBytes);
         var url = await _storage.UploadAsync(storageContainer, blobPath, uploadStream, finalContentType, ct);
-        return url;
+        return RehostResult.Success(url);
     }
 
-    private static (byte[] Bytes, string ContentType, string Extension) ProcessImage(
+    private static (byte[] Bytes, string ContentType, string Extension)? ProcessImage(
         byte[] imageBytes, string contentType, long maxFileSize, int? maxDimensionPx)
     {
         var isGif = contentType.Equals("image/gif", StringComparison.OrdinalIgnoreCase);
@@ -100,7 +107,7 @@ public class DiscordMediaRehostService
         if (isGif)
         {
             if (imageBytes.Length > maxFileSize)
-                return (Array.Empty<byte>(), "skip", ".gif");
+                return null; // Oversized GIF — skip
             return (imageBytes, "image/gif", ".gif");
         }
 
