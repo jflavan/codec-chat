@@ -649,7 +649,9 @@ public class CodecDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(m => m.ServerId)
                 .OnDelete(DeleteBehavior.Cascade);
-            e.HasIndex(m => new { m.ServerId, m.DiscordEntityId, m.EntityType }).IsUnique();
+            e.HasIndex(m => new { m.ServerId, m.DiscordEntityId, m.EntityType })
+                .IsUnique()
+                .HasFilter("\"EntityType\" != 'PendingReply'");
             e.Property(m => m.DiscordEntityId).HasMaxLength(20);
             e.Property(m => m.EntityType).HasConversion<string>();
         });
