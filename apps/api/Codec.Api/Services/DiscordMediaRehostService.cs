@@ -33,7 +33,7 @@ public class DiscordMediaRehostService
         _logger = logger;
     }
 
-    public async Task<RehostResult> RehostImageAsync(
+    public virtual async Task<RehostResult> RehostImageAsync(
         string discordCdnUrl,
         string storageContainer,
         long maxFileSize,

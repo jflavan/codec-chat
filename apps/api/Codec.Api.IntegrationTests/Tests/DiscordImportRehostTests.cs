@@ -72,20 +72,11 @@ public class DiscordImportRehostTests(CodecWebFactory factory) : IntegrationTest
             await db.SaveChangesAsync();
         });
 
-        // Attempt to start a new import while RehostingMedia is active.
-        // The DB unique index blocks this even though the code pre-check
-        // only looks for Pending/InProgress — the Discord API call fails
-        // first in test (no real Discord), so expect BadRequest (invalid token).
-        // But if the pre-check included RehostingMedia, it would be Conflict.
-        // Either way, the import must be blocked.
         var response = await client.PostAsJsonAsync(
             $"/servers/{serverId}/discord-import",
             new { botToken = "any-token", discordGuildId = "999888777" });
 
-        // The code pre-check doesn't include RehostingMedia, so it falls through
-        // to the Discord API call which fails in test → 400.
-        // This verifies the endpoint doesn't succeed (import is blocked).
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Conflict);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     // ── DELETE /servers/{serverId}/discord-import during RehostingMedia ───
@@ -114,10 +105,9 @@ public class DiscordImportRehostTests(CodecWebFactory factory) : IntegrationTest
             await db.SaveChangesAsync();
         });
 
-        // Cancel endpoint only looks for Pending/InProgress, not RehostingMedia
         var response = await client.DeleteAsync($"/servers/{serverId}/discord-import");
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     // ── POST /servers/{serverId}/discord-import/resync during RehostingMedia ──

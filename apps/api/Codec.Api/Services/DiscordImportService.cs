@@ -649,7 +649,7 @@ public class DiscordImportService
             resolvedCount, pendingReplies.Count, importId);
     }
 
-    private async Task RehostEmojisAsync(
+    internal async Task RehostEmojisAsync(
         CodecDbContext db, Guid serverId, Guid importId, IClientProxy group, CancellationToken ct)
     {
         var emojiMappings = await db.DiscordEntityMappings
@@ -711,7 +711,7 @@ public class DiscordImportService
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task RehostAttachmentsAsync(
+    internal async Task RehostAttachmentsAsync(
         CodecDbContext db, Guid serverId, IClientProxy group, CancellationToken ct)
     {
         var channelIds = await db.Channels

@@ -57,7 +57,7 @@ public class DiscordImportController : ControllerBase
         // Quick pre-check before expensive Discord API call (DB unique index is the ultimate guard)
         var existing = await _db.DiscordImports
             .AnyAsync(d => d.ServerId == serverId &&
-                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress));
+                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress || d.Status == DiscordImportStatus.RehostingMedia));
         if (existing)
             return Conflict(new { error = "An import is already in progress for this server." });
 
@@ -194,7 +194,7 @@ public class DiscordImportController : ControllerBase
 
         var import = await _db.DiscordImports
             .FirstOrDefaultAsync(d => d.ServerId == serverId &&
-                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress));
+                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress || d.Status == DiscordImportStatus.RehostingMedia));
 
         if (import is null)
             return NotFound(new { error = "No in-progress import to cancel." });
