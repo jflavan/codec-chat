@@ -127,10 +127,12 @@ import { ReportType } from '$lib/types/index.js';
 	<span class="system-message-text">{message.body}</span>
 </div>
 {:else}
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <article
 	class="message"
 	class:grouped
 	class:mentioned={isMentioned}
+	tabindex="0"
 >
 	<!-- Floating action bar — appears on hover at top-right of message -->
 	<MessageActionBar
@@ -506,6 +508,15 @@ import { ReportType } from '$lib/types/index.js';
 		.message .message-time-inline {
 			color: var(--text-muted);
 			opacity: 0.5;
+		}
+
+		/* Highlight tapped message on mobile (no hover available) */
+		.message:focus-within {
+			background: var(--bg-message-hover);
+		}
+
+		.message:focus {
+			outline: none;
 		}
 	}
 	.pin-indicator {
