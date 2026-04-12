@@ -505,6 +505,8 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `GET /servers/{serverId}/discord-import/mappings` - List Discord-to-Codec user mappings (requires ManageServer permission)
 - `POST /servers/{serverId}/discord-import/claim` - Claim a Discord identity and link imported messages to Codec account (requires server membership)
 
+After the text import completes, a media re-hosting phase downloads imported emoji and message image attachments from Discord's CDN and re-uploads them to Codec's own storage (Local or AzureBlob). This ensures media remains accessible after Discord CDN URLs expire. Images over 10MB are resized (max 4096px) and compressed. Emojis over 512KB are compressed. Non-image files are skipped.
+
 #### Push Notifications
 - `GET /push-subscriptions/vapid-key` - Get VAPID public key for Web Push API (public, no auth)
 - `POST /push-subscriptions` - Register or re-activate a push subscription (endpoint, p256dh, auth keys)

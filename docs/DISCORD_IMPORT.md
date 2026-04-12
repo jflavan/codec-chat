@@ -66,6 +66,15 @@ The import runs in this order:
 | Messages | Full message history per channel | Imported newest-first (`before` pagination) across up to 4 channels in parallel; only message types 0 (regular) and 19 (reply) are imported — system messages skipped; only the first attachment per message is imported (multiple attachments not supported); Discord CDN URLs used directly for attachments (no re-hosting); reply chains preserved via `PendingReply` backfill (see below); author info stored in `ImportedAuthorName`/`ImportedAuthorAvatarUrl`/`ImportedDiscordUserId`; `ImportMessagesAvailable` SignalR event with `{ channelId, count }` sent to `channel-{channelId}` group after each batch so the frontend reloads messages in real-time |
 | Pins | Pinned messages per channel | Matched to imported messages via entity mappings |
 
+## Media Re-hosting
+
+After the text import completes (stages 1-9), the import transitions to a `RehostingMedia` phase:
+
+- **Stage 10 — Emoji re-hosting:** Custom emojis are downloaded from Discord CDN and uploaded to Codec storage. Emojis larger than 512KB are compressed. Emojis are accessible in the server's emoji picker immediately after import.
+- **Stage 11 — Attachment re-hosting:** Message image attachments (`image/jpeg`, `image/png`, `image/webp`, `image/gif`) are downloaded newest-first, resized if over 4096px, compressed if over 10MB, and uploaded to Codec storage. Non-image attachments and GIFs over 10MB are skipped.
+
+The `ImportCompleted` SignalR event fires after stage 9, so users see "Import complete" immediately. Media re-hosting continues in the background. If re-hosting fails, a retry will pick up where it left off (already re-hosted images are skipped).
+
 ## Identity Claiming
 
 After import, Discord members can claim their imported messages:
