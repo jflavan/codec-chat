@@ -20,31 +20,35 @@ public class DiscordImportController : ControllerBase
     private readonly DiscordApiClient _discordClient;
     private readonly ILogger<DiscordImportController> _logger;
     private readonly IDataProtectionProvider _dataProtection;
+    private readonly IUserService _userService;
 
     public DiscordImportController(
         CodecDbContext db,
         Channel<Guid> importQueue,
         DiscordApiClient discordClient,
         ILogger<DiscordImportController> logger,
-        IDataProtectionProvider dataProtection)
+        IDataProtectionProvider dataProtection,
+        IUserService userService)
     {
         _db = db;
         _importQueue = importQueue;
         _discordClient = discordClient;
         _logger = logger;
         _dataProtection = dataProtection;
+        _userService = userService;
     }
 
-    private Guid GetUserId() => Guid.Parse(User.FindFirst("sub")!.Value);
+    private async Task<User?> GetCurrentUserAsync()
+        => await _userService.ResolveUserAsync(User);
 
     private async Task<bool> HasManageServerPermission(Guid serverId)
     {
-        var userId = GetUserId();
-        var user = await _db.Users.FindAsync(userId);
-        if (user?.IsGlobalAdmin == true) return true;
+        var user = await GetCurrentUserAsync();
+        if (user is null) return false;
+        if (user.IsGlobalAdmin) return true;
 
         var memberRoles = await _db.ServerMemberRoles
-            .Where(mr => mr.UserId == userId && mr.Role!.ServerId == serverId)
+            .Where(mr => mr.UserId == user.Id && mr.Role!.ServerId == serverId)
             .Select(mr => mr.Role!.Permissions)
             .ToListAsync();
 
@@ -57,6 +61,9 @@ public class DiscordImportController : ControllerBase
     {
         if (!await HasManageServerPermission(serverId))
             return Forbid();
+
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser is null) return Unauthorized();
 
         var existing = await _db.DiscordImports
             .FirstOrDefaultAsync(d => d.ServerId == serverId &&
@@ -83,7 +90,7 @@ public class DiscordImportController : ControllerBase
             DiscordGuildId = request.DiscordGuildId,
             EncryptedBotToken = protector.Protect(request.BotToken),
             Status = DiscordImportStatus.Pending,
-            InitiatedByUserId = GetUserId()
+            InitiatedByUserId = currentUser.Id
         };
 
         _db.DiscordImports.Add(import);
@@ -131,6 +138,9 @@ public class DiscordImportController : ControllerBase
         if (!await HasManageServerPermission(serverId))
             return Forbid();
 
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser is null) return Unauthorized();
+
         var lastImport = await _db.DiscordImports
             .Where(d => d.ServerId == serverId && d.Status == DiscordImportStatus.Completed)
             .OrderByDescending(d => d.CompletedAt)
@@ -157,7 +167,7 @@ public class DiscordImportController : ControllerBase
             DiscordGuildId = request.DiscordGuildId,
             EncryptedBotToken = protector.Protect(request.BotToken),
             Status = DiscordImportStatus.Pending,
-            InitiatedByUserId = GetUserId(),
+            InitiatedByUserId = currentUser.Id,
             LastSyncedAt = lastImport.LastSyncedAt
         };
 
@@ -214,9 +224,10 @@ public class DiscordImportController : ControllerBase
     [HttpPost("claim")]
     public async Task<IActionResult> ClaimIdentity(Guid serverId, [FromBody] ClaimDiscordIdentityRequest request)
     {
-        var userId = GetUserId();
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser is null) return Unauthorized();
 
-        var isMember = await _db.ServerMembers.AnyAsync(m => m.ServerId == serverId && m.UserId == userId);
+        var isMember = await _db.ServerMembers.AnyAsync(m => m.ServerId == serverId && m.UserId == currentUser.Id);
         if (!isMember)
             return Forbid();
 
@@ -229,11 +240,10 @@ public class DiscordImportController : ControllerBase
         if (mapping.CodecUserId is not null)
             return Conflict(new { error = "This Discord identity has already been claimed." });
 
-        var user = await _db.Users.FindAsync(userId);
-        if (user?.DiscordSubject is not null && user.DiscordSubject != request.DiscordUserId)
+        if (currentUser.DiscordSubject is not null && currentUser.DiscordSubject != request.DiscordUserId)
             return BadRequest(new { error = "Your linked Discord account doesn't match this identity." });
 
-        mapping.CodecUserId = userId;
+        mapping.CodecUserId = currentUser.Id;
         mapping.ClaimedAt = DateTimeOffset.UtcNow;
 
         var channelIds = await _db.Channels
@@ -247,8 +257,8 @@ public class DiscordImportController : ControllerBase
                         m.AuthorUserId == null &&
                         m.AuthorName == mapping.DiscordUsername)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(m => m.AuthorUserId, userId)
-                .SetProperty(m => m.AuthorName, user!.DisplayName)
+                .SetProperty(m => m.AuthorUserId, currentUser.Id)
+                .SetProperty(m => m.AuthorName, currentUser.DisplayName)
                 .SetProperty(m => m.ImportedAuthorName, (string?)null)
                 .SetProperty(m => m.ImportedAuthorAvatarUrl, (string?)null));
 

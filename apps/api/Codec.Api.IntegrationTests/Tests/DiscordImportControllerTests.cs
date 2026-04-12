@@ -249,7 +249,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
         // User is a server member (they created it), but no mapping exists
         var response = await client.PostAsJsonAsync(
             $"/servers/{serverId}/discord-import/claim",
-            new { discordUserId = "nonexistent-discord-id" });
+            new { discordUserId = "99999999999999999" });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
