@@ -394,7 +394,7 @@ module apiApp 'modules/container-app-api.bicep' = {
     livekitApiSecretKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiSecret' : ''
     jwtSecretKvUrl: '${keyVault.outputs.uri}secrets/Jwt--Secret'
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
-    redisConnectionStringKvUrl: redisEnabled ? redisCache.outputs.connectionStringSecretUri : ''
+    redisConnectionStringKvUrl: redisCache.?outputs.connectionStringSecretUri ?? ''
     appInsightsConnectionString: appInsights.outputs.connectionString
     emailConnectionStringKvUrl: emailEnabled ? communicationServices.?outputs.connectionStringSecretUri ?? '' : ''
     emailSenderAddress: emailEnabled ? communicationServices.?outputs.senderAddress ?? emailSenderAddress : emailSenderAddress
@@ -419,7 +419,7 @@ module webApp 'modules/container-app-web.bicep' = {
     publicGoogleClientId: googleClientId
     publicRecaptchaSiteKey: recaptchaSiteKey
     publicGiphyApiKey: giphyApiKey
-    publicLivekitUrl: voiceVmEnabled ? voiceVm.outputs.livekitUrl : ''
+    publicLivekitUrl: voiceVm.?outputs.livekitUrl ?? ''
     customDomainName: webCustomDomain
     managedCertificateId: webCertId
   }

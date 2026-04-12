@@ -36,7 +36,6 @@ param vmSize string = 'Standard_D2als_v7'
 
 // ── Port constants ──────────────────────────────────────────────────────────────
 var turnPort        = 3478
-var signalPort      = 7880
 var rtcTcpPort      = 7881
 var rtcMinPort      = 50000
 var rtcMaxPort      = 60000
