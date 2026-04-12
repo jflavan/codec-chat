@@ -21,6 +21,7 @@ public class DiscordImportController : ControllerBase
     private readonly ILogger<DiscordImportController> _logger;
     private readonly IDataProtectionProvider _dataProtection;
     private readonly IUserService _userService;
+    private readonly DiscordImportCancellationRegistry _cancellationRegistry;
 
     public DiscordImportController(
         CodecDbContext db,
@@ -28,7 +29,8 @@ public class DiscordImportController : ControllerBase
         DiscordApiClient discordClient,
         ILogger<DiscordImportController> logger,
         IDataProtectionProvider dataProtection,
-        IUserService userService)
+        IUserService userService,
+        DiscordImportCancellationRegistry cancellationRegistry)
     {
         _db = db;
         _importQueue = importQueue;
@@ -36,6 +38,7 @@ public class DiscordImportController : ControllerBase
         _logger = logger;
         _dataProtection = dataProtection;
         _userService = userService;
+        _cancellationRegistry = cancellationRegistry;
     }
 
     private async Task<User?> GetCurrentUserAsync()
@@ -199,6 +202,8 @@ public class DiscordImportController : ControllerBase
         import.EncryptedBotToken = null;
         await _db.SaveChangesAsync();
 
+        _cancellationRegistry.Cancel(import.Id);
+
         return NoContent();
     }
 
@@ -234,6 +239,12 @@ public class DiscordImportController : ControllerBase
         if (!isMember)
             return Forbid();
 
+        if (currentUser.DiscordSubject is null)
+            return BadRequest(new { error = "You must link your Discord account before claiming an identity. Go to Account Settings to connect Discord." });
+
+        if (currentUser.DiscordSubject != request.DiscordUserId)
+            return BadRequest(new { error = "Your linked Discord account doesn't match this identity." });
+
         var mapping = await _db.DiscordUserMappings
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.DiscordUserId == request.DiscordUserId);
 
@@ -243,8 +254,7 @@ public class DiscordImportController : ControllerBase
         if (mapping.CodecUserId is not null)
             return Conflict(new { error = "This Discord identity has already been claimed." });
 
-        if (currentUser.DiscordSubject is not null && currentUser.DiscordSubject != request.DiscordUserId)
-            return BadRequest(new { error = "Your linked Discord account doesn't match this identity." });
+        await using var transaction = await _db.Database.BeginTransactionAsync();
 
         mapping.CodecUserId = currentUser.Id;
         mapping.ClaimedAt = DateTimeOffset.UtcNow;
@@ -258,7 +268,7 @@ public class DiscordImportController : ControllerBase
             .Where(m => channelIds.Contains(m.ChannelId) &&
                         m.ImportedAuthorName != null &&
                         m.AuthorUserId == null &&
-                        m.AuthorName == mapping.DiscordUsername)
+                        m.ImportedAuthorName == mapping.DiscordUsername)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(m => m.AuthorUserId, currentUser.Id)
                 .SetProperty(m => m.AuthorName, currentUser.DisplayName)
@@ -266,6 +276,7 @@ public class DiscordImportController : ControllerBase
                 .SetProperty(m => m.ImportedAuthorAvatarUrl, (string?)null));
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return Ok(new { claimed = true });
     }

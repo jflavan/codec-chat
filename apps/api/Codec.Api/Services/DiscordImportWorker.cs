@@ -10,17 +10,20 @@ public class DiscordImportWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IDataProtectionProvider _dataProtection;
     private readonly ILogger<DiscordImportWorker> _logger;
+    private readonly DiscordImportCancellationRegistry _cancellationRegistry;
 
     public DiscordImportWorker(
         Channel<Guid> queue,
         IServiceScopeFactory scopeFactory,
         IDataProtectionProvider dataProtection,
-        ILogger<DiscordImportWorker> logger)
+        ILogger<DiscordImportWorker> logger,
+        DiscordImportCancellationRegistry cancellationRegistry)
     {
         _queue = queue;
         _scopeFactory = scopeFactory;
         _dataProtection = dataProtection;
         _logger = logger;
+        _cancellationRegistry = cancellationRegistry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -46,7 +49,20 @@ public class DiscordImportWorker : BackgroundService
 
                 var protector = _dataProtection.CreateProtector("DiscordBotToken");
                 var botToken = protector.Unprotect(import.EncryptedBotToken);
-                await importService.RunImportAsync(importId, botToken, stoppingToken);
+
+                using var cts = _cancellationRegistry.Register(importId, stoppingToken);
+                try
+                {
+                    await importService.RunImportAsync(importId, botToken, cts.Token);
+                }
+                finally
+                {
+                    _cancellationRegistry.Remove(importId);
+                }
+            }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Import {ImportId} was cancelled", importId);
             }
             catch (Exception ex)
             {

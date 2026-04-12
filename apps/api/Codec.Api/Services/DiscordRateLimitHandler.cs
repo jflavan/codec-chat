@@ -15,7 +15,7 @@ public class DiscordRateLimitHandler : DelegatingHandler
     private const int MaxRetries = 5;
 
     // Global: 50 req/sec as per Discord docs
-    private static readonly TokenBucketRateLimiter GlobalLimiter = new(new TokenBucketRateLimiterOptions
+    private static readonly TokenBucketRateLimiter _globalLimiter = new(new TokenBucketRateLimiterOptions
     {
         TokenLimit = 50,
         ReplenishmentPeriod = TimeSpan.FromSeconds(1),
@@ -25,7 +25,7 @@ public class DiscordRateLimitHandler : DelegatingHandler
     });
 
     // Per-bucket: tracks when each bucket's limit resets
-    private static readonly ConcurrentDictionary<string, DateTimeOffset> BucketResetTimes = new();
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> _bucketResetTimes = new();
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
@@ -34,12 +34,18 @@ public class DiscordRateLimitHandler : DelegatingHandler
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            // Wait for global rate limit token
-            using var lease = await GlobalLimiter.AcquireAsync(1, cancellationToken);
-            if (!lease.IsAcquired)
+            // Wait for global rate limit token, retrying until a lease is acquired
+            while (true)
+            {
+                using var lease = await _globalLimiter.AcquireAsync(1, cancellationToken);
+                if (lease.IsAcquired)
+                    break;
                 await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+            }
 
-            response = await base.SendAsync(request, cancellationToken);
+            // Clone the request so retries work (content stream is consumed after first send)
+            using var clonedRequest = await CloneRequestAsync(request, cancellationToken);
+            response = await base.SendAsync(clonedRequest, cancellationToken);
 
             // Track per-bucket limits from response headers
             TrackBucketLimits(response);
@@ -56,6 +62,25 @@ public class DiscordRateLimitHandler : DelegatingHandler
         }
 
         return response;
+    }
+
+    private static async Task<HttpRequestMessage> CloneRequestAsync(
+        HttpRequestMessage request, CancellationToken ct)
+    {
+        var clone = new HttpRequestMessage(request.Method, request.RequestUri);
+        foreach (var header in request.Headers)
+            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+        if (request.Content is not null)
+        {
+            var contentBytes = await request.Content.ReadAsByteArrayAsync(ct);
+            var newContent = new ByteArrayContent(contentBytes);
+            foreach (var header in request.Content.Headers)
+                newContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            clone.Content = newContent;
+        }
+
+        return clone;
     }
 
     private static void TrackBucketLimits(HttpResponseMessage response)
@@ -75,7 +100,7 @@ public class DiscordRateLimitHandler : DelegatingHandler
             if (resetStr is not null &&
                 double.TryParse(resetStr, CultureInfo.InvariantCulture, out var resetAfterSecs))
             {
-                BucketResetTimes[bucket] = DateTimeOffset.UtcNow.AddSeconds(resetAfterSecs);
+                _bucketResetTimes[bucket] = DateTimeOffset.UtcNow.AddSeconds(resetAfterSecs);
             }
         }
     }

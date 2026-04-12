@@ -144,6 +144,16 @@ public class DiscordImportService
                 importedMembers = import.ImportedMembers
             }, ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            _logger.LogInformation("Discord import {ImportId} was cancelled", importId);
+            import.Status = DiscordImportStatus.Cancelled;
+            import.EncryptedBotToken = null;
+            await db.SaveChangesAsync(CancellationToken.None);
+
+            var group = _hub.Clients.Group($"server-{import.ServerId}");
+            await group.SendAsync("ImportFailed", new { errorMessage = "Import was cancelled." }, CancellationToken.None);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Discord import {ImportId} failed", importId);
@@ -379,7 +389,7 @@ public class DiscordImportService
                     .AnyAsync(m => m.ServerId == serverId && m.DiscordUserId == dm.User.Id, ct);
                 if (exists) continue;
 
-                var displayName = dm.Nick ?? dm.User.GlobalName ?? dm.User.Username;
+                var displayName = dm.User.GlobalName ?? dm.User.Username;
                 string? avatarUrl = dm.User.Avatar is not null
                     ? $"https://cdn.discordapp.com/avatars/{dm.User.Id}/{dm.User.Avatar}.png"
                     : null;

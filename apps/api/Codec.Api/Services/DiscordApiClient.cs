@@ -72,9 +72,12 @@ public class DiscordApiClient
     public async Task<Stream> DownloadFileAsync(string url, CancellationToken ct = default)
     {
         using var cdnClient = new HttpClient();
-        var response = await cdnClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await cdnClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStreamAsync(ct);
+        var memoryStream = new MemoryStream();
+        await response.Content.CopyToAsync(memoryStream, ct);
+        memoryStream.Position = 0;
+        return memoryStream;
     }
 }
 

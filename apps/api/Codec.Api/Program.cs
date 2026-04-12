@@ -372,6 +372,7 @@ builder.Services.AddHostedService<AdminMetricsService>();
 // Discord import
 builder.Services.AddSingleton(Channel.CreateUnbounded<Guid>(
     new UnboundedChannelOptions { SingleReader = true }));
+builder.Services.AddSingleton<DiscordImportCancellationRegistry>();
 builder.Services.AddScoped<DiscordImportService>();
 builder.Services.AddHostedService<DiscordImportWorker>();
 builder.Services.AddHttpClient<DiscordApiClient>()
