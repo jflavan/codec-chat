@@ -235,7 +235,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
   - RESTful controller-based API design (`[ApiController]`)
   - SignalR hub for real-time messaging and typing indicators
   - Shared `UserService` for cross-cutting user resolution
-  - `DiscordImportService`, `DiscordApiClient`, `DiscordPermissionMapper`, `DiscordRateLimitHandler`, `DiscordImportWorker` for Discord server import
+  - `DiscordImportService`, `DiscordApiClient`, `DiscordPermissionMapper`, `DiscordRateLimitHandler`, `DiscordImportWorker` for Discord server import (newest-first message pagination, 4 parallel channels, global `TokenBucketRateLimiter` at 50 req/sec, live `ImportMessagesAvailable` channel events)
   - Automatic migrations (development)
   - CORS support for local development
 
@@ -646,6 +646,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `ImportProgress` | `{ stage, completed, total, percentComplete }` | Discord import progress update for each stage (sent to server group) |
 | `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers, completedAt }` | Discord import finished successfully (sent to server group) |
 | `ImportFailed` | `{ errorMessage }` | Discord import failed with error details (sent to server group) |
+| `ImportMessagesAvailable` | `{ channelId }` | New batch of imported messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.

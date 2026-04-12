@@ -1,6 +1,6 @@
 # Discord Import
 
-Codec supports importing an entire Discord server — structure, messages, emojis, and member mappings — into an existing Codec server. The import is initiated from the **Discord Import** tab in server settings and runs as a background job with real-time progress via SignalR.
+Codec supports importing an entire Discord server — structure, messages, emojis, and member mappings — into an existing Codec server. The import is initiated from the **Discord Import** tab in server settings and runs as a background job with real-time progress via SignalR. Messages are imported newest-first so users see recent conversations immediately, with history backfilled in the background. Live `ImportMessagesAvailable` SignalR events notify the frontend after each batch, enabling real-time message loading during import.
 
 ## Overview
 
@@ -55,7 +55,7 @@ The import runs in this order:
 | Permission Overrides | Per-channel role overrides | Allow/deny bitmasks mapped to Codec permissions |
 | Emojis | Custom emojis | Downloaded from Discord CDN; name and animated flag preserved |
 | Members | Guild members | Discord username, avatar URL, and role assignments stored |
-| Messages | Full message history per channel | Imported in parallel (up to 4 channels); attachments stored as image/file URLs; reply chains preserved; author info stored in `ImportedAuthorName`/`ImportedAuthorAvatarUrl` |
+| Messages | Full message history per channel | Imported newest-first (`before` pagination) across up to 4 channels in parallel; Discord CDN URLs used directly for attachments (no re-hosting); reply chains preserved; author info stored in `ImportedAuthorName`/`ImportedAuthorAvatarUrl`; `ImportMessagesAvailable` SignalR event sent to `channel-{channelId}` group after each batch so the frontend reloads messages in real-time |
 | Pins | Pinned messages per channel | Matched to imported messages via entity mappings |
 
 ## Identity Claiming
@@ -103,6 +103,7 @@ All events are sent to the `server-{serverId}` group.
 | `ImportProgress` | `{ stage, completed, total, percentComplete }` | Progress update for each import stage (Roles, Categories, Channels, Emojis, Members, Messages, Pins) |
 | `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers, completedAt }` | Import finished successfully |
 | `ImportFailed` | `{ errorMessage }` | Import failed with error details |
+| `ImportMessagesAvailable` | `{ channelId }` | New batch of messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
 
 ## Permission Mapping
 
@@ -135,8 +136,24 @@ Discord permissions without a Codec equivalent (e.g., Manage Webhooks, Create In
 - **Background worker** (`DiscordImportWorker`) — hosted service that reads from a `Channel<Guid>` queue and processes imports sequentially.
 - **Channel\<T\> queue** — `System.Threading.Channels.Channel<Guid>` registered as a singleton; the controller writes import IDs and the worker reads them.
 - **Parallel channel imports** — message history is fetched for up to 4 channels concurrently (`MaxParallelChannels = 4` in `DiscordImportService`).
-- **Discord CDN URLs** — emoji images are downloaded from `cdn.discordapp.com` and stored locally (or in blob storage); message attachment URLs reference the original Discord CDN.
-- **Rate limiting** — `DiscordRateLimitHandler` is a `DelegatingHandler` on the Discord API `HttpClient` that reads `X-RateLimit-*` response headers and delays requests when limits are hit.
+- **No attachment re-hosting** — message attachment and image URLs reference the original Discord CDN directly (no download/re-upload). Emoji images are still downloaded from `cdn.discordapp.com` and stored locally (or in blob storage).
+- **Rate limiting** — `DiscordRateLimitHandler` is a `DelegatingHandler` on the Discord API `HttpClient` that reads `X-RateLimit-*` response headers and delays requests when limits are hit. A global `TokenBucketRateLimiter` (50 tokens/sec) coordinates rate limiting across all parallel channel imports.
+- **Live channel updates** — `ImportMessagesAvailable` SignalR event is sent to the `channel-{channelId}` group after each message batch, so the frontend can reload and display messages as they are imported.
 - **Bot token security** — tokens are encrypted at rest using ASP.NET Core Data Protection (`IDataProtectionProvider`) and cleared after import completes.
 - **Scoped services** — the worker creates a new DI scope per import to get fresh `CodecDbContext` and `DiscordApiClient` instances.
 - **Entity mappings** — `DiscordEntityMapping` records track the relationship between Discord IDs and Codec IDs for roles, categories, channels, messages, emojis, and pins, enabling re-sync and cross-reference.
+
+## Performance Characteristics
+
+Benchmarked on a real Discord server import:
+
+| Metric | Value |
+|--------|-------|
+| Total messages imported | 371,000 |
+| Wall-clock time | ~20 minutes |
+| Messages per API call | 98+ (Discord returns up to 100) |
+| Discord API 429 rate | ~10% of requests |
+| Parallel channels | 4 concurrent |
+| Pagination direction | Newest-first (`before` cursor) |
+
+The newest-first strategy means users see recent messages within seconds of import start. The global `TokenBucketRateLimiter` keeps 429 rates manageable while maximizing throughput across parallel channel imports.

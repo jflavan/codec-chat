@@ -1,5 +1,13 @@
 # Discord Server Import
 
+> **Implementation divergences (2026-04-12):** The final implementation differs from this original spec in several ways:
+> - **No attachment re-hosting** -- Discord CDN URLs are used directly for message attachments (no download/re-upload to Codec file storage). Emojis are still downloaded.
+> - **Newest-first pagination** -- Messages are imported newest-first using `before` cursor pagination (not oldest-first as originally specified), so users see recent messages immediately.
+> - **Live channel updates** -- An `ImportMessagesAvailable` SignalR event is sent to `channel-{channelId}` groups after each message batch, enabling real-time message loading in the frontend during import.
+> - **Parallel channel imports (4 concurrent)** -- Message history is fetched for up to 4 channels concurrently via `SemaphoreSlim`.
+> - **Global rate limiting** -- A `TokenBucketRateLimiter` (50 tokens/sec) enforces Discord's API rate limit across all parallel imports, replacing the original ~40 req/sec cap.
+> - **Performance** -- 371K messages imported in ~20 minutes, 98+ msgs/API call, ~10% 429 rate.
+
 Import Discord server content into Codec via a Discord bot, run as a background job in the API.
 
 ## Scope
