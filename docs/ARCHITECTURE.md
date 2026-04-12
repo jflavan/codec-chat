@@ -649,6 +649,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers }` | Discord import milestone fired before media re-hosting begins (sent to server group) |
 | `ImportFailed` | `{ errorMessage }` | Discord import failed with error details (sent to server group) |
 | `ImportMessagesAvailable` | `{ channelId, count }` | New batch of imported messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
+| `ImportRehostCompleted` | `{ importedChannels, importedMessages, importedMembers }` | Discord media re-hosting finished (sent to server group); frontend updates import status |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.

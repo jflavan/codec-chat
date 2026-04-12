@@ -297,4 +297,155 @@ public class DiscordMediaRehostServiceTests
 
         Assert.Equal(RehostOutcome.Failed, result.Outcome);
     }
+
+    // ========== RehostFileAsync tests ==========
+
+    [Fact]
+    public async Task RehostFileAsync_Success_UploadsPdf()
+    {
+        var pdfBytes = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }; // %PDF-
+
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(pdfBytes)
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+
+        _storageMock.Setup(s => s.UploadAsync(
+            "files", It.IsAny<string>(), It.IsAny<Stream>(), "application/pdf", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://codec.chat/uploads/files/import/abc123.pdf");
+
+        var service = CreateService(response);
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/document.pdf",
+            "files", 50 * 1024 * 1024, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Success, result.Outcome);
+        Assert.Equal("https://codec.chat/uploads/files/import/abc123.pdf", result.Url);
+        _storageMock.Verify(s => s.UploadAsync(
+            "files", It.Is<string>(p => p.StartsWith("import/") && p.EndsWith(".pdf")),
+            It.IsAny<Stream>(), "application/pdf", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RehostFileAsync_Failed_OnHttpFailure()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.Forbidden);
+
+        var service = CreateService(response);
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/expired.zip",
+            "files", 50 * 1024 * 1024, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Failed, result.Outcome);
+    }
+
+    [Fact]
+    public async Task RehostFileAsync_Failed_OnNetworkException()
+    {
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("Network error"));
+
+        var httpClient = new HttpClient(handler.Object);
+        var service = new DiscordMediaRehostService(httpClient, _storageMock.Object, _loggerMock.Object);
+
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/file.zip",
+            "files", 50 * 1024 * 1024, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Failed, result.Outcome);
+    }
+
+    [Fact]
+    public async Task RehostFileAsync_Skipped_WhenDeclaredSizeExceedsMax()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(new byte[] { 0x00 })
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+        response.Content.Headers.ContentLength = 100 * 1024 * 1024; // 100 MB, exceeds 50 MB max
+
+        var service = CreateService(response);
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/huge.zip",
+            "files", 50 * 1024 * 1024, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Skipped, result.Outcome);
+    }
+
+    [Fact]
+    public async Task RehostFileAsync_Skipped_WhenStreamExceedsMaxSize()
+    {
+        var largeBytes = new byte[1024];
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(largeBytes)
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+
+        var service = CreateService(response);
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/file.zip",
+            "files", 512, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Skipped, result.Outcome);
+    }
+
+    [Fact]
+    public async Task RehostFileAsync_Success_UsesExtensionFromUrl()
+    {
+        var fileBytes = new byte[] { 0x50, 0x4B, 0x03, 0x04 }; // PK zip header
+
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(fileBytes)
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+
+        _storageMock.Setup(s => s.UploadAsync(
+            "files", It.IsAny<string>(), It.IsAny<Stream>(), "application/zip", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://codec.chat/uploads/files/import/abc123.zip");
+
+        var service = CreateService(response);
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/456/archive.zip",
+            "files", 50 * 1024 * 1024, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Success, result.Outcome);
+        _storageMock.Verify(s => s.UploadAsync(
+            "files", It.Is<string>(p => p.EndsWith(".zip")),
+            It.IsAny<Stream>(), "application/zip", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RehostFileAsync_Success_FallsBackToBinExtensionWhenMissing()
+    {
+        var fileBytes = new byte[] { 0x00, 0x01, 0x02 };
+
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(fileBytes)
+        };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+
+        _storageMock.Setup(s => s.UploadAsync(
+            "files", It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("https://codec.chat/uploads/files/import/abc123.bin");
+
+        var service = CreateService(response);
+        var result = await service.RehostFileAsync(
+            "https://cdn.discordapp.com/attachments/123/456/noextfile",
+            "files", 50 * 1024 * 1024, CancellationToken.None);
+
+        Assert.Equal(RehostOutcome.Success, result.Outcome);
+        _storageMock.Verify(s => s.UploadAsync(
+            "files", It.Is<string>(p => p.EndsWith(".bin")),
+            It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

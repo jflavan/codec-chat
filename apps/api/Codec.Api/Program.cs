@@ -381,7 +381,8 @@ builder.Services.AddTransient<DiscordRateLimitHandler>();
 builder.Services.AddHttpClient<DiscordMediaRehostService>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
     {
-        AllowAutoRedirect = false,
+        AllowAutoRedirect = true,
+        MaxAutomaticRedirections = 3,
         UseCookies = false,
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         ConnectCallback = async (context, cancellationToken) =>
@@ -420,7 +421,7 @@ builder.Services.AddHttpClient<DiscordMediaRehostService>()
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
             try
             {
-                await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+                await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
                 return new NetworkStream(socket, ownsSocket: true);
             }
             catch
@@ -500,7 +501,7 @@ builder.Services.AddHttpClient("webhook", client =>
         var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
-            await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+            await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
             return new NetworkStream(socket, ownsSocket: true);
         }
         catch
@@ -566,7 +567,7 @@ builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =
         var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
-            await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+            await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
             return new NetworkStream(socket, ownsSocket: true);
         }
         catch
@@ -631,7 +632,7 @@ builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>(client =>
         var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
-            await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+            await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
             return new NetworkStream(socket, ownsSocket: true);
         }
         catch

@@ -162,6 +162,10 @@ public class DiscordImportService
             await group.SendAsync("ImportProgress", new { stage = "Re-hosting images", completed = 0, total = 0, percentComplete = 97f }, ct);
             await RehostAttachmentsAsync(db, serverId, group, ct);
 
+            // 12. Re-host non-image file attachments (newest first)
+            await group.SendAsync("ImportProgress", new { stage = "Re-hosting files", completed = 0, total = 0, percentComplete = 98.5f }, ct);
+            await RehostFileAttachmentsAsync(db, serverId, group, ct);
+
             // Complete
             import.Status = DiscordImportStatus.Completed;
             import.CompletedAt = DateTimeOffset.UtcNow;
@@ -728,7 +732,7 @@ public class DiscordImportService
             .ToListAsync(ct);
 
         var totalCount = await db.Messages
-            .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl != null && m.ImageUrl.Contains("cdn.discordapp.com"))
+            .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl is not null && m.ImageUrl.Contains("cdn.discordapp.com"))
             .CountAsync(ct);
 
         if (totalCount == 0) return;
@@ -746,7 +750,7 @@ public class DiscordImportService
             ct.ThrowIfCancellationRequested();
 
             var messages = await db.Messages
-                .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl != null && m.ImageUrl.Contains("cdn.discordapp.com"))
+                .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl is not null && m.ImageUrl.Contains("cdn.discordapp.com"))
                 .OrderByDescending(m => m.CreatedAt)
                 .Take(batchSize)
                 .ToListAsync(ct);
@@ -788,7 +792,81 @@ public class DiscordImportService
                 stage = $"Re-hosting images ({completed}/{totalCount})",
                 completed,
                 total = totalCount,
-                percentComplete = 97f + ((float)completed / totalCount * 3f)
+                percentComplete = 97f + ((float)completed / totalCount * 1.5f)
+            }, ct);
+        }
+    }
+
+    internal async Task RehostFileAttachmentsAsync(
+        CodecDbContext db, Guid serverId, IClientProxy group, CancellationToken ct)
+    {
+        var channelIds = await db.Channels
+            .Where(c => c.ServerId == serverId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+
+        var totalCount = await db.Messages
+            .Where(m => channelIds.Contains(m.ChannelId) && m.FileUrl is not null && m.FileUrl.Contains("cdn.discordapp.com"))
+            .CountAsync(ct);
+
+        if (totalCount == 0) return;
+
+        using var scope = _scopeFactory.CreateScope();
+        var rehostService = scope.ServiceProvider.GetRequiredService<DiscordMediaRehostService>();
+
+        var completed = 0;
+        var consecutiveFailures = 0;
+        const int maxConsecutiveFailures = 10;
+        const int batchSize = 50;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var messages = await db.Messages
+                .Where(m => channelIds.Contains(m.ChannelId) && m.FileUrl is not null && m.FileUrl.Contains("cdn.discordapp.com"))
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(batchSize)
+                .ToListAsync(ct);
+
+            if (messages.Count == 0) break;
+
+            foreach (var message in messages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var result = await rehostService.RehostFileAsync(
+                    message.FileUrl!, "files", 50 * 1024 * 1024, ct);
+
+                switch (result.Outcome)
+                {
+                    case RehostOutcome.Success:
+                        message.FileUrl = result.Url!;
+                        consecutiveFailures = 0;
+                        break;
+                    case RehostOutcome.Failed:
+                        message.FileUrl = null;
+                        consecutiveFailures++;
+                        _logger.LogWarning("Failed to re-host file for message {MessageId}, clearing FileUrl", message.Id);
+                        if (consecutiveFailures >= maxConsecutiveFailures)
+                            throw new InvalidOperationException("Too many consecutive file re-host failures. Aborting media re-hosting.");
+                        break;
+                    case RehostOutcome.Skipped:
+                        message.FileUrl = null;
+                        break;
+                }
+
+                completed++;
+            }
+
+            await db.SaveChangesAsync(ct);
+
+            await group.SendAsync("ImportProgress", new
+            {
+                stage = $"Re-hosting files ({completed}/{totalCount})",
+                completed,
+                total = totalCount,
+                percentComplete = 98.5f + ((float)completed / totalCount * 1.5f)
             }, ct);
         }
     }

@@ -122,6 +122,68 @@ public class DiscordMediaRehostService
         return RehostResult.Success(url);
     }
 
+    public virtual async Task<RehostResult> RehostFileAsync(
+        string discordCdnUrl,
+        string storageContainer,
+        long maxFileSize,
+        CancellationToken ct)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.GetAsync(discordCdnUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to download file from {Url}", discordCdnUrl);
+            return RehostResult.Failed;
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Discord CDN returned {StatusCode} for {Url}", response.StatusCode, discordCdnUrl);
+                return RehostResult.Failed;
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+
+            if (response.Content.Headers.ContentLength is > 0 and var declaredSize && declaredSize > maxFileSize)
+            {
+                _logger.LogDebug("Skipping oversized file download ({Size} bytes) from {Url}", declaredSize, discordCdnUrl);
+                return RehostResult.Skipped;
+            }
+
+            using var bodyStream = await response.Content.ReadAsStreamAsync(ct);
+            using var memoryStream = new MemoryStream();
+            var buffer = new byte[81920];
+            long totalRead = 0;
+            int bytesRead;
+            while ((bytesRead = await bodyStream.ReadAsync(buffer, ct)) > 0)
+            {
+                totalRead += bytesRead;
+                if (totalRead > maxFileSize)
+                {
+                    _logger.LogDebug("File download exceeded max size ({Max} bytes) from {Url}", maxFileSize, discordCdnUrl);
+                    return RehostResult.Skipped;
+                }
+                memoryStream.Write(buffer, 0, bytesRead);
+            }
+
+            var fileBytes = memoryStream.ToArray();
+            var hashPrefix = Convert.ToHexString(SHA256.HashData(fileBytes))[..16].ToLowerInvariant();
+            var extension = Path.GetExtension(new Uri(discordCdnUrl).AbsolutePath);
+            if (string.IsNullOrEmpty(extension))
+                extension = ".bin";
+            var blobPath = $"import/{hashPrefix}{extension}";
+
+            using var uploadStream = new MemoryStream(fileBytes);
+            var url = await _storage.UploadAsync(storageContainer, blobPath, uploadStream, contentType, ct);
+            return RehostResult.Success(url);
+        }
+    }
+
     private static (byte[] Bytes, string ContentType, string Extension)? ProcessImage(
         byte[] imageBytes, string contentType, long maxFileSize, int? maxDimensionPx)
     {
@@ -187,7 +249,9 @@ public class DiscordMediaRehostService
             }
 
             using var final = image.Encode(format, 25);
-            return (final!.ToArray(), outputContentType, outputExtension);
+            if (final is null)
+                return null;
+            return (final.ToArray(), outputContentType, outputExtension);
         }
         finally
         {

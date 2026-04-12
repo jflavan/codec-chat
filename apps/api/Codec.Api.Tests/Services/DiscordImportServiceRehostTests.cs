@@ -107,6 +107,25 @@ public class DiscordImportServiceRehostTests
         return msg.Id;
     }
 
+    private static Guid SeedMessageWithFile(CodecDbContext db, Guid channelId, string fileUrl)
+    {
+        var msg = new Message
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = channelId,
+            AuthorName = "testuser",
+            Body = "test",
+            FileUrl = fileUrl,
+            FileName = "attachment.pdf",
+            FileContentType = "application/pdf",
+            FileSize = 1024,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        db.Messages.Add(msg);
+        db.SaveChanges();
+        return msg.Id;
+    }
+
     // ========== RehostEmojisAsync tests ==========
 
     [Fact]
@@ -387,5 +406,183 @@ public class DiscordImportServiceRehostTests
         _rehostMock.Verify(r => r.RehostImageAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(3));
+    }
+
+    // ========== RehostFileAttachmentsAsync tests ==========
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_NoFilesToRehost_ReturnsWithoutCreatingScope()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        db.Channels.Add(new Channel { Id = Guid.NewGuid(), ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        var service = CreateService();
+        await service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None);
+
+        _rehostMock.Verify(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_AllFilesSucceed_UpdatesFileUrls()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new Channel { Id = channelId, ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        var msgIds = new[]
+        {
+            SeedMessageWithFile(db, channelId, "https://cdn.discordapp.com/attachments/1/a.pdf"),
+            SeedMessageWithFile(db, channelId, "https://cdn.discordapp.com/attachments/2/b.zip"),
+            SeedMessageWithFile(db, channelId, "https://cdn.discordapp.com/attachments/3/c.docx")
+        };
+
+        var callIndex = 0;
+        _rehostMock.Setup(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                callIndex++;
+                return RehostResult.Success($"https://codec.chat/uploads/files/import/file_{callIndex}.pdf");
+            });
+
+        var service = CreateService();
+        await service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None);
+
+        foreach (var id in msgIds)
+        {
+            var msg = await db.Messages.FindAsync(id);
+            Assert.NotNull(msg);
+            Assert.StartsWith("https://codec.chat/uploads/", msg.FileUrl);
+            Assert.DoesNotContain("cdn.discordapp.com", msg.FileUrl!);
+        }
+    }
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_FailedClearsFileUrl()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new Channel { Id = channelId, ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        var msgId = SeedMessageWithFile(db, channelId, "https://cdn.discordapp.com/attachments/1/a.pdf");
+
+        _rehostMock.Setup(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RehostResult.Failed);
+
+        var service = CreateService();
+        await service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None);
+
+        var msg = await db.Messages.FindAsync(msgId);
+        Assert.NotNull(msg);
+        Assert.Null(msg.FileUrl);
+    }
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_SkippedClearsFileUrl()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new Channel { Id = channelId, ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        var msgId = SeedMessageWithFile(db, channelId, "https://cdn.discordapp.com/attachments/1/a.pdf");
+
+        _rehostMock.Setup(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RehostResult.Skipped);
+
+        var service = CreateService();
+        await service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None);
+
+        var msg = await db.Messages.FindAsync(msgId);
+        Assert.NotNull(msg);
+        Assert.Null(msg.FileUrl);
+    }
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_TenConsecutiveFailures_ThrowsInvalidOperationException()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new Channel { Id = channelId, ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        for (var i = 0; i < 10; i++)
+            SeedMessageWithFile(db, channelId, $"https://cdn.discordapp.com/attachments/{i}/file.pdf");
+
+        _rehostMock.Setup(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RehostResult.Failed);
+
+        var service = CreateService();
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_BatchLoopTerminates_AfterProcessingAll()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new Channel { Id = channelId, ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        for (var i = 0; i < 3; i++)
+            SeedMessageWithFile(db, channelId, $"https://cdn.discordapp.com/attachments/{i}/file.pdf");
+
+        _rehostMock.Setup(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RehostResult.Success("https://codec.chat/uploads/files/import/ok.pdf"));
+
+        var service = CreateService();
+        await service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None);
+
+        var remaining = await db.Messages
+            .Where(m => m.FileUrl != null && m.FileUrl.Contains("cdn.discordapp.com"))
+            .CountAsync();
+        Assert.Equal(0, remaining);
+
+        _rehostMock.Verify(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task RehostFileAttachmentsAsync_IgnoresMessagesWithOnlyImageUrl()
+    {
+        using var db = CreateDb();
+        var (serverId, _) = SeedServerAndImport(db);
+
+        var channelId = Guid.NewGuid();
+        db.Channels.Add(new Channel { Id = channelId, ServerId = serverId, Name = "general" });
+        await db.SaveChangesAsync();
+
+        // Seed a message with ImageUrl (not FileUrl) — should not be processed by file rehost
+        SeedMessageWithImage(db, channelId, "https://cdn.discordapp.com/attachments/1/image.png");
+
+        var service = CreateService();
+        await service.RehostFileAttachmentsAsync(db, serverId, _groupMock.Object, CancellationToken.None);
+
+        _rehostMock.Verify(r => r.RehostFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }
