@@ -244,6 +244,12 @@ jobs:
             --command-id RunShellScript \
             --scripts "
               set -e
+              # Stop and disable nginx if present — it conflicts with Caddy on ports 80/443
+              if systemctl is-active --quiet nginx 2>/dev/null; then
+                echo 'Stopping nginx to free ports 80/443 for Caddy...'
+                systemctl stop nginx
+                systemctl disable nginx
+              fi
               docker compose -f /opt/voice/docker-compose.yml pull
               docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
             "
@@ -255,21 +261,16 @@ jobs:
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
             --scripts "
-              sleep 10
-              echo '=== Container status ==='
-              docker ps -a --filter name=voice --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-              echo '=== LiveKit container ==='
-              docker inspect --format='{{.State.Running}}' voice-livekit-1 2>/dev/null && echo LIVEKIT_OK || echo LIVEKIT_FAIL
-              echo '=== Caddy container ==='
-              docker inspect --format='{{.State.Running}}' voice-caddy-1 2>/dev/null && echo CADDY_OK || echo CADDY_FAIL
-              echo '=== Caddy logs (last 30 lines) ==='
-              docker logs voice-caddy-1 --tail 30 2>&1 || echo 'No Caddy logs available'
+              sleep 15
               echo '=== Listening ports ==='
               ss -tlnp 2>/dev/null | grep -E ':(80|443|7880|7881)\s' || echo 'No matching ports'
-              echo '=== Local connectivity ==='
-              curl -sf -o /dev/null -w 'LiveKit HTTP %{http_code}' http://localhost:7880 2>/dev/null || echo 'LiveKit HTTP unreachable'
-              curl -sf -o /dev/null -w 'Caddy HTTP %{http_code}' http://localhost:80 2>/dev/null || echo 'Caddy HTTP unreachable'
-              curl -skf -o /dev/null -w 'Caddy HTTPS %{http_code}' https://localhost:443 2>/dev/null || echo 'Caddy HTTPS unreachable'
+              echo '=== LiveKit logs (last 5) ==='
+              docker logs voice-livekit-1 --tail 5 2>&1 || echo 'No LiveKit logs'
+              echo '=== Caddy logs (last 10) ==='
+              docker logs voice-caddy-1 --tail 10 2>&1 || echo 'No Caddy logs'
+              echo '=== HEALTH CHECK RESULTS ==='
+              docker inspect --format='{{.State.Running}}' voice-livekit-1 2>/dev/null && echo LIVEKIT_OK || echo LIVEKIT_FAIL
+              docker inspect --format='{{.State.Running}}' voice-caddy-1 2>/dev/null && echo CADDY_OK || echo CADDY_FAIL
             " \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
           echo "$DIAG"
