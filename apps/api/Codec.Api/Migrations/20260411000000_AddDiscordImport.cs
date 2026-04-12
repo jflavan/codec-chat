@@ -26,6 +26,13 @@ namespace Codec.Api.Migrations
                 maxLength: 512,
                 nullable: true);
 
+            migrationBuilder.AddColumn<string>(
+                name: "ImportedDiscordUserId",
+                table: "Messages",
+                type: "character varying(20)",
+                maxLength: 20,
+                nullable: true);
+
             // Create DiscordImports table
             migrationBuilder.CreateTable(
                 name: "DiscordImports",
@@ -165,6 +172,7 @@ namespace Codec.Api.Migrations
 
             migrationBuilder.DropColumn(name: "ImportedAuthorName", table: "Messages");
             migrationBuilder.DropColumn(name: "ImportedAuthorAvatarUrl", table: "Messages");
+            migrationBuilder.DropColumn(name: "ImportedDiscordUserId", table: "Messages");
         }
     }
 }

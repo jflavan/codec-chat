@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Threading.Channels;
 using Codec.Api.Data;
 using Codec.Api.Models;
@@ -47,29 +46,13 @@ public class DiscordImportController : ControllerBase
         return user;
     }
 
-    private async Task<bool> HasManageServerPermission(Guid serverId)
-    {
-        var user = await GetCurrentUserAsync();
-        if (user is null) return false;
-        if (user.IsGlobalAdmin) return true;
-
-        var memberRoles = await _db.ServerMemberRoles
-            .Where(mr => mr.UserId == user.Id && mr.Role!.ServerId == serverId)
-            .Select(mr => mr.Role!.Permissions)
-            .ToListAsync();
-
-        var combined = memberRoles.Aggregate(Permission.None, (a, b) => a | b);
-        return combined.Has(Permission.ManageServer);
-    }
-
     [HttpPost]
     public async Task<IActionResult> StartImport(Guid serverId, [FromBody] StartDiscordImportRequest request)
     {
-        if (!await HasManageServerPermission(serverId))
-            return Forbid();
-
         var currentUser = await GetCurrentUserAsync();
         if (currentUser is null) return Unauthorized();
+
+        await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
         var existing = await _db.DiscordImports
             .FirstOrDefaultAsync(d => d.ServerId == serverId &&
@@ -113,8 +96,10 @@ public class DiscordImportController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetStatus(Guid serverId)
     {
-        if (!await HasManageServerPermission(serverId))
-            return Forbid();
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser is null) return Unauthorized();
+
+        await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
         var import = await _db.DiscordImports
             .Where(d => d.ServerId == serverId)
@@ -141,11 +126,10 @@ public class DiscordImportController : ControllerBase
     [HttpPost("resync")]
     public async Task<IActionResult> Resync(Guid serverId, [FromBody] StartDiscordImportRequest request)
     {
-        if (!await HasManageServerPermission(serverId))
-            return Forbid();
-
         var currentUser = await GetCurrentUserAsync();
         if (currentUser is null) return Unauthorized();
+
+        await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
         var lastImport = await _db.DiscordImports
             .Where(d => d.ServerId == serverId && d.Status == DiscordImportStatus.Completed)
@@ -188,8 +172,10 @@ public class DiscordImportController : ControllerBase
     [HttpDelete]
     public async Task<IActionResult> CancelImport(Guid serverId)
     {
-        if (!await HasManageServerPermission(serverId))
-            return Forbid();
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser is null) return Unauthorized();
+
+        await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
         var import = await _db.DiscordImports
             .FirstOrDefaultAsync(d => d.ServerId == serverId &&
@@ -210,8 +196,10 @@ public class DiscordImportController : ControllerBase
     [HttpGet("mappings")]
     public async Task<IActionResult> GetUserMappings(Guid serverId)
     {
-        if (!await HasManageServerPermission(serverId))
-            return Forbid();
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser is null) return Unauthorized();
+
+        await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
         var mappings = await _db.DiscordUserMappings
             .Where(m => m.ServerId == serverId)
@@ -266,14 +254,15 @@ public class DiscordImportController : ControllerBase
 
         await _db.Messages
             .Where(m => channelIds.Contains(m.ChannelId) &&
-                        m.ImportedAuthorName != null &&
+                        m.ImportedDiscordUserId != null &&
                         m.AuthorUserId == null &&
-                        m.ImportedAuthorName == mapping.DiscordUsername)
+                        m.ImportedDiscordUserId == request.DiscordUserId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(m => m.AuthorUserId, currentUser.Id)
                 .SetProperty(m => m.AuthorName, currentUser.DisplayName)
                 .SetProperty(m => m.ImportedAuthorName, (string?)null)
-                .SetProperty(m => m.ImportedAuthorAvatarUrl, (string?)null));
+                .SetProperty(m => m.ImportedAuthorAvatarUrl, (string?)null)
+                .SetProperty(m => m.ImportedDiscordUserId, (string?)null));
 
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();

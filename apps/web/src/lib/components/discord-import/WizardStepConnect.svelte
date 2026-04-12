@@ -2,20 +2,17 @@
 	let {
 		botToken = $bindable(),
 		guildId = $bindable(),
-		validatedGuild = $bindable()
+		isValid = $bindable()
 	}: {
 		botToken: string;
 		guildId: string;
-		validatedGuild: { name: string; icon: string | null; memberCount: number | null } | null;
+		isValid: boolean;
 	} = $props();
 
-	// Auto-enable when both fields are filled
+	const hasRequiredFields = $derived(botToken.trim().length > 0 && guildId.trim().length > 0);
+
 	$effect(() => {
-		if (botToken.trim() && guildId.trim()) {
-			validatedGuild = { name: '', icon: null, memberCount: null };
-		} else {
-			validatedGuild = null;
-		}
+		isValid = hasRequiredFields;
 	});
 </script>
 

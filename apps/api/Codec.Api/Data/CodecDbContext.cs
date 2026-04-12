@@ -657,5 +657,9 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<Message>()
             .Property(m => m.ImportedAuthorAvatarUrl)
             .HasMaxLength(512);
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.ImportedDiscordUserId)
+            .HasMaxLength(20);
     }
 }

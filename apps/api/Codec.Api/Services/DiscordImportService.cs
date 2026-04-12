@@ -34,6 +34,8 @@ public class DiscordImportService
         var import = await db.DiscordImports.FindAsync([importId], ct);
         if (import is null) return;
 
+        if (import.Status == DiscordImportStatus.Cancelled) return;
+
         import.Status = DiscordImportStatus.InProgress;
         import.StartedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -163,7 +165,7 @@ public class DiscordImportService
             await db.SaveChangesAsync(CancellationToken.None);
 
             var group = _hub.Clients.Group($"server-{import.ServerId}");
-            await group.SendAsync("ImportFailed", new { errorMessage = import.ErrorMessage }, CancellationToken.None);
+            await group.SendAsync("ImportFailed", new { errorMessage = "Import failed. An administrator can check the import status for details." }, CancellationToken.None);
         }
     }
 
@@ -473,6 +475,7 @@ public class DiscordImportService
                     Id = Guid.NewGuid(), ChannelId = codecChannelId, AuthorUserId = null,
                     AuthorName = dm.Author.GlobalName ?? dm.Author.Username,
                     ImportedAuthorName = dm.Author.GlobalName ?? dm.Author.Username,
+                    ImportedDiscordUserId = dm.Author.Id,
                     ImportedAuthorAvatarUrl = dm.Author.Avatar is not null
                         ? $"https://cdn.discordapp.com/avatars/{dm.Author.Id}/{dm.Author.Avatar}.png" : null,
                     Body = dm.Content ?? string.Empty,

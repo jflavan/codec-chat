@@ -639,6 +639,10 @@ namespace Codec.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("ImportedDiscordUserId")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("MessageType")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")

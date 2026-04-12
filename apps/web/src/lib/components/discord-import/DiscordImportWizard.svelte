@@ -24,7 +24,7 @@
 	let applicationId = $state('');
 	let botToken = $state('');
 	let guildId = $state('');
-	let validatedGuild = $state<{ name: string; icon: string | null; memberCount: number | null } | null>(null);
+	let connectStepValid = $state(false);
 	let importServerId = $state<string | null>(null);
 	let importError = $state<string | null>(null);
 	let isStarting = $state(false);
@@ -39,7 +39,7 @@
 			applicationId = '';
 			botToken = '';
 			guildId = '';
-			validatedGuild = null;
+			connectStepValid = false;
 			importServerId = null;
 			importError = null;
 			isStarting = false;
@@ -70,7 +70,7 @@
 			return destinationMode === 'create' ? newServerName.trim().length > 0 : selectedServerId !== null;
 		}
 		if (currentStep === 2) return true;
-		if (currentStep === 3) return validatedGuild !== null;
+		if (currentStep === 3) return connectStepValid;
 		return false;
 	});
 
@@ -156,7 +156,7 @@
 				<WizardStepConnect
 					bind:botToken={botToken}
 					bind:guildId={guildId}
-					bind:validatedGuild={validatedGuild}
+					bind:isValid={connectStepValid}
 				/>
 				{#if importError}
 					<div class="import-error">{importError}</div>
