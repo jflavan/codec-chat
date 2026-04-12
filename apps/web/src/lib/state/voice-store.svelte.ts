@@ -1,5 +1,6 @@
 // apps/web/src/lib/state/voice-store.svelte.ts
 import { getContext, setContext } from 'svelte';
+import { env } from '$env/dynamic/public';
 import type { VoiceChannelMember, Channel } from '$lib/types/index.js';
 import type { ApiClient } from '$lib/api/client.js';
 import type { ChatHubService } from '$lib/services/chat-hub.js';
@@ -104,7 +105,7 @@ export class VoiceStore {
 	) {
 		this._loadUserVolumes();
 		this._loadVoicePreferences();
-		this.liveKitUrl = import.meta.env.PUBLIC_LIVEKIT_URL || 'ws://localhost:7880';
+		this.liveKitUrl = env.PUBLIC_LIVEKIT_URL || 'ws://localhost:7880';
 	}
 
 	/* ��══════════════════ Core Voice ═══════════════════ */
