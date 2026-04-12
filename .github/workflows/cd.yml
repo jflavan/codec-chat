@@ -254,17 +254,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "
-              for i in 1 2 3 4 5; do
-                if docker compose -f /opt/voice/docker-compose.yml ps --format json | grep -q livekit; then
-                  RUNNING=\$(docker compose -f /opt/voice/docker-compose.yml ps --format json | grep livekit | grep -c running || true)
-                  if [ \"\$RUNNING\" -gt 0 ]; then echo LIVEKIT_OK; exit 0; fi
-                fi
-                sleep 5
-              done
-              echo LIVEKIT_FAIL
-              docker compose -f /opt/voice/docker-compose.yml logs --tail=20
-            " \
+            --scripts "sleep 10 && docker inspect --format='{{.State.Running}}' voice-livekit-1 2>/dev/null && echo LIVEKIT_OK || echo LIVEKIT_FAIL" \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
           if [[ "$STATUS" != *"LIVEKIT_OK"* ]]; then
             echo "::error::LiveKit health check failed: $STATUS"
