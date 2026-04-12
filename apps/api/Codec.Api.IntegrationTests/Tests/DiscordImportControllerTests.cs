@@ -224,7 +224,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
             {
                 Id = Guid.NewGuid(),
                 ServerId = serverId,
-                DiscordUserId = "discord-user-1",
+                DiscordUserId = "22222222222222222",
                 DiscordUsername = "TestDiscordUser#1234"
             });
             await db.SaveChangesAsync();
@@ -265,7 +265,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
 
         var response = await nonMember.PostAsJsonAsync(
             $"/servers/{serverId}/discord-import/claim",
-            new { discordUserId = "some-discord-id" });
+            new { discordUserId = "11111111111111111" });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -293,7 +293,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
             {
                 Id = Guid.NewGuid(),
                 ServerId = serverId,
-                DiscordUserId = "already-claimed-discord",
+                DiscordUserId = "33333333333333333",
                 DiscordUsername = "AlreadyClaimed#0001",
                 CodecUserId = memberId,
                 ClaimedAt = DateTimeOffset.UtcNow
@@ -304,7 +304,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
         // Owner (also a member) tries to claim the same Discord identity
         var response = await owner.PostAsJsonAsync(
             $"/servers/{serverId}/discord-import/claim",
-            new { discordUserId = "already-claimed-discord" });
+            new { discordUserId = "33333333333333333" });
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -324,7 +324,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
             {
                 Id = Guid.NewGuid(),
                 ServerId = serverId,
-                DiscordUserId = "unclaimed-discord-id",
+                DiscordUserId = "44444444444444444",
                 DiscordUsername = "UnclaimedUser#5678"
             });
             await db.SaveChangesAsync();
@@ -332,7 +332,7 @@ public class DiscordImportControllerTests(CodecWebFactory factory) : Integration
 
         var response = await client.PostAsJsonAsync(
             $"/servers/{serverId}/discord-import/claim",
-            new { discordUserId = "unclaimed-discord-id" });
+            new { discordUserId = "44444444444444444" });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();

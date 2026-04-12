@@ -54,6 +54,13 @@ public class DiscordImportController : ControllerBase
 
         await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
+        // Quick pre-check before expensive Discord API call (DB unique index is the ultimate guard)
+        var existing = await _db.DiscordImports
+            .AnyAsync(d => d.ServerId == serverId &&
+                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress));
+        if (existing)
+            return Conflict(new { error = "An import is already in progress for this server." });
+
         _discordClient.SetBotToken(request.BotToken);
         DiscordGuild guild;
         try
