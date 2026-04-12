@@ -310,24 +310,28 @@ module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
   }
 }
 
+// Effective LiveKit credentials: use provided values or fallback dev keys when voice is enabled.
+// Both the voice VM (via CD pipeline) and the API container must use matching credentials.
+var effectiveLivekitApiKey = livekitApiKey != '' ? livekitApiKey : 'devkey'
+var effectiveLivekitApiSecret = livekitApiSecret != '' ? livekitApiSecret : 'secret-must-be-at-least-32-chars'
+
 // Store the LiveKit API key in Key Vault so the API Container App can reference it securely.
-// Only create when the value is provided — empty secrets cause Container App provisioning failures.
-module livekitApiKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled && livekitApiKey != '') {
+module livekitApiKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
   name: 'livekit-api-key'
   params: {
     keyVaultName: keyVault.outputs.name
     secretName: 'LiveKit--ApiKey'
-    secretValue: livekitApiKey
+    secretValue: effectiveLivekitApiKey
   }
 }
 
 // Store the LiveKit API secret in Key Vault.
-module livekitApiSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled && livekitApiSecret != '') {
+module livekitApiSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
   name: 'livekit-api-secret'
   params: {
     keyVaultName: keyVault.outputs.name
     secretName: 'LiveKit--ApiSecret'
-    secretValue: livekitApiSecret
+    secretValue: effectiveLivekitApiSecret
   }
 }
 
@@ -391,8 +395,8 @@ module apiApp 'modules/container-app-api.bicep' = {
     customDomainName: apiCustomDomain
     managedCertificateId: apiCertId
     livekitServerUrl: voiceVm.?outputs.livekitUrl ?? ''
-    livekitApiKeyKvUrl: voiceVmEnabled && livekitApiKey != '' ? '${keyVault.outputs.uri}secrets/LiveKit--ApiKey' : ''
-    livekitApiSecretKvUrl: voiceVmEnabled && livekitApiSecret != '' ? '${keyVault.outputs.uri}secrets/LiveKit--ApiSecret' : ''
+    livekitApiKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiKey' : ''
+    livekitApiSecretKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiSecret' : ''
     jwtSecretKvUrl: '${keyVault.outputs.uri}secrets/Jwt--Secret'
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisCache.?outputs.connectionStringSecretUri ?? ''
