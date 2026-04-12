@@ -58,8 +58,6 @@ public class ServersControllerWebhookTests : IDisposable
             new Mock<IAvatarService>().Object,
             new Mock<ICustomEmojiService>().Object,
             hub.Object,
-            new Mock<IHttpClientFactory>().Object,
-            new Mock<IConfiguration>().Object,
             messageCache,
             webhookService,
             new PermissionResolverService(_db));

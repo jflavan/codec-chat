@@ -1,8 +1,7 @@
-using System.Text;
-using System.Text.Json;
 using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
+using Livekit.Server.Sdk.Dotnet;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +14,7 @@ namespace Codec.Api.Hubs;
 /// Clients join channel-scoped, user-scoped, server-scoped, and voice-scoped groups.
 /// </summary>
 [Authorize]
-public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker, IPermissionResolverService permissionResolver, MetricsCounterService metricsCounter) : Hub
+public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration config, ILogger<ChatHub> logger, Services.VoiceCallTimeoutService callTimeoutService, PresenceTracker presenceTracker, IPermissionResolverService permissionResolver, MetricsCounterService metricsCounter) : Hub
 {
     /// <summary>
     /// Called when a client connects. Automatically joins the user-scoped group
@@ -329,8 +328,8 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     }
 
     /// <summary>
-    /// Accepts an incoming DM voice call. Sets up the SFU room and transports for the
-    /// recipient, then notifies the caller to set up their transports.
+    /// Accepts an incoming DM voice call. Creates a VoiceState for the recipient,
+    /// generates a LiveKit token, and notifies the caller.
     /// </summary>
     public async Task<object> AcceptCall(string callId)
     {
@@ -360,26 +359,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         call.Status = VoiceCallStatus.Active;
         call.AnsweredAt = DateTimeOffset.UtcNow;
 
-        // Create SFU room and transports for the recipient.
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        var roomId = $"call-{call.Id}";
-        JsonElement routerRtpCapabilities, sendTransport, recvTransport;
-        try
-        {
-            routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, roomId);
-            sendTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "send");
-            recvTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "recv");
-        }
-        catch
-        {
-            try
-            {
-                using var cleanupClient = httpClientFactory.CreateClient("sfu");
-                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{Context.ConnectionId}");
-            }
-            catch { /* best-effort */ }
-            throw;
-        }
+        var roomName = $"call-{call.Id}";
 
         // Persist VoiceState for recipient.
         var recipientVoiceState = new VoiceState
@@ -388,50 +368,34 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             UserId = appUser.Id,
             DmChannelId = call.DmChannelId,
             ConnectionId = Context.ConnectionId,
-            ParticipantId = Context.ConnectionId,
             JoinedAt = DateTimeOffset.UtcNow
         };
         db.VoiceStates.Add(recipientVoiceState);
         await db.SaveChangesAsync();
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{roomId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{roomName}");
 
-        // Generate TURN credentials.
-        var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
-        var turnSecret = config["Voice:TurnSecret"] ?? "";
-        object? iceServers = null;
-        if (!string.IsNullOrWhiteSpace(turnSecret))
-        {
-            var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
-            var turnUsername = $"{expiry}:{appUser.Id}";
-            var keyBytes = Encoding.UTF8.GetBytes(turnSecret);
-            var msgBytes = Encoding.UTF8.GetBytes(turnUsername);
-            using var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes);
-            var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
-            iceServers = new[] { new { urls = new[] { turnServerUrl }, username = turnUsername, credential } };
-        }
+        // Generate LiveKit token for the recipient.
+        var token = GenerateLiveKitToken(appUser.Id.ToString(), appUser.EffectiveDisplayName, roomName);
 
-        // Notify the caller so they can also set up their WebRTC connection.
+        // Notify the caller so they can also connect to LiveKit.
         await Clients.Group($"user-{call.CallerUserId}").SendAsync("CallAccepted", new
         {
             callId = call.Id,
             dmChannelId = call.DmChannelId,
-            roomId
+            roomName
         });
 
         return new
         {
             callId = call.Id,
-            roomId,
-            routerRtpCapabilities,
-            sendTransportOptions = sendTransport,
-            recvTransportOptions = recvTransport,
-            iceServers
+            roomName,
+            token
         };
     }
 
     /// <summary>
-    /// Called by the caller after receiving CallAccepted to create their SFU transports.
+    /// Called by the caller after receiving CallAccepted to get their LiveKit token.
     /// </summary>
     public async Task<object> SetupCallTransports(string callId)
     {
@@ -452,25 +416,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         if (existingVoiceState is not null)
             await LeaveVoiceChannelInternal(appUser, existingVoiceState);
 
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        var roomId = $"call-{call.Id}";
-        JsonElement routerRtpCapabilities, sendTransport, recvTransport;
-        try
-        {
-            routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, roomId);
-            sendTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "send");
-            recvTransport = await CreateSfuTransportAsync(sfuApiUrl, roomId, Context.ConnectionId, "recv");
-        }
-        catch
-        {
-            try
-            {
-                using var cleanupClient = httpClientFactory.CreateClient("sfu");
-                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{Context.ConnectionId}");
-            }
-            catch { /* best-effort */ }
-            throw;
-        }
+        var roomName = $"call-{call.Id}";
 
         var voiceState = new VoiceState
         {
@@ -478,56 +424,19 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             UserId = appUser.Id,
             DmChannelId = call.DmChannelId,
             ConnectionId = Context.ConnectionId,
-            ParticipantId = Context.ConnectionId,
             JoinedAt = DateTimeOffset.UtcNow
         };
         db.VoiceStates.Add(voiceState);
         await db.SaveChangesAsync();
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{roomId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{roomName}");
 
-        // Generate TURN credentials.
-        var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
-        var turnSecret = config["Voice:TurnSecret"] ?? "";
-        object? iceServers = null;
-        if (!string.IsNullOrWhiteSpace(turnSecret))
-        {
-            var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
-            var turnUsername = $"{expiry}:{appUser.Id}";
-            var keyBytes = Encoding.UTF8.GetBytes(turnSecret);
-            var msgBytes = Encoding.UTF8.GetBytes(turnUsername);
-            using var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes);
-            var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
-            iceServers = new[] { new { urls = new[] { turnServerUrl }, username = turnUsername, credential } };
-        }
-
-        // Get other participant (recipient) to check for their producer.
-        var otherVoiceState = await db.VoiceStates
-            .AsNoTracking()
-            .Where(vs => vs.DmChannelId == call.DmChannelId && vs.UserId != appUser.Id)
-            .Select(vs => new
-            {
-                userId = vs.UserId,
-                displayName = vs.User!.Nickname ?? vs.User.DisplayName,
-                avatarUrl = vs.User.CustomAvatarPath ?? vs.User.AvatarUrl,
-                vs.IsMuted,
-                vs.IsDeafened,
-                participantId = vs.ParticipantId,
-                producerId = vs.ProducerId,
-                videoProducerId = vs.VideoProducerId,
-                screenProducerId = vs.ScreenProducerId,
-                vs.IsVideoEnabled,
-                vs.IsScreenSharing
-            })
-            .ToListAsync();
+        var token = GenerateLiveKitToken(appUser.Id.ToString(), appUser.EffectiveDisplayName, roomName);
 
         return new
         {
-            routerRtpCapabilities,
-            sendTransportOptions = sendTransport,
-            recvTransportOptions = recvTransport,
-            members = otherVoiceState,
-            iceServers
+            roomName,
+            token
         };
     }
 
@@ -592,8 +501,8 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     }
 
     /// <summary>
-    /// Ends an active call. Either party can call this. Cleans up SFU resources,
-    /// removes VoiceState, and persists a system message with the call duration.
+    /// Ends an active call. Either party can call this. Removes VoiceState
+    /// records and persists a system message with the call duration.
     /// </summary>
     public async Task EndCall()
     {
@@ -654,21 +563,12 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             .Where(vs => vs.DmChannelId == call.DmChannelId)
             .ToListAsync();
 
-        var roomId = $"call-{call.Id}";
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
+        var roomName = $"call-{call.Id}";
 
         foreach (var vs in voiceStates)
         {
             db.VoiceStates.Remove(vs);
-            await Groups.RemoveFromGroupAsync(vs.ConnectionId, $"voice-{roomId}");
-
-            // Clean up SFU participant.
-            try
-            {
-                using var client = httpClientFactory.CreateClient("sfu");
-                await client.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{vs.ParticipantId}");
-            }
-            catch { /* best-effort */ }
+            await Groups.RemoveFromGroupAsync(vs.ConnectionId, $"voice-{roomName}");
         }
 
         await db.SaveChangesAsync();
@@ -703,9 +603,8 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     /* ═══════════════════ Voice ═══════════════════ */
 
     /// <summary>
-    /// Joins a voice channel. Calls the SFU first — if that fails nothing is written to
-    /// the DB and no events are sent. Returns router RTP capabilities, transport options,
-    /// and the current members (including their producerIds for immediate consumption).
+    /// Joins a voice channel. Persists VoiceState, broadcasts join event to the server,
+    /// and returns a LiveKit token for direct WebRTC connection.
     /// </summary>
     public async Task<object> JoinVoiceChannel(string channelId)
     {
@@ -740,47 +639,13 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         if (existing is not null)
             await LeaveVoiceChannelInternal(appUser, existing);
 
-        // Call the SFU before touching the DB. If any step fails, clean up any
-        // resources already created so they don't leak in the SFU room.
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        JsonElement routerRtpCapabilities, sendTransport, recvTransport;
-        try
-        {
-            routerRtpCapabilities = await GetOrCreateSfuRoomAsync(sfuApiUrl, channelId);
-            sendTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "send");
-            recvTransport = await CreateSfuTransportAsync(sfuApiUrl, channelId, Context.ConnectionId, "recv");
-        }
-        catch (HttpRequestException ex)
-        {
-            logger.LogError(ex, "Failed to reach SFU at {SfuApiUrl} for channel {ChannelId}", sfuApiUrl, channelId);
-            try
-            {
-                using var cleanupClient = httpClientFactory.CreateClient("sfu");
-                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
-            }
-            catch { /* SFU cleanup is best-effort */ }
-            throw new HubException("Voice server is unavailable. Please try again later.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Unexpected error setting up SFU transports for channel {ChannelId}", channelId);
-            try
-            {
-                using var cleanupClient = httpClientFactory.CreateClient("sfu");
-                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
-            }
-            catch { /* SFU cleanup is best-effort */ }
-            throw new HubException("Failed to set up voice connection. Please try again later.");
-        }
-
-        // SFU is ready — persist voice state and join the SignalR group.
+        // Persist voice state and join the SignalR group.
         var voiceState = new VoiceState
         {
             Id = Guid.NewGuid(),
             UserId = appUser.Id,
             ChannelId = channelGuid,
             ConnectionId = Context.ConnectionId,
-            ParticipantId = Context.ConnectionId,
             JoinedAt = DateTimeOffset.UtcNow
         };
         db.VoiceStates.Add(voiceState);
@@ -790,25 +655,11 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         }
         catch (DbUpdateException)
         {
-            // Unique index on UserId fired — user already has an active session on another
-            // connection (e.g. two browser tabs). Best-effort: clean up the SFU transports
-            // that were already created so they don't leak in the SFU room.
-            try
-            {
-                using var cleanupClient = httpClientFactory.CreateClient("sfu");
-                await cleanupClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}/participants/{Context.ConnectionId}");
-            }
-            catch
-            {
-                // SFU cleanup is best-effort; suppress any errors.
-            }
-
             throw new HubException("You are already in a voice channel on another connection.");
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{channelId}");
 
-        // Include producerIds so the new participant can immediately consume existing media.
         var members = await db.VoiceStates
             .AsNoTracking()
             .Where(vs => vs.ChannelId == channelGuid && vs.UserId != appUser.Id)
@@ -819,10 +670,6 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 avatarUrl = vs.User.CustomAvatarPath ?? vs.User.AvatarUrl,
                 vs.IsMuted,
                 vs.IsDeafened,
-                participantId = vs.ParticipantId,
-                producerId = vs.ProducerId,
-                videoProducerId = vs.VideoProducerId,
-                screenProducerId = vs.ScreenProducerId,
                 vs.IsVideoEnabled,
                 vs.IsScreenSharing
             })
@@ -833,215 +680,23 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
             channelId,
             userId = appUser.Id,
             displayName = appUser.EffectiveDisplayName,
-            avatarUrl = appUser.CustomAvatarPath ?? appUser.AvatarUrl,
-            participantId = Context.ConnectionId
+            avatarUrl = appUser.CustomAvatarPath ?? appUser.AvatarUrl
         };
 
-        // Notify all server members so the sidebar voice member list updates for everyone,
-        // not just participants already in the voice channel.
+        // Notify all server members so the sidebar voice member list updates for everyone.
         var serverId = channel.ServerId.ToString();
         await Clients.Group($"server-{serverId}").SendAsync("UserJoinedVoice", joiningUser);
 
-        // Generate TURN credentials so the client can relay through the TURN server
-        // when direct UDP is blocked by NAT/firewall.
-        var turnServerUrl = config["Voice:TurnServerUrl"] ?? "turn:localhost:3478";
-        var turnSecret = config["Voice:TurnSecret"] ?? "";
-        object? iceServers = null;
-        if (!string.IsNullOrWhiteSpace(turnSecret))
-        {
-            var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
-            var turnUsername = $"{expiry}:{appUser.Id}";
-            var keyBytes = System.Text.Encoding.UTF8.GetBytes(turnSecret);
-            var msgBytes = System.Text.Encoding.UTF8.GetBytes(turnUsername);
-            using var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes);
-            var credential = Convert.ToBase64String(hmac.ComputeHash(msgBytes));
-            iceServers = new[]
-            {
-                new { urls = new[] { turnServerUrl }, username = turnUsername, credential }
-            };
-        }
+        // Generate LiveKit token for the client to connect directly.
+        var roomName = channelId;
+        var token = GenerateLiveKitToken(appUser.Id.ToString(), appUser.EffectiveDisplayName, roomName);
 
         return new
         {
-            routerRtpCapabilities,
-            sendTransportOptions = sendTransport,
-            recvTransportOptions = recvTransport,
-            members,
-            iceServers
+            token,
+            roomName,
+            members
         };
-    }
-
-    /// <summary>
-    /// Connects a WebRTC transport with the DTLS parameters provided by the client.
-    /// The caller's active channel is looked up from their VoiceState.
-    /// </summary>
-    public async Task ConnectTransport(string transportId, JsonElement dtlsParameters)
-    {
-        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
-        var voiceState = await db.VoiceStates
-            .AsNoTracking()
-            .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
-
-        if (voiceState is null)
-            throw new HubException("Not currently in a voice session.");
-
-        var roomId = await GetSfuRoomIdAsync(voiceState);
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        using var client = httpClientFactory.CreateClient("sfu");
-        var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, dtlsParameters });
-        var content = new StringContent(body, Encoding.UTF8, "application/json");
-        var resp = await client.PostAsync(
-            $"{sfuApiUrl}/rooms/{roomId}/transports/{transportId}/connect", content);
-        resp.EnsureSuccessStatusCode();
-    }
-
-    /// <summary>
-    /// Creates a mediasoup Producer, persists the producerId so late joiners can consume
-    /// this participant, and notifies other participants to create a Consumer.
-    /// </summary>
-    /// <param name="transportId">The send transport ID.</param>
-    /// <param name="rtpParameters">RTP parameters for the new producer.</param>
-    /// <param name="label">Producer label: "audio" (default), "video", or "screen".</param>
-    public async Task<object> Produce(string transportId, JsonElement rtpParameters, string? label = null)
-    {
-        label ??= "audio";
-        if (label is not ("audio" or "video" or "screen"))
-            throw new HubException("Invalid producer label. Must be 'audio', 'video', or 'screen'.");
-
-        var kind = label == "audio" ? "audio" : "video";
-
-        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
-        var voiceState = await db.VoiceStates
-            .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
-
-        if (voiceState is null)
-            throw new HubException("Not currently in a voice session.");
-
-        // Check Speak permission for audio producers on server voice channels.
-        if (label == "audio" && voiceState.ChannelId.HasValue && !appUser.IsGlobalAdmin)
-        {
-            var canSpeak = await permissionResolver.HasChannelPermissionAsync(voiceState.ChannelId.Value, appUser.Id, Permission.Speak);
-            if (!canSpeak)
-                throw new HubException("Missing permission: Speak");
-        }
-
-        var roomId = await GetSfuRoomIdAsync(voiceState);
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        using var client = httpClientFactory.CreateClient("sfu");
-        var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, kind, rtpParameters, label });
-        var content = new StringContent(body, Encoding.UTF8, "application/json");
-        var resp = await client.PostAsync(
-            $"{sfuApiUrl}/rooms/{roomId}/transports/{transportId}/produce", content);
-        resp.EnsureSuccessStatusCode();
-
-        var result = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        var producerId = result.GetProperty("producerId").GetString()!;
-
-        switch (label)
-        {
-            case "audio":
-                voiceState.ProducerId = producerId;
-                break;
-            case "video":
-                voiceState.VideoProducerId = producerId;
-                voiceState.IsVideoEnabled = true;
-                break;
-            case "screen":
-                voiceState.ScreenProducerId = producerId;
-                voiceState.IsScreenSharing = true;
-                break;
-        }
-        await db.SaveChangesAsync();
-
-        await Clients.OthersInGroup($"voice-{roomId}").SendAsync("NewProducer", new
-        {
-            channelId = voiceState.ChannelId?.ToString(),
-            userId = appUser.Id,
-            participantId = Context.ConnectionId,
-            producerId,
-            label
-        });
-
-        return new { producerId };
-    }
-
-    /// <summary>
-    /// Stops a video or screen share producer. Closes the SFU producer, clears the
-    /// persisted ID, and notifies other participants.
-    /// </summary>
-    public async Task StopProducing(string label)
-    {
-        if (label is not ("video" or "screen"))
-            throw new HubException("Can only stop 'video' or 'screen' producers.");
-
-        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
-        var voiceState = await db.VoiceStates
-            .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
-
-        if (voiceState is null) return;
-
-        var roomId = await GetSfuRoomIdAsync(voiceState);
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-
-        // Close the producer in the SFU
-        try
-        {
-            using var client = httpClientFactory.CreateClient("sfu");
-            await client.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{voiceState.ParticipantId}/producers/{label}");
-        }
-        catch { /* best-effort */ }
-
-        var producerId = label == "video" ? voiceState.VideoProducerId : voiceState.ScreenProducerId;
-
-        if (label == "video")
-        {
-            voiceState.VideoProducerId = null;
-            voiceState.IsVideoEnabled = false;
-        }
-        else
-        {
-            voiceState.ScreenProducerId = null;
-            voiceState.IsScreenSharing = false;
-        }
-        await db.SaveChangesAsync();
-
-        if (producerId is not null)
-        {
-            await Clients.OthersInGroup($"voice-{roomId}").SendAsync("ProducerClosed", new
-            {
-                channelId = voiceState.ChannelId?.ToString(),
-                userId = appUser.Id,
-                participantId = Context.ConnectionId,
-                producerId,
-                label
-            });
-        }
-    }
-
-    /// <summary>
-    /// Creates a mediasoup Consumer so the calling client can receive a specific producer's audio.
-    /// The caller's active channel is looked up from their VoiceState.
-    /// </summary>
-    public async Task<object> Consume(string producerId, string recvTransportId, JsonElement rtpCapabilities)
-    {
-        var (appUser, _) = await userService.GetOrCreateUserAsync(Context.User!);
-        var voiceState = await db.VoiceStates
-            .AsNoTracking()
-            .FirstOrDefaultAsync(vs => vs.UserId == appUser.Id);
-
-        if (voiceState is null)
-            throw new HubException("Not currently in a voice session.");
-
-        var roomId = await GetSfuRoomIdAsync(voiceState);
-        var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-        using var client = httpClientFactory.CreateClient("sfu");
-        var body = JsonSerializer.Serialize(new { participantId = voiceState.ParticipantId, producerId, transportId = recvTransportId, rtpCapabilities });
-        var content = new StringContent(body, Encoding.UTF8, "application/json");
-        var resp = await client.PostAsync(
-            $"{sfuApiUrl}/rooms/{roomId}/consumers", content);
-        resp.EnsureSuccessStatusCode();
-
-        return await resp.Content.ReadFromJsonAsync<JsonElement>();
     }
 
     /// <summary>
@@ -1079,8 +734,8 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         else if (voiceState.DmChannelId.HasValue)
         {
             // DM call — broadcast to the voice room group.
-            var roomId = await GetSfuRoomIdAsync(voiceState);
-            await Clients.OthersInGroup($"voice-{roomId}").SendAsync("VoiceStateUpdated", new
+            var roomName = await GetLiveKitRoomNameAsync(voiceState);
+            await Clients.OthersInGroup($"voice-{roomName}").SendAsync("VoiceStateUpdated", new
             {
                 channelId = (string?)null,
                 userId = appUser.Id,
@@ -1191,8 +846,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                         await Clients.Group($"server-{staleServerId}").SendAsync("UserLeftVoice", new
                         {
                             channelId = staleChannelId,
-                            userId = stale.UserId,
-                            participantId = stale.ParticipantId
+                            userId = stale.UserId
                         });
                     }
                     catch { /* best-effort */ }
@@ -1265,7 +919,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
     private async Task LeaveVoiceChannelInternal(Models.User appUser, VoiceState voiceState)
     {
         var channelId = voiceState.ChannelId?.ToString();
-        string? roomId = null;
+        string? roomName = null;
 
         Guid? serverId = null;
         if (voiceState.ChannelId.HasValue)
@@ -1274,7 +928,7 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                 .Where(c => c.Id == voiceState.ChannelId.Value)
                 .Select(c => (Guid?)c.ServerId)
                 .FirstOrDefaultAsync();
-            roomId = channelId;
+            roomName = channelId;
         }
         else if (voiceState.DmChannelId.HasValue)
         {
@@ -1284,44 +938,34 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                     && (c.Status == VoiceCallStatus.Active || c.Status == VoiceCallStatus.Ringing))
                 .FirstOrDefaultAsync();
             if (call is not null)
-                roomId = $"call-{call.Id}";
+                roomName = $"call-{call.Id}";
         }
 
         db.VoiceStates.Remove(voiceState);
         await db.SaveChangesAsync();
 
-        if (roomId is not null)
+        if (roomName is not null)
         {
-            await Groups.RemoveFromGroupAsync(voiceState.ConnectionId, $"voice-{roomId}");
+            await Groups.RemoveFromGroupAsync(voiceState.ConnectionId, $"voice-{roomName}");
 
             if (serverId.HasValue)
             {
                 await Clients.Group($"server-{serverId}").SendAsync("UserLeftVoice", new
                 {
                     channelId,
-                    userId = appUser.Id,
-                    participantId = voiceState.ParticipantId
+                    userId = appUser.Id
                 });
             }
-
-            // Remove from SFU.
-            var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-            try
-            {
-                using var client = httpClientFactory.CreateClient("sfu");
-                await client.DeleteAsync($"{sfuApiUrl}/rooms/{roomId}/participants/{voiceState.ParticipantId}");
-            }
-            catch { /* best-effort */ }
         }
     }
 
-    /* ── Room ID resolver ── */
+    /* ── LiveKit helpers ── */
 
     /// <summary>
-    /// Resolves the SFU room ID for the given voice state.
+    /// Resolves the LiveKit room name for the given voice state.
     /// Server voice channels use the channel ID; DM calls use "call-{callId}".
     /// </summary>
-    private async Task<string> GetSfuRoomIdAsync(VoiceState voiceState)
+    private async Task<string> GetLiveKitRoomNameAsync(VoiceState voiceState)
     {
         if (voiceState.ChannelId.HasValue)
             return voiceState.ChannelId.Value.ToString();
@@ -1342,25 +986,29 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
         throw new HubException("Not currently in a voice session.");
     }
 
-    /* ── SFU helpers ── */
-
-    private async Task<JsonElement> GetOrCreateSfuRoomAsync(string sfuApiUrl, string channelId)
+    /// <summary>
+    /// Generates a LiveKit access token for the given user and room.
+    /// </summary>
+    private string GenerateLiveKitToken(string userId, string displayName, string roomName)
     {
-        using var client = httpClientFactory.CreateClient("sfu");
-        var resp = await client.PostAsync($"{sfuApiUrl}/rooms/{channelId}", null);
-        resp.EnsureSuccessStatusCode();
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("routerRtpCapabilities");
-    }
+        var apiKey = config["LiveKit:ApiKey"]
+            ?? throw new InvalidOperationException("LiveKit:ApiKey must be configured.");
+        var apiSecret = config["LiveKit:ApiSecret"]
+            ?? throw new InvalidOperationException("LiveKit:ApiSecret must be configured.");
 
-    private async Task<JsonElement> CreateSfuTransportAsync(string sfuApiUrl, string channelId, string participantId, string direction)
-    {
-        using var client = httpClientFactory.CreateClient("sfu");
-        var body = JsonSerializer.Serialize(new { participantId, direction });
-        var content = new StringContent(body, Encoding.UTF8, "application/json");
-        var resp = await client.PostAsync($"{sfuApiUrl}/rooms/{channelId}/transports", content);
-        resp.EnsureSuccessStatusCode();
-        return await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var token = new AccessToken(apiKey, apiSecret)
+            .WithIdentity(userId)
+            .WithName(displayName)
+            .WithGrants(new VideoGrants
+            {
+                RoomJoin = true,
+                Room = roomName,
+                CanPublish = true,
+                CanSubscribe = true
+            })
+            .WithTtl(TimeSpan.FromMinutes(15));
+
+        return token.ToJwt();
     }
 
     private static string Truncate(string? value, int maxLength)

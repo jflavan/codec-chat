@@ -359,14 +359,6 @@ export async function setupSignalR(
 				voice.handleVoiceStateUpdated(event);
 			},
 
-			onNewProducer: async (event) => {
-				await voice.handleNewProducer(event);
-			},
-
-			onProducerClosed: (event) => {
-				voice.handleProducerClosed(event);
-			},
-
 			/* ─── Calls ─── */
 
 			onIncomingCall: (event) => {

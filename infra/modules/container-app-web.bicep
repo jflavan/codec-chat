@@ -15,6 +15,9 @@ param publicRecaptchaSiteKey string = ''
 @description('GIPHY API key for GIF search')
 param publicGiphyApiKey string = ''
 
+@description('LiveKit server WebSocket URL for voice')
+param publicLivekitUrl string = ''
+
 @description('Custom domain name for the web app (e.g., codec-chat.com). Leave empty to skip.')
 param customDomainName string = ''
 
@@ -88,6 +91,10 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'PUBLIC_GIPHY_API_KEY'
               value: publicGiphyApiKey
+            }
+            {
+              name: 'PUBLIC_LIVEKIT_URL'
+              value: publicLivekitUrl
             }
           ]
           probes: [

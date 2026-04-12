@@ -39,8 +39,8 @@ public class VoiceControllerTests : IDisposable
         _config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Voice:TurnSecret"] = "test-secret-key-for-hmac",
-                ["Voice:TurnServerUrl"] = "turn:test:3478"
+                ["LiveKit:ApiKey"] = "testkey",
+                ["LiveKit:ApiSecret"] = "testsecretmustbe32charslong12345"
             })
             .Build();
 
@@ -88,7 +88,6 @@ public class VoiceControllerTests : IDisposable
         {
             UserId = _otherUser.Id,
             ChannelId = channel.Id,
-            ParticipantId = "p1",
             ConnectionId = "c1",
             IsMuted = true,
             IsDeafened = false,
@@ -154,7 +153,6 @@ public class VoiceControllerTests : IDisposable
         {
             UserId = _testUser.Id,
             ChannelId = Guid.NewGuid(),
-            ParticipantId = "p1",
             ConnectionId = "c1",
             IsMuted = false,
             IsDeafened = false,
@@ -251,36 +249,57 @@ public class VoiceControllerTests : IDisposable
         result.Should().BeOfType<NoContentResult>();
     }
 
-    // --- GetTurnCredentials ---
+    // --- GetToken ---
 
     [Fact]
-    public async Task GetTurnCredentials_WithSecret_ReturnsCredentials()
+    public async Task GetToken_MissingRoomName_ReturnsBadRequest()
     {
-        var result = await _controller.GetTurnCredentials();
+        var result = await _controller.GetToken(roomName: "");
 
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        ok.Value.Should().NotBeNull();
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
-    public async Task GetTurnCredentials_NoSecret_ThrowsInvalidOperation()
+    public async Task GetToken_ValidConfig_ReturnsToken()
+    {
+        // Seed a VoiceState so the user is authorized to get a token for this room.
+        var channel = CreateVoiceChannel();
+        _db.VoiceStates.Add(new VoiceState
+        {
+            UserId = _testUser.Id,
+            ChannelId = channel.Id,
+            ConnectionId = "conn-1",
+            JoinedAt = DateTimeOffset.UtcNow
+        });
+        _db.SaveChanges();
+
+        var result = await _controller.GetToken(roomName: channel.Id.ToString());
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        json.Should().Contain("token");
+    }
+
+    [Fact]
+    public async Task GetToken_NoLiveKitConfig_ThrowsInvalidOperation()
     {
         var emptyConfig = new ConfigurationBuilder().Build();
         var controller = new VoiceController(_db, _userService.Object, emptyConfig);
         controller.ControllerContext = _controller.ControllerContext;
 
-        await FluentActions.Invoking(() => controller.GetTurnCredentials())
+        // Use a valid GUID roomName so format validation passes and the config check is reached.
+        var channel = CreateVoiceChannel();
+        _db.VoiceStates.Add(new VoiceState
+        {
+            UserId = _testUser.Id,
+            ChannelId = channel.Id,
+            ConnectionId = "conn-cfg",
+            JoinedAt = DateTimeOffset.UtcNow
+        });
+        _db.SaveChanges();
+
+        await FluentActions.Invoking(() => controller.GetToken(roomName: channel.Id.ToString()))
             .Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task GetTurnCredentials_UsesConfiguredTurnUrl()
-    {
-        var result = await _controller.GetTurnCredentials();
-
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        // The response should contain the configured URL
-        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
-        json.Should().Contain("turn:test:3478");
     }
 }

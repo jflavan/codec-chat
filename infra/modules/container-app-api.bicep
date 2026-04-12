@@ -15,17 +15,14 @@ param storageBlobEndpoint string
 param corsAllowedOrigins array
 param apiBaseUrl string
 
-@description('URL of the mediasoup SFU (e.g., https://sfu.codec-chat.com).')
-param sfuApiUrl string = ''
+@description('LiveKit server URL (e.g., ws://<voice-vm-ip>:7880).')
+param livekitServerUrl string = ''
 
-@description('TURN server URL for WebRTC ICE (e.g., turn:<voice-vm-ip>:3478).')
-param turnServerUrl string = ''
+@description('Key Vault secret URL for the LiveKit API key. Leave empty if voice is not enabled.')
+param livekitApiKeyKvUrl string = ''
 
-@description('Key Vault secret URL for the TURN shared secret. Leave empty if voice is not enabled.')
-param voiceTurnKvUrl string = ''
-
-@description('Key Vault secret URL for the SFU internal API key. Leave empty if voice is not enabled.')
-param voiceSfuInternalKeyKvUrl string = ''
+@description('Key Vault secret URL for the LiveKit API secret. Leave empty if voice is not enabled.')
+param livekitApiSecretKvUrl string = ''
 
 @description('Key Vault secret URL for the JWT signing secret (email/password auth).')
 @secure()
@@ -139,16 +136,16 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: jwtSecretKvUrl
           identity: 'system'
         }
-      ], voiceTurnKvUrl != '' ? [
+      ], livekitApiKeyKvUrl != '' ? [
         {
-          name: 'voice-turn-secret'
-          keyVaultUrl: voiceTurnKvUrl
+          name: 'livekit-api-key'
+          keyVaultUrl: livekitApiKeyKvUrl
           identity: 'system'
         }
-      ] : [], voiceSfuInternalKeyKvUrl != '' ? [
+      ] : [], livekitApiSecretKvUrl != '' ? [
         {
-          name: 'voice-sfu-internal-key'
-          keyVaultUrl: voiceSfuInternalKeyKvUrl
+          name: 'livekit-api-secret'
+          keyVaultUrl: livekitApiSecretKvUrl
           identity: 'system'
         }
       ] : [], gitHubTokenKvUrl != '' ? [
@@ -242,24 +239,20 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'OTEL_SERVICE_NAME'
               value: 'codec-api'
             }
-          ], sfuApiUrl != '' ? [
+          ], livekitServerUrl != '' ? [
             {
-              name: 'Voice__MediasoupApiUrl'
-              value: sfuApiUrl
+              name: 'LiveKit__ServerUrl'
+              value: livekitServerUrl
             }
+          ] : [], livekitApiKeyKvUrl != '' ? [
             {
-              name: 'Voice__TurnServerUrl'
-              value: turnServerUrl
+              name: 'LiveKit__ApiKey'
+              secretRef: 'livekit-api-key'
             }
-          ] : [], voiceTurnKvUrl != '' ? [
+          ] : [], livekitApiSecretKvUrl != '' ? [
             {
-              name: 'Voice__TurnSecret'
-              secretRef: 'voice-turn-secret'
-            }
-          ] : [], voiceSfuInternalKeyKvUrl != '' ? [
-            {
-              name: 'Voice__SfuInternalKey'
-              secretRef: 'voice-sfu-internal-key'
+              name: 'LiveKit__ApiSecret'
+              secretRef: 'livekit-api-secret'
             }
           ] : [], gitHubTokenKvUrl != '' ? [
             {

@@ -19,7 +19,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("servers")]
-public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, IHttpClientFactory httpClientFactory, IConfiguration config, MessageCacheService messageCache, WebhookService webhookService, IPermissionResolverService permissionResolver) : ControllerBase
+public partial class ServersController(CodecDbContext db, IUserService userService, IAvatarService avatarService, ICustomEmojiService customEmojiService, IHubContext<ChatHub> hub, MessageCacheService messageCache, WebhookService webhookService, IPermissionResolverService permissionResolver) : ControllerBase
 {
     /// <summary>
     /// Lists servers the current user is a member of.
@@ -1834,23 +1834,11 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                     await hub.Clients.Group($"server-{serverId}").SendAsync("UserLeftVoice", new
                     {
                         channelId = channelId.ToString(),
-                        userId = vs.UserId,
-                        participantId = vs.ParticipantId
+                        userId = vs.UserId
                     });
                 }
 
                 db.VoiceStates.RemoveRange(voiceStates);
-
-                var sfuApiUrl = config["Voice:MediasoupApiUrl"] ?? "http://localhost:3001";
-                try
-                {
-                    using var sfuClient = httpClientFactory.CreateClient("sfu");
-                    await sfuClient.DeleteAsync($"{sfuApiUrl}/rooms/{channelId}");
-                }
-                catch
-                {
-                    // SFU cleanup is best-effort; channel deletion proceeds regardless.
-                }
             }
         }
 

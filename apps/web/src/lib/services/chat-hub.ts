@@ -205,13 +205,11 @@ export type UserJoinedVoiceEvent = {
 	userId: string;
 	displayName: string;
 	avatarUrl?: string | null;
-	participantId: string;
 };
 
 export type UserLeftVoiceEvent = {
 	channelId: string;
 	userId: string;
-	participantId: string;
 };
 
 export type VoiceStateUpdatedEvent = {
@@ -219,22 +217,6 @@ export type VoiceStateUpdatedEvent = {
 	userId: string;
 	isMuted: boolean;
 	isDeafened: boolean;
-};
-
-export type NewProducerEvent = {
-	channelId: string;
-	userId: string;
-	participantId: string;
-	producerId: string;
-	label?: string;
-};
-
-export type ProducerClosedEvent = {
-	channelId: string;
-	userId: string;
-	participantId: string;
-	producerId: string;
-	label: string;
 };
 
 export type IncomingCallEvent = {
@@ -248,7 +230,7 @@ export type IncomingCallEvent = {
 export type CallAcceptedEvent = {
 	callId: string;
 	dmChannelId: string;
-	roomId: string;
+	roomName: string;
 };
 
 export type CallDeclinedEvent = {
@@ -305,8 +287,6 @@ export type SignalRCallbacks = {
 	onUserJoinedVoice?: (event: UserJoinedVoiceEvent) => void;
 	onUserLeftVoice?: (event: UserLeftVoiceEvent) => void;
 	onVoiceStateUpdated?: (event: VoiceStateUpdatedEvent) => void;
-	onNewProducer?: (event: NewProducerEvent) => void;
-	onProducerClosed?: (event: ProducerClosedEvent) => void;
 	onIncomingCall?: (event: IncomingCallEvent) => void;
 	onCallAccepted?: (event: CallAcceptedEvent) => void;
 	onCallDeclined?: (event: CallDeclinedEvent) => void;
@@ -480,12 +460,6 @@ export class ChatHubService {
 		}
 		if (callbacks.onVoiceStateUpdated) {
 			connection.on('VoiceStateUpdated', callbacks.onVoiceStateUpdated);
-		}
-		if (callbacks.onNewProducer) {
-			connection.on('NewProducer', callbacks.onNewProducer);
-		}
-		if (callbacks.onProducerClosed) {
-			connection.on('ProducerClosed', callbacks.onProducerClosed);
 		}
 		if (callbacks.onIncomingCall) {
 			connection.on('IncomingCall', callbacks.onIncomingCall);
@@ -772,41 +746,12 @@ export class ChatHubService {
 	/* ───── Voice ───── */
 
 	async joinVoiceChannel(channelId: string): Promise<{
-		routerRtpCapabilities: object;
-		sendTransportOptions: object;
-		recvTransportOptions: object;
+		token: string;
+		roomName: string;
 		members: object[];
 	}> {
 		if (!this.isConnected) throw new Error('Hub not connected');
 		return this.connection!.invoke('JoinVoiceChannel', channelId);
-	}
-
-	async connectTransport(transportId: string, dtlsParameters: object): Promise<void> {
-		if (!this.isConnected) throw new Error('Hub not connected');
-		await this.connection!.invoke('ConnectTransport', transportId, dtlsParameters);
-	}
-
-	async produce(sendTransportId: string, rtpParameters: object, label?: string): Promise<string> {
-		if (!this.isConnected) throw new Error('Hub not connected');
-		const result = await this.connection!.invoke('Produce', sendTransportId, rtpParameters, label ?? null);
-		// The hub returns { producerId: "..." }; extract the string for the caller.
-		return typeof result === 'string' ? result : result.producerId;
-	}
-
-	async stopProducing(label: string): Promise<void> {
-		if (this.isConnected) {
-			await this.connection!.invoke('StopProducing', label).catch(() => {});
-		}
-	}
-
-	async consume(producerId: string, recvTransportId: string, rtpCapabilities: object): Promise<{
-		id: string;
-		producerId: string;
-		kind: string;
-		rtpParameters: object;
-	}> {
-		if (!this.isConnected) throw new Error('Hub not connected');
-		return this.connection!.invoke('Consume', producerId, recvTransportId, rtpCapabilities);
 	}
 
 	async updateVoiceState(isMuted: boolean, isDeafened: boolean): Promise<void> {
@@ -835,11 +780,8 @@ export class ChatHubService {
 
 	async acceptCall(callId: string): Promise<{
 		callId: string;
-		roomId: string;
-		routerRtpCapabilities: object;
-		sendTransportOptions: object;
-		recvTransportOptions: object;
-		iceServers?: object[];
+		roomName: string;
+		token: string;
 		alreadyHandled?: boolean;
 	}> {
 		if (!this.isConnected) throw new Error('Hub not connected');
@@ -847,11 +789,8 @@ export class ChatHubService {
 	}
 
 	async setupCallTransports(callId: string): Promise<{
-		routerRtpCapabilities: object;
-		sendTransportOptions: object;
-		recvTransportOptions: object;
-		members: object[];
-		iceServers?: object[];
+		roomName: string;
+		token: string;
 	}> {
 		if (!this.isConnected) throw new Error('Hub not connected');
 		return this.connection!.invoke('SetupCallTransports', callId);

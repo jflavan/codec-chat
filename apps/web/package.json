@@ -38,7 +38,7 @@
 	"dependencies": {
 		"@microsoft/signalr": "^10.0.0",
 		"devalue": "^5.6.4",
-		"mediasoup-client": "^3.18.7",
+		"livekit-client": "^2.18.1",
 		"svelte-dnd-action": "^0.9.69",
 		"svelte-youtube-embed": "^0.4.6"
 	},

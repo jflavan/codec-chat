@@ -577,10 +577,10 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `StartDmTyping` | `dmChannelId: string, displayName: string` | Broadcast typing indicator to DM partner |
 | `StopDmTyping` | `dmChannelId: string, displayName: string` | Clear typing indicator |
 | `StartCall` | `dmChannelId: string` | Initiate a DM voice call; creates VoiceCall record; sends `IncomingCall` to recipient |
-| `AcceptCall` | `callId: string` | Accept an incoming call; sets up SFU transports; returns transport options for both parties |
-| `SetupCallTransports` | `callId: string, sendTransportId: string, recvTransportId: string` | Finalize transport setup for the call initiator after callee accepts |
+| `AcceptCall` | `callId: string` | Accept an incoming call; generates LiveKit token; returns room name and token for both parties |
+| `SetupCallTransports` | `callId: string` | Generate LiveKit token for the call initiator after callee accepts; returns room name and token |
 | `DeclineCall` | `callId: string` | Decline an incoming call; ends the call with `Declined` reason |
-| `EndCall` | `callId: string` | End an active or ringing call; cleans up SFU state and VoiceState records |
+| `EndCall` | `callId: string` | End an active or ringing call; removes VoiceState records |
 
 #### Server → Client Events
 | Event | Payload | Description |
