@@ -77,5 +77,42 @@ public class AdminMessagesControllerTests : IDisposable
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    [Fact]
+    public async Task SearchMessages_WhitespaceSearch_ReturnsBadRequest()
+    {
+        var result = await _controller.SearchMessages("   ", new PaginationParams());
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SearchMessages_SingleCharSearch_ReturnsBadRequest()
+    {
+        var result = await _controller.SearchMessages("a", new PaginationParams());
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData("x")]
+    [InlineData("a")]
+    public async Task SearchMessages_ShortSearch_ReturnsBadRequest(string search)
+    {
+        // Search terms with length < 2 should be rejected
+        var result = await _controller.SearchMessages(search, new PaginationParams());
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SearchMessages_BadRequest_ContainsErrorMessage()
+    {
+        var result = await _controller.SearchMessages("", new PaginationParams());
+
+        var badRequest = result as BadRequestObjectResult;
+        badRequest.Should().NotBeNull();
+        badRequest!.Value.Should().NotBeNull();
+    }
+
     public void Dispose() => _db.Dispose();
 }

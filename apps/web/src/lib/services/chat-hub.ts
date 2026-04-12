@@ -268,6 +268,38 @@ export type CallMissedEvent = {
 	dmChannelId: string;
 };
 
+export type MemberRolesUpdatedEvent = {
+	serverId: string;
+	userId: string;
+	roleIds: string[];
+};
+
+export type RoleCreatedEvent = {
+	serverId: string;
+	role: {
+		id: string;
+		name: string;
+		color: string | null;
+		position: number;
+		permissions: number;
+		isSystemRole: boolean;
+		isHoisted: boolean;
+		isMentionable: boolean;
+	};
+};
+
+export type RoleUpdatedEvent = RoleCreatedEvent;
+
+export type RoleDeletedEvent = {
+	serverId: string;
+	roleId: string;
+	roleName: string;
+};
+
+export type RolesReorderedEvent = {
+	serverId: string;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
