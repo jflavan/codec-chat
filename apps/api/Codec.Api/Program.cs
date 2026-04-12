@@ -389,8 +389,11 @@ builder.Services.AddHttpClient<DiscordMediaRehostService>()
         {
             // DNS rebinding protection: resolve and validate before connecting.
             var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-            foreach (var ip in entries)
+            foreach (var entry in entries)
             {
+                // Normalize IPv4-mapped IPv6 addresses (e.g. ::ffff:10.0.0.1) to IPv4
+                var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
+
                 if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
                     throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
 
@@ -469,8 +472,10 @@ builder.Services.AddHttpClient("webhook", client =>
     {
         // DNS rebinding protection: resolve and validate before connecting.
         var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        foreach (var ip in entries)
+        foreach (var entry in entries)
         {
+            var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
+
             if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
                 throw new HttpRequestException($"Blocked webhook connection to private IP {ip}.");
 
@@ -528,8 +533,10 @@ builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =
     {
         // DNS rebinding protection: resolve and validate before connecting.
         var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        foreach (var ip in entries)
+        foreach (var entry in entries)
         {
+            var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
+
             if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
             {
                 throw new HttpRequestException($"Blocked connection to private IP {ip}.");
@@ -593,8 +600,10 @@ builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>(client =>
     ConnectCallback = async (context, cancellationToken) =>
     {
         var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        foreach (var ip in entries)
+        foreach (var entry in entries)
         {
+            var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
+
             if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
             {
                 throw new HttpRequestException($"Blocked connection to private IP {ip}.");

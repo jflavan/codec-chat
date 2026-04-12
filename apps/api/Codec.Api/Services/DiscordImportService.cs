@@ -166,6 +166,9 @@ public class DiscordImportService
             await group.SendAsync("ImportProgress", new { stage = "Re-hosting files", completed = 0, total = 0, percentComplete = 98.5f }, ct);
             await RehostFileAttachmentsAsync(db, serverId, group, ct);
 
+            // Check for cancellation one final time before committing success
+            ct.ThrowIfCancellationRequested();
+
             // Complete
             import.Status = DiscordImportStatus.Completed;
             import.CompletedAt = DateTimeOffset.UtcNow;
@@ -732,7 +735,7 @@ public class DiscordImportService
             .ToListAsync(ct);
 
         var totalCount = await db.Messages
-            .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl is not null && m.ImageUrl.Contains("cdn.discordapp.com"))
+            .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl != null && m.ImageUrl.Contains("cdn.discordapp.com"))
             .CountAsync(ct);
 
         if (totalCount == 0) return;
@@ -750,7 +753,7 @@ public class DiscordImportService
             ct.ThrowIfCancellationRequested();
 
             var messages = await db.Messages
-                .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl is not null && m.ImageUrl.Contains("cdn.discordapp.com"))
+                .Where(m => channelIds.Contains(m.ChannelId) && m.ImageUrl != null && m.ImageUrl.Contains("cdn.discordapp.com"))
                 .OrderByDescending(m => m.CreatedAt)
                 .Take(batchSize)
                 .ToListAsync(ct);
@@ -806,7 +809,7 @@ public class DiscordImportService
             .ToListAsync(ct);
 
         var totalCount = await db.Messages
-            .Where(m => channelIds.Contains(m.ChannelId) && m.FileUrl is not null && m.FileUrl.Contains("cdn.discordapp.com"))
+            .Where(m => channelIds.Contains(m.ChannelId) && m.FileUrl != null && m.FileUrl.Contains("cdn.discordapp.com"))
             .CountAsync(ct);
 
         if (totalCount == 0) return;
@@ -824,7 +827,7 @@ public class DiscordImportService
             ct.ThrowIfCancellationRequested();
 
             var messages = await db.Messages
-                .Where(m => channelIds.Contains(m.ChannelId) && m.FileUrl is not null && m.FileUrl.Contains("cdn.discordapp.com"))
+                .Where(m => channelIds.Contains(m.ChannelId) && m.FileUrl != null && m.FileUrl.Contains("cdn.discordapp.com"))
                 .OrderByDescending(m => m.CreatedAt)
                 .Take(batchSize)
                 .ToListAsync(ct);
