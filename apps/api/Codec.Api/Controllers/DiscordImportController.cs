@@ -77,7 +77,7 @@ public class DiscordImportController : ControllerBase
         {
             guild = await _discordClient.GetGuildAsync(request.DiscordGuildId);
         }
-        catch (HttpRequestException)
+        catch (Exception)
         {
             return BadRequest(new { error = "Invalid bot token or guild ID. Ensure the bot has been added to the Discord server." });
         }
@@ -154,7 +154,7 @@ public class DiscordImportController : ControllerBase
         {
             await _discordClient.GetGuildAsync(request.DiscordGuildId);
         }
-        catch (HttpRequestException)
+        catch (Exception)
         {
             return BadRequest(new { error = "Invalid bot token or guild ID." });
         }
