@@ -154,11 +154,14 @@
 				<div class="emoji-row">
 					<img src={emoji.imageUrl} alt={emoji.name} width="32" height="32" />
 					{#if renamingId === emoji.id}
-						<input
+						<label for="rename-emoji-{emoji.id}" class="sr-only">New emoji name</label>
+					<input
+							id="rename-emoji-{emoji.id}"
 							class="input rename-input"
 							bind:value={renameValue}
 							onkeydown={handleRenameKeydown}
 							maxlength="32"
+							aria-label="New name for :{emoji.name}:"
 						/>
 						<div class="inline-actions">
 							<button type="button" class="btn-primary" disabled={!renameValid} onclick={saveRename}>Save</button>
@@ -170,6 +173,7 @@
 							<button
 								type="button"
 								class="btn-edit"
+								aria-label="Rename :{emoji.name}:"
 								onclick={() => startRename(emoji.id, emoji.name)}
 							>
 								Rename
@@ -177,6 +181,7 @@
 							<button
 								type="button"
 								class="btn-danger-sm"
+								aria-label="Delete :{emoji.name}:"
 								onclick={() => (deletingId = emoji.id)}
 							>
 								Delete
@@ -447,6 +452,18 @@
 		color: var(--danger);
 		font-size: 12px;
 		white-space: nowrap;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	@media (max-width: 899px) {

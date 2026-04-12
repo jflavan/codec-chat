@@ -39,7 +39,9 @@
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Link your Google account"
+	aria-labelledby="link-account-title"
+	tabindex="-1"
+	onkeydown={(e) => { if (e.key === 'Escape') handleCancel(); }}
 >
 	<div class="modal">
 		<div class="logo">
@@ -48,7 +50,7 @@
 			<span class="bracket">]</span>
 		</div>
 
-		<h1 class="heading">Link your Google account</h1>
+		<h1 id="link-account-title" class="heading">Link your Google account</h1>
 		<p class="subtext">
 			An account with <strong class="email">{auth.linkingEmail}</strong> already exists.
 			Enter your password to link your Google account.
@@ -56,22 +58,25 @@
 
 		<form class="form" onsubmit={handleSubmit}>
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div id="link-error" class="error-message" role="alert" aria-live="assertive">{error}</div>
 			{/if}
 
-			<label class="field">
+			<label class="field" for="link-password">
 				<span class="field-label">Password</span>
 				<input
+					id="link-password"
 					type="password"
 					bind:value={password}
 					bind:this={passwordInput}
 					placeholder="Your password"
 					autocomplete="current-password"
+					aria-describedby={error ? 'link-error' : undefined}
+					aria-invalid={error ? 'true' : undefined}
 					required
 				/>
 			</label>
 
-			<button type="submit" class="submit-btn" disabled={!password || isSubmitting}>
+			<button type="submit" class="submit-btn" aria-busy={isSubmitting} disabled={!password || isSubmitting}>
 				{isSubmitting ? 'Linking...' : 'Link Account'}
 			</button>
 

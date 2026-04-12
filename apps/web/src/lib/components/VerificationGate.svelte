@@ -54,12 +54,12 @@
 
 <div class="verification-overlay">
 	<div class="verification-card">
-		<div class="icon">&#9993;</div>
-		<h2>Check your email</h2>
+		<div class="icon" aria-hidden="true">&#9993;</div>
+		<h1>Check your email</h1>
 		<p>We sent a verification link to your email address. Click the link to verify your account and start using Codec.</p>
 
 		<div class="actions">
-			<button class="btn-primary" onclick={handleCheck} disabled={checking}>
+			<button class="btn-primary" aria-busy={checking} onclick={handleCheck} disabled={checking}>
 				{checking ? 'Checking...' : "I've verified my email"}
 			</button>
 
@@ -75,10 +75,10 @@
 		</div>
 
 		{#if resendSuccess}
-			<p class="success">Verification email sent!</p>
+			<p class="success" role="status" aria-live="polite">Verification email sent!</p>
 		{/if}
 		{#if resendError}
-			<p class="error">{resendError}</p>
+			<p class="error" role="alert">{resendError}</p>
 		{/if}
 
 		<button class="btn-link" onclick={() => auth.signOut()}>Sign out</button>
@@ -107,9 +107,10 @@
 		margin-bottom: 16px;
 	}
 
-	h2 {
+	h1 {
 		color: var(--text-primary, #f2f3f5);
 		margin-bottom: 8px;
+		font-size: 1.5rem;
 	}
 
 	p {

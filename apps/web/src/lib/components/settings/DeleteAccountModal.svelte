@@ -19,6 +19,22 @@
 	let isDeleting = $state(false);
 	let ownedServers = $state<{ id: string; name: string }[]>([]);
 	let googleCredential = $state<string | null>(null);
+	let modalEl = $state<HTMLElement | undefined>(undefined);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		previousFocus = document.activeElement as HTMLElement | null;
+		const raf = requestAnimationFrame(() => {
+			const firstFocusable = modalEl?.querySelector<HTMLElement>(
+				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+			(firstFocusable ?? modalEl)?.focus();
+		});
+		return () => {
+			cancelAnimationFrame(raf);
+			previousFocus?.focus();
+		};
+	});
 
 	const hasPassword = $derived(auth.authType === 'local');
 	const hasGoogle = $derived(!!auth.me?.user.googleSubject);
@@ -76,7 +92,7 @@
 </script>
 
 <div class="modal-backdrop" role="presentation" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" tabindex="-1" bind:this={modalEl} onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
 		<h2 id="delete-title" class="modal-title">Delete Account</h2>
 
 		<div class="warning">
@@ -131,7 +147,7 @@
 			</label>
 
 			{#if error}
-				<p class="error">{error}</p>
+				<p class="error" role="alert" aria-live="assertive">{error}</p>
 			{/if}
 
 			<div class="actions">

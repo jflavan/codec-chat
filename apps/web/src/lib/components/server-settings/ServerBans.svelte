@@ -65,10 +65,10 @@
 
 					<div class="ban-actions">
 						{#if unbanningUserId === ban.userId}
-							<button class="role-btn role-btn-danger" onclick={() => unban(ban.userId)}>
+							<button class="role-btn role-btn-danger" aria-label="Confirm unban {ban.displayName}" onclick={() => unban(ban.userId)}>
 								Are you sure?
 							</button>
-							<button class="role-btn role-btn-cancel" onclick={cancelUnban}>
+							<button class="role-btn role-btn-cancel" aria-label="Cancel unban" onclick={cancelUnban}>
 								Cancel
 							</button>
 						{:else}

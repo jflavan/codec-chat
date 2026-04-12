@@ -145,9 +145,10 @@
 			<button
 				class="category-tab"
 				title={cat.name}
+				aria-label={cat.name}
 				onclick={() => scrollToCategory(cat.id)}
 			>
-				{cat.icon}
+				<span aria-hidden="true">{cat.icon}</span>
 			</button>
 		{/each}
 	</div>
@@ -162,12 +163,13 @@
 							type="button"
 							class="emoji-btn"
 							title={item.name}
+							aria-label={item.name}
 							onclick={() => handleSelect(item.emoji)}
 						>
 							{#if item.isCustom && item.imageUrl}
 								<img src={item.imageUrl} alt={item.name} width="20" height="20" />
 							{:else}
-								{item.emoji}
+								<span aria-hidden="true">{item.emoji}</span>
 							{/if}
 						</button>
 					{/each}

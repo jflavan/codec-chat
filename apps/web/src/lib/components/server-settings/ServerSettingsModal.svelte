@@ -20,6 +20,13 @@
 		if (ui.serverSettingsOpen) {
 			previousFocus = document.activeElement as HTMLElement | null;
 			dialogEl?.showModal();
+			const raf = requestAnimationFrame(() => {
+				const firstFocusable = dialogEl?.querySelector<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				);
+				firstFocusable?.focus();
+			});
+			return () => cancelAnimationFrame(raf);
 		} else {
 			dialogEl?.close();
 			previousFocus?.focus();
@@ -43,10 +50,11 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
-	aria-label="Server Settings"
+	aria-labelledby="server-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
+	<h2 id="server-settings-title" class="sr-only">Server Settings</h2>
 	<div class="settings-panel" role="document">
 		<div class="settings-sidebar-col">
 			<ServerSettingsSidebar />
@@ -63,23 +71,41 @@
 				</svg>
 			</button>
 			{#if ui.serverSettingsCategory === 'channels'}
-				<ServerChannels />
+				<div role="tabpanel" id="tab-panel-channels" aria-labelledby="tab-btn-channels">
+					<ServerChannels />
+				</div>
 			{:else if ui.serverSettingsCategory === 'invites'}
-				<ServerInvites />
+				<div role="tabpanel" id="tab-panel-invites" aria-labelledby="tab-btn-invites">
+					<ServerInvites />
+				</div>
 			{:else if ui.serverSettingsCategory === 'webhooks'}
-				<ServerWebhooks />
+				<div role="tabpanel" id="tab-panel-webhooks" aria-labelledby="tab-btn-webhooks">
+					<ServerWebhooks />
+				</div>
 			{:else if ui.serverSettingsCategory === 'emojis'}
-				<ServerEmojis />
+				<div role="tabpanel" id="tab-panel-emojis" aria-labelledby="tab-btn-emojis">
+					<ServerEmojis />
+				</div>
 			{:else if ui.serverSettingsCategory === 'roles'}
-				<ServerRoles />
+				<div role="tabpanel" id="tab-panel-roles" aria-labelledby="tab-btn-roles">
+					<ServerRoles />
+				</div>
 			{:else if ui.serverSettingsCategory === 'members'}
-				<ServerMembers />
+				<div role="tabpanel" id="tab-panel-members" aria-labelledby="tab-btn-members">
+					<ServerMembers />
+				</div>
 			{:else if ui.serverSettingsCategory === 'bans'}
-				<ServerBans />
+				<div role="tabpanel" id="tab-panel-bans" aria-labelledby="tab-btn-bans">
+					<ServerBans />
+				</div>
 			{:else if ui.serverSettingsCategory === 'audit-log'}
-				<ServerAuditLog />
+				<div role="tabpanel" id="tab-panel-audit-log" aria-labelledby="tab-btn-audit-log">
+					<ServerAuditLog />
+				</div>
 			{:else}
-				<ServerSettings />
+				<div role="tabpanel" id="tab-panel-general" aria-labelledby="tab-btn-general">
+					<ServerSettings />
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -173,5 +199,17 @@
 			top: 8px;
 			right: 8px;
 		}
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

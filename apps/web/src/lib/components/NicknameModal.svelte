@@ -45,7 +45,7 @@
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Choose your nickname"
+	aria-labelledby="nickname-modal-title"
 	tabindex="-1"
 	onkeydown={handleKeydown}
 >
@@ -56,15 +56,15 @@
 			<span class="bracket">]</span>
 		</div>
 
-		<h1 class="heading">Choose your nickname</h1>
+		<h1 id="nickname-modal-title" class="heading">Choose your nickname</h1>
 		<p class="subtext">This is how others will see you in chat</p>
 
 		<form class="form" onsubmit={handleSubmit}>
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div id="nickname-error" class="error-message" role="alert">{error}</div>
 			{/if}
 
-			<label class="field">
+			<label class="field" for="nickname-input">
 				<span class="field-label">
 					Nickname
 					<span class="char-counter" class:over={trimmed.length > MAX_LEN}>
@@ -72,6 +72,7 @@
 					</span>
 				</span>
 				<input
+					id="nickname-input"
 					type="text"
 					bind:value={nickname}
 					bind:this={nicknameInput}
@@ -79,11 +80,13 @@
 					minlength={MIN_LEN}
 					maxlength={MAX_LEN}
 					autocomplete="username"
+					aria-describedby={error ? 'nickname-error' : undefined}
+					aria-invalid={error ? 'true' : undefined}
 					required
 				/>
 			</label>
 
-			<button type="submit" class="submit-btn" disabled={!isValid || isSubmitting}>
+			<button type="submit" class="submit-btn" aria-busy={isSubmitting} disabled={!isValid || isSubmitting}>
 				{isSubmitting ? 'Setting up...' : 'Continue'}
 			</button>
 		</form>

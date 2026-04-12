@@ -159,13 +159,15 @@
 </script>
 
 <div class="server-channels">
-	<h1 class="settings-title">Channels</h1>
+	<h2 class="settings-title">Channels</h2>
 
 	<!-- Category creation -->
 	<section class="settings-section">
-		<h2 class="section-title">Add Category</h2>
+		<h3 class="section-title">Add Category</h3>
 		<div class="add-category-row">
+			<label for="new-category-name" class="sr-only">Category name</label>
 			<input
+				id="new-category-name"
 				type="text"
 				class="input"
 				placeholder="Category name"
@@ -186,7 +188,7 @@
 
 	<!-- Uncategorized channels -->
 	<section class="settings-section">
-		<h2 class="section-title">Uncategorized</h2>
+		<h3 class="section-title">Uncategorized</h3>
 		<div
 			use:dndzone={{ items: localUncategorized, flipDurationMs: 150 }}
 			onconsider={handleUncatConsider}
@@ -205,7 +207,9 @@
 			<div class="category-header">
 				{#if categoryEditId === group.categoryId}
 					<div class="category-edit-row">
+						<label for="category-edit-name-{group.categoryId}" class="sr-only">Category name</label>
 						<input
+							id="category-edit-name-{group.categoryId}"
 							type="text"
 							class="input input-sm"
 							bind:value={categoryEditName}
@@ -219,7 +223,7 @@
 						<button type="button" class="btn-secondary btn-sm" onclick={() => { categoryEditId = null; categoryEditName = ''; }}>Cancel</button>
 					</div>
 				{:else}
-					<h2 class="section-title category-name">{group.name}</h2>
+					<h3 class="section-title category-name">{group.name}</h3>
 					<div class="category-actions">
 						<button type="button" class="btn-edit" onclick={() => startEditCategory(group.categoryId, group.name)}>Rename</button>
 						{#if confirmDeleteCategoryId === group.categoryId}
@@ -252,7 +256,9 @@
 			<div class="channel-edit">
 				<div class="channel-edit-name-row">
 					{@render channelTypeIcon(channel.type)}
+					<label for="channel-edit-name-{channel.id}" class="sr-only">Channel name</label>
 					<input
+						id="channel-edit-name-{channel.id}"
 						type="text"
 						class="input"
 						bind:value={channelEditName}
@@ -265,7 +271,9 @@
 					/>
 				</div>
 				{#if channel.type !== 'voice'}
+					<label for="channel-edit-desc-{channel.id}" class="sr-only">Channel description</label>
 					<textarea
+						id="channel-edit-desc-{channel.id}"
 						class="input textarea"
 						maxlength="256"
 						rows="2"
@@ -645,5 +653,17 @@
 		color: var(--danger);
 		font-size: 12px;
 		white-space: nowrap;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

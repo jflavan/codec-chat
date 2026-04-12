@@ -22,7 +22,6 @@
 </script>
 
 {#if ui.lightboxImageUrl}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="lightbox-backdrop"
 		role="dialog"

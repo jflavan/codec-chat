@@ -69,14 +69,14 @@
 </script>
 
 <div class="server-audit-log">
-	<h1 class="settings-title">Audit Log</h1>
+	<h2 class="settings-title">Audit Log</h2>
 
 	{#if servers.isLoadingAuditLog && servers.auditLogEntries.length === 0}
 		<p class="muted centered">Loading…</p>
 	{:else if servers.auditLogEntries.length === 0}
 		<p class="muted centered">No audit log entries.</p>
 	{:else}
-		<div class="log-list" bind:this={scrollEl} onscroll={handleScroll}>
+		<div class="log-list" bind:this={scrollEl} onscroll={handleScroll} role="log" aria-label="Audit log entries" aria-live="polite">
 			{#each servers.auditLogEntries as entry (entry.id)}
 				<div class="log-entry">
 					<div class="actor-avatar">

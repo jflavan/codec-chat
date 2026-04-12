@@ -19,6 +19,24 @@
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let success = $state(false);
+	let dialogEl = $state<HTMLElement | undefined>(undefined);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		if (modal) {
+			previousFocus = document.activeElement as HTMLElement | null;
+			// Focus the first focusable element inside the dialog after the DOM updates
+			const raf = requestAnimationFrame(() => {
+				const firstFocusable = dialogEl?.querySelector<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				);
+				firstFocusable?.focus();
+			});
+			return () => cancelAnimationFrame(raf);
+		} else {
+			previousFocus?.focus();
+		}
+	});
 
 	const MAX_REASON = 2000;
 
@@ -68,7 +86,12 @@
 
 {#if modal}
 	<div class="modal-backdrop" role="presentation" onclick={handleBackdrop}>
-		<div class="modal" role="dialog" aria-labelledby="report-title" aria-modal="true">
+		<div class="modal" role="dialog" aria-labelledby="report-title" aria-modal="true" bind:this={dialogEl}>
+			<button class="close-btn" onclick={handleClose} aria-label="Close dialog">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+				</svg>
+			</button>
 			<h2 id="report-title">Report {typeLabel}</h2>
 			<p class="context">{modal.targetName}</p>
 
@@ -88,7 +111,7 @@
 					<span class="char-count">{reason.length}/{MAX_REASON}</span>
 
 					{#if error}
-						<p class="error-msg">{error}</p>
+						<p class="error-msg" role="alert" aria-live="assertive">{error}</p>
 					{/if}
 
 					<div class="actions">
@@ -122,6 +145,29 @@
 		padding: 24px;
 		width: 90%;
 		max-width: 440px;
+		position: relative;
+	}
+
+	.close-btn {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		background: none;
+		border: none;
+		padding: 6px;
+		border-radius: 50%;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		min-width: 36px;
+		min-height: 36px;
+		transition: color 150ms ease, background-color 150ms ease;
+	}
+
+	.close-btn:hover {
+		color: var(--text-header);
+		background: var(--bg-message-hover);
 	}
 
 	h2 {

@@ -203,7 +203,7 @@
 <div class="feed-wrapper">
 	<div class="message-feed" bind:this={container} onscroll={handleScroll}>
 		{#if messages.isLoadingMessages}
-			<p class="muted feed-status">Loading messages…</p>
+			<p class="muted feed-status" aria-live="polite" aria-atomic="true">Loading messages…</p>
 		{:else if messages.messages.length === 0}
 			{#if channelStore.selectedChannelName}
 				<ChannelWelcome channelName={channelStore.selectedChannelName} />
@@ -215,7 +215,7 @@
 				<ChannelWelcome channelName={channelStore.selectedChannelName} />
 			{/if}
 			{#if messages.isLoadingOlderMessages}
-				<p class="muted feed-status loading-older">Loading older messages…</p>
+				<p class="muted feed-status loading-older" aria-live="polite" aria-atomic="true">Loading older messages…</p>
 			{/if}
 			{#each messages.messages as message, i (message.id)}
 				{@const prev = i > 0 ? messages.messages[i - 1] : null}

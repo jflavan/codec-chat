@@ -1,15 +1,28 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	let { x, y, items, onClose }: {
 		x: number;
 		y: number;
 		items: { label: string; onClick: () => void }[];
 		onClose: () => void;
 	} = $props();
+
+	let menuEl: HTMLDivElement | undefined = $state();
+
+	$effect(() => {
+		if (menuEl) {
+			tick().then(() => {
+				const first = menuEl?.querySelector<HTMLElement>('[role="menuitem"]');
+				first?.focus();
+			});
+		}
+	});
 </script>
 
 <svelte:window onclick={onClose} onkeydown={(e) => e.key === 'Escape' && onClose()} />
 
-<div class="context-menu" style="left: {x}px; top: {y}px;" role="menu">
+<div bind:this={menuEl} class="context-menu" style="left: {x}px; top: {y}px;" role="menu" aria-label="Channel options">
 	{#each items as item}
 		<button
 			class="context-menu-item"

@@ -32,14 +32,16 @@
 </script>
 
 <nav class="settings-sidebar" aria-label="Server settings categories">
-	<ul class="category-list" role="tablist" aria-orientation="vertical">
+	<ul class="category-list" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
 		{#each categories as cat (cat.id)}
 			<li role="presentation">
 				<button
 					role="tab"
+					id="tab-btn-{cat.id}"
 					class="category-item"
 					class:active={ui.serverSettingsCategory === cat.id}
 					aria-selected={ui.serverSettingsCategory === cat.id}
+					aria-controls="tab-panel-{cat.id}"
 					onclick={() => { ui.serverSettingsCategory = cat.id; }}
 				>
 					<span class="category-label">{cat.label}</span>

@@ -287,8 +287,9 @@
 				<button
 					type="button"
 					class="quick-emoji-btn"
+					aria-label={customMatch ? customMatch.name : emoji}
 					onclick={() => handleEmojiInsert(emoji)}
-				>{#if customMatch}<img src={customMatch.imageUrl} alt={customMatch.name} width="22" height="22" class="quick-emoji-img" />{:else}{emoji}{/if}</button>
+				>{#if customMatch}<img src={customMatch.imageUrl} alt={customMatch.name} width="22" height="22" class="quick-emoji-img" />{:else}<span aria-hidden="true">{emoji}</span>{/if}</button>
 			{/each}
 			<button
 				type="button"

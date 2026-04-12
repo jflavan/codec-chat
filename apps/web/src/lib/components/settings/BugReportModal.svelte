@@ -19,6 +19,14 @@
 			successUrl = null;
 			error = null;
 			dialogEl?.showModal();
+			// Focus the first focusable field after the dialog opens
+			const raf = requestAnimationFrame(() => {
+				const firstFocusable = dialogEl?.querySelector<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				);
+				firstFocusable?.focus();
+			});
+			return () => cancelAnimationFrame(raf);
 		} else {
 			dialogEl?.close();
 		}
@@ -65,7 +73,7 @@
 <dialog
 	bind:this={dialogEl}
 	class="bug-report-dialog"
-	aria-label="Report a Bug"
+	aria-labelledby="bug-report-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
@@ -76,7 +84,7 @@
 			</svg>
 		</button>
 
-		<h2>Report a Bug</h2>
+		<h2 id="bug-report-title">Report a Bug</h2>
 
 		{#if successUrl}
 			<div class="success">
@@ -111,7 +119,7 @@
 				</label>
 
 				{#if error}
-					<p class="error">{error}</p>
+					<p class="error" role="alert" aria-live="assertive">{error}</p>
 				{/if}
 
 				<button type="submit" class="submit-btn" disabled={submitting || !title.trim() || !description.trim()}>

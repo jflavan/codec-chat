@@ -81,7 +81,7 @@
 		</button>
 	{:else}
 		<div id="google-button" class="google-button"></div>
-		<span class="user-panel-status">{auth.status}</span>
+		<span class="user-panel-status" aria-live="polite">{auth.status}</span>
 	{/if}
 </div>
 

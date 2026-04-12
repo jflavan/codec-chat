@@ -132,25 +132,28 @@
 					{#if editingRoleId === role.id}
 						<div class="role-edit-panel">
 							<div class="role-edit-header">
+								<label for="role-edit-name-{role.id}" class="sr-only">Role name</label>
 								<input
+									id="role-edit-name-{role.id}"
 									type="text"
 									class="role-name-input"
 									bind:value={editName}
 									disabled={role.isSystemRole}
 									placeholder="Role name"
 								/>
-								<input type="color" class="role-color-input" bind:value={editColor} />
+								<label for="role-edit-color-{role.id}" class="sr-only">Role color</label>
+								<input id="role-edit-color-{role.id}" type="color" class="role-color-input" bind:value={editColor} aria-label="Role color" />
 								<button class="role-btn role-btn-save" onclick={saveEdit}>Save</button>
 								<button class="role-btn role-btn-cancel" onclick={() => (editingRoleId = null)}>Cancel</button>
 							</div>
 							<div class="permissions-section">
-								<h4 class="permissions-title">Permissions</h4>
+								<h3 class="permissions-title">Permissions</h3>
 								{#if role.isSystemRole}
 									<p class="permissions-readonly-note">This is a system role. All permissions are granted and cannot be changed.</p>
 								{/if}
 								{#each permissionCategories as category (category.name)}
 									<div class="permission-category">
-										<h5 class="permission-category-name">{category.name}</h5>
+										<h4 class="permission-category-name">{category.name}</h4>
 										<div class="permission-grid">
 											{#each category.permissions as perm (perm.flag)}
 												<label class="permission-toggle {role.isSystemRole ? 'permission-toggle--readonly' : ''}">
@@ -201,14 +204,17 @@
 		<div class="create-role">
 			<h3 class="subsection-title">Create Role</h3>
 			<div class="create-role-form">
+				<label for="new-role-name" class="sr-only">New role name</label>
 				<input
+					id="new-role-name"
 					type="text"
 					class="role-name-input"
 					placeholder="Role name"
 					bind:value={newRoleName}
 					maxlength={100}
 				/>
-				<input type="color" class="role-color-input" bind:value={newRoleColor} />
+				<label for="new-role-color" class="sr-only">New role color</label>
+				<input id="new-role-color" type="color" class="role-color-input" bind:value={newRoleColor} aria-label="New role color" />
 				<button class="role-btn role-btn-create" onclick={createRole} disabled={isCreating || !newRoleName.trim()}>
 					{isCreating ? 'Creating…' : 'Create'}
 				</button>
@@ -508,5 +514,17 @@
 	.role-btn-cancel:hover {
 		color: var(--text-normal);
 		border-color: var(--text-normal);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

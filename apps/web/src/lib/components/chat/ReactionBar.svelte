@@ -119,9 +119,9 @@
 <div class="reaction-bar">
 	{#each reactions as reaction (reaction.emoji)}
 		{@const custom = getCustomEmoji(reaction.emoji)}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="reaction-pill-wrapper"
+			role="none"
 			onmouseenter={(e) => showPopover(reaction.emoji, e.currentTarget)}
 			onmouseleave={hidePopover}
 			ontouchstart={(e) => handleTouchStart(reaction.emoji, e.currentTarget)}
@@ -136,6 +136,8 @@
 				disabled={isPending(reaction.emoji)}
 				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
 				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
+				aria-label="{custom ? `:${custom.name}:` : reaction.emoji} — {reaction.count} {reaction.count === 1 ? 'reaction' : 'reactions'}{hasReacted(reaction) ? ', reacted' : ''}"
+				aria-pressed={hasReacted(reaction)}
 			>
 				<span class="reaction-emoji">
 					{#if custom}

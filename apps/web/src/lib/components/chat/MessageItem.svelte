@@ -127,12 +127,10 @@ import { ReportType } from '$lib/types/index.js';
 	<span class="system-message-text">{message.body}</span>
 </div>
 {:else}
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <article
 	class="message"
 	class:grouped
 	class:mentioned={isMentioned}
-	tabindex="0"
 >
 	<!-- Floating action bar — appears on hover at top-right of message -->
 	<MessageActionBar
@@ -178,7 +176,7 @@ import { ReportType } from '$lib/types/index.js';
 			{/if}
 			<div class="message-header">
 				<strong class="message-author" class:deleted-user={!message.authorUserId}>{message.authorUserId ? message.authorName : 'Deleted User'}</strong>
-				<time class="message-time">{formatTime(message.createdAt)}</time>
+				<time class="message-time" datetime={message.createdAt}>{formatTime(message.createdAt)}</time>
 				{#if message.editedAt}
 					<span class="edited-label">(edited)</span>
 				{/if}
@@ -189,6 +187,7 @@ import { ReportType } from '$lib/types/index.js';
 						class="edit-input"
 						bind:value={editBody}
 						onkeydown={handleEditKeydown}
+						aria-label="Edit message"
 					></textarea>
 					<div class="edit-actions">
 						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
@@ -198,7 +197,7 @@ import { ReportType } from '$lib/types/index.js';
 				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={servers.customEmojis} /></p>
 			{/if}
 			{#if message.imageUrl}
-				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)} aria-label="View full-size image">
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
@@ -232,7 +231,7 @@ import { ReportType } from '$lib/types/index.js';
 		</div>
 	{:else}
 		<div class="message-avatar-col">
-			<time class="message-time-inline">{formatTime(message.createdAt)}</time>
+			<time class="message-time-inline" datetime={message.createdAt}>{formatTime(message.createdAt)}</time>
 		</div>
 		<div class="message-content">
 			{#if message.replyContext}
@@ -247,6 +246,7 @@ import { ReportType } from '$lib/types/index.js';
 						class="edit-input"
 						bind:value={editBody}
 						onkeydown={handleEditKeydown}
+						aria-label="Edit message"
 					></textarea>
 					<div class="edit-actions">
 						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
@@ -261,7 +261,7 @@ import { ReportType } from '$lib/types/index.js';
 				</p>
 			{/if}
 			{#if message.imageUrl}
-				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)} aria-label="View full-size image">
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}

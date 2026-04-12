@@ -133,6 +133,7 @@
 						bind:value={channelDescriptionDraft}
 						placeholder="Channel topic…"
 						maxlength="256"
+						aria-label="Channel description"
 						onblur={saveChannelDescription}
 						onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveChannelDescription(); } if (e.key === 'Escape') { editingChannelDescription = false; } }}
 					/>

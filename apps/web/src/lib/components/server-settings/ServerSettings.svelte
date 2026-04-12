@@ -60,11 +60,11 @@
 
 
 <div class="server-settings">
-	<h1 class="settings-title">Server Settings</h1>
+	<h2 class="settings-title">Server Settings</h2>
 
 	<!-- Server Overview Section -->
 	<section class="settings-section">
-		<h2 class="section-title">Server Overview</h2>
+		<h3 class="section-title">Server Overview</h3>
 
 		<!-- Server Icon -->
 		<div class="form-group">
@@ -106,6 +106,7 @@
 							type="file"
 							accept="image/jpeg,image/png,image/webp,image/gif"
 							class="hidden-file-input"
+							aria-label="Upload server icon"
 							onchange={handleIconFileChange}
 						/>
 					</div>
@@ -114,11 +115,12 @@
 		</div>
 		
 		<div class="form-group">
-			<label for="server-name" class="label">Server Name</label>
+			<span class="label" id="server-name-label">Server Name</span>
 			{#if isEditingServerName}
 				<div class="inline-edit">
 					<input
 						id="server-name"
+						aria-labelledby="server-name-label"
 						type="text"
 						class="input"
 						bind:value={serverNameEdit}
@@ -154,7 +156,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="display-field">
+				<div class="display-field" aria-labelledby="server-name-label">
 					<span class="field-value">{servers.selectedServerName}</span>
 					{#if servers.canManageChannels}
 						<button type="button" class="btn-edit" onclick={startEditingServerName}>

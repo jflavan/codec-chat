@@ -218,7 +218,7 @@
 			{#each categorizedGroups as group}
 				{@const isCollapsed = collapsedCategories.has(group.id)}
 				<div class="channel-category">
-					<button class="category-collapse-btn" onclick={() => toggleCollapse(group.id)} aria-expanded={!isCollapsed}>
+					<button class="category-collapse-btn" onclick={() => toggleCollapse(group.id)} aria-expanded={!isCollapsed} aria-controls="category-channels-{group.id}">
 						<span class="category-arrow" class:collapsed={isCollapsed}>▾</span>
 						<span class="category-label">{group.name}</span>
 					</button>
@@ -232,7 +232,7 @@
 				</div>
 
 				{#if !isCollapsed}
-					<ul class="channel-list" role="list">
+					<ul id="category-channels-{group.id}" class="channel-list" role="list">
 						{#each group.channels as channel}
 							{@const isMuted = servers.isChannelMuted(channel.id)}
 							<li>
@@ -343,6 +343,7 @@
 				<input
 					type="text"
 					placeholder={ui.newChannelType === 'voice' ? 'new-voice' : 'new-channel'}
+					aria-label="Channel name"
 					maxlength="100"
 					bind:value={ui.newChannelName}
 					disabled={channelStore.isCreatingChannel}

@@ -102,6 +102,8 @@
 		</div>
 		<p class="tagline">Real-time chat, open source.</p>
 
+		<h1 class="sign-in-heading">Sign in to Codec</h1>
+
 		<div class="sign-in-section">
 			<p class="sign-in-label">Sign in to start chatting</p>
 			<div id="login-google-button"></div>
@@ -131,46 +133,55 @@
 					type="button"
 					class="mode-btn"
 					class:active={mode === 'signin'}
+					aria-pressed={mode === 'signin'}
 					onclick={() => { mode = 'signin'; error = ''; }}
 				>Sign in</button>
 				<button
 					type="button"
 					class="mode-btn"
 					class:active={mode === 'signup'}
+					aria-pressed={mode === 'signup'}
 					onclick={() => { mode = 'signup'; error = ''; }}
 				>Create account</button>
 			</div>
 
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div id="auth-error" class="error-message" role="alert">{error}</div>
 			{/if}
 
-			<label class="field">
+			<label class="field" for="auth-email">
 				<span class="field-label">Email</span>
 				<input
+					id="auth-email"
 					type="email"
 					bind:value={email}
 					placeholder="you@example.com"
 					autocomplete="email"
+					aria-describedby={error ? 'auth-error' : undefined}
+					aria-invalid={error ? 'true' : undefined}
 					required
 				/>
 			</label>
 
-			<label class="field">
+			<label class="field" for="auth-password">
 				<span class="field-label">Password</span>
 				<input
+					id="auth-password"
 					type="password"
 					bind:value={password}
 					placeholder="Min 8 characters"
 					autocomplete={mode === 'signin' ? 'current-password' : 'new-password'}
+					aria-describedby={error ? 'auth-error' : undefined}
+					aria-invalid={error ? 'true' : undefined}
 					required
 				/>
 			</label>
 
 			{#if mode === 'signup'}
-				<label class="field">
+				<label class="field" for="auth-confirm-password">
 					<span class="field-label">Confirm password</span>
 					<input
+						id="auth-confirm-password"
 						type="password"
 						bind:value={confirmPassword}
 						placeholder="Re-enter password"
@@ -179,7 +190,7 @@
 					/>
 				</label>
 
-				<label class="field">
+				<label class="field" for="auth-nickname">
 					<span class="field-label">
 						Nickname
 						<span class="char-counter" class:over={nickname.trim().length > 32}>
@@ -187,6 +198,7 @@
 						</span>
 					</span>
 					<input
+						id="auth-nickname"
 						type="text"
 						bind:value={nickname}
 						placeholder="2–32 characters"
@@ -198,7 +210,7 @@
 				</label>
 			{/if}
 
-			<button type="submit" class="submit-btn" disabled={isSubmitting}>
+			<button type="submit" class="submit-btn" aria-busy={isSubmitting} disabled={isSubmitting}>
 				{#if isSubmitting}
 					Working...
 				{:else if mode === 'signin'}
@@ -289,6 +301,16 @@
 		font-size: 16px;
 		color: var(--text-muted);
 		letter-spacing: 2px;
+	}
+
+	.sign-in-heading {
+		margin: 0;
+		font-family: 'Space Grotesk', monospace;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text-header);
+		letter-spacing: 1px;
+		text-align: center;
 	}
 
 	.sign-in-section {
