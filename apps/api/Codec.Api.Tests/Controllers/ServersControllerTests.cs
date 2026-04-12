@@ -132,6 +132,38 @@ public class ServersControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMyServers_ReturnsIsOwnerTrue_ForOwnedServer_AndFalse_ForMemberOnlyServer()
+    {
+        var ownedServer = new Server { Name = "Owned" };
+        var memberServer = new Server { Name = "Member Only" };
+        _db.Servers.AddRange(ownedServer, memberServer);
+
+        var ownerRole = new ServerRoleEntity { ServerId = ownedServer.Id, Name = "Owner", Position = 0, IsSystemRole = true, Permissions = Permission.Administrator };
+        var memberRole2 = new ServerRoleEntity { ServerId = memberServer.Id, Name = "Member", Position = 2, IsSystemRole = true, Permissions = PermissionExtensions.MemberDefaults };
+        _db.ServerRoles.AddRange(ownerRole, memberRole2);
+
+        _db.ServerMembers.AddRange(
+            new ServerMember { Server = ownedServer, UserId = _testUser.Id },
+            new ServerMember { Server = memberServer, UserId = _testUser.Id }
+        );
+        _db.ServerMemberRoles.AddRange(
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow },
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole2.Id, AssignedAt = DateTimeOffset.UtcNow }
+        );
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMyServers();
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        var servers = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(json)!;
+        var owned = servers.Single(s => s.GetProperty("ServerId").GetString() == ownedServer.Id.ToString());
+        var nonOwned = servers.Single(s => s.GetProperty("ServerId").GetString() == memberServer.Id.ToString());
+        owned.GetProperty("IsOwner").GetBoolean().Should().BeTrue();
+        nonOwned.GetProperty("IsOwner").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Create_ReturnsCreated()
     {
         var result = await _controller.Create(new CreateServerRequest("New Server"));
