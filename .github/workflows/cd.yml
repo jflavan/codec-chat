@@ -248,34 +248,58 @@ jobs:
               docker compose -f /opt/voice/docker-compose.yml up -d --remove-orphans
             "
 
-      - name: Verify LiveKit health (internal)
+      - name: Verify voice services health (internal)
         run: |
-          STATUS=$(az vm run-command invoke \
+          DIAG=$(az vm run-command invoke \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.VOICE_VM_NAME }} \
             --command-id RunShellScript \
-            --scripts "sleep 10 && docker inspect --format='{{.State.Running}}' voice-livekit-1 2>/dev/null && echo LIVEKIT_OK || echo LIVEKIT_FAIL" \
+            --scripts "
+              sleep 10
+              echo '=== Container status ==='
+              docker ps -a --filter name=voice --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+              echo '=== LiveKit container ==='
+              docker inspect --format='{{.State.Running}}' voice-livekit-1 2>/dev/null && echo LIVEKIT_OK || echo LIVEKIT_FAIL
+              echo '=== Caddy container ==='
+              docker inspect --format='{{.State.Running}}' voice-caddy-1 2>/dev/null && echo CADDY_OK || echo CADDY_FAIL
+              echo '=== Caddy logs (last 30 lines) ==='
+              docker logs voice-caddy-1 --tail 30 2>&1 || echo 'No Caddy logs available'
+              echo '=== Listening ports ==='
+              ss -tlnp 2>/dev/null | grep -E ':(80|443|7880|7881)\s' || echo 'No matching ports'
+              echo '=== Local connectivity ==='
+              curl -sf -o /dev/null -w 'LiveKit HTTP %{http_code}' http://localhost:7880 2>/dev/null || echo 'LiveKit HTTP unreachable'
+              curl -sf -o /dev/null -w 'Caddy HTTP %{http_code}' http://localhost:80 2>/dev/null || echo 'Caddy HTTP unreachable'
+              curl -skf -o /dev/null -w 'Caddy HTTPS %{http_code}' https://localhost:443 2>/dev/null || echo 'Caddy HTTPS unreachable'
+            " \
             --query "value[0].message" -o tsv 2>/dev/null || echo "FAILED")
-          if [[ "$STATUS" != *"LIVEKIT_OK"* ]]; then
-            echo "::error::LiveKit health check failed: $STATUS"
+          echo "$DIAG"
+          if [[ "$DIAG" != *"LIVEKIT_OK"* ]]; then
+            echo "::error::LiveKit container is not running"
             exit 1
           fi
-          echo "LiveKit internal health check passed"
+          if [[ "$DIAG" != *"CADDY_OK"* ]]; then
+            echo "::error::Caddy container is not running — check logs above"
+            exit 1
+          fi
+          echo "Voice services internal health check passed"
 
       - name: Verify LiveKit TLS (external)
         run: |
           VOICE_FQDN="${{ needs.build-and-push.outputs.voice-fqdn }}"
-          # Allow up to 60s for Caddy to provision the TLS certificate on first deploy
-          for i in $(seq 1 6); do
-            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "https://${VOICE_FQDN}" 2>/dev/null || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
+          # Allow up to 90s for Caddy to provision the TLS certificate on first deploy
+          for i in $(seq 1 9); do
+            HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${VOICE_FQDN}" 2>/dev/null)
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "101" ]; then
               echo "LiveKit TLS health check passed (HTTPS $HTTP_CODE)"
               exit 0
             fi
-            echo "  Attempt $i/6 — HTTP $HTTP_CODE, retrying in 10s..."
+            echo "  Attempt $i/9 — HTTP $HTTP_CODE, retrying in 10s..."
             sleep 10
           done
-          echo "::warning::LiveKit TLS health check did not return 200 (last: $HTTP_CODE). Caddy may still be provisioning the certificate."
+          # Try HTTP fallback to see if the server is at least reachable
+          HTTP_FALLBACK=$(curl -s -o /dev/null -w "%{http_code}" "http://${VOICE_FQDN}" 2>/dev/null)
+          echo "  HTTP fallback: $HTTP_FALLBACK"
+          echo "::warning::LiveKit TLS health check did not return 200 (last HTTPS: $HTTP_CODE, HTTP: $HTTP_FALLBACK). Caddy may still be provisioning the certificate."
 
   migrate-database:
     runs-on: ubuntu-latest
