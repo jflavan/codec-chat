@@ -364,6 +364,11 @@ namespace Codec.Api.Migrations
 
                     b.HasIndex("ServerId");
 
+                    b.HasIndex("ServerId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DiscordImports_ServerId_ActiveImport")
+                        .HasFilter("\"Status\" IN ('Pending', 'InProgress')");
+
                     b.ToTable("DiscordImports");
                 });
 
