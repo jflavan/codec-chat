@@ -7,6 +7,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const apiBase = env.PUBLIC_API_BASE_URL ?? '';
 	const wsBase = apiBase.replace(/^http/, 'ws');
 	const livekitUrl = env.PUBLIC_LIVEKIT_URL ?? '';
+	const livekitHttpUrl = livekitUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
 
 	// SvelteKit manages the core CSP header (including nonces for inline scripts)
 	// via svelte.config.js. Here we append the dynamic directives that depend on
@@ -31,7 +32,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			'https://*.giphy.com',
 			apiBase
 		].join(' '),
-		'connect-src': `'self' ${apiBase} ${wsBase} ${livekitUrl ? livekitUrl + ' ' : ''}https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com https://api.giphy.com`,
+		'connect-src': `'self' ${apiBase} ${wsBase} ${livekitUrl ? livekitUrl + ' ' : ''}${livekitHttpUrl ? livekitHttpUrl + ' ' : ''}https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com https://api.giphy.com`,
 		'frame-src': 'https://accounts.google.com https://www.google.com https://www.youtube-nocookie.com https://github.com https://discord.com'
 	};
 
