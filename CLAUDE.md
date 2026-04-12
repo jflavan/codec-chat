@@ -79,7 +79,7 @@ apps/
       Models/        # EF Core entities + request DTOs
       Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
       Hubs/          # ChatHub (SignalR)
-      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, DiscordImportService, DiscordApiClient, DiscordPermissionMapper, DiscordRateLimitHandler, DiscordImportWorker, file storage
+      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, DiscordImportService, DiscordApiClient, DiscordPermissionMapper, DiscordRateLimitHandler, DiscordImportWorker, DiscordImportCancellationRegistry, file storage
       Filters/       # ValidateRecaptchaAttribute (action filter)
       Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience

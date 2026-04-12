@@ -10,12 +10,20 @@ The Discord import feature migrates:
 - **Categories** preserving order
 - **Channels** with descriptions and category assignments
 - **Per-channel permission overrides** (allow/deny bitmasks per role)
-- **Custom emojis** (downloaded from Discord CDN)
+- **Custom emojis** (Discord CDN URLs used directly, same as attachments)
 - **Members** with role assignments and Discord avatar URLs
-- **Messages** with author info, attachments, image URLs, and reply chains
+- **Messages** with author info, first attachment, image URLs, and reply chains (only message types 0/regular and 19/reply are imported; system messages skipped)
 - **Pinned messages** per channel
 
-Imported messages display the original Discord author's name and avatar via `ImportedAuthorName` and `ImportedAuthorAvatarUrl` fields on the `Message` entity, shown with an `ImportedAuthorBadge` in the UI.
+Imported messages display the original Discord author's name and avatar via `ImportedAuthorName`, `ImportedAuthorAvatarUrl`, and `ImportedDiscordUserId` fields on the `Message` entity, shown with an `ImportedAuthorBadge` in the UI.
+
+### Data Model: Message Fields for Import
+
+Three nullable fields are added to the `Message` entity:
+
+- `ImportedAuthorName` (string?) -- Discord username, used for display when author hasn't claimed
+- `ImportedAuthorAvatarUrl` (string?) -- Discord avatar URL, used for display when author hasn't claimed
+- `ImportedDiscordUserId` (string?) -- Discord user snowflake ID, used for claim matching; cleared on claim
 
 ## How It Works (Wizard Flow)
 
@@ -49,13 +57,13 @@ The import runs in this order:
 
 | Stage | What's Imported | Notes |
 |-------|----------------|-------|
-| Roles | All server roles except @everyone | Permissions mapped via `DiscordPermissionMapper`; position and color preserved |
+| Roles | All server roles except @everyone; managed (bot) roles skipped | Permissions mapped via `DiscordPermissionMapper`; position and color preserved; @everyone permissions synced to Codec's existing @everyone role |
 | Categories | Channel categories | Position preserved |
-| Channels | Text channels | Description, category assignment, and position preserved |
+| Channels | Text and voice channels | Description, category assignment, and position preserved |
 | Permission Overrides | Per-channel role overrides | Allow/deny bitmasks mapped to Codec permissions |
-| Emojis | Custom emojis | Downloaded from Discord CDN; name and animated flag preserved |
+| Emojis | Custom emojis | Discord CDN URLs used directly (not downloaded); name and animated flag preserved |
 | Members | Guild members | Discord username, avatar URL, and role assignments stored |
-| Messages | Full message history per channel | Imported newest-first (`before` pagination) across up to 4 channels in parallel; Discord CDN URLs used directly for attachments (no re-hosting); reply chains preserved; author info stored in `ImportedAuthorName`/`ImportedAuthorAvatarUrl`; `ImportMessagesAvailable` SignalR event sent to `channel-{channelId}` group after each batch so the frontend reloads messages in real-time |
+| Messages | Full message history per channel | Imported newest-first (`before` pagination) across up to 4 channels in parallel; only message types 0 (regular) and 19 (reply) are imported — system messages skipped; only the first attachment per message is imported (multiple attachments not supported); Discord CDN URLs used directly for attachments (no re-hosting); reply chains preserved via `PendingReply` backfill (see below); author info stored in `ImportedAuthorName`/`ImportedAuthorAvatarUrl`/`ImportedDiscordUserId`; `ImportMessagesAvailable` SignalR event with `{ channelId, count }` sent to `channel-{channelId}` group after each batch so the frontend reloads messages in real-time |
 | Pins | Pinned messages per channel | Matched to imported messages via entity mappings |
 
 ## Identity Claiming
@@ -66,18 +74,20 @@ After import, Discord members can claim their imported messages:
 2. They navigate to server settings and find the Discord Import tab.
 3. They click "Claim" next to their Discord username.
 4. If the user has a linked Discord account (`DiscordSubject` on User), the system verifies the Discord user ID matches.
-5. On claim, all messages authored by that Discord user are updated: `AuthorUserId` is set to the Codec user, and `ImportedAuthorName`/`ImportedAuthorAvatarUrl` are cleared.
+5. On claim, all messages authored by that Discord user are updated: `AuthorUserId` is set to the Codec user, and `ImportedAuthorName`/`ImportedAuthorAvatarUrl`/`ImportedDiscordUserId` are cleared.
 
 Endpoint: `POST /servers/{serverId}/discord-import/claim`
 
 ## Re-sync
 
-After the initial import, you can pull new messages posted since the last import:
+After the initial import, you can re-sync to pick up new messages:
 
 1. Open the Discord Import tab in server settings.
 2. Click **Re-sync** and provide the bot token again.
-3. The system creates a new `DiscordImport` record with `LastSyncedAt` set from the previous completed import.
-4. Only messages newer than `LastSyncedAt` are fetched.
+3. The system creates a new `DiscordImport` record and re-imports all messages from Discord.
+4. Existing messages are skipped via deduplication checks against `DiscordEntityMapping` records — only genuinely new messages are created.
+
+**Note:** Re-sync currently re-processes all messages rather than filtering by `LastSyncedAt`. The dedup checks ensure no duplicates are created, but all messages are fetched from the Discord API again.
 
 Endpoint: `POST /servers/{serverId}/discord-import/resync`
 
@@ -103,7 +113,7 @@ All events are sent to the `server-{serverId}` group.
 | `ImportProgress` | `{ stage, completed, total, percentComplete }` | Progress update for each import stage (Roles, Categories, Channels, Emojis, Members, Messages, Pins) |
 | `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers, completedAt }` | Import finished successfully |
 | `ImportFailed` | `{ errorMessage }` | Import failed with error details |
-| `ImportMessagesAvailable` | `{ channelId }` | New batch of messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
+| `ImportMessagesAvailable` | `{ channelId, count }` | New batch of messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
 
 ## Permission Mapping
 
@@ -136,8 +146,10 @@ Discord permissions without a Codec equivalent (e.g., Manage Webhooks, Create In
 - **Background worker** (`DiscordImportWorker`) — hosted service that reads from a `Channel<Guid>` queue and processes imports sequentially.
 - **Channel\<T\> queue** — `System.Threading.Channels.Channel<Guid>` registered as a singleton; the controller writes import IDs and the worker reads them.
 - **Parallel channel imports** — message history is fetched for up to 4 channels concurrently (`MaxParallelChannels = 4` in `DiscordImportService`).
-- **No attachment re-hosting** — message attachment and image URLs reference the original Discord CDN directly (no download/re-upload). Emoji images are still downloaded from `cdn.discordapp.com` and stored locally (or in blob storage).
-- **Rate limiting** — `DiscordRateLimitHandler` is a `DelegatingHandler` on the Discord API `HttpClient` that reads `X-RateLimit-*` response headers and delays requests when limits are hit. A global `TokenBucketRateLimiter` (50 tokens/sec) coordinates rate limiting across all parallel channel imports.
+- **No attachment re-hosting** — message attachment and image URLs reference the original Discord CDN directly (no download/re-upload). Emoji images also use Discord CDN URLs directly.
+- **Reply backfill (`PendingReply`)** — since messages are imported newest-first, a reply may reference a message that hasn't been imported yet. These are tracked as `PendingReply` entity mappings in `DiscordEntityMapping`. After all messages in a channel are imported, a final backfill pass resolves pending replies by looking up the now-imported parent messages.
+- **Rate limiting** — `DiscordRateLimitHandler` is a `DelegatingHandler` on the Discord API `HttpClient` that reads `X-RateLimit-*` response headers (including per-endpoint `X-RateLimit-Bucket` tracking) and delays requests when limits are hit. A global `TokenBucketRateLimiter` (50 tokens/sec) coordinates rate limiting across all parallel channel imports.
+- **Partial visibility** — imported data is visible immediately as each batch completes. Users can browse channels and read messages during an in-progress import.
 - **Live channel updates** — `ImportMessagesAvailable` SignalR event is sent to the `channel-{channelId}` group after each message batch, so the frontend can reload and display messages as they are imported.
 - **Bot token security** — tokens are encrypted at rest using ASP.NET Core Data Protection (`IDataProtectionProvider`) and cleared after import completes.
 - **Scoped services** — the worker creates a new DI scope per import to get fresh `CodecDbContext` and `DiscordApiClient` instances.
@@ -157,3 +169,12 @@ Benchmarked on a real Discord server import:
 | Pagination direction | Newest-first (`before` cursor) |
 
 The newest-first strategy means users see recent messages within seconds of import start. The global `TokenBucketRateLimiter` keeps 429 rates manageable while maximizing throughput across parallel channel imports.
+
+## Limitations
+
+- **Only first attachment per message** — if a Discord message has multiple attachments, only the first is imported; additional attachments are dropped.
+- **Only regular messages and replies** — only Discord message types 0 (regular) and 19 (reply) are imported. System messages (joins, boosts, pins, etc.) are skipped.
+- **Reactions not imported** — message reactions are not included in the import.
+- **Discord CDN URLs may break** — attachments and emoji images reference Discord CDN URLs directly. If the source Discord server is deleted, these URLs may stop working.
+- **Re-sync re-processes all messages** — re-sync does not filter by `LastSyncedAt`; it fetches all messages from Discord and relies on deduplication checks to skip existing ones.
+- **Managed roles skipped** — bot integration roles (marked as `managed` by Discord) are not imported.

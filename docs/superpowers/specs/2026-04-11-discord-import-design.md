@@ -1,18 +1,27 @@
 # Discord Server Import
 
 > **Implementation divergences (2026-04-12):** The final implementation differs from this original spec in several ways:
-> - **No attachment re-hosting** -- Discord CDN URLs are used directly for message attachments (no download/re-upload to Codec file storage). Emojis are still downloaded.
+> - **No attachment re-hosting** -- Discord CDN URLs are used directly for message attachments (no download/re-upload to Codec file storage).
+> - **Emojis use Discord CDN URLs directly** -- emoji images are not downloaded and stored locally; they reference Discord CDN URLs, same as attachments.
 > - **Newest-first pagination** -- Messages are imported newest-first using `before` cursor pagination (not oldest-first as originally specified), so users see recent messages immediately.
+> - **`PendingReply` entity type** -- added to `DiscordEntityType` enum to track replies to not-yet-imported messages during newest-first pagination; resolved in a final backfill pass.
+> - **`ImportedDiscordUserId` field** -- added to `Message` entity (not in original spec) to store the Discord user snowflake for claim matching; cleared on claim.
 > - **Live channel updates** -- An `ImportMessagesAvailable` SignalR event is sent to `channel-{channelId}` groups after each message batch, enabling real-time message loading in the frontend during import.
 > - **Parallel channel imports (4 concurrent)** -- Message history is fetched for up to 4 channels concurrently via `SemaphoreSlim`.
 > - **Global rate limiting** -- A `TokenBucketRateLimiter` (50 tokens/sec) enforces Discord's API rate limit across all parallel imports, replacing the original ~40 req/sec cap.
+> - **Reactions not imported** -- reactions are documented in the spec scope but not implemented.
+> - **Re-sync does not filter by `LastSyncedAt`** -- re-sync re-imports all messages and relies on deduplication checks to skip existing ones.
+> - **Only first attachment per message** -- if a Discord message has multiple attachments, only the first is imported.
+> - **Only message types 0 and 19** -- only regular messages (type 0) and replies (type 19) are imported; system messages are skipped.
+> - **Managed roles skipped** -- bot integration roles (marked as `managed` by Discord) are not imported.
+> - **Voice channels imported** -- both text and voice channels are imported (spec only mentioned text channels).
 > - **Performance** -- 371K messages imported in ~20 minutes, 98+ msgs/API call, ~10% 429 rate.
 
 Import Discord server content into Codec via a Discord bot, run as a background job in the API.
 
 ## Scope
 
-Full migration: server structure (categories, channels, roles, permission overrides), message history (with attachments, reactions, replies, pins), custom emojis, and member mappings. Admin-triggered, one-shot with optional re-sync.
+Full migration: server structure (categories, channels, roles, permission overrides), message history (with attachments, replies, pins), custom emojis, and member mappings. Admin-triggered, one-shot with optional re-sync. Reactions are not imported in the current implementation.
 
 ## Data Model
 
@@ -56,17 +65,18 @@ Full migration: server structure (categories, channels, roles, permission overri
 | DiscordImportId | Guid | FK to DiscordImport |
 | ServerId | Guid | FK to Server |
 | DiscordEntityId | string | Discord snowflake |
-| EntityType | enum | Role, Category, Channel, Message, Emoji, PinnedMessage |
+| EntityType | enum | Role, Category, Channel, Message, Emoji, PinnedMessage, PendingReply |
 | CodecEntityId | Guid | The corresponding Codec record's ID |
 
 Unique constraint on `(ServerId, DiscordEntityId, EntityType)`.
 
 ### Changes to Existing Models
 
-**`Message`** -- two new nullable fields:
+**`Message`** -- three new nullable fields:
 
 - `ImportedAuthorName` (string?) -- Discord username, used for display when author hasn't claimed
 - `ImportedAuthorAvatarUrl` (string?) -- Discord avatar, used for display when author hasn't claimed
+- `ImportedDiscordUserId` (string?) -- Discord user snowflake ID, used for claim matching; cleared on claim
 
 No changes to Server, Channel, ChannelCategory, ServerRoleEntity, Reaction, CustomEmoji, PinnedMessage, or ChannelPermissionOverride. Imported data uses existing models directly.
 
@@ -81,13 +91,13 @@ Background job using `IHostedService` with a `Channel<DiscordImportJob>` queue (
 1. Admin calls `POST /servers/{serverId}/discord-import` with `{ botToken, discordGuildId }`.
 2. Controller validates the bot token against Discord API (`GET /guilds/{guildId}`), creates a `DiscordImport` record (status: Pending), enqueues the job, returns `202 Accepted` with the import ID.
 3. Background worker picks up the job and imports in order:
-   1. **Roles** -- create `ServerRoleEntity` records, map Discord role IDs to Codec role IDs. `@everyone` maps to Codec's existing `@everyone` system role (permissions updated, not duplicated).
+   1. **Roles** -- create `ServerRoleEntity` records, map Discord role IDs to Codec role IDs. `@everyone` maps to Codec's existing `@everyone` system role (permissions synced, not duplicated). Managed (bot integration) roles are skipped.
    2. **Categories** -- create `ChannelCategory` records, map IDs.
-   3. **Channels** -- create `Channel` records with correct category and position, map IDs.
+   3. **Channels** -- create `Channel` records (both text and voice) with correct category and position, map IDs.
    4. **Channel permission overrides** -- create `ChannelPermissionOverride` records using role ID mapping.
-   5. **Custom emojis** -- download images to Codec file storage, create `CustomEmoji` records.
+   5. **Custom emojis** -- Discord CDN URLs used directly (not downloaded), create `CustomEmoji` records.
    6. **Members** -- create `DiscordUserMapping` records (no Codec User records created).
-   7. **Messages** (per channel, paginated oldest-first) -- create `Message` records with `ImportedAuthorName`/`ImportedAuthorAvatarUrl`, download attachments to Codec file storage, create `Reaction` records.
+   7. **Messages** (per channel, paginated newest-first via `before` cursor) -- create `Message` records with `ImportedAuthorName`/`ImportedAuthorAvatarUrl`/`ImportedDiscordUserId`; only first attachment per message imported (Discord CDN URLs used directly); only message types 0 (regular) and 19 (reply) imported; `PendingReply` mappings tracked for replies to not-yet-imported messages, resolved in a final backfill pass. Reactions are not imported.
    8. **Pinned messages** -- create `PinnedMessage` records.
 4. Progress updates pushed via SignalR to `server-{serverId}` group after each stage and every ~100 messages.
 
@@ -99,7 +109,7 @@ A `DelegatingHandler` on a named `HttpClient("discord")` that reads `X-RateLimit
 
 When triggered again on the same guild:
 - Roles, categories, channels matched by Discord ID via `DiscordEntityMapping`; existing records skipped, new ones created.
-- Messages fetched only after `LastSyncedAt`.
+- Messages are re-fetched in full; existing messages are skipped via dedup checks against `DiscordEntityMapping` records. `LastSyncedAt` is not used for filtering.
 - Admin must provide a fresh bot token (previous one was cleared).
 
 ### Failure Handling
