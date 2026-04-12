@@ -13,6 +13,7 @@
 	const isInProgress = $derived(
 		importStatus?.status === 'Pending' || importStatus?.status === 'InProgress'
 	);
+	const isRehostingMedia = $derived(importStatus?.status === 'RehostingMedia');
 	const isCompleted = $derived(importStatus?.status === 'Completed');
 	const isFailed = $derived(importStatus?.status === 'Failed');
 	const mappings = $derived(servers.discordUserMappings);
@@ -76,6 +77,29 @@
 				{/if}
 			</div>
 			<button class="cancel-btn" onclick={handleCancel}>Cancel Import</button>
+		</div>
+	{:else if isRehostingMedia}
+		<div class="import-status">
+			<h3>Import Complete — Optimizing Media</h3>
+			<p>Messages have been imported. Images are being re-hosted in the background.</p>
+
+			{#if importStatus?.stage}
+				<p class="stage-label">{importStatus.stage}</p>
+			{/if}
+
+			<div class="progress-bar">
+				{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
+					<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
+				{:else}
+					<div class="progress-fill pulse"></div>
+				{/if}
+			</div>
+
+			<div class="import-stats">
+				<span>{importStatus?.importedChannels ?? 0} channels</span>
+				<span>{importStatus?.importedMessages ?? 0} messages</span>
+				<span>{importStatus?.importedMembers ?? 0} members</span>
+			</div>
 		</div>
 	{:else if isFailed}
 		<div class="status-card failed">
@@ -322,6 +346,21 @@
 
 	.start-btn:hover:not(:disabled) {
 		opacity: 0.9;
+	}
+
+	.import-status {
+		padding: 16px;
+		background: var(--bg-secondary);
+		border-radius: 8px;
+		margin-bottom: 24px;
+	}
+
+	.import-stats {
+		display: flex;
+		gap: 16px;
+		font-size: 14px;
+		color: var(--text-normal);
+		margin: 8px 0 0;
 	}
 
 	.cancel-btn {

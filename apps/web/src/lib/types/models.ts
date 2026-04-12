@@ -529,7 +529,7 @@ export enum ReportType {
 }
 
 /** Discord import job status. */
-export type DiscordImportStatus = 'Pending' | 'InProgress' | 'Completed' | 'Failed' | 'Cancelled';
+export type DiscordImportStatus = 'Pending' | 'InProgress' | 'Completed' | 'Failed' | 'Cancelled' | 'RehostingMedia';
 
 /** Discord import job. */
 export type DiscordImport = {

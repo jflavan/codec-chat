@@ -15,6 +15,7 @@
 	const isInProgress = $derived(
 		importStatus?.status === 'Pending' || importStatus?.status === 'InProgress'
 	);
+	const isRehostingMedia = $derived(importStatus?.status === 'RehostingMedia');
 	const isCompleted = $derived(importStatus?.status === 'Completed');
 	const isFailed = $derived(importStatus?.status === 'Failed');
 
@@ -41,6 +42,24 @@
 				<div class="progress-fill pulse"></div>
 			{/if}
 		</div>
+
+	{:else if isRehostingMedia}
+		<h2>Import complete</h2>
+		<p class="subtitle">Your messages are imported. Media is being optimized in the background — you can close this window.</p>
+
+		{#if importStatus?.stage}
+			<p class="stage-label">{importStatus.stage}</p>
+		{/if}
+
+		<div class="progress-bar">
+			{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
+				<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
+			{:else}
+				<div class="progress-fill pulse"></div>
+			{/if}
+		</div>
+
+		<button class="btn-primary" onclick={onGoToServer}>Go to Server</button>
 
 	{:else if isCompleted}
 		<div class="success-icon">

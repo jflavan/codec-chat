@@ -399,9 +399,10 @@ export async function setupSignalR(
 
 			onImportProgress: (event) => {
 				if (servers.discordImport) {
+					const currentStatus = servers.discordImport.status;
 					servers.discordImport = {
 						...servers.discordImport,
-						status: 'InProgress',
+						status: currentStatus === 'RehostingMedia' ? 'RehostingMedia' : 'InProgress',
 						stage: event.stage,
 						percentComplete: event.percentComplete,
 					};
@@ -411,11 +412,10 @@ export async function setupSignalR(
 				if (servers.discordImport) {
 					servers.discordImport = {
 						...servers.discordImport,
-						status: 'Completed',
+						status: 'RehostingMedia',
 						importedChannels: event.importedChannels,
 						importedMessages: event.importedMessages,
 						importedMembers: event.importedMembers,
-						completedAt: new Date().toISOString()
 					};
 				}
 			},
