@@ -79,7 +79,7 @@ apps/
       Models/        # EF Core entities + request DTOs
       Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
       Hubs/          # ChatHub (SignalR)
-      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, file storage
+      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, DiscordImportService, DiscordApiClient, DiscordPermissionMapper, DiscordRateLimitHandler, DiscordImportWorker, file storage
       Filters/       # ValidateRecaptchaAttribute (action filter)
       Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
@@ -98,6 +98,7 @@ apps/
         server-settings/  # ServerSettings, ServerChannels, ServerRoles, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerBans, ServerWebhooks, ServerSettingsSidebar, ServerSettingsModal
         report/        # ReportModal (user/message/server abuse reports)
         announcements/ # AnnouncementBanner (dismissible site-wide announcements)
+        discord-import/ # Discord import wizard (4-step flow)
     routes/
       +layout.svelte  # Root layout
       +page.svelte    # Root shell; creates stores, wires cross-store callbacks, sets context
