@@ -237,6 +237,11 @@ builder.Services.AddDbContext<CodecDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("Default");
     options.UseNpgsql(connectionString);
+    if (builder.Environment.IsDevelopment())
+    {
+        options.ConfigureWarnings(w =>
+            w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
 });
 
 builder.Services.AddScoped<IUserService, UserService>();

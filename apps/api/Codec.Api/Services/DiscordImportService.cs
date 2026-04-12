@@ -298,6 +298,9 @@ public class DiscordImportService
         CodecDbContext db, DiscordApiClient discord, Guid serverId, string guildId, Guid importId, CancellationToken ct)
     {
         var emojis = await discord.GetGuildEmojisAsync(guildId, ct);
+        var usedNames = new HashSet<string>(
+            await db.CustomEmojis.Where(e => e.ServerId == serverId).Select(e => e.Name).ToListAsync(ct),
+            StringComparer.OrdinalIgnoreCase);
 
         foreach (var de in emojis)
         {
@@ -307,8 +310,14 @@ public class DiscordImportService
                 .FirstOrDefaultAsync(m => m.ServerId == serverId && m.DiscordEntityId == de.Id && m.EntityType == DiscordEntityType.Emoji, ct);
             if (existing is not null) continue;
 
-            var nameExists = await db.CustomEmojis.AnyAsync(e => e.ServerId == serverId && e.Name == de.Name, ct);
-            var emojiName = nameExists ? $"{de.Name}_imported" : de.Name;
+            var emojiName = de.Name;
+            var suffix = 0;
+            while (usedNames.Contains(emojiName))
+            {
+                suffix++;
+                emojiName = $"{de.Name}_{suffix}";
+            }
+            usedNames.Add(emojiName);
 
             var ext = de.Animated == true ? "gif" : "png";
             var emojiUrl = $"https://cdn.discordapp.com/emojis/{de.Id}.{ext}";

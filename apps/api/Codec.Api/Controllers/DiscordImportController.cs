@@ -31,7 +31,7 @@ public class DiscordImportController : ControllerBase
         _logger = logger;
     }
 
-    private Guid GetUserId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private Guid GetUserId() => Guid.Parse(User.FindFirst("sub")!.Value);
 
     private async Task<bool> HasManageServerPermission(Guid serverId)
     {
