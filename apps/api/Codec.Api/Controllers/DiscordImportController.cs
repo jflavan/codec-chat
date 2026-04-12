@@ -4,6 +4,7 @@ using Codec.Api.Data;
 using Codec.Api.Models;
 using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,17 +19,20 @@ public class DiscordImportController : ControllerBase
     private readonly Channel<Guid> _importQueue;
     private readonly DiscordApiClient _discordClient;
     private readonly ILogger<DiscordImportController> _logger;
+    private readonly IDataProtectionProvider _dataProtection;
 
     public DiscordImportController(
         CodecDbContext db,
         Channel<Guid> importQueue,
         DiscordApiClient discordClient,
-        ILogger<DiscordImportController> logger)
+        ILogger<DiscordImportController> logger,
+        IDataProtectionProvider dataProtection)
     {
         _db = db;
         _importQueue = importQueue;
         _discordClient = discordClient;
         _logger = logger;
+        _dataProtection = dataProtection;
     }
 
     private Guid GetUserId() => Guid.Parse(User.FindFirst("sub")!.Value);
@@ -71,12 +75,13 @@ public class DiscordImportController : ControllerBase
             return BadRequest(new { error = "Invalid bot token or guild ID. Ensure the bot has been added to the Discord server." });
         }
 
+        var protector = _dataProtection.CreateProtector("DiscordBotToken");
         var import = new DiscordImport
         {
             Id = Guid.NewGuid(),
             ServerId = serverId,
             DiscordGuildId = request.DiscordGuildId,
-            EncryptedBotToken = request.BotToken,
+            EncryptedBotToken = protector.Protect(request.BotToken),
             Status = DiscordImportStatus.Pending,
             InitiatedByUserId = GetUserId()
         };
@@ -144,12 +149,13 @@ public class DiscordImportController : ControllerBase
             return BadRequest(new { error = "Invalid bot token or guild ID." });
         }
 
+        var protector = _dataProtection.CreateProtector("DiscordBotToken");
         var import = new DiscordImport
         {
             Id = Guid.NewGuid(),
             ServerId = serverId,
             DiscordGuildId = request.DiscordGuildId,
-            EncryptedBotToken = request.BotToken,
+            EncryptedBotToken = protector.Protect(request.BotToken),
             Status = DiscordImportStatus.Pending,
             InitiatedByUserId = GetUserId(),
             LastSyncedAt = lastImport.LastSyncedAt

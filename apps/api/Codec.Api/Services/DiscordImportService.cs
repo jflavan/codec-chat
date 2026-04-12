@@ -50,19 +50,22 @@ public class DiscordImportService
             var roleMap = await ImportRolesAsync(db, discordClient, serverId, guildId, importId, ct);
             await db.SaveChangesAsync(ct);
 
+            // Fetch guild channels once for categories, channels, and permission overrides
+            var allGuildChannels = await discordClient.GetGuildChannelsAsync(guildId, ct);
+
             // 2. Categories
             await group.SendAsync("ImportProgress", new { stage = "Categories", completed = 0, total = 0, percentComplete = 10f }, ct);
-            var categoryMap = await ImportCategoriesAsync(db, discordClient, serverId, guildId, importId, ct);
+            var categoryMap = await ImportCategoriesAsync(db, serverId, importId, allGuildChannels, ct);
             await db.SaveChangesAsync(ct);
 
             // 3. Channels
             await group.SendAsync("ImportProgress", new { stage = "Channels", completed = 0, total = 0, percentComplete = 20f }, ct);
-            var channelMap = await ImportChannelsAsync(db, discordClient, serverId, guildId, importId, categoryMap, ct);
+            var channelMap = await ImportChannelsAsync(db, serverId, importId, allGuildChannels, categoryMap, ct);
             import.ImportedChannels = channelMap.Count;
             await db.SaveChangesAsync(ct);
 
             // 4. Channel permission overrides
-            await ImportChannelPermissionOverridesAsync(db, discordClient, guildId, channelMap, roleMap, ct);
+            await ImportChannelPermissionOverridesAsync(db, allGuildChannels, channelMap, roleMap, ct);
             await db.SaveChangesAsync(ct);
 
             // 5. Custom emojis
@@ -188,10 +191,9 @@ public class DiscordImportService
     }
 
     private async Task<Dictionary<string, Guid>> ImportCategoriesAsync(
-        CodecDbContext db, DiscordApiClient discord, Guid serverId, string guildId, Guid importId, CancellationToken ct)
+        CodecDbContext db, Guid serverId, Guid importId, List<DiscordChannel> allChannels, CancellationToken ct)
     {
-        var channels = await discord.GetGuildChannelsAsync(guildId, ct);
-        var categories = channels.Where(c => c.Type == 4).OrderBy(c => c.Position).ToList();
+        var categories = allChannels.Where(c => c.Type == 4).OrderBy(c => c.Position).ToList();
         var categoryMap = new Dictionary<string, Guid>();
 
         foreach (var dc in categories)
@@ -222,10 +224,9 @@ public class DiscordImportService
     }
 
     private async Task<Dictionary<string, Guid>> ImportChannelsAsync(
-        CodecDbContext db, DiscordApiClient discord, Guid serverId, string guildId, Guid importId,
+        CodecDbContext db, Guid serverId, Guid importId, List<DiscordChannel> allChannels,
         Dictionary<string, Guid> categoryMap, CancellationToken ct)
     {
-        var allChannels = await discord.GetGuildChannelsAsync(guildId, ct);
         var channels = allChannels.Where(c => c.Type is 0 or 2).OrderBy(c => c.Position).ToList();
         var channelMap = new Dictionary<string, Guid>();
 
@@ -262,11 +263,9 @@ public class DiscordImportService
     }
 
     private async Task ImportChannelPermissionOverridesAsync(
-        CodecDbContext db, DiscordApiClient discord, string guildId,
+        CodecDbContext db, List<DiscordChannel> allChannels,
         Dictionary<string, Guid> channelMap, Dictionary<string, Guid> roleMap, CancellationToken ct)
     {
-        var allChannels = await discord.GetGuildChannelsAsync(guildId, ct);
-
         foreach (var dc in allChannels.Where(c => c.Type is 0 or 2))
         {
             if (dc.PermissionOverwrites is null || !channelMap.TryGetValue(dc.Id, out var codecChannelId))
@@ -392,16 +391,10 @@ public class DiscordImportService
         Guid importId, DateTimeOffset? lastSyncedAt, IClientProxy group, CancellationToken ct)
     {
         var count = 0;
+        // For re-sync, we don't set `after` — the dedup check (AnyAsync) in the loop
+        // will skip already-imported messages. This avoids incorrect lexicographic ordering
+        // of Discord snowflake IDs.
         string? after = null;
-
-        if (lastSyncedAt is not null)
-        {
-            var lastMapping = await db.DiscordEntityMappings
-                .Where(m => m.ServerId == serverId && m.EntityType == DiscordEntityType.Message)
-                .OrderByDescending(m => m.DiscordEntityId)
-                .FirstOrDefaultAsync(ct);
-            if (lastMapping is not null) after = lastMapping.DiscordEntityId;
-        }
 
         while (true)
         {

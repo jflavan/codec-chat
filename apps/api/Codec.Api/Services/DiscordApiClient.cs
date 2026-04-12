@@ -7,6 +7,7 @@ namespace Codec.Api.Services;
 public class DiscordApiClient
 {
     private readonly HttpClient _http;
+    private string? _botToken;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -19,69 +20,59 @@ public class DiscordApiClient
         _http.BaseAddress = new Uri("https://discord.com/api/v10/");
     }
 
-    public void SetBotToken(string token)
+    public void SetBotToken(string token) => _botToken = token;
+
+    private HttpRequestMessage CreateRequest(HttpMethod method, string url)
     {
-        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", token);
+        var request = new HttpRequestMessage(method, url);
+        if (_botToken is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bot", _botToken);
+        return request;
     }
 
-    public async Task<DiscordGuild> GetGuildAsync(string guildId, CancellationToken ct = default)
+    private async Task<T> SendAsync<T>(string url, CancellationToken ct)
     {
-        var response = await _http.GetAsync($"guilds/{guildId}?with_counts=true", ct);
+        using var request = CreateRequest(HttpMethod.Get, url);
+        var response = await _http.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<DiscordGuild>(JsonOptions, ct))!;
+        return (await response.Content.ReadFromJsonAsync<T>(JsonOptions, ct))!;
     }
 
-    public async Task<List<DiscordRole>> GetGuildRolesAsync(string guildId, CancellationToken ct = default)
-    {
-        var response = await _http.GetAsync($"guilds/{guildId}/roles", ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<List<DiscordRole>>(JsonOptions, ct))!;
-    }
+    public Task<DiscordGuild> GetGuildAsync(string guildId, CancellationToken ct = default)
+        => SendAsync<DiscordGuild>($"guilds/{guildId}?with_counts=true", ct);
 
-    public async Task<List<DiscordChannel>> GetGuildChannelsAsync(string guildId, CancellationToken ct = default)
-    {
-        var response = await _http.GetAsync($"guilds/{guildId}/channels", ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<List<DiscordChannel>>(JsonOptions, ct))!;
-    }
+    public Task<List<DiscordRole>> GetGuildRolesAsync(string guildId, CancellationToken ct = default)
+        => SendAsync<List<DiscordRole>>($"guilds/{guildId}/roles", ct);
 
-    public async Task<List<DiscordGuildMember>> GetGuildMembersAsync(
+    public Task<List<DiscordChannel>> GetGuildChannelsAsync(string guildId, CancellationToken ct = default)
+        => SendAsync<List<DiscordChannel>>($"guilds/{guildId}/channels", ct);
+
+    public Task<List<DiscordGuildMember>> GetGuildMembersAsync(
         string guildId, int limit = 1000, string? after = null, CancellationToken ct = default)
     {
         var url = $"guilds/{guildId}/members?limit={limit}";
         if (after is not null) url += $"&after={after}";
-        var response = await _http.GetAsync(url, ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<List<DiscordGuildMember>>(JsonOptions, ct))!;
+        return SendAsync<List<DiscordGuildMember>>(url, ct);
     }
 
-    public async Task<List<DiscordMessage>> GetChannelMessagesAsync(
+    public Task<List<DiscordMessage>> GetChannelMessagesAsync(
         string channelId, int limit = 100, string? after = null, CancellationToken ct = default)
     {
         var url = $"channels/{channelId}/messages?limit={limit}";
         if (after is not null) url += $"&after={after}";
-        var response = await _http.GetAsync(url, ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<List<DiscordMessage>>(JsonOptions, ct))!;
+        return SendAsync<List<DiscordMessage>>(url, ct);
     }
 
-    public async Task<List<DiscordMessage>> GetPinnedMessagesAsync(string channelId, CancellationToken ct = default)
-    {
-        var response = await _http.GetAsync($"channels/{channelId}/pins", ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<List<DiscordMessage>>(JsonOptions, ct))!;
-    }
+    public Task<List<DiscordMessage>> GetPinnedMessagesAsync(string channelId, CancellationToken ct = default)
+        => SendAsync<List<DiscordMessage>>($"channels/{channelId}/pins", ct);
 
-    public async Task<List<DiscordEmoji>> GetGuildEmojisAsync(string guildId, CancellationToken ct = default)
-    {
-        var response = await _http.GetAsync($"guilds/{guildId}/emojis", ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<List<DiscordEmoji>>(JsonOptions, ct))!;
-    }
+    public Task<List<DiscordEmoji>> GetGuildEmojisAsync(string guildId, CancellationToken ct = default)
+        => SendAsync<List<DiscordEmoji>>($"guilds/{guildId}/emojis", ct);
 
     public async Task<Stream> DownloadFileAsync(string url, CancellationToken ct = default)
     {
-        var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var cdnClient = new HttpClient();
+        var response = await cdnClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStreamAsync(ct);
     }
