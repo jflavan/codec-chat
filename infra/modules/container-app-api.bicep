@@ -22,6 +22,7 @@ param livekitServerUrl string = ''
 param livekitApiKeyKvUrl string = ''
 
 @description('Key Vault secret URL for the LiveKit API secret. Leave empty if voice is not enabled.')
+@secure()
 param livekitApiSecretKvUrl string = ''
 
 @description('Key Vault secret URL for the JWT signing secret (email/password auth).')
@@ -135,6 +136,16 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'jwt-secret'
           keyVaultUrl: jwtSecretKvUrl
           identity: 'system'
+        }
+        // Transitional: old revisions still reference these deleted mediasoup secrets.
+        // Keep them with dummy values until all old revisions are deactivated, then remove.
+        {
+          name: 'voice-turn-secret'
+          value: 'deprecated'
+        }
+        {
+          name: 'voice-sfu-internal-key'
+          value: 'deprecated'
         }
       ], livekitApiKeyKvUrl != '' ? [
         {
