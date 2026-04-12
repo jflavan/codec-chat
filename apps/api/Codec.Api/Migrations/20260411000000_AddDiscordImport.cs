@@ -76,6 +76,13 @@ namespace Codec.Api.Migrations
                 column: "ServerId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_DiscordImports_ServerId_ActiveImport",
+                table: "DiscordImports",
+                column: "ServerId",
+                unique: true,
+                filter: "\"Status\" IN ('Pending', 'InProgress')");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_DiscordImports_InitiatedByUserId",
                 table: "DiscordImports",
                 column: "InitiatedByUserId");

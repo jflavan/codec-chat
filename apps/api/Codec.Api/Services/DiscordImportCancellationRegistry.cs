@@ -4,38 +4,49 @@ namespace Codec.Api.Services;
 
 public class DiscordImportCancellationRegistry
 {
-    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _tokens = new();
-    private readonly ConcurrentDictionary<Guid, byte> _pendingCancellations = new();
+    private readonly Lock _lock = new();
+    private readonly Dictionary<Guid, CancellationTokenSource> _tokens = new();
+    private readonly HashSet<Guid> _pendingCancellations = new();
 
     public CancellationTokenSource Register(Guid importId, CancellationToken linkedToken)
     {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(linkedToken);
 
-        if (_pendingCancellations.TryRemove(importId, out _))
+        lock (_lock)
         {
-            cts.Cancel();
+            if (_pendingCancellations.Remove(importId))
+            {
+                cts.Cancel();
+            }
+
+            _tokens[importId] = cts;
         }
 
-        _tokens[importId] = cts;
         return cts;
     }
 
     public void Cancel(Guid importId)
     {
-        if (_tokens.TryRemove(importId, out var cts))
+        lock (_lock)
         {
-            cts.Cancel();
-        }
-        else
-        {
-            _pendingCancellations[importId] = 0;
+            if (_tokens.Remove(importId, out var cts))
+            {
+                cts.Cancel();
+            }
+            else
+            {
+                _pendingCancellations.Add(importId);
+            }
         }
     }
 
     public void Remove(Guid importId)
     {
-        _pendingCancellations.TryRemove(importId, out _);
-        if (_tokens.TryRemove(importId, out var cts))
-            cts.Dispose();
+        lock (_lock)
+        {
+            _pendingCancellations.Remove(importId);
+            if (_tokens.Remove(importId, out var cts))
+                cts.Dispose();
+        }
     }
 }

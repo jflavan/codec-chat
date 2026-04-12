@@ -46,17 +46,26 @@ public class DiscordRateLimitHandler : DelegatingHandler
             }
 
             // Wait for global rate limit token, retrying until a lease is acquired
+            RateLimitLease lease;
             while (true)
             {
-                using var lease = await _globalLimiter.AcquireAsync(1, cancellationToken);
+                lease = await _globalLimiter.AcquireAsync(1, cancellationToken);
                 if (lease.IsAcquired)
                     break;
+                lease.Dispose();
                 await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
             }
 
-            // Clone the request so retries work (content stream is consumed after first send)
-            using var clonedRequest = await CloneRequestAsync(request, cancellationToken);
-            response = await base.SendAsync(clonedRequest, cancellationToken);
+            try
+            {
+                // Clone the request so retries work (content stream is consumed after first send)
+                using var clonedRequest = await CloneRequestAsync(request, cancellationToken);
+                response = await base.SendAsync(clonedRequest, cancellationToken);
+            }
+            finally
+            {
+                lease.Dispose();
+            }
 
             // Track per-bucket limits from response headers
             TrackBucketLimits(response);
