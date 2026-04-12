@@ -8,20 +8,19 @@ namespace Codec.Api.Services;
 
 public class DiscordImportService
 {
+    private const int MaxParallelChannels = 4;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHubContext<ChatHub> _hub;
-    private readonly IFileStorageService _fileStorage;
     private readonly ILogger<DiscordImportService> _logger;
 
     public DiscordImportService(
         IServiceScopeFactory scopeFactory,
         IHubContext<ChatHub> hub,
-        IFileStorageService fileStorage,
         ILogger<DiscordImportService> logger)
     {
         _scopeFactory = scopeFactory;
         _hub = hub;
-        _fileStorage = fileStorage;
         _logger = logger;
     }
 
@@ -79,25 +78,50 @@ public class DiscordImportService
             import.ImportedMembers = memberCount;
             await db.SaveChangesAsync(ct);
 
-            // 7. Messages (per channel)
+            // 7. Messages (parallel across channels)
             var textChannelIds = channelMap.ToList();
             var totalMessages = 0;
-            for (var i = 0; i < textChannelIds.Count; i++)
-            {
-                var (discordChannelId, codecChannelId) = textChannelIds[i];
-                await group.SendAsync("ImportProgress", new
-                {
-                    stage = $"Messages ({i + 1}/{textChannelIds.Count})",
-                    completed = totalMessages,
-                    total = 0,
-                    percentComplete = 40f + ((float)i / textChannelIds.Count * 50f)
-                }, ct);
+            var completedChannels = 0;
+            var semaphore = new SemaphoreSlim(MaxParallelChannels);
+            var messageLock = new object();
 
-                var count = await ImportChannelMessagesAsync(
-                    db, discordClient, serverId, codecChannelId, discordChannelId,
-                    importId, import.LastSyncedAt, group, ct);
-                totalMessages += count;
-            }
+            var channelTasks = textChannelIds.Select(async kvp =>
+            {
+                var (discordChannelId, codecChannelId) = kvp;
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    // Each channel gets its own DbContext scope (EF contexts aren't thread-safe)
+                    using var channelScope = _scopeFactory.CreateScope();
+                    var channelDb = channelScope.ServiceProvider.GetRequiredService<CodecDbContext>();
+                    var channelDiscord = channelScope.ServiceProvider.GetRequiredService<DiscordApiClient>();
+                    channelDiscord.SetBotToken(botToken);
+
+                    var count = await ImportChannelMessagesAsync(
+                        channelDb, channelDiscord, serverId, codecChannelId, discordChannelId,
+                        importId, group, ct);
+
+                    lock (messageLock)
+                    {
+                        totalMessages += count;
+                        completedChannels++;
+                    }
+
+                    await group.SendAsync("ImportProgress", new
+                    {
+                        stage = $"Messages ({completedChannels}/{textChannelIds.Count})",
+                        completed = totalMessages,
+                        total = 0,
+                        percentComplete = 40f + ((float)completedChannels / textChannelIds.Count * 50f)
+                    }, ct);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            await Task.WhenAll(channelTasks);
             import.ImportedMessages = totalMessages;
             await db.SaveChangesAsync(ct);
 
@@ -321,21 +345,11 @@ public class DiscordImportService
             var ext = de.Animated == true ? "gif" : "png";
             var emojiUrl = $"https://cdn.discordapp.com/emojis/{de.Id}.{ext}";
             var contentType = ext == "gif" ? "image/gif" : "image/png";
-            string storedUrl;
-            try
-            {
-                using var stream = await discord.DownloadFileAsync(emojiUrl, ct);
-                storedUrl = await _fileStorage.UploadAsync("emojis", $"{serverId}/emoji_{de.Id}.{ext}", stream, contentType, ct);
-            }
-            catch
-            {
-                storedUrl = emojiUrl;
-            }
 
             var emoji = new CustomEmoji
             {
                 Id = Guid.NewGuid(), ServerId = serverId, Name = emojiName,
-                ImageUrl = storedUrl, ContentType = contentType, IsAnimated = de.Animated == true
+                ImageUrl = emojiUrl, ContentType = contentType, IsAnimated = de.Animated == true
             };
             db.CustomEmojis.Add(emoji);
             db.DiscordEntityMappings.Add(new DiscordEntityMapping
@@ -388,7 +402,7 @@ public class DiscordImportService
 
     private async Task<int> ImportChannelMessagesAsync(
         CodecDbContext db, DiscordApiClient discord, Guid serverId, Guid codecChannelId, string discordChannelId,
-        Guid importId, DateTimeOffset? lastSyncedAt, IClientProxy group, CancellationToken ct)
+        Guid importId, IClientProxy group, CancellationToken ct)
     {
         var count = 0;
         // Start from snowflake "0" to get the oldest messages first.
@@ -427,40 +441,20 @@ public class DiscordImportService
                     replyToMessageId = replyMapping?.CodecEntityId;
                 }
 
+                // Use Discord CDN URLs directly — no re-hosting needed
                 string? fileUrl = null, fileName = null, fileContentType = null, imageUrl = null;
                 long? fileSize = null;
                 if (dm.Attachments is { Count: > 0 })
                 {
                     var att = dm.Attachments[0];
-                    try
+                    if (att.ContentType?.StartsWith("image/") == true)
+                        imageUrl = att.Url;
+                    else
                     {
-                        using var stream = await discord.DownloadFileAsync(att.Url, ct);
-                        var storedPath = await _fileStorage.UploadAsync(
-                            "imports", $"{serverId}/{codecChannelId}/{att.Filename}", stream,
-                            att.ContentType ?? "application/octet-stream", ct);
-
-                        if (att.ContentType?.StartsWith("image/") == true)
-                            imageUrl = storedPath;
-                        else
-                        {
-                            fileUrl = storedPath;
-                            fileName = att.Filename;
-                            fileContentType = att.ContentType;
-                            fileSize = att.Size;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to download attachment {AttachmentId}", att.Id);
-                        if (att.ContentType?.StartsWith("image/") == true)
-                            imageUrl = att.Url;
-                        else
-                        {
-                            fileUrl = att.Url;
-                            fileName = att.Filename;
-                            fileContentType = att.ContentType;
-                            fileSize = att.Size;
-                        }
+                        fileUrl = att.Url;
+                        fileName = att.Filename;
+                        fileContentType = att.ContentType;
+                        fileSize = att.Size;
                     }
                 }
 
