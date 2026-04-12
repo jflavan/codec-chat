@@ -311,7 +311,8 @@ module voiceVm 'modules/voice-vm.bicep' = if (voiceVmEnabled) {
 }
 
 // Store the LiveKit API key in Key Vault so the API Container App can reference it securely.
-module livekitApiKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
+// Only create when the value is provided — empty secrets cause Container App provisioning failures.
+module livekitApiKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled && livekitApiKey != '') {
   name: 'livekit-api-key'
   params: {
     keyVaultName: keyVault.outputs.name
@@ -321,7 +322,7 @@ module livekitApiKeyKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
 }
 
 // Store the LiveKit API secret in Key Vault.
-module livekitApiSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled) {
+module livekitApiSecretKv 'modules/key-vault-secret.bicep' = if (voiceVmEnabled && livekitApiSecret != '') {
   name: 'livekit-api-secret'
   params: {
     keyVaultName: keyVault.outputs.name
@@ -390,8 +391,8 @@ module apiApp 'modules/container-app-api.bicep' = {
     customDomainName: apiCustomDomain
     managedCertificateId: apiCertId
     livekitServerUrl: voiceVm.?outputs.livekitUrl ?? ''
-    livekitApiKeyKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiKey' : ''
-    livekitApiSecretKvUrl: voiceVmEnabled ? '${keyVault.outputs.uri}secrets/LiveKit--ApiSecret' : ''
+    livekitApiKeyKvUrl: voiceVmEnabled && livekitApiKey != '' ? '${keyVault.outputs.uri}secrets/LiveKit--ApiKey' : ''
+    livekitApiSecretKvUrl: voiceVmEnabled && livekitApiSecret != '' ? '${keyVault.outputs.uri}secrets/LiveKit--ApiSecret' : ''
     jwtSecretKvUrl: '${keyVault.outputs.uri}secrets/Jwt--Secret'
     gitHubTokenKvUrl: gitHubToken != '' ? '${keyVault.outputs.uri}secrets/GitHub--Token' : ''
     redisConnectionStringKvUrl: redisCache.?outputs.connectionStringSecretUri ?? ''
