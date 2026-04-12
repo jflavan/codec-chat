@@ -41,6 +41,9 @@ public class CodecDbContext : DbContext
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<AdminAction> AdminActions => Set<AdminAction>();
     public DbSet<SystemAnnouncement> SystemAnnouncements => Set<SystemAnnouncement>();
+    public DbSet<DiscordImport> DiscordImports => Set<DiscordImport>();
+    public DbSet<DiscordUserMapping> DiscordUserMappings => Set<DiscordUserMapping>();
+    public DbSet<DiscordEntityMapping> DiscordEntityMappings => Set<DiscordEntityMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -599,5 +602,70 @@ public class CodecDbContext : DbContext
             e.Property(a => a.Title).HasMaxLength(200);
             e.Property(a => a.Body).HasMaxLength(5000);
         });
+
+        modelBuilder.Entity<DiscordImport>(e =>
+        {
+            e.HasOne(d => d.Server)
+                .WithMany()
+                .HasForeignKey(d => d.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(d => d.InitiatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.InitiatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(d => d.ServerId);
+            e.HasIndex(d => d.ServerId)
+                .HasFilter("\"Status\" IN ('Pending', 'InProgress', 'RehostingMedia')")
+                .IsUnique()
+                .HasDatabaseName("IX_DiscordImports_ServerId_ActiveImport");
+            e.Property(d => d.DiscordGuildId).HasMaxLength(20);
+            e.Property(d => d.ErrorMessage).HasMaxLength(2000);
+            e.Property(d => d.Status).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<DiscordUserMapping>(e =>
+        {
+            e.HasOne(m => m.Server)
+                .WithMany()
+                .HasForeignKey(m => m.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(m => m.CodecUser)
+                .WithMany()
+                .HasForeignKey(m => m.CodecUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(m => new { m.ServerId, m.DiscordUserId }).IsUnique();
+            e.Property(m => m.DiscordUserId).HasMaxLength(20);
+            e.Property(m => m.DiscordUsername).HasMaxLength(100);
+            e.Property(m => m.DiscordAvatarUrl).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<DiscordEntityMapping>(e =>
+        {
+            e.HasOne(m => m.DiscordImport)
+                .WithMany()
+                .HasForeignKey(m => m.DiscordImportId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(m => m.Server)
+                .WithMany()
+                .HasForeignKey(m => m.ServerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(m => new { m.ServerId, m.DiscordEntityId, m.EntityType })
+                .IsUnique()
+                .HasFilter("\"EntityType\" != 'PendingReply'");
+            e.Property(m => m.DiscordEntityId).HasMaxLength(20);
+            e.Property(m => m.EntityType).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.ImportedAuthorName)
+            .HasMaxLength(100);
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.ImportedAuthorAvatarUrl)
+            .HasMaxLength(512);
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.ImportedDiscordUserId)
+            .HasMaxLength(20);
     }
 }

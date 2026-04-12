@@ -9,6 +9,7 @@ import { ReportType } from '$lib/types/index.js';
 	import YouTubeEmbed from './YouTubeEmbed.svelte';
 	import ReplyReference from './ReplyReference.svelte';
 	import MessageActionBar from './MessageActionBar.svelte';
+	import ImportedAuthorBadge from './ImportedAuthorBadge.svelte';
 	import { getAuthStore } from '$lib/state/auth-store.svelte.js';
 	import { getUIStore } from '$lib/state/ui-store.svelte.js';
 	import { getServerStore } from '$lib/state/server-store.svelte.js';
@@ -161,11 +162,13 @@ import { ReportType } from '$lib/types/index.js';
 
 	{#if !grouped}
 		<div class="message-avatar-col">
-			{#if message.authorAvatarUrl}
+			{#if message.importedAuthorAvatarUrl}
+				<img class="message-avatar-img" src={message.importedAuthorAvatarUrl} alt="" />
+			{:else if message.authorAvatarUrl}
 				<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
 			{:else}
-				<div class="message-avatar" class:deleted-avatar={!message.authorUserId} aria-hidden="true">
-					{message.authorUserId ? message.authorName.slice(0, 1).toUpperCase() : '?'}
+				<div class="message-avatar" class:deleted-avatar={!message.authorUserId && !message.importedAuthorName} aria-hidden="true">
+					{message.importedAuthorName ? message.importedAuthorName.slice(0, 1).toUpperCase() : message.authorUserId ? message.authorName.slice(0, 1).toUpperCase() : '?'}
 				</div>
 			{/if}
 		</div>
@@ -177,7 +180,7 @@ import { ReportType } from '$lib/types/index.js';
 				/>
 			{/if}
 			<div class="message-header">
-				<strong class="message-author" class:deleted-user={!message.authorUserId}>{message.authorUserId ? message.authorName : 'Deleted User'}</strong>
+				<strong class="message-author" class:deleted-user={!message.authorUserId && !message.importedAuthorName}>{message.importedAuthorName ? message.importedAuthorName : message.authorUserId ? message.authorName : 'Deleted User'}</strong>{#if message.importedAuthorName}<ImportedAuthorBadge />{/if}
 				<time class="message-time">{formatTime(message.createdAt)}</time>
 				{#if message.editedAt}
 					<span class="edited-label">(edited)</span>

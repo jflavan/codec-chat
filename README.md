@@ -84,7 +84,7 @@ For full setup details, see [Development Setup](docs/DEV_SETUP.md).
 - **User profiles** — nicknames, custom status messages, custom avatars with server-specific overrides, friends system with real-time notifications
 - **Moderation** — user banning with message purge, content reporting, custom roles with 21 granular permissions, audit log with 90-day retention
 - **Admin panel** — standalone admin site for platform-wide management: live dashboard, user/server management, moderation queue, system announcements, audit log
-- **Integrations** — outgoing webhooks with HMAC-SHA256 signing, web push notifications
+- **Integrations** — outgoing webhooks with HMAC-SHA256 signing, web push notifications, Discord server import with full message history migration
 - **PWA** — installable on desktop and mobile with offline fallback, app shortcuts, and share target
 - **Authentication** — Google Sign-In, email/password, GitHub OAuth, Discord OAuth, and SAML 2.0 SSO — all backed by API-issued JWTs with rotating refresh tokens
 - **Account management** — account deletion with data anonymization, account linking across providers, email verification
@@ -150,6 +150,7 @@ Codec is in alpha — your feedback matters! Use the [Bug Report template](https
 - [User Settings](docs/USER_SETTINGS.md) - User settings feature specification
 - [Message Replies](docs/REPLIES.md) - Message replies feature specification
 - [Voice Channels](docs/VOICE.md) - Voice channels feature specification, SFU architecture, and infrastructure
+- [Discord Import](docs/DISCORD_IMPORT.md) - Discord server import wizard, pipeline, identity claiming, and API
 - [Data Layer](docs/DATA.md) - Database schema and migrations
 - [Testing](docs/TESTING.md) - Testing strategy, test suites, coverage, and how to add tests
 

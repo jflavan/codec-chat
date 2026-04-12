@@ -250,6 +250,34 @@ export type CallMissedEvent = {
 	dmChannelId: string;
 };
 
+export type ImportProgressEvent = {
+	stage: string;
+	completed: number;
+	total: number;
+	percentComplete: number;
+};
+
+export type ImportCompletedEvent = {
+	importedChannels: number;
+	importedMessages: number;
+	importedMembers: number;
+};
+
+export type ImportRehostCompletedEvent = {
+	importedChannels: number;
+	importedMessages: number;
+	importedMembers: number;
+};
+
+export type ImportFailedEvent = {
+	errorMessage: string;
+};
+
+export type ImportMessagesAvailableEvent = {
+	channelId: string;
+	count: number;
+};
+
 export type SignalRCallbacks = {
 	onMessage: (msg: Message) => void;
 	onUserTyping: (channelId: string, displayName: string) => void;
@@ -308,6 +336,11 @@ export type SignalRCallbacks = {
 	onMessageUnpinned?: (event: MessageUnpinnedEvent) => void;
 	onChannelOverrideUpdated?: (event: ChannelOverrideUpdatedEvent) => void;
 	onAccountDeleted?: () => void;
+	onImportProgress?: (event: ImportProgressEvent) => void;
+	onImportCompleted?: (event: ImportCompletedEvent) => void;
+	onImportRehostCompleted?: (event: ImportRehostCompletedEvent) => void;
+	onImportFailed?: (event: ImportFailedEvent) => void;
+	onImportMessagesAvailable?: (event: ImportMessagesAvailableEvent) => void;
 	onReconnecting?: () => void;
 	onReconnected?: () => void;
 	onClose?: (error?: Error) => void;
@@ -524,6 +557,21 @@ export class ChatHubService {
 		}
 		if (callbacks.onAccountDeleted) {
 			connection.on('AccountDeleted', callbacks.onAccountDeleted);
+		}
+		if (callbacks.onImportProgress) {
+			connection.on('ImportProgress', callbacks.onImportProgress);
+		}
+		if (callbacks.onImportCompleted) {
+			connection.on('ImportCompleted', callbacks.onImportCompleted);
+		}
+		if (callbacks.onImportRehostCompleted) {
+			connection.on('ImportRehostCompleted', callbacks.onImportRehostCompleted);
+		}
+		if (callbacks.onImportFailed) {
+			connection.on('ImportFailed', callbacks.onImportFailed);
+		}
+		if (callbacks.onImportMessagesAvailable) {
+			connection.on('ImportMessagesAvailable', callbacks.onImportMessagesAvailable);
 		}
 
 		if (callbacks.onReconnecting) {

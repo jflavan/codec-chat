@@ -214,6 +214,17 @@ import { ReportType } from '$lib/types/index.js';
 				{/if}
 			</div>
 
+			<button
+				class="server-icon import-discord"
+				aria-label="Import from Discord"
+				title="Import from Discord"
+				onclick={() => ui.openDiscordWizard('create')}
+			>
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+					<path d="M10 2a1 1 0 0 1 .7.3l6 6a1 1 0 0 1-.7 1.7H13v4a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-4H4a1 1 0 0 1-.7-1.7l6-6A1 1 0 0 1 10 2z"/>
+				</svg>
+			</button>
+
 			<div class="server-action-wrapper" bind:this={joinWrapperEl}>
 				<button
 					class="server-icon join-by-code"
@@ -424,6 +435,17 @@ import { ReportType } from '$lib/types/index.js';
 
 	.add-server:hover {
 		background: var(--success);
+		color: var(--bg-tertiary);
+		border-radius: 16px;
+	}
+
+	.import-discord {
+		background: var(--bg-primary);
+		color: var(--accent);
+	}
+
+	.import-discord:hover {
+		background: var(--accent);
 		color: var(--bg-tertiary);
 		border-radius: 16px;
 	}

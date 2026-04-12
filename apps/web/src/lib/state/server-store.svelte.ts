@@ -13,7 +13,9 @@ import type {
 	WebhookDelivery,
 	BannedMember,
 	Channel,
-	PresenceStatus
+	PresenceStatus,
+	DiscordImport,
+	DiscordUserMapping
 } from '$lib/types/index.js';
 import { Permission, hasPermission } from '$lib/types/index.js';
 import type { ApiClient } from '$lib/api/client.js';
@@ -70,6 +72,12 @@ export class ServerStore {
 	isCreatingWebhook = $state(false);
 	selectedWebhookId = $state<string | null>(null);
 	isLoadingDeliveries = $state(false);
+
+	/* ───── discord import ───── */
+	discordImport = $state<DiscordImport | null>(null);
+	discordUserMappings = $state<DiscordUserMapping[]>([]);
+	isLoadingImport = $state(false);
+	isStartingImport = $state(false);
 
 	/* ───── loading flags ───── */
 	isLoadingServers = $state(false);
@@ -128,6 +136,10 @@ export class ServerStore {
 
 	readonly canManageEmojis = $derived(
 		this.auth.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageEmojis)
+	);
+
+	readonly canManageServer = $derived(
+		this.auth.isGlobalAdmin || hasPermission(this.currentServerPermissions, Permission.ManageServer)
 	);
 
 	readonly canViewAuditLog = $derived(
@@ -1026,6 +1038,75 @@ export class ServerStore {
 		}
 	}
 
+	/* ═══════════════════ Discord Import ═══════════════════ */
+
+	async loadDiscordImport(serverId: string): Promise<void> {
+		if (!this.auth.idToken) return;
+		this.isLoadingImport = true;
+		try {
+			this.discordImport = await this.api.getDiscordImportStatus(this.auth.idToken, serverId);
+		} catch {
+			this.discordImport = null;
+		} finally {
+			this.isLoadingImport = false;
+		}
+	}
+
+	async startDiscordImport(serverId: string, botToken: string, guildId: string): Promise<void> {
+		if (!this.auth.idToken) return;
+		this.isStartingImport = true;
+		try {
+			await this.api.startDiscordImport(this.auth.idToken, serverId, botToken, guildId);
+			await this.loadDiscordImport(serverId);
+		} catch (e) {
+			this.ui.setError(e);
+		} finally {
+			this.isStartingImport = false;
+		}
+	}
+
+	async resyncDiscordImport(serverId: string, botToken: string, guildId: string): Promise<void> {
+		if (!this.auth.idToken) return;
+		this.isStartingImport = true;
+		try {
+			await this.api.resyncDiscordImport(this.auth.idToken, serverId, botToken, guildId);
+			await this.loadDiscordImport(serverId);
+		} catch (e) {
+			this.ui.setError(e);
+		} finally {
+			this.isStartingImport = false;
+		}
+	}
+
+	async cancelDiscordImport(serverId: string): Promise<void> {
+		if (!this.auth.idToken) return;
+		try {
+			await this.api.cancelDiscordImport(this.auth.idToken, serverId);
+			await this.loadDiscordImport(serverId);
+		} catch (e) {
+			this.ui.setError(e);
+		}
+	}
+
+	async loadDiscordUserMappings(serverId: string): Promise<void> {
+		if (!this.auth.idToken) return;
+		try {
+			this.discordUserMappings = await this.api.getDiscordUserMappings(this.auth.idToken, serverId);
+		} catch {
+			this.discordUserMappings = [];
+		}
+	}
+
+	async claimDiscordIdentity(serverId: string, discordUserId: string): Promise<void> {
+		if (!this.auth.idToken) return;
+		try {
+			await this.api.claimDiscordIdentity(this.auth.idToken, serverId, discordUserId);
+			await this.loadDiscordUserMappings(serverId);
+		} catch (e) {
+			this.ui.setError(e);
+		}
+	}
+
 	/* ═══════════════════ Reset ═══════════════════ */
 
 	reset(): void {
@@ -1047,6 +1128,10 @@ export class ServerStore {
 		this.isCreatingWebhook = false;
 		this.selectedWebhookId = null;
 		this.isLoadingDeliveries = false;
+		this.discordImport = null;
+		this.discordUserMappings = [];
+		this.isLoadingImport = false;
+		this.isStartingImport = false;
 		this.isLoadingServers = false;
 		this.isLoadingMembers = false;
 		this.isLoadingInvites = false;

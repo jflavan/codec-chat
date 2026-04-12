@@ -68,6 +68,14 @@ dotnet ef database update                  # Apply manually
 dotnet ef migrations script                # View SQL
 ```
 
+**CRITICAL: Every migration requires THREE files.** If `dotnet ef` is unavailable (common in non-interactive shells), you must create all three manually:
+
+1. **`<Timestamp>_<Name>.cs`** — the `Up()` and `Down()` methods with schema changes
+2. **`<Timestamp>_<Name>.Designer.cs`** — a full model snapshot at the time of this migration, annotated with `[DbContext(typeof(CodecDbContext))]` and `[Migration("<Timestamp>_<Name>")]`
+3. **`CodecDbContextModelSnapshot.cs`** — updated to reflect the current model state (must match the Designer.cs snapshot)
+
+Without the Designer.cs file, EF Core will not recognize the migration, `db.Database.Migrate()` will skip it, and integration tests will fail with `PendingModelChangesWarning`. Copy the previous migration's Designer.cs as a starting point, update the class name, migration attribute, and add/modify entity definitions to match your changes. The ModelSnapshot must also be updated with the same entity changes.
+
 ## Architecture
 
 ### Repository Layout
@@ -79,7 +87,7 @@ apps/
       Models/        # EF Core entities + request DTOs
       Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
       Hubs/          # ChatHub (SignalR)
-      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, file storage
+      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, DiscordImportService, DiscordApiClient, DiscordPermissionMapper, DiscordRateLimitHandler, DiscordImportWorker, DiscordImportCancellationRegistry, DiscordMediaRehostService, file storage
       Filters/       # ValidateRecaptchaAttribute (action filter)
       Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
@@ -98,6 +106,7 @@ apps/
         server-settings/  # ServerSettings, ServerChannels, ServerRoles, ServerInvites, ServerAuditLog, ServerEmojis, ServerMembers, ServerBans, ServerWebhooks, ServerSettingsSidebar, ServerSettingsModal
         report/        # ReportModal (user/message/server abuse reports)
         announcements/ # AnnouncementBanner (dismissible site-wide announcements)
+        discord-import/ # Discord import wizard (4-step flow)
     routes/
       +layout.svelte  # Root layout
       +page.svelte    # Root shell; creates stores, wires cross-store callbacks, sets context
@@ -187,7 +196,7 @@ PUBLIC_LIVEKIT_URL=ws://localhost:7880
 
 ## Required Updates When Changing Code
 
-- **Data model changes:** create a new EF Core migration and update `SeedData` if needed
+- **Data model changes:** create a new EF Core migration (all three files: migration, Designer.cs, and updated ModelSnapshot.cs) and update `SeedData` if needed
 - **Auth changes:** update `docs/AUTH.md`
 - **User-visible behavior changes:** update `docs/ARCHITECTURE.md`, `docs/FEATURES.md`, and `PLAN.md`
 - **Public env vars:** keep `apps/web/.env.example` in sync

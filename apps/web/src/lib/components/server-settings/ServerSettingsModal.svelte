@@ -10,6 +10,7 @@
 	import ServerWebhooks from './ServerWebhooks.svelte';
 	import ServerAuditLog from './ServerAuditLog.svelte';
 	import ServerBans from './ServerBans.svelte';
+	import ServerDiscordImport from './ServerDiscordImport.svelte';
 
 	const ui = getUIStore();
 
@@ -78,6 +79,8 @@
 				<ServerBans />
 			{:else if ui.serverSettingsCategory === 'audit-log'}
 				<ServerAuditLog />
+			{:else if ui.serverSettingsCategory === 'discord-import'}
+				<ServerDiscordImport />
 			{:else}
 				<ServerSettings />
 			{/if}

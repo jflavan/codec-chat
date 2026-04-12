@@ -386,6 +386,57 @@ export async function setupSignalR(
 			onAccountDeleted: () => {
 				auth.signOut();
 			},
+
+			/* ─── Discord import ─── */
+
+			onImportProgress: (event) => {
+				if (servers.discordImport) {
+					const currentStatus = servers.discordImport.status;
+					servers.discordImport = {
+						...servers.discordImport,
+						status: currentStatus === 'RehostingMedia' ? 'RehostingMedia' : 'InProgress',
+						stage: event.stage,
+						percentComplete: event.percentComplete,
+					};
+				}
+			},
+			onImportCompleted: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'RehostingMedia',
+						importedChannels: event.importedChannels,
+						importedMessages: event.importedMessages,
+						importedMembers: event.importedMembers,
+					};
+				}
+			},
+			onImportRehostCompleted: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'Completed',
+						importedChannels: event.importedChannels,
+						importedMessages: event.importedMessages,
+						importedMembers: event.importedMembers,
+					};
+				}
+			},
+			onImportFailed: (event) => {
+				if (servers.discordImport) {
+					servers.discordImport = {
+						...servers.discordImport,
+						status: 'Failed',
+						errorMessage: event.errorMessage
+					};
+				}
+			},
+			onImportMessagesAvailable: (event) => {
+				// Reload messages if the user is viewing the channel that just got new imports
+				if (channels.selectedChannelId === event.channelId) {
+					messages.loadMessages(event.channelId);
+				}
+			},
 		}
 	);
 

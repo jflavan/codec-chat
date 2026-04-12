@@ -131,6 +131,12 @@ src/
 │   │   │   ├── ServerMembers.svelte       # Members tab — member role management (promote/demote, Owner/Admin)
 │   │   │   ├── ServerBans.svelte          # Bans tab — ban/unban members with reason
 │   │   │   └── ServerWebhooks.svelte      # Webhooks tab — webhook CRUD with event type selection
+│   │   ├── discord-import/
+│   │   │   ├── DiscordImportWizard.svelte  # 4-step import wizard container
+│   │   │   ├── WizardStepBotSetup.svelte   # Step 2: Discord bot creation instructions
+│   │   │   ├── WizardStepConnect.svelte     # Step 3: Bot token + guild ID entry
+│   │   │   ├── WizardStepDestination.svelte # Step 1: Choose target server
+│   │   │   └── WizardStepProgress.svelte    # Step 4: Real-time import progress
 │   │   ├── report/
 │   │   │   └── ReportModal.svelte       # User/message/server report submission dialog
 │   │   ├── announcements/
@@ -229,6 +235,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
   - RESTful controller-based API design (`[ApiController]`)
   - SignalR hub for real-time messaging and typing indicators
   - Shared `UserService` for cross-cutting user resolution
+  - `DiscordImportService`, `DiscordApiClient`, `DiscordPermissionMapper`, `DiscordRateLimitHandler`, `DiscordImportWorker`, `DiscordImportCancellationRegistry`, `DiscordMediaRehostService` for Discord server import (newest-first message pagination with `PendingReply` backfill, 4 parallel channels, global `TokenBucketRateLimiter` at 50 req/sec, live `ImportMessagesAvailable` channel events)
   - Automatic migrations (development)
   - CORS support for local development
 
@@ -490,6 +497,16 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `PATCH /servers/{serverId}/webhooks/{webhookId}` - Update a webhook configuration
 - `DELETE /servers/{serverId}/webhooks/{webhookId}` - Delete a webhook and its delivery logs
 
+#### Discord Import
+- `POST /servers/{serverId}/discord-import` - Start a Discord server import (requires ManageServer permission; validates bot token and guild ID; returns import ID)
+- `GET /servers/{serverId}/discord-import` - Get latest import status for a server (requires ManageServer permission; returns status, counts, timestamps)
+- `POST /servers/{serverId}/discord-import/resync` - Re-sync messages since last completed import (requires ManageServer permission)
+- `DELETE /servers/{serverId}/discord-import` - Cancel an in-progress import (requires ManageServer permission)
+- `GET /servers/{serverId}/discord-import/mappings` - List Discord-to-Codec user mappings (requires ManageServer permission)
+- `POST /servers/{serverId}/discord-import/claim` - Claim a Discord identity and link imported messages to Codec account (requires server membership)
+
+After the text import completes, a media re-hosting phase downloads imported emoji and message image attachments from Discord's CDN and re-uploads them to Codec's own storage (Local or AzureBlob). This ensures media remains accessible after Discord CDN URLs expire. Images over 10MB are resized (max 4096px) and compressed. Emojis over 512KB are compressed. Non-image files are skipped.
+
 #### Push Notifications
 - `GET /push-subscriptions/vapid-key` - Get VAPID public key for Web Push API (public, no auth)
 - `POST /push-subscriptions` - Register or re-activate a push subscription (endpoint, p256dh, auth keys)
@@ -628,6 +645,11 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `CallMissed` | `{ callId }` | Call timed out without being answered (sent to caller's user group) |
 | `BannedFromServer` | `{ serverId, serverName, reason }` | User was banned from a server (sent to banned user's user group) |
 | `MemberBanned` | `{ serverId, userId }` | A member was banned (sent to server group; triggers member list refresh) |
+| `ImportProgress` | `{ stage, completed, total, percentComplete }` | Discord import progress update for each stage (sent to server group) |
+| `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers }` | Discord import milestone fired before media re-hosting begins (sent to server group) |
+| `ImportFailed` | `{ errorMessage }` | Discord import failed with error details (sent to server group) |
+| `ImportMessagesAvailable` | `{ channelId, count }` | New batch of imported messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
+| `ImportRehostCompleted` | `{ importedChannels, importedMessages, importedMembers }` | Discord media re-hosting finished (sent to server group); frontend updates import status |
 
 ### Request/Response Format
 All endpoints use JSON for request bodies and responses.
@@ -940,6 +962,22 @@ DirectMessage ─┘
 #### SystemAnnouncement
 - Platform-wide announcement displayed to all users
 - Fields: Id, Title, Body, IsActive, ExpiresAt (nullable), CreatedByUserId (FK → User), CreatedAt
+
+#### DiscordImport
+- Record of a Discord server import operation
+- Fields: Id, ServerId (FK → Server), DiscordGuildId, EncryptedBotToken (nullable, cleared after import), Status (Pending/InProgress/Completed/Failed/Cancelled/RehostingMedia), StartedAt, CompletedAt, ErrorMessage, ImportedChannels, ImportedMessages, ImportedMembers, LastSyncedAt, InitiatedByUserId (FK → User), CreatedAt
+- Bot token encrypted at rest via ASP.NET Core Data Protection
+
+#### DiscordUserMapping
+- Maps a Discord user to a Codec user within an imported server
+- Fields: Id, ServerId (FK → Server), DiscordUserId, DiscordUsername, DiscordAvatarUrl (nullable), CodecUserId (nullable FK → User), ClaimedAt (nullable), CreatedAt
+- `CodecUserId` is set when a Codec user claims the Discord identity
+
+#### DiscordEntityMapping
+- Maps a Discord entity ID to a Codec entity ID for cross-referencing during import
+- Fields: Id, DiscordImportId (FK → DiscordImport), ServerId (FK → Server), DiscordEntityId, EntityType (Role/Category/Channel/Message/Emoji/PinnedMessage/PendingReply), CodecEntityId
+- Used during re-sync to match existing entities and during message import to resolve reply chains
+- `PendingReply` entries track replies to not-yet-imported messages (due to newest-first pagination) and are resolved in a final backfill pass per channel
 
 ## Configuration
 

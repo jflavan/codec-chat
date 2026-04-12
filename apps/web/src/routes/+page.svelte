@@ -39,6 +39,7 @@
 	import NicknameModal from '$lib/components/NicknameModal.svelte';
 	import LinkAccountModal from '$lib/components/LinkAccountModal.svelte';
 	import VerificationGate from '$lib/components/VerificationGate.svelte';
+	import DiscordImportWizard from '$lib/components/discord-import/DiscordImportWizard.svelte';
 
 	const apiBaseUrl = env.PUBLIC_API_BASE_URL ?? '';
 	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
@@ -259,6 +260,10 @@
 
 {#if auth.needsLinking}
 	<LinkAccountModal />
+{/if}
+
+{#if ui.discordWizardOpen}
+	<DiscordImportWizard {api} />
 {/if}
 {/if}
 

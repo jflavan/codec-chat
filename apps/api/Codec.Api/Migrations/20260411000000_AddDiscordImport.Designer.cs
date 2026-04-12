@@ -3,6 +3,7 @@ using System;
 using Codec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Codec.Api.Migrations
 {
     [DbContext(typeof(CodecDbContext))]
-    partial class CodecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260411000000_AddDiscordImport")]
+    partial class AddDiscordImport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -273,64 +275,6 @@ namespace Codec.Api.Migrations
                     b.ToTable("CustomEmojis");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.DirectMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AuthorName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("AuthorUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DmChannelId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("EditedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FileContentType")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .HasColumnType("text");
-
-                    b.Property<long?>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("FileUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("text");
-
-                    b.Property<int>("MessageType")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("ReplyToDirectMessageId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AuthorUserId");
-
-                    b.HasIndex("DmChannelId");
-
-                    b.HasIndex("ReplyToDirectMessageId");
-
-                    b.ToTable("DirectMessages");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.DiscordEntityMapping", b =>
                 {
                     b.Property<Guid>("Id")
@@ -360,8 +304,7 @@ namespace Codec.Api.Migrations
                     b.HasIndex("DiscordImportId");
 
                     b.HasIndex("ServerId", "DiscordEntityId", "EntityType")
-                        .IsUnique()
-                        .HasFilter("\"EntityType\" != 'PendingReply'");
+                        .IsUnique();
 
                     b.ToTable("DiscordEntityMappings");
                 });
@@ -419,10 +362,12 @@ namespace Codec.Api.Migrations
 
                     b.HasIndex("InitiatedByUserId");
 
+                    b.HasIndex("ServerId");
+
                     b.HasIndex("ServerId")
                         .IsUnique()
                         .HasDatabaseName("IX_DiscordImports_ServerId_ActiveImport")
-                        .HasFilter("\"Status\" IN ('Pending', 'InProgress', 'RehostingMedia')");
+                        .HasFilter("\"Status\" IN ('Pending', 'InProgress')");
 
                     b.ToTable("DiscordImports");
                 });
@@ -467,6 +412,64 @@ namespace Codec.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("DiscordUserMappings");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.DirectMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DmChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileContentType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileName")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int>("MessageType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ReplyToDirectMessageId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("DmChannelId");
+
+                    b.HasIndex("ReplyToDirectMessageId");
+
+                    b.ToTable("DirectMessages");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.DmChannel", b =>
@@ -1343,8 +1346,21 @@ namespace Codec.Api.Migrations
                     b.Property<DateTimeOffset>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ParticipantId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProducerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ScreenProducerId")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("VideoProducerId")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -1585,30 +1601,6 @@ namespace Codec.Api.Migrations
                     b.Navigation("UploadedByUser");
                 });
 
-            modelBuilder.Entity("Codec.Api.Models.DirectMessage", b =>
-                {
-                    b.HasOne("Codec.Api.Models.User", "AuthorUser")
-                        .WithMany("DirectMessages")
-                        .HasForeignKey("AuthorUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Codec.Api.Models.DmChannel", "DmChannel")
-                        .WithMany("Messages")
-                        .HasForeignKey("DmChannelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Codec.Api.Models.DirectMessage", null)
-                        .WithMany()
-                        .HasForeignKey("ReplyToDirectMessageId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("AuthorUser");
-
-                    b.Navigation("DmChannel");
-                });
-
             modelBuilder.Entity("Codec.Api.Models.DiscordEntityMapping", b =>
                 {
                     b.HasOne("Codec.Api.Models.DiscordImport", "DiscordImport")
@@ -1663,6 +1655,30 @@ namespace Codec.Api.Migrations
                     b.Navigation("CodecUser");
 
                     b.Navigation("Server");
+                });
+
+            modelBuilder.Entity("Codec.Api.Models.DirectMessage", b =>
+                {
+                    b.HasOne("Codec.Api.Models.User", "AuthorUser")
+                        .WithMany("DirectMessages")
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Codec.Api.Models.DmChannel", "DmChannel")
+                        .WithMany("Messages")
+                        .HasForeignKey("DmChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Codec.Api.Models.DirectMessage", null)
+                        .WithMany()
+                        .HasForeignKey("ReplyToDirectMessageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AuthorUser");
+
+                    b.Navigation("DmChannel");
                 });
 
             modelBuilder.Entity("Codec.Api.Models.DmChannelMember", b =>

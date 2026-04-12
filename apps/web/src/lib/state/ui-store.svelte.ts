@@ -33,7 +33,7 @@ export class UIStore {
 	settingsCategory = $state<'profile' | 'account' | 'voice-audio' | 'appearance' | 'notifications'>('profile');
 	bugReportOpen = $state(false);
 	serverSettingsOpen = $state(false);
-	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log'>('general');
+	serverSettingsCategory = $state<'general' | 'channels' | 'invites' | 'webhooks' | 'emojis' | 'roles' | 'members' | 'bans' | 'audit-log' | 'discord-import'>('general');
 	reportModal = $state<{ reportType: ReportType; targetId: string; targetName: string } | null>(null);
 
 	/* ───── mobile ───── */
@@ -63,6 +63,11 @@ export class UIStore {
 
 	/* ───── presence (shared across stores) ───── */
 	userPresence = new SvelteMap<string, PresenceStatus>();
+
+	/* ───── discord import wizard ───── */
+	discordWizardOpen = $state(false);
+	discordWizardMode = $state<'create' | 'existing'>('create');
+	discordWizardServerId = $state<string | null>(null);
 
 	/* ───── reaction tracking (shared by MessageStore and DmStore) ───── */
 	pendingReactionKeys = $state<Set<string>>(new Set());
@@ -115,6 +120,16 @@ export class UIStore {
 
 	closeReportModal(): void {
 		this.reportModal = null;
+	}
+
+	openDiscordWizard(mode: 'create' | 'existing' = 'create', serverId?: string): void {
+		this.discordWizardMode = mode;
+		this.discordWizardServerId = serverId ?? null;
+		this.discordWizardOpen = true;
+	}
+
+	closeDiscordWizard(): void {
+		this.discordWizardOpen = false;
 	}
 
 	dismissAlphaNotification(): void {
