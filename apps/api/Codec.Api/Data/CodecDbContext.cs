@@ -614,6 +614,10 @@ public class CodecDbContext : DbContext
                 .HasForeignKey(d => d.InitiatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(d => d.ServerId);
+            e.HasIndex(d => d.ServerId)
+                .HasFilter("\"Status\" IN ('Pending', 'InProgress')")
+                .IsUnique()
+                .HasDatabaseName("IX_DiscordImports_ServerId_ActiveImport");
             e.Property(d => d.DiscordGuildId).HasMaxLength(20);
             e.Property(d => d.ErrorMessage).HasMaxLength(2000);
             e.Property(d => d.Status).HasConversion<string>();

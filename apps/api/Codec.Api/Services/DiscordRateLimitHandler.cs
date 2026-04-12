@@ -7,7 +7,7 @@ namespace Codec.Api.Services;
 /// <summary>
 /// DelegatingHandler that respects Discord's rate limit system:
 /// - Global rate limit: 50 requests/second across all endpoints
-/// - Per-route limits: tracked via X-RateLimit-Bucket, proactively waits when remaining hits 0
+/// - Per-route limits: tracked via X-RateLimit-Bucket, proactively delays when remaining hits 0
 /// - 429 responses: retries after Retry-After delay (up to 5 retries)
 /// </summary>
 public class DiscordRateLimitHandler : DelegatingHandler
@@ -34,6 +34,17 @@ public class DiscordRateLimitHandler : DelegatingHandler
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
+            // Wait for per-bucket reset if this bucket was exhausted
+            var bucketKey = $"{request.Method}:{request.RequestUri?.AbsolutePath}";
+            if (_bucketResetTimes.TryGetValue(bucketKey, out var resetTime))
+            {
+                var delay = resetTime - DateTimeOffset.UtcNow;
+                if (delay > TimeSpan.Zero)
+                    await Task.Delay(delay, cancellationToken);
+                // Don't remove — expired entries are harmless (delay <= 0 skips them),
+                // and removing can evict a newer reset written by a concurrent request.
+            }
+
             // Wait for global rate limit token, retrying until a lease is acquired
             while (true)
             {
@@ -57,6 +68,7 @@ public class DiscordRateLimitHandler : DelegatingHandler
                 break;
 
             var retryAfter = ParseRetryAfter(response);
+            response.Dispose();
             if (retryAfter > TimeSpan.Zero)
                 await Task.Delay(retryAfter, cancellationToken);
         }
@@ -100,7 +112,12 @@ public class DiscordRateLimitHandler : DelegatingHandler
             if (resetStr is not null &&
                 double.TryParse(resetStr, CultureInfo.InvariantCulture, out var resetAfterSecs))
             {
-                _bucketResetTimes[bucket] = DateTimeOffset.UtcNow.AddSeconds(resetAfterSecs);
+                // Key by request path so SendAsync can look it up before the next call
+                if (response.RequestMessage?.RequestUri?.AbsolutePath is { } path)
+                {
+                    var key = $"{response.RequestMessage.Method}:{path}";
+                    _bucketResetTimes[key] = DateTimeOffset.UtcNow.AddSeconds(resetAfterSecs);
+                }
             }
         }
     }

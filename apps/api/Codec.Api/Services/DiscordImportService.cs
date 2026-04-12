@@ -151,7 +151,14 @@ public class DiscordImportService
             _logger.LogInformation("Discord import {ImportId} was cancelled", importId);
             import.Status = DiscordImportStatus.Cancelled;
             import.EncryptedBotToken = null;
-            await db.SaveChangesAsync(CancellationToken.None);
+            try
+            {
+                await db.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception saveEx)
+            {
+                _logger.LogError(saveEx, "Failed to persist cancellation status for import {ImportId}", importId);
+            }
 
             var group = _hub.Clients.Group($"server-{import.ServerId}");
             await group.SendAsync("ImportFailed", new { errorMessage = "Import was cancelled." }, CancellationToken.None);
@@ -162,7 +169,14 @@ public class DiscordImportService
             import.Status = DiscordImportStatus.Failed;
             import.ErrorMessage = "Import failed unexpectedly. Check server logs for details.";
             import.EncryptedBotToken = null;
-            await db.SaveChangesAsync(CancellationToken.None);
+            try
+            {
+                await db.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception saveEx)
+            {
+                _logger.LogError(saveEx, "Failed to persist failure status for import {ImportId}", importId);
+            }
 
             var group = _hub.Clients.Group($"server-{import.ServerId}");
             await group.SendAsync("ImportFailed", new { errorMessage = "Import failed. An administrator can check the import status for details." }, CancellationToken.None);

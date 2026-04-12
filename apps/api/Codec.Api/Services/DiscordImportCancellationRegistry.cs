@@ -25,7 +25,6 @@ public class DiscordImportCancellationRegistry
         if (_tokens.TryRemove(importId, out var cts))
         {
             cts.Cancel();
-            cts.Dispose();
         }
         else
         {

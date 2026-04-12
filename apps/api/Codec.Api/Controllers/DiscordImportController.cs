@@ -54,12 +54,6 @@ public class DiscordImportController : ControllerBase
 
         await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
-        var existing = await _db.DiscordImports
-            .FirstOrDefaultAsync(d => d.ServerId == serverId &&
-                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress));
-        if (existing is not null)
-            return Conflict(new { error = "An import is already in progress for this server." });
-
         _discordClient.SetBotToken(request.BotToken);
         DiscordGuild guild;
         try
@@ -83,7 +77,14 @@ public class DiscordImportController : ControllerBase
         };
 
         _db.DiscordImports.Add(import);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { error = "An import is already in progress for this server." });
+        }
 
         await _importQueue.Writer.WriteAsync(import.Id);
 
@@ -162,7 +163,14 @@ public class DiscordImportController : ControllerBase
         };
 
         _db.DiscordImports.Add(import);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { error = "An import is already in progress for this server." });
+        }
 
         await _importQueue.Writer.WriteAsync(import.Id);
 
