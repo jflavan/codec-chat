@@ -5,6 +5,7 @@ namespace Codec.Api.Models;
 public class StartDiscordImportRequest
 {
     [Required]
+    [MaxLength(200)]
     public string BotToken { get; set; } = string.Empty;
 
     [Required]

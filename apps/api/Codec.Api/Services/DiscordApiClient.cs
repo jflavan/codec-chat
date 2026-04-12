@@ -70,16 +70,6 @@ public class DiscordApiClient
     public Task<List<DiscordEmoji>> GetGuildEmojisAsync(string guildId, CancellationToken ct = default)
         => SendAsync<List<DiscordEmoji>>($"guilds/{guildId}/emojis", ct);
 
-    public async Task<Stream> DownloadFileAsync(string url, CancellationToken ct = default)
-    {
-        using var cdnClient = new HttpClient();
-        using var response = await cdnClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-        var memoryStream = new MemoryStream();
-        await response.Content.CopyToAsync(memoryStream, ct);
-        memoryStream.Position = 0;
-        return memoryStream;
-    }
 }
 
 // Discord API response DTOs

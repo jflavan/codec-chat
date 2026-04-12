@@ -199,11 +199,18 @@ public class DiscordImportController : ControllerBase
         if (import is null)
             return NotFound(new { error = "No in-progress import to cancel." });
 
-        import.Status = DiscordImportStatus.Cancelled;
-        import.EncryptedBotToken = null;
-        await _db.SaveChangesAsync();
-
+        // Cancel the token first so the worker observes cancellation before we touch the DB.
+        // The worker's catch(OperationCanceledException) block handles the status transition.
         _cancellationRegistry.Cancel(import.Id);
+
+        // Use atomic update with status filter to avoid overwriting a terminal state
+        // set by the worker between our read and this write.
+        await _db.DiscordImports
+            .Where(d => d.Id == import.Id &&
+                (d.Status == DiscordImportStatus.Pending || d.Status == DiscordImportStatus.InProgress || d.Status == DiscordImportStatus.RehostingMedia))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(d => d.Status, DiscordImportStatus.Cancelled)
+                .SetProperty(d => d.EncryptedBotToken, (string?)null));
 
         return NoContent();
     }
@@ -247,16 +254,22 @@ public class DiscordImportController : ControllerBase
         if (currentUser.DiscordSubject is not null && currentUser.DiscordSubject != request.DiscordUserId)
             return BadRequest(new { error = "Your linked Discord account doesn't match this identity." });
 
-        var mapping = await _db.DiscordUserMappings
-            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.DiscordUserId == request.DiscordUserId);
-
-        if (mapping is null)
-            return NotFound(new { error = "Discord user mapping not found." });
-
         await using var transaction = await _db.Database.BeginTransactionAsync();
 
-        // Re-fetch the mapping inside the transaction with a row lock to prevent race conditions
-        mapping = await _db.DiscordUserMappings
+        // Check inside the transaction to prevent concurrent claims of different identities.
+        var alreadyClaimed = await _db.DiscordUserMappings
+            .FromSqlRaw(
+                """SELECT * FROM "DiscordUserMappings" WHERE "ServerId" = {0} AND "CodecUserId" = {1} FOR UPDATE""",
+                serverId, currentUser.Id)
+            .AnyAsync();
+        if (alreadyClaimed)
+        {
+            await transaction.RollbackAsync();
+            return Conflict(new { error = "You have already claimed a Discord identity in this server." });
+        }
+
+        // Lock the target mapping row to prevent the same identity being claimed concurrently.
+        var mapping = await _db.DiscordUserMappings
             .FromSqlRaw(
                 """SELECT * FROM "DiscordUserMappings" WHERE "ServerId" = {0} AND "DiscordUserId" = {1} FOR UPDATE""",
                 serverId, request.DiscordUserId)

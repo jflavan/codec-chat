@@ -19,6 +19,16 @@ public class DiscordMediaRehostService
         "image/jpeg", "image/png", "image/webp", "image/gif"
     };
 
+    private static readonly HashSet<string> SafeFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif",
+        ".mp4", ".webm", ".mov", ".avi", ".mkv",
+        ".mp3", ".ogg", ".wav", ".flac",
+        ".pdf", ".txt", ".csv", ".json", ".xml",
+        ".zip", ".gz", ".tar", ".7z", ".rar",
+        ".bin"
+    };
+
     private readonly HttpClient _http;
     private readonly IFileStorageService _storage;
     private readonly ILogger<DiscordMediaRehostService> _logger;
@@ -174,12 +184,13 @@ public class DiscordMediaRehostService
             var fileBytes = memoryStream.ToArray();
             var hashPrefix = Convert.ToHexString(SHA256.HashData(fileBytes))[..16].ToLowerInvariant();
             var extension = Path.GetExtension(new Uri(discordCdnUrl).AbsolutePath);
-            if (string.IsNullOrEmpty(extension))
+            if (string.IsNullOrEmpty(extension) || !SafeFileExtensions.Contains(extension.ToLowerInvariant()))
                 extension = ".bin";
+            var safeContentType = extension == ".bin" ? "application/octet-stream" : contentType;
             var blobPath = $"import/{hashPrefix}{extension}";
 
             using var uploadStream = new MemoryStream(fileBytes);
-            var url = await _storage.UploadAsync(storageContainer, blobPath, uploadStream, contentType, ct);
+            var url = await _storage.UploadAsync(storageContainer, blobPath, uploadStream, safeContentType, ct);
             return RehostResult.Success(url);
         }
     }
@@ -209,10 +220,14 @@ public class DiscordMediaRehostService
             if (longest > maxDimensionPx.Value)
             {
                 var ratio = (float)maxDimensionPx.Value / longest;
-                var newWidth = (int)(bitmap.Width * ratio);
-                var newHeight = (int)(bitmap.Height * ratio);
-                workingBitmap = bitmap.Resize(new SKImageInfo(newWidth, newHeight), SKSamplingOptions.Default);
-                disposeBitmap = true;
+                var newWidth = Math.Max(1, (int)(bitmap.Width * ratio));
+                var newHeight = Math.Max(1, (int)(bitmap.Height * ratio));
+                var resized = bitmap.Resize(new SKImageInfo(newWidth, newHeight), SKSamplingOptions.Default);
+                if (resized is not null)
+                {
+                    workingBitmap = resized;
+                    disposeBitmap = true;
+                }
             }
         }
 
@@ -249,9 +264,9 @@ public class DiscordMediaRehostService
             }
 
             using var final = image.Encode(format, 25);
-            if (final is null)
-                return null;
-            return (final.ToArray(), outputContentType, outputExtension);
+            if (final is not null && final.Size <= maxFileSize)
+                return (final.ToArray(), outputContentType, outputExtension);
+            return null;
         }
         finally
         {
