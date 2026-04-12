@@ -391,10 +391,10 @@ public class DiscordImportService
         Guid importId, DateTimeOffset? lastSyncedAt, IClientProxy group, CancellationToken ct)
     {
         var count = 0;
-        // For re-sync, we don't set `after` — the dedup check (AnyAsync) in the loop
-        // will skip already-imported messages. This avoids incorrect lexicographic ordering
-        // of Discord snowflake IDs.
-        string? after = null;
+        // Start from snowflake "0" to get the oldest messages first.
+        // Discord's `after` param returns messages newer than the given ID in ascending order.
+        // Without `after`, Discord returns the newest messages (descending), which breaks pagination.
+        string? after = "0";
 
         while (true)
         {
