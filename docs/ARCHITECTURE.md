@@ -235,7 +235,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
   - RESTful controller-based API design (`[ApiController]`)
   - SignalR hub for real-time messaging and typing indicators
   - Shared `UserService` for cross-cutting user resolution
-  - `DiscordImportService`, `DiscordApiClient`, `DiscordPermissionMapper`, `DiscordRateLimitHandler`, `DiscordImportWorker`, `DiscordImportCancellationRegistry` for Discord server import (newest-first message pagination with `PendingReply` backfill, 4 parallel channels, global `TokenBucketRateLimiter` at 50 req/sec, live `ImportMessagesAvailable` channel events)
+  - `DiscordImportService`, `DiscordApiClient`, `DiscordPermissionMapper`, `DiscordRateLimitHandler`, `DiscordImportWorker`, `DiscordImportCancellationRegistry`, `DiscordMediaRehostService` for Discord server import (newest-first message pagination with `PendingReply` backfill, 4 parallel channels, global `TokenBucketRateLimiter` at 50 req/sec, live `ImportMessagesAvailable` channel events)
   - Automatic migrations (development)
   - CORS support for local development
 
@@ -646,7 +646,7 @@ The SignalR hub provides real-time communication. Clients connect with their JWT
 | `BannedFromServer` | `{ serverId, serverName, reason }` | User was banned from a server (sent to banned user's user group) |
 | `MemberBanned` | `{ serverId, userId }` | A member was banned (sent to server group; triggers member list refresh) |
 | `ImportProgress` | `{ stage, completed, total, percentComplete }` | Discord import progress update for each stage (sent to server group) |
-| `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers, completedAt }` | Discord import finished successfully (sent to server group) |
+| `ImportCompleted` | `{ importedChannels, importedMessages, importedMembers }` | Discord import milestone fired before media re-hosting begins (sent to server group) |
 | `ImportFailed` | `{ errorMessage }` | Discord import failed with error details (sent to server group) |
 | `ImportMessagesAvailable` | `{ channelId, count }` | New batch of imported messages available in a channel (sent to `channel-{channelId}` group); frontend reloads messages on receipt |
 
@@ -964,7 +964,7 @@ DirectMessage ─┘
 
 #### DiscordImport
 - Record of a Discord server import operation
-- Fields: Id, ServerId (FK → Server), DiscordGuildId, EncryptedBotToken (nullable, cleared after import), Status (Pending/InProgress/Completed/Failed/Cancelled), StartedAt, CompletedAt, ErrorMessage, ImportedChannels, ImportedMessages, ImportedMembers, LastSyncedAt, InitiatedByUserId (FK → User), CreatedAt
+- Fields: Id, ServerId (FK → Server), DiscordGuildId, EncryptedBotToken (nullable, cleared after import), Status (Pending/InProgress/Completed/Failed/Cancelled/RehostingMedia), StartedAt, CompletedAt, ErrorMessage, ImportedChannels, ImportedMessages, ImportedMembers, LastSyncedAt, InitiatedByUserId (FK → User), CreatedAt
 - Bot token encrypted at rest via ASP.NET Core Data Protection
 
 #### DiscordUserMapping
