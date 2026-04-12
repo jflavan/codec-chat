@@ -39,7 +39,10 @@ public class DiscordImportController : ControllerBase
     }
 
     private async Task<User?> GetCurrentUserAsync()
-        => await _userService.ResolveUserAsync(User);
+    {
+        var (user, _) = await _userService.GetOrCreateUserAsync(User);
+        return user;
+    }
 
     private async Task<bool> HasManageServerPermission(Guid serverId)
     {
