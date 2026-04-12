@@ -247,10 +247,26 @@ public class DiscordImportController : ControllerBase
         if (mapping is null)
             return NotFound(new { error = "Discord user mapping not found." });
 
-        if (mapping.CodecUserId is not null)
-            return Conflict(new { error = "This Discord identity has already been claimed." });
-
         await using var transaction = await _db.Database.BeginTransactionAsync();
+
+        // Re-fetch the mapping inside the transaction with a row lock to prevent race conditions
+        mapping = await _db.DiscordUserMappings
+            .FromSqlRaw(
+                """SELECT * FROM "DiscordUserMappings" WHERE "ServerId" = {0} AND "DiscordUserId" = {1} FOR UPDATE""",
+                serverId, request.DiscordUserId)
+            .FirstOrDefaultAsync();
+
+        if (mapping is null)
+        {
+            await transaction.RollbackAsync();
+            return NotFound(new { error = "Discord user mapping not found." });
+        }
+
+        if (mapping.CodecUserId is not null)
+        {
+            await transaction.RollbackAsync();
+            return Conflict(new { error = "This Discord identity has already been claimed." });
+        }
 
         mapping.CodecUserId = currentUser.Id;
         mapping.ClaimedAt = DateTimeOffset.UtcNow;

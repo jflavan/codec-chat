@@ -7,7 +7,8 @@ public enum DiscordEntityType
     Channel = 2,
     Message = 3,
     Emoji = 4,
-    PinnedMessage = 5
+    PinnedMessage = 5,
+    PendingReply = 6
 }
 
 public class DiscordEntityMapping

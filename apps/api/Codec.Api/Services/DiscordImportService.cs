@@ -128,8 +128,14 @@ public class DiscordImportService
             await db.SaveChangesAsync(ct);
 
             // 8. Pinned messages
-            await group.SendAsync("ImportProgress", new { stage = "Pins", completed = 0, total = 0, percentComplete = 95f }, ct);
+            await group.SendAsync("ImportProgress", new { stage = "Pins", completed = 0, total = 0, percentComplete = 90f }, ct);
             await ImportPinnedMessagesAsync(db, discordClient, serverId, channelMap, importId, ct);
+            await db.SaveChangesAsync(ct);
+
+            // 9. Backfill reply-to references (needed because newest-first import means
+            //    the replied-to message may not exist when the reply is first imported)
+            await group.SendAsync("ImportProgress", new { stage = "Resolving replies", completed = 0, total = 0, percentComplete = 95f }, ct);
+            await BackfillReplyReferencesAsync(db, serverId, importId, ct);
             await db.SaveChangesAsync(ct);
 
             // Complete
@@ -419,7 +425,9 @@ public class DiscordImportService
             }
 
             await db.SaveChangesAsync(ct);
-            after = members[^1].User?.Id;
+            var lastUserId = members.LastOrDefault(m => m.User is not null)?.User?.Id;
+            if (lastUserId is null) break;
+            after = lastUserId;
             if (members.Count < 1000) break;
         }
 
@@ -464,11 +472,14 @@ public class DiscordImportService
                 if (existing) continue;
 
                 Guid? replyToMessageId = null;
+                string? unresolvedReplyDiscordId = null;
                 if (dm.MessageReference?.MessageId is not null)
                 {
                     var replyMapping = await db.DiscordEntityMappings
                         .FirstOrDefaultAsync(m => m.ServerId == serverId && m.DiscordEntityId == dm.MessageReference.MessageId && m.EntityType == DiscordEntityType.Message, ct);
                     replyToMessageId = replyMapping?.CodecEntityId;
+                    if (replyToMessageId is null)
+                        unresolvedReplyDiscordId = dm.MessageReference.MessageId;
                 }
 
                 // Use Discord CDN URLs directly — no re-hosting needed
@@ -509,6 +520,15 @@ public class DiscordImportService
                     Id = Guid.NewGuid(), DiscordImportId = importId, ServerId = serverId,
                     DiscordEntityId = dm.Id, EntityType = DiscordEntityType.Message, CodecEntityId = message.Id
                 });
+                if (unresolvedReplyDiscordId is not null)
+                {
+                    db.DiscordEntityMappings.Add(new DiscordEntityMapping
+                    {
+                        Id = Guid.NewGuid(), DiscordImportId = importId, ServerId = serverId,
+                        DiscordEntityId = unresolvedReplyDiscordId, EntityType = DiscordEntityType.PendingReply,
+                        CodecEntityId = message.Id
+                    });
+                }
                 count++;
                 batchCount++;
             }
@@ -574,5 +594,41 @@ public class DiscordImportService
                 });
             }
         }
+    }
+
+    private async Task BackfillReplyReferencesAsync(
+        CodecDbContext db, Guid serverId, Guid importId, CancellationToken ct)
+    {
+        // PendingReply mappings: DiscordEntityId = Discord reply-to message ID,
+        // CodecEntityId = Codec message that needs its ReplyToMessageId set.
+        var pendingReplies = await db.DiscordEntityMappings
+            .Where(m => m.DiscordImportId == importId && m.EntityType == DiscordEntityType.PendingReply)
+            .ToListAsync(ct);
+
+        if (pendingReplies.Count == 0) return;
+
+        // Batch-load all message mappings for this import to avoid N+1 queries
+        var messageMappings = await db.DiscordEntityMappings
+            .Where(m => m.ServerId == serverId && m.EntityType == DiscordEntityType.Message)
+            .ToDictionaryAsync(m => m.DiscordEntityId, m => m.CodecEntityId, ct);
+
+        var resolvedCount = 0;
+        foreach (var pending in pendingReplies)
+        {
+            if (messageMappings.TryGetValue(pending.DiscordEntityId, out var replyToCodecId))
+            {
+                var message = await db.Messages.FindAsync([pending.CodecEntityId], ct);
+                if (message is not null && message.ReplyToMessageId is null)
+                {
+                    message.ReplyToMessageId = replyToCodecId;
+                    resolvedCount++;
+                }
+            }
+
+            db.DiscordEntityMappings.Remove(pending);
+        }
+
+        _logger.LogInformation("Backfilled {Resolved}/{Total} reply references for import {ImportId}",
+            resolvedCount, pendingReplies.Count, importId);
     }
 }
