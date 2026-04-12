@@ -182,15 +182,23 @@ jobs:
           API_KEY=$(az keyvault secret show \
             --vault-name kv-codec-prod \
             --name LiveKit--ApiKey \
-            --query value -o tsv)
+            --query value -o tsv 2>/dev/null || echo "")
           API_SECRET=$(az keyvault secret show \
             --vault-name kv-codec-prod \
             --name LiveKit--ApiSecret \
-            --query value -o tsv)
-          echo "::add-mask::$API_KEY"
-          echo "::add-mask::$API_SECRET"
-          echo "api-key=$API_KEY" >> "$GITHUB_OUTPUT"
-          echo "api-secret=$API_SECRET" >> "$GITHUB_OUTPUT"
+            --query value -o tsv 2>/dev/null || echo "")
+          if [ -n "$API_KEY" ] && [ -n "$API_SECRET" ]; then
+            echo "::add-mask::$API_KEY"
+            echo "::add-mask::$API_SECRET"
+            echo "api-key=$API_KEY" >> "$GITHUB_OUTPUT"
+            echo "api-secret=$API_SECRET" >> "$GITHUB_OUTPUT"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::LiveKit secrets not found in Key Vault — voice services will start without authentication"
+            echo "api-key=devkey" >> "$GITHUB_OUTPUT"
+            echo "api-secret=secret-must-be-at-least-32-chars" >> "$GITHUB_OUTPUT"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Substitute variables in templates
         env:
