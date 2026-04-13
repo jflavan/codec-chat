@@ -2203,7 +2203,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 m.ChannelId,
                 m.ReplyToMessageId,
                 AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
-                AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null
+                AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
+                m.ImportedAuthorName,
+                m.ImportedAuthorAvatarUrl
             })
             .ToListAsync();
 
@@ -2327,6 +2329,8 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 message.AuthorName,
                 message.AuthorUserId,
                 AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
+                message.ImportedAuthorName,
+                message.ImportedAuthorAvatarUrl,
                 message.Body,
                 message.ImageUrl,
                 message.FileUrl,

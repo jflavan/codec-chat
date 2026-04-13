@@ -96,7 +96,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.ReplyToMessageId,
                     AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                     AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
-                    m.MessageType
+                    m.MessageType,
+                    m.ImportedAuthorName,
+                    m.ImportedAuthorAvatarUrl
                 })
                 .FirstOrDefaultAsync();
 
@@ -129,7 +131,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.ReplyToMessageId,
                     AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                     AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
-                    m.MessageType
+                    m.MessageType,
+                    m.ImportedAuthorName,
+                    m.ImportedAuthorAvatarUrl
                 })
                 .ToListAsync();
 
@@ -157,7 +161,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     m.ReplyToMessageId,
                     AuthorCustomAvatarPath = m.AuthorUser != null ? m.AuthorUser.CustomAvatarPath : null,
                     AuthorGoogleAvatarUrl = m.AuthorUser != null ? m.AuthorUser.AvatarUrl : null,
-                    m.MessageType
+                    m.MessageType,
+                    m.ImportedAuthorName,
+                    m.ImportedAuthorAvatarUrl
                 })
                 .ToListAsync();
 
@@ -288,6 +294,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     message.EditedAt,
                     message.ChannelId,
                     AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
+                    message.ImportedAuthorName,
+                    message.ImportedAuthorAvatarUrl,
                     Reactions = aroundReactionLookup.TryGetValue(message.Id, out var reactions)
                         ? reactions
                         : Array.Empty<ReactionSummary>(),
@@ -337,7 +345,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.ReplyToMessageId,
                 AuthorCustomAvatarPath = message.AuthorUser != null ? message.AuthorUser.CustomAvatarPath : null,
                 AuthorGoogleAvatarUrl = message.AuthorUser != null ? message.AuthorUser.AvatarUrl : null,
-                message.MessageType
+                message.MessageType,
+                message.ImportedAuthorName,
+                message.ImportedAuthorAvatarUrl
             })
             .ToListAsync();
 
@@ -469,6 +479,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 message.EditedAt,
                 message.ChannelId,
                 AuthorAvatarUrl = avatarService.ResolveUrl(message.AuthorCustomAvatarPath) ?? message.AuthorGoogleAvatarUrl,
+                message.ImportedAuthorName,
+                message.ImportedAuthorAvatarUrl,
                 Reactions = reactionLookup.TryGetValue(message.Id, out var reactions)
                     ? reactions
                     : Array.Empty<ReactionSummary>(),
@@ -1082,6 +1094,8 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     editedAt = msg.EditedAt,
                     channelId = msg.ChannelId,
                     authorAvatarUrl = avatarService.ResolveUrl(msg.AuthorUser?.CustomAvatarPath) ?? msg.AuthorUser?.AvatarUrl,
+                    importedAuthorName = msg.ImportedAuthorName,
+                    importedAuthorAvatarUrl = msg.ImportedAuthorAvatarUrl,
                     reactions = reactionLookup.TryGetValue(msg.Id, out var reactions) ? reactions : Array.Empty<ReactionSummary>(),
                     linkPreviews = linkPreviewLookup.TryGetValue(msg.Id, out var previews) ? previews : Array.Empty<LinkPreviewDto>(),
                     mentions = Array.Empty<object>(),
