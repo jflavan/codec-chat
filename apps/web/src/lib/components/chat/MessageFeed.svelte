@@ -2,6 +2,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { getChannelStore } from '$lib/state/channel-store.svelte.js';
 	import { getMessageStore } from '$lib/state/message-store.svelte.js';
+	import { formatDateSeparator, isDifferentDay } from '$lib/utils/format.js';
 	import MessageItem from './MessageItem.svelte';
 	import ChannelWelcome from './ChannelWelcome.svelte';
 
@@ -219,7 +220,13 @@
 			{/if}
 			{#each messages.messages as message, i (message.id)}
 				{@const prev = i > 0 ? messages.messages[i - 1] : null}
-				{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
+				{@const newDay = !prev || isDifferentDay(prev.createdAt, message.createdAt)}
+				{@const isGrouped = !newDay && prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
+				{#if newDay}
+					<div class="date-separator" role="separator">
+						<span class="date-separator-label">{formatDateSeparator(message.createdAt)}</span>
+					</div>
+				{/if}
 				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={messages.highlightedMessageId === message.id}>
 					<MessageItem {message} grouped={isGrouped} onScrollToMessage={scrollToMessage} />
 				</div>
@@ -267,6 +274,29 @@
 	.loading-older {
 		padding: 8px;
 		font-size: 13px;
+	}
+
+	.date-separator {
+		display: flex;
+		align-items: center;
+		margin: 8px 16px;
+		gap: 8px;
+	}
+
+	.date-separator::before,
+	.date-separator::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--border);
+	}
+
+	.date-separator-label {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-muted);
+		white-space: nowrap;
+		padding: 2px 4px;
 	}
 
 	.muted {

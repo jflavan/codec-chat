@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Message, Mention } from '$lib/types/index.js';
 import { ReportType } from '$lib/types/index.js';
-	import { formatTime } from '$lib/utils/format.js';
+	import { formatTime, formatMessageTimestamp } from '$lib/utils/format.js';
 	import ReactionBar from './ReactionBar.svelte';
 	import LinkifiedText from './LinkifiedText.svelte';
 	import LinkPreviewCard from './LinkPreviewCard.svelte';
@@ -190,7 +190,7 @@ import { ReportType } from '$lib/types/index.js';
 			{/if}
 			<div class="message-header">
 				<strong class="message-author" class:deleted-user={!message.authorUserId && !message.importedAuthorName}>{message.importedAuthorName ? message.importedAuthorName : message.authorUserId ? message.authorName : 'Deleted User'}</strong>{#if message.importedAuthorName}<ImportedAuthorBadge />{/if}
-				<time class="message-time">{formatTime(message.createdAt)}</time>
+				<time class="message-time">{formatMessageTimestamp(message.createdAt)}</time>
 				{#if message.editedAt}
 					<span class="edited-label">(edited)</span>
 				{/if}
