@@ -523,7 +523,10 @@ public class DiscordImportService
                 if (dm.Attachments is { Count: > 0 })
                 {
                     var att = dm.Attachments[0];
-                    if (att.ContentType?.StartsWith("image/") == true)
+                    var ext = Path.GetExtension(att.Filename)?.ToLowerInvariant();
+                    var isImage = att.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true
+                        || ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".svg" or ".bmp" or ".ico" or ".avif";
+                    if (isImage)
                         imageUrl = att.Url;
                     else
                     {
