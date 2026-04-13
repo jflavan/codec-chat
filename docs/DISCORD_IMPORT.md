@@ -93,10 +93,9 @@ After the initial import, you can re-sync to pick up new messages:
 
 1. Open the Discord Import tab in server settings.
 2. Click **Re-sync** and provide the bot token again.
-3. The system creates a new `DiscordImport` record and re-imports all messages from Discord.
-4. Existing messages are skipped via deduplication checks against `DiscordEntityMapping` records — only genuinely new messages are created.
+3. The system creates a new `DiscordImport` record and incrementally imports only new messages from Discord.
 
-**Note:** Re-sync currently re-processes all messages rather than filtering by `LastSyncedAt`. The dedup checks ensure no duplicates are created, but all messages are fetched from the Discord API again.
+**Incremental import:** For each channel, the system finds the newest already-imported Discord message ID (via `DiscordEntityMapping` joined with `Messages`) and uses Discord's `after` pagination parameter to fetch only messages newer than that point. Channels with no previously imported messages fall back to full newest-first (`before`) pagination. This same optimization applies to retries of failed imports — channels that were fully imported before the failure are skipped entirely.
 
 Endpoint: `POST /servers/{serverId}/discord-import/resync`
 
@@ -185,5 +184,5 @@ The newest-first strategy means users see recent messages within seconds of impo
 - **Only regular messages and replies** — only Discord message types 0 (regular) and 19 (reply) are imported. System messages (joins, boosts, pins, etc.) are skipped.
 - **Reactions not imported** — message reactions are not included in the import.
 - **Discord CDN URLs may break (non-image attachments and avatars only)** — non-image file attachments (`FileUrl`) still reference Discord CDN URLs and may expire if the source Discord server is deleted. Member avatars (`DiscordAvatarUrl`, `ImportedAuthorAvatarUrl`) also use Discord CDN URLs, though these are public/unsigned and low risk. Custom emojis and image attachments are re-hosted to Codec storage and are not affected.
-- **Re-sync re-processes all messages** — re-sync does not filter by `LastSyncedAt`; it fetches all messages from Discord and relies on deduplication checks to skip existing ones.
+- **Re-sync is incremental for messages** — re-sync uses `after` pagination from the newest already-imported Discord message ID per channel, fetching only new messages from the Discord API. Other entities (roles, categories, channels, members) are still re-fetched but deduplicated via `DiscordEntityMapping` checks.
 - **Managed roles skipped** — bot integration roles (marked as `managed` by Discord) are not imported.

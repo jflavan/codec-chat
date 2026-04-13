@@ -976,7 +976,7 @@ DirectMessage ─┘
 #### DiscordEntityMapping
 - Maps a Discord entity ID to a Codec entity ID for cross-referencing during import
 - Fields: Id, DiscordImportId (FK → DiscordImport), ServerId (FK → Server), DiscordEntityId, EntityType (Role/Category/Channel/Message/Emoji/PinnedMessage/PendingReply), CodecEntityId
-- Used during re-sync to match existing entities and during message import to resolve reply chains
+- Used during re-sync for incremental message import (`after` pagination from newest imported Discord ID per channel) and to resolve reply chains
 - `PendingReply` entries track replies to not-yet-imported messages (due to newest-first pagination) and are resolved in a final backfill pass per channel
 
 ## Configuration

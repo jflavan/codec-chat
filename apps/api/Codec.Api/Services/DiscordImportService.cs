@@ -485,11 +485,23 @@ public class DiscordImportService
         Guid importId, IClientProxy serverGroup, CancellationToken ct)
     {
         var count = 0;
-        // Import newest messages first using `before` pagination (no cursor = newest page).
-        // This lets users see their most recent messages while history backfills.
-        // Discord returns messages in descending order (newest first).
-        // Each page: msgs[0] = newest, msgs[^1] = oldest. Use msgs[^1].Id as `before` cursor.
+
+        // Check if we already have imported messages for this channel (resync / retry).
+        // If so, use `after` pagination to fetch only newer messages from Discord.
+        // Discord snowflake IDs are monotonically increasing, so MAX(DiscordEntityId) = newest.
+        var newestImportedDiscordId = await db.DiscordEntityMappings
+            .Where(m => m.ServerId == serverId && m.EntityType == DiscordEntityType.Message)
+            .Join(db.Messages.Where(msg => msg.ChannelId == codecChannelId),
+                mapping => mapping.CodecEntityId,
+                message => message.Id,
+                (mapping, _) => mapping.DiscordEntityId)
+            .MaxAsync(id => (string?)id, ct);
+
+        // When resuming: use `after` to fetch only messages newer than the last imported one.
+        // For initial import: use `before` pagination (newest-first) so users see recent messages first.
+        var useAfterPagination = newestImportedDiscordId is not null;
         string? before = null;
+        string? after = newestImportedDiscordId;
 
         var channelGroup = _hub.Clients.Group($"channel-{codecChannelId}");
 
@@ -498,7 +510,10 @@ public class DiscordImportService
             List<DiscordMessage> messages;
             try
             {
-                messages = await discord.GetChannelMessagesAsync(discordChannelId, 100, before: before, ct: ct);
+                messages = await discord.GetChannelMessagesAsync(discordChannelId, 100,
+                    before: useAfterPagination ? null : before,
+                    after: useAfterPagination ? after : null,
+                    ct: ct);
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
@@ -602,8 +617,13 @@ public class DiscordImportService
                 }, ct);
             }
 
-            // Use oldest message in page as `before` cursor to get the next older page
-            before = messages[^1].Id;
+            // Advance pagination cursor.
+            // `after` mode: Discord returns ascending (oldest first), use last (newest) as next cursor.
+            // `before` mode: Discord returns descending (newest first), use last (oldest) as next cursor.
+            if (useAfterPagination)
+                after = messages[^1].Id;
+            else
+                before = messages[^1].Id;
             if (messages.Count < 100) break;
         }
 
