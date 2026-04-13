@@ -140,12 +140,12 @@ public class DiscordImportController : ControllerBase
         await _userService.EnsurePermissionAsync(serverId, currentUser.Id, Permission.ManageServer, currentUser.IsGlobalAdmin);
 
         var lastImport = await _db.DiscordImports
-            .Where(d => d.ServerId == serverId && d.Status == DiscordImportStatus.Completed)
-            .OrderByDescending(d => d.CompletedAt)
+            .Where(d => d.ServerId == serverId && (d.Status == DiscordImportStatus.Completed || d.Status == DiscordImportStatus.Failed))
+            .OrderByDescending(d => d.CreatedAt)
             .FirstOrDefaultAsync();
 
         if (lastImport is null)
-            return BadRequest(new { error = "No completed import found to re-sync." });
+            return BadRequest(new { error = "No completed or failed import found to re-sync." });
 
         _discordClient.SetBotToken(request.BotToken);
         try

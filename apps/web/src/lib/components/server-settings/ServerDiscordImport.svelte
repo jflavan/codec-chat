@@ -112,24 +112,42 @@
 			</p>
 		</div>
 
-		<div class="import-form">
-			<h3>Retry Import</h3>
-			<label class="form-label">
-				Bot Token
-				<input type="password" bind:value={botToken} placeholder="Paste your Discord bot token" class="form-input" />
-			</label>
-			<label class="form-label">
-				Discord Guild ID
-				<input type="text" bind:value={guildId} placeholder="e.g. 123456789012345678" class="form-input" />
-			</label>
-			<button
-				class="start-btn"
-				disabled={servers.isStartingImport || !botToken.trim() || !guildId.trim()}
-				onclick={handleStart}
-			>
-				{servers.isStartingImport ? 'Starting...' : 'Retry Import'}
-			</button>
-		</div>
+		{#if importStatus?.importedMessages}
+			<div class="import-form">
+				<h3>Re-sync</h3>
+				<p class="description">The previous import partially succeeded. Re-sync to retry failed steps and pull in any new messages.</p>
+				<label class="form-label">
+					Bot Token
+					<input type="password" bind:value={botToken} placeholder="Paste your Discord bot token" class="form-input" />
+				</label>
+				<button
+					class="start-btn"
+					disabled={servers.isStartingImport || !botToken.trim()}
+					onclick={handleResync}
+				>
+					{servers.isStartingImport ? 'Starting...' : 'Re-sync'}
+				</button>
+			</div>
+		{:else}
+			<div class="import-form">
+				<h3>Retry Import</h3>
+				<label class="form-label">
+					Bot Token
+					<input type="password" bind:value={botToken} placeholder="Paste your Discord bot token" class="form-input" />
+				</label>
+				<label class="form-label">
+					Discord Guild ID
+					<input type="text" bind:value={guildId} placeholder="e.g. 123456789012345678" class="form-input" />
+				</label>
+				<button
+					class="start-btn"
+					disabled={servers.isStartingImport || !botToken.trim() || !guildId.trim()}
+					onclick={handleStart}
+				>
+					{servers.isStartingImport ? 'Starting...' : 'Retry Import'}
+				</button>
+			</div>
+		{/if}
 	{:else if isCompleted}
 		<div class="status-card completed">
 			<h3>Import Complete</h3>
