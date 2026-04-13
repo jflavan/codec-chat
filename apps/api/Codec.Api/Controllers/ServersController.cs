@@ -1653,10 +1653,9 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     }
 
     /// <summary>
-    /// Returns basic server info for an invite code without requiring authentication.
-    /// Used by the invite landing page to show a preview before sign-in.
+    /// Returns basic server info for an invite code.
+    /// Used by the invite landing page to show a preview before the user accepts.
     /// </summary>
-    [AllowAnonymous]
     [HttpGet("/invites/{code}")]
     public async Task<IActionResult> GetInvitePreview(string code)
     {

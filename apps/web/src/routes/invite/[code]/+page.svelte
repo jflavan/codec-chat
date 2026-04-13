@@ -24,26 +24,27 @@
 			return;
 		}
 
-		const api = new ApiClient(apiBaseUrl, async () => null);
-
-		// Check if user has a valid session
 		const token = loadStoredToken();
 		hasAuth = !!token && !isTokenExpired(token);
 
-		try {
-			const preview = await api.getInvitePreview(code);
-			serverName = preview.serverName;
-			serverIcon = preview.serverIcon;
-			memberCount = preview.memberCount;
-		} catch (e: unknown) {
-			if (e instanceof Error) {
-				error = e.message;
-			} else {
-				error = 'This invite link is invalid or has expired.';
+		if (hasAuth) {
+			// Authenticated: fetch server preview
+			const api = new ApiClient(apiBaseUrl, async () => null);
+			try {
+				const preview = await api.getInvitePreview(token!, code);
+				serverName = preview.serverName;
+				serverIcon = preview.serverIcon;
+				memberCount = preview.memberCount;
+			} catch (e: unknown) {
+				if (e instanceof Error) {
+					error = e.message;
+				} else {
+					error = 'This invite link is invalid or has expired.';
+				}
 			}
-		} finally {
-			isLoading = false;
 		}
+
+		isLoading = false;
 	});
 
 	async function handleJoin() {
@@ -85,7 +86,7 @@
 				<p class="error-text">{error}</p>
 				<a href="/" class="home-link">Go to Codec</a>
 			</div>
-		{:else}
+		{:else if hasAuth}
 			<p class="invite-label">You've been invited to join</p>
 
 			<div class="server-preview">
@@ -101,16 +102,17 @@
 			<button class="join-btn" onclick={handleJoin} disabled={isJoining}>
 				{#if isJoining}
 					Joining...
-				{:else if hasAuth}
-					Accept Invite
 				{:else}
-					Sign in to Join
+					Accept Invite
 				{/if}
 			</button>
+		{:else}
+			<p class="invite-label">You've been invited to a server</p>
+			<p class="hint-text">Sign in or create an account to accept this invite.</p>
 
-			{#if !hasAuth}
-				<p class="hint-text">You'll be asked to sign in or create an account first.</p>
-			{/if}
+			<button class="join-btn" onclick={handleJoin}>
+				Sign in to Join
+			</button>
 		{/if}
 	</div>
 	<div class="scanlines"></div>

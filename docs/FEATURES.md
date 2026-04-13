@@ -32,6 +32,7 @@ This document tracks implemented and planned features for Codec.
 - Server name editing, server icons, and server deletion
 - Custom emojis — upload, rename, delete per server (PNG, JPEG, WebP, GIF; 256 KB max; 50 per server)
 - Server invite codes with configurable expiry and max uses
+- Invite landing page — `/invite/[code]` route shows a server preview (name, icon, member count) for authenticated users with an explicit "Accept Invite" button; unauthenticated users see a generic landing page and are redirected back to the invite after sign-in
 - Kick members with real-time notification and auto-redirect
 
 ### Server Settings
