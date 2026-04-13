@@ -71,6 +71,17 @@
 			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui)
 		]);
 
+		// Check for a pending invite from the /invite/[code] page
+		const pendingInvite = localStorage.getItem('pendingInviteCode');
+		if (pendingInvite) {
+			localStorage.removeItem('pendingInviteCode');
+			try {
+				await servers.joinViaInvite(pendingInvite);
+			} catch {
+				// Invite may have expired or been used — continue normally
+			}
+		}
+
 		// Load channels/members/emojis for the auto-selected first server
 		if (servers.selectedServerId) {
 			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);
