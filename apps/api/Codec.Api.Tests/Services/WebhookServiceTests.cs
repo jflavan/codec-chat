@@ -53,6 +53,49 @@ public class WebhookServiceTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
+    /// <summary>
+    /// Polls until the condition returns true or the timeout expires.
+    /// Replaces fixed Task.Delay calls that cause flaky tests on slow CI runners.
+    /// </summary>
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 5000, int pollIntervalMs = 25)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        while (!condition())
+        {
+            if (Environment.TickCount64 >= deadline)
+                throw new TimeoutException($"Condition not met within {timeoutMs}ms");
+            await Task.Delay(pollIntervalMs);
+        }
+    }
+
+    /// <summary>
+    /// Sets up the mock HTTP handler to return a response and signal a semaphore after each call.
+    /// Use with WaitForHttpCallsAsync to deterministically wait for background dispatch.
+    /// </summary>
+    private SemaphoreSlim SetupHttpResponseWithSignal(HttpStatusCode statusCode = HttpStatusCode.OK)
+    {
+        var signal = new SemaphoreSlim(0);
+        _httpHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(statusCode))
+            .Callback(() => signal.Release());
+        return signal;
+    }
+
+    private static async Task WaitForHttpCallsAsync(SemaphoreSlim signal, int expectedCalls = 1, int timeoutMs = 5000)
+    {
+        for (var i = 0; i < expectedCalls; i++)
+        {
+            if (!await signal.WaitAsync(timeoutMs))
+                throw new TimeoutException($"Expected {expectedCalls} HTTP calls but only got {i} within {timeoutMs}ms");
+        }
+        // Brief pause after signal to let the service finish post-dispatch work (logging, etc.)
+        await Task.Delay(50);
+    }
+
     private Webhook CreateWebhook(
         string eventTypes = "MessageCreated",
         bool isActive = true,
@@ -102,12 +145,11 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_DeliversToMatchingWebhook()
     {
         var webhook = CreateWebhook("MessageCreated");
-        SetupHttpResponse(HttpStatusCode.OK);
+        var signal = SetupHttpResponseWithSignal(HttpStatusCode.OK);
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "hello" });
 
-        // Allow background task to complete
-        await Task.Delay(500);
+        await WaitForHttpCallsAsync(signal);
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -130,7 +172,7 @@ public class WebhookServiceTests : IDisposable
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "hello" });
 
-        await Task.Delay(500);
+        await Task.Delay(200); // Negative test: brief wait to confirm no dispatch occurred
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -147,7 +189,7 @@ public class WebhookServiceTests : IDisposable
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "hello" });
 
-        await Task.Delay(500);
+        await Task.Delay(200); // Negative test: brief wait to confirm no dispatch occurred
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -160,11 +202,11 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_MatchesMultipleEventTypes()
     {
         var webhook = CreateWebhook("MessageCreated,MemberJoined,ChannelCreated");
-        SetupHttpResponse(HttpStatusCode.OK);
+        var signal = SetupHttpResponseWithSignal(HttpStatusCode.OK);
 
         _service.DispatchEvent(_serverId, WebhookEventType.MemberJoined, new { userId = Guid.NewGuid() });
 
-        await Task.Delay(500);
+        await WaitForHttpCallsAsync(signal);
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -197,7 +239,7 @@ public class WebhookServiceTests : IDisposable
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "hello" });
 
-        await Task.Delay(500);
+        await Task.Delay(200); // Negative test: brief wait to confirm no dispatch occurred
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -212,16 +254,13 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_RetriesOnServerError_UpTo3Times()
     {
         var webhook = CreateWebhook("MessageCreated");
-        SetupHttpResponse(HttpStatusCode.InternalServerError);
+        var signal = SetupHttpResponseWithSignal(HttpStatusCode.InternalServerError);
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "fail" });
 
-        // RetryDelays are [5s, 30s, 5min] but we can't wait that long in tests.
-        // The Task.Delay calls will run but we check after enough wall time.
-        // Since this is a unit test, we'll wait enough for the first attempt at least.
-        await Task.Delay(1000);
+        // At minimum, attempt 1 should have been made; all 3 may not complete due to retry delays.
+        await WaitForHttpCallsAsync(signal);
 
-        // At minimum, attempt 1 should have been made; all 3 may not complete due to delays.
         var logs = await _db.WebhookDeliveryLogs.Where(l => l.WebhookId == webhook.Id).ToListAsync();
         logs.Should().HaveCountGreaterThanOrEqualTo(1);
         logs.All(l => l.Success == false).Should().BeTrue();
@@ -232,11 +271,19 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_RetriesOnException_LogsError()
     {
         var webhook = CreateWebhook("MessageCreated");
-        SetupHttpException(new HttpRequestException("Connection refused"));
+        var callCount = 0;
+        _httpHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("Connection refused"))
+            .Callback(() => Interlocked.Increment(ref callCount));
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "fail" });
 
-        await Task.Delay(1000);
+        await WaitUntilAsync(() => Volatile.Read(ref callCount) >= 1);
+        await Task.Delay(50); // Let delivery log write complete
 
         var logs = await _db.WebhookDeliveryLogs.Where(l => l.WebhookId == webhook.Id).ToListAsync();
         logs.Should().HaveCountGreaterThanOrEqualTo(1);
@@ -249,11 +296,11 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_SuccessOnFirstAttempt_NoRetries()
     {
         var webhook = CreateWebhook("MessageCreated");
-        SetupHttpResponse(HttpStatusCode.OK);
+        var signal = SetupHttpResponseWithSignal(HttpStatusCode.OK);
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "ok" });
 
-        await Task.Delay(500);
+        await WaitForHttpCallsAsync(signal);
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -289,7 +336,7 @@ public class WebhookServiceTests : IDisposable
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "signed" });
 
-        await Task.Delay(500);
+        await WaitUntilAsync(() => capturedSignature is not null);
 
         capturedSignature.Should().NotBeNull();
         capturedSignature.Should().StartWith("sha256=");
@@ -317,7 +364,7 @@ public class WebhookServiceTests : IDisposable
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "unsigned" });
 
-        await Task.Delay(500);
+        await WaitUntilAsync(() => capturedRequest is not null);
 
         capturedRequest.Should().NotBeNull();
         capturedRequest!.Headers.Contains("X-Webhook-Signature").Should().BeFalse();
@@ -338,7 +385,7 @@ public class WebhookServiceTests : IDisposable
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "test" });
 
-        await Task.Delay(500);
+        await WaitUntilAsync(() => capturedRequest is not null);
 
         capturedRequest.Should().NotBeNull();
         capturedRequest!.Headers.GetValues("X-Webhook-Event").First().Should().Be("MessageCreated");
@@ -357,15 +404,15 @@ public class WebhookServiceTests : IDisposable
                 "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
-            .Callback<HttpRequestMessage, CancellationToken>(async (req, _) =>
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) =>
             {
-                capturedBody = await req.Content!.ReadAsStringAsync();
+                capturedBody = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             })
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "hello", channelId = "abc" });
 
-        await Task.Delay(500);
+        await WaitUntilAsync(() => capturedBody is not null);
 
         capturedBody.Should().NotBeNull();
         var doc = JsonDocument.Parse(capturedBody!);
@@ -385,11 +432,11 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_LogsDeliveryLogOnSuccess()
     {
         var webhook = CreateWebhook("ChannelCreated");
-        SetupHttpResponse(HttpStatusCode.OK);
+        var signal = SetupHttpResponseWithSignal(HttpStatusCode.OK);
 
         _service.DispatchEvent(_serverId, WebhookEventType.ChannelCreated, new { name = "general" });
 
-        await Task.Delay(500);
+        await WaitForHttpCallsAsync(signal);
 
         var log = await _db.WebhookDeliveryLogs.FirstOrDefaultAsync(l => l.WebhookId == webhook.Id);
         log.Should().NotBeNull();
@@ -404,11 +451,19 @@ public class WebhookServiceTests : IDisposable
     public async Task DispatchEvent_LogsDeliveryLogOnFailure()
     {
         var webhook = CreateWebhook("ChannelCreated");
-        SetupHttpException(new TaskCanceledException("Request timed out"));
+        var callCount = 0;
+        _httpHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new TaskCanceledException("Request timed out"))
+            .Callback(() => Interlocked.Increment(ref callCount));
 
         _service.DispatchEvent(_serverId, WebhookEventType.ChannelCreated, new { name = "general" });
 
-        await Task.Delay(1000);
+        await WaitUntilAsync(() => Volatile.Read(ref callCount) >= 1);
+        await Task.Delay(50); // Let delivery log write complete
 
         var logs = await _db.WebhookDeliveryLogs.Where(l => l.WebhookId == webhook.Id).ToListAsync();
         logs.Should().HaveCountGreaterThanOrEqualTo(1);
@@ -421,12 +476,11 @@ public class WebhookServiceTests : IDisposable
     {
         CreateWebhook("MessageCreated", url: "https://hook1.example.com/a");
         CreateWebhook("MessageCreated", url: "https://hook2.example.com/b");
-        SetupHttpResponse(HttpStatusCode.OK);
+        var signal = SetupHttpResponseWithSignal(HttpStatusCode.OK);
 
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "multi" });
 
-        // Give background tasks time — InMemory DB may have concurrency quirks with Task.WhenAll
-        await Task.Delay(1000);
+        await WaitForHttpCallsAsync(signal, expectedCalls: 2);
 
         _httpHandler.Protected().Verify(
             "SendAsync",
@@ -443,7 +497,7 @@ public class WebhookServiceTests : IDisposable
         // Should not throw — fires on background thread
         _service.DispatchEvent(_serverId, WebhookEventType.MessageCreated, new { content = "noop" });
 
-        await Task.Delay(500);
+        await Task.Delay(200); // Negative test: brief wait to confirm no dispatch occurred
 
         _httpHandler.Protected().Verify(
             "SendAsync",
