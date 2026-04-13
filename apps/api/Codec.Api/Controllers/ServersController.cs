@@ -371,7 +371,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             var permissions = roles.Count > 0
                 ? roles.Aggregate(Permission.None, (acc, role) => acc | role.Permissions)
                 : Permission.None;
-            var displayRole = roles.FirstOrDefault(r2 => r2.Color is not null && r2.Color != "");
+            var displayRole = roles.FirstOrDefault(r2 => !r2.IsSystemRole);
             var highestPosition = roles.Count > 0 ? roles.Min(r2 => r2.Position) : int.MaxValue;
 
             return new
