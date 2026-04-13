@@ -33,7 +33,7 @@
 
 	const categorizedGroups = $derived(
 		servers.categories
-			.sort((a, b) => a.position - b.position)
+			.toSorted((a, b) => a.position - b.position)
 			.map((cat) => ({
 				...cat,
 				channels: channelStore.channels
