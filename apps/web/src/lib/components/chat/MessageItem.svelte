@@ -16,6 +16,15 @@ import { ReportType } from '$lib/types/index.js';
 	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import { extractYouTubeUrls } from '$lib/utils/youtube.js';
 
+	const imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
+
+	function isImageFile(contentType?: string | null, fileName?: string | null): boolean {
+		if (contentType?.startsWith('image/')) return true;
+		if (!fileName) return false;
+		const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+		return imageExtensions.has(ext);
+	}
+
 	let {
 		message,
 		grouped = false,
@@ -205,7 +214,11 @@ import { ReportType } from '$lib/types/index.js';
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
-			{#if message.fileUrl && message.fileName}
+			{#if message.fileUrl && message.fileName && isImageFile(message.fileContentType, message.fileName)}
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.fileUrl!)}>
+					<img src={message.fileUrl} alt={message.fileName} class="message-image" loading="lazy" />
+				</button>
+			{:else if message.fileUrl && message.fileName}
 				<FileCard fileUrl={message.fileUrl} fileName={message.fileName} fileSize={message.fileSize} fileContentType={message.fileContentType} />
 			{/if}
 			{#if message.linkPreviews?.length}
@@ -268,7 +281,11 @@ import { ReportType } from '$lib/types/index.js';
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
-			{#if message.fileUrl && message.fileName}
+			{#if message.fileUrl && message.fileName && isImageFile(message.fileContentType, message.fileName)}
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.fileUrl!)}>
+					<img src={message.fileUrl} alt={message.fileName} class="message-image" loading="lazy" />
+				</button>
+			{:else if message.fileUrl && message.fileName}
 				<FileCard fileUrl={message.fileUrl} fileName={message.fileName} fileSize={message.fileSize} fileContentType={message.fileContentType} />
 			{/if}
 			{#if message.linkPreviews?.length}
