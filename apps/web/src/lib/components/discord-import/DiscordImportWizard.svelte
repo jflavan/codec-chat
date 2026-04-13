@@ -269,7 +269,7 @@
 	}
 
 	.step-dot.completed {
-		background: var(--text-positive, #3ba55d);
+		background: var(--success);
 	}
 
 	.wizard-content {
@@ -278,8 +278,8 @@
 
 	.import-error {
 		padding: 10px 14px;
-		background: rgba(237, 66, 69, 0.1);
-		color: var(--status-danger);
+		background: rgba(var(--danger-rgb), 0.1);
+		color: var(--danger);
 		border-radius: 4px;
 		font-size: 14px;
 		margin-top: 12px;

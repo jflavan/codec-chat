@@ -64,8 +64,8 @@
 	{:else if isCompleted}
 		<div class="success-icon">
 			<svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-				<circle cx="24" cy="24" r="24" fill="var(--text-positive, #3ba55d)" opacity="0.15" />
-				<path d="M20 25.5l3.5 3.5 5-6" stroke="var(--text-positive, #3ba55d)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+				<circle cx="24" cy="24" r="24" fill="var(--success)" opacity="0.15" />
+				<path d="M20 25.5l3.5 3.5 5-6" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
 			</svg>
 		</div>
 		<h2>Import Complete</h2>
@@ -195,8 +195,8 @@
 
 	.error-msg {
 		padding: 10px 14px;
-		background: rgba(237, 66, 69, 0.1);
-		color: var(--status-danger);
+		background: rgba(var(--danger-rgb), 0.1);
+		color: var(--danger);
 		border-radius: 4px;
 		font-size: 14px;
 		text-align: left;

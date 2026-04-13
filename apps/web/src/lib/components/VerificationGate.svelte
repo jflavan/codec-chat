@@ -179,7 +179,7 @@
 	}
 
 	.error {
-		color: var(--status-danger, #f23f43);
+		color: var(--danger);
 		font-size: 14px;
 	}
 </style>
