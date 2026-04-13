@@ -239,7 +239,7 @@
 	}
 
 	.google-verified {
-		color: var(--text-positive, #43b581);
+		color: var(--success);
 		font-size: 14px;
 		margin: 4px 0 0;
 	}

@@ -256,7 +256,7 @@
 
 	.status-card.in-progress { background: var(--bg-secondary); }
 	.status-card.completed { background: var(--bg-secondary); }
-	.status-card.failed { background: rgba(237, 66, 69, 0.1); }
+	.status-card.failed { background: rgba(var(--danger-rgb), 0.1); }
 
 	.progress-stats {
 		display: flex;
@@ -297,7 +297,7 @@
 	}
 
 	.error-msg {
-		color: var(--status-danger);
+		color: var(--danger);
 		font-size: 14px;
 		margin: 8px 0;
 	}
@@ -371,6 +371,7 @@
 		background: var(--bg-secondary);
 		border-radius: 8px;
 		margin-bottom: 24px;
+		color: var(--text-normal);
 	}
 
 	.import-stats {
@@ -455,7 +456,7 @@
 
 	.claimed-badge {
 		font-size: 12px;
-		color: var(--text-positive, #3ba55d);
+		color: var(--success);
 		font-weight: 600;
 	}
 
