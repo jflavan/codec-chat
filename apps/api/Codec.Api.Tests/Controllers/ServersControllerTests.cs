@@ -3066,6 +3066,107 @@ public class ServersControllerTests : IDisposable
     // ═══════════════════ GetMembers ═══════════════════
 
     [Fact]
+    public async Task GetMembers_DisplayRole_UsesHighestHoistedRole()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (ownerRole, _, memberRole) = CreateDefaultRoles(server);
+
+        // Add a custom hoisted role at position between admin and member
+        var customRole = new ServerRoleEntity
+        {
+            ServerId = server.Id, Name = "VIP", Color = "#FF0000",
+            Position = 1, IsSystemRole = false, IsHoisted = true
+        };
+        _db.ServerRoles.Add(customRole);
+
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        // Assign only the custom hoisted role and the member role
+        _db.ServerMemberRoles.AddRange(
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = customRole.Id },
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id }
+        );
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+
+        var result = await _controller.GetMembers(server.Id);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var members = ok.Value.Should().BeAssignableTo<IEnumerable<object>>().Subject.ToList();
+        members.Should().HaveCount(1);
+
+        // DisplayRole should be the hoisted custom role, not null
+        var json = System.Text.Json.JsonSerializer.Serialize(members[0]);
+        json.Should().Contain("VIP");
+    }
+
+    [Fact]
+    public async Task GetMembers_NoHoistedRole_DisplayRoleIsNull()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, _, memberRole) = CreateDefaultRoles(server);
+
+        // Add a non-hoisted custom role
+        var customRole = new ServerRoleEntity
+        {
+            ServerId = server.Id, Name = "Lurker",
+            Position = 1, IsSystemRole = false, IsHoisted = false
+        };
+        _db.ServerRoles.Add(customRole);
+
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        _db.ServerMemberRoles.AddRange(
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = customRole.Id },
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id }
+        );
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+
+        var result = await _controller.GetMembers(server.Id);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var members = ok.Value.Should().BeAssignableTo<IEnumerable<object>>().Subject.ToList();
+        members.Should().HaveCount(1);
+
+        // DisplayRole should be null since no roles are hoisted (Member is not hoisted)
+        var json = System.Text.Json.JsonSerializer.Serialize(members[0]);
+        json.Should().Contain("\"DisplayRole\":null");
+    }
+
+    [Fact]
+    public async Task GetMembers_SystemHoistedRole_UsedAsDisplayRole()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (ownerRole, _, memberRole) = CreateDefaultRoles(server);
+
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+        // Assign the hoisted system Owner role
+        _db.ServerMemberRoles.AddRange(
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = ownerRole.Id },
+            new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id }
+        );
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsureMemberAsync(server.Id, _testUser.Id, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id });
+
+        var result = await _controller.GetMembers(server.Id);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var members = ok.Value.Should().BeAssignableTo<IEnumerable<object>>().Subject.ToList();
+
+        // DisplayRole should be Owner (hoisted system role, not filtered out)
+        var json = System.Text.Json.JsonSerializer.Serialize(members[0]);
+        json.Should().Contain("Owner");
+    }
+
+    [Fact]
     public async Task GetMembers_ValidServer_ReturnsMembers()
     {
         var server = new Server { Name = "S" };
