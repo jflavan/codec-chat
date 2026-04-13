@@ -156,23 +156,34 @@ public class DiscordImportService
             import.Status = DiscordImportStatus.RehostingMedia;
             await db.SaveChangesAsync(ct);
 
-            // 10. Re-host emoji images
-            await group.SendAsync("ImportProgress", new { stage = "Re-hosting emojis", completed = 0, total = 0, percentComplete = 96f }, ct);
-            await RehostEmojisAsync(db, serverId, importId, group, ct);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                // 10. Re-host emoji images
+                await group.SendAsync("ImportProgress", new { stage = "Re-hosting emojis", completed = 0, total = 0, percentComplete = 96f }, ct);
+                await RehostEmojisAsync(db, serverId, importId, group, ct);
+                await db.SaveChangesAsync(ct);
 
-            // 11. Re-host message image attachments (newest first)
-            await group.SendAsync("ImportProgress", new { stage = "Re-hosting images", completed = 0, total = 0, percentComplete = 97f }, ct);
-            await RehostAttachmentsAsync(db, serverId, group, ct);
+                // 11. Re-host message image attachments (newest first)
+                await group.SendAsync("ImportProgress", new { stage = "Re-hosting images", completed = 0, total = 0, percentComplete = 97f }, ct);
+                await RehostAttachmentsAsync(db, serverId, group, ct);
 
-            // 12. Re-host non-image file attachments (newest first)
-            await group.SendAsync("ImportProgress", new { stage = "Re-hosting files", completed = 0, total = 0, percentComplete = 98.5f }, ct);
-            await RehostFileAttachmentsAsync(db, serverId, group, ct);
+                // 12. Re-host non-image file attachments (newest first)
+                await group.SendAsync("ImportProgress", new { stage = "Re-hosting files", completed = 0, total = 0, percentComplete = 98.5f }, ct);
+                await RehostFileAttachmentsAsync(db, serverId, group, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw; // Let the outer catch handle cancellation
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Media re-hosting failed for import {ImportId}, completing import without full re-hosting", importId);
+            }
 
             // Check for cancellation one final time before committing success
             ct.ThrowIfCancellationRequested();
 
-            // Complete
+            // Complete — the text import succeeded even if re-hosting partially failed
             import.Status = DiscordImportStatus.Completed;
             import.CompletedAt = DateTimeOffset.UtcNow;
             import.LastSyncedAt = DateTimeOffset.UtcNow;
