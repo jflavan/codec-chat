@@ -29,7 +29,7 @@ public class ReportsControllerTests : IDisposable
 
         _testUser = new User { Id = Guid.NewGuid(), GoogleSubject = "g-1", DisplayName = "Reporter" };
         _targetUser = new User { Id = Guid.NewGuid(), GoogleSubject = "g-2", DisplayName = "Target", Email = "target@test.com" };
-        _testServer = new Server { Name = "Test Server" };
+        _testServer = new Server { Name = "Test Server", Description = "A test server" };
 
         _db.Users.Add(_testUser);
         _db.Users.Add(_targetUser);
@@ -62,7 +62,31 @@ public class ReportsControllerTests : IDisposable
         };
 
         var result = await _controller.CreateReport(request);
-        result.Should().BeOfType<OkObjectResult>();
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateReport_UserReport_PersistsReportInDatabase()
+    {
+        var request = new CreateReportRequest
+        {
+            ReportType = ReportType.User,
+            TargetId = _targetUser.Id.ToString(),
+            Reason = "Spam"
+        };
+
+        await _controller.CreateReport(request);
+
+        var report = await _db.Reports.FirstOrDefaultAsync();
+        report.Should().NotBeNull();
+        report!.ReporterId.Should().Be(_testUser.Id);
+        report.ReportType.Should().Be(ReportType.User);
+        report.TargetId.Should().Be(_targetUser.Id.ToString());
+        report.Reason.Should().Be("Spam");
+        report.Status.Should().Be(ReportStatus.Open);
+        report.TargetSnapshot.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -76,7 +100,88 @@ public class ReportsControllerTests : IDisposable
         };
 
         var result = await _controller.CreateReport(request);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateReport_ServerReport_PersistsSnapshotWithServerInfo()
+    {
+        var request = new CreateReportRequest
+        {
+            ReportType = ReportType.Server,
+            TargetId = _testServer.Id.ToString(),
+            Reason = "Inappropriate content"
+        };
+
+        await _controller.CreateReport(request);
+
+        var report = await _db.Reports.FirstOrDefaultAsync();
+        report.Should().NotBeNull();
+        report!.TargetSnapshot.Should().Contain("Test Server");
+    }
+
+    [Fact]
+    public async Task CreateReport_MessageReport_ReturnsOkWithId()
+    {
+        var channel = new Channel { Name = "general", ServerId = _testServer.Id };
+        _db.Channels.Add(channel);
+        await _db.SaveChangesAsync();
+
+        var message = new Message
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = channel.Id,
+            AuthorUserId = _targetUser.Id,
+            AuthorName = _targetUser.DisplayName,
+            Body = "Bad message content"
+        };
+        _db.Messages.Add(message);
+        await _db.SaveChangesAsync();
+
+        var request = new CreateReportRequest
+        {
+            ReportType = ReportType.Message,
+            TargetId = message.Id.ToString(),
+            Reason = "Offensive"
+        };
+
+        var result = await _controller.CreateReport(request);
+
         result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task CreateReport_MessageReport_PersistsSnapshotWithMessageBody()
+    {
+        var channel = new Channel { Name = "general", ServerId = _testServer.Id };
+        _db.Channels.Add(channel);
+        await _db.SaveChangesAsync();
+
+        var message = new Message
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = channel.Id,
+            AuthorUserId = _targetUser.Id,
+            AuthorName = _targetUser.DisplayName,
+            Body = "Bad message content"
+        };
+        _db.Messages.Add(message);
+        await _db.SaveChangesAsync();
+
+        var request = new CreateReportRequest
+        {
+            ReportType = ReportType.Message,
+            TargetId = message.Id.ToString(),
+            Reason = "Offensive"
+        };
+
+        await _controller.CreateReport(request);
+
+        var report = await _db.Reports.FirstOrDefaultAsync();
+        report.Should().NotBeNull();
+        report!.TargetSnapshot.Should().Contain("Bad message content");
     }
 
     [Fact]
@@ -90,7 +195,9 @@ public class ReportsControllerTests : IDisposable
         };
 
         var result = await _controller.CreateReport(request);
-        result.Should().BeOfType<BadRequestObjectResult>();
+
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        bad.Value.Should().NotBeNull();
     }
 
     [Fact]
@@ -104,6 +211,7 @@ public class ReportsControllerTests : IDisposable
         };
 
         var result = await _controller.CreateReport(request);
+
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -118,6 +226,7 @@ public class ReportsControllerTests : IDisposable
         };
 
         var result = await _controller.CreateReport(request);
+
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
@@ -132,7 +241,28 @@ public class ReportsControllerTests : IDisposable
         };
 
         var result = await _controller.CreateReport(request);
+
         result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task CreateReport_SetsCreatedAtToUtcNow()
+    {
+        var before = DateTimeOffset.UtcNow;
+
+        var request = new CreateReportRequest
+        {
+            ReportType = ReportType.User,
+            TargetId = _targetUser.Id.ToString(),
+            Reason = "Test timing"
+        };
+
+        await _controller.CreateReport(request);
+
+        var after = DateTimeOffset.UtcNow;
+        var report = await _db.Reports.FirstOrDefaultAsync();
+        report.Should().NotBeNull();
+        report!.CreatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
     }
 
     public void Dispose() => _db.Dispose();
