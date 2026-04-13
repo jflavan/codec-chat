@@ -30,6 +30,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			'https://cdn.discordapp.com',
 			'https://avatars.githubusercontent.com',
 			'https://*.giphy.com',
+			'https://*.ytimg.com',
 			apiBase
 		].join(' '),
 		'connect-src': `'self' ${apiBase} ${wsBase} ${livekitUrl ? livekitUrl + ' ' : ''}${livekitHttpUrl ? livekitHttpUrl + ' ' : ''}https://accounts.google.com https://www.google.com https://play.google.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://discord.com https://api.giphy.com`,
