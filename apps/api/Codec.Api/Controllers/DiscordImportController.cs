@@ -145,7 +145,7 @@ public class DiscordImportController : ControllerBase
             .FirstOrDefaultAsync();
 
         if (lastImport is null)
-            return BadRequest(new { error = "No completed or failed import found to re-sync." });
+            return BadRequest(new { error = "No completed import found to re-sync." });
 
         _discordClient.SetBotToken(request.BotToken);
         try
