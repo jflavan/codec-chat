@@ -10,7 +10,7 @@
 > - **Parallel channel imports (4 concurrent)** -- Message history is fetched for up to 4 channels concurrently via `SemaphoreSlim`.
 > - **Global rate limiting** -- A `TokenBucketRateLimiter` (50 tokens/sec) enforces Discord's API rate limit across all parallel imports, replacing the original ~40 req/sec cap.
 > - **Reactions not imported** -- reactions are documented in the spec scope but not implemented.
-> - **Re-sync does not filter by `LastSyncedAt`** -- re-sync re-imports all messages and relies on deduplication checks to skip existing ones.
+> - **Re-sync uses incremental `after` pagination** -- for each channel, the newest already-imported Discord message ID is found via `DiscordEntityMapping` joined with `Messages`, and only newer messages are fetched using Discord's `after` parameter. Channels with no prior messages fall back to full `before` pagination.
 > - **Only first attachment per message** -- if a Discord message has multiple attachments, only the first is imported.
 > - **Only message types 0 and 19** -- only regular messages (type 0) and replies (type 19) are imported; system messages are skipped.
 > - **Managed roles skipped** -- bot integration roles (marked as `managed` by Discord) are not imported.
@@ -109,7 +109,7 @@ A `DelegatingHandler` on a named `HttpClient("discord")` that reads `X-RateLimit
 
 When triggered again on the same guild:
 - Roles, categories, channels matched by Discord ID via `DiscordEntityMapping`; existing records skipped, new ones created.
-- Messages are re-fetched in full; existing messages are skipped via dedup checks against `DiscordEntityMapping` records. `LastSyncedAt` is not used for filtering.
+- Messages are imported incrementally: for each channel, the newest already-imported Discord message ID is found (via `DiscordEntityMapping` joined with `Messages`), and only newer messages are fetched using Discord's `after` pagination parameter. Channels with no prior messages fall back to full `before` pagination. Deduplication checks remain as a safety net.
 - Admin must provide a fresh bot token (previous one was cleared).
 
 ### Failure Handling
