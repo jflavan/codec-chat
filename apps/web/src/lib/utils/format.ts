@@ -23,13 +23,16 @@ export function formatTime(value: string): string {
  * - Older: "04/11/2026 2:30 PM"
  */
 export function formatMessageTimestamp(value: string): string {
-	const cached = timestampCache.get(value);
+	const now = new Date();
+	const today = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+	const cacheKey = `${today}:${value}`;
+
+	const cached = timestampCache.get(cacheKey);
 	if (cached !== undefined) return cached;
 
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return '';
 
-	const now = new Date();
 	const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 	let result: string;
@@ -42,7 +45,7 @@ export function formatMessageTimestamp(value: string): string {
 	}
 
 	if (timestampCache.size >= TIME_CACHE_MAX) timestampCache.clear();
-	timestampCache.set(value, result);
+	timestampCache.set(cacheKey, result);
 	return result;
 }
 
