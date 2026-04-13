@@ -71,6 +71,14 @@
 			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui)
 		]);
 
+		// Redirect back to invite page after sign-in so user sees preview + accept
+		const pendingInvite = localStorage.getItem('pendingInviteCode');
+		if (pendingInvite) {
+			localStorage.removeItem('pendingInviteCode');
+			window.location.href = `/invite/${encodeURIComponent(pendingInvite)}`;
+			return;
+		}
+
 		// Load channels/members/emojis for the auto-selected first server
 		if (servers.selectedServerId) {
 			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);

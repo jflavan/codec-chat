@@ -1653,6 +1653,50 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     }
 
     /// <summary>
+    /// Returns basic server info for an invite code.
+    /// Used by the invite landing page to show a preview before the user accepts.
+    /// </summary>
+    [HttpGet("/invites/{code}")]
+    public async Task<IActionResult> GetInvitePreview(string code)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var invite = await db.ServerInvites
+            .FirstOrDefaultAsync(i => i.Code == code);
+
+        if (invite is null)
+        {
+            return NotFound(new { error = "Invalid invite code." });
+        }
+
+        if (invite.ExpiresAt is not null && invite.ExpiresAt <= now)
+        {
+            return BadRequest(new { error = "This invite has expired." });
+        }
+
+        if (invite.MaxUses is not null && invite.UseCount >= invite.MaxUses)
+        {
+            return BadRequest(new { error = "This invite has reached maximum uses." });
+        }
+
+        var server = await db.Servers.FindAsync(invite.ServerId);
+        if (server is null || server.IsQuarantined)
+        {
+            return NotFound(new { error = "This server is not available." });
+        }
+
+        var memberCount = await db.ServerMembers
+            .CountAsync(m => m.ServerId == invite.ServerId);
+
+        return Ok(new
+        {
+            serverName = server.Name,
+            serverIcon = server.IconUrl,
+            memberCount
+        });
+    }
+
+    /// <summary>
     /// Joins a server via an invite code. Any authenticated user can use this.
     /// Uses an absolute route to break out of the "servers" prefix.
     /// </summary>

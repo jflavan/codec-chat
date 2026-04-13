@@ -151,6 +151,7 @@ src/
 └── routes/
     ├── +layout.svelte      # Root layout (global CSS, font preconnect)
     ├── +page.svelte        # Thin composition shell (~75 lines)
+    ├── invite/[code]/+page.svelte  # Invite landing page (preview + accept for authed users, sign-in prompt for unauthed)
     └── auth/callback/
         ├── github/+page.svelte   # GitHub OAuth callback handler
         └── discord/+page.svelte  # Discord OAuth callback handler
@@ -428,6 +429,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `POST /servers/{serverId}/invites` - Create an invite code (requires Owner, Admin, or Global Admin role; generates 8-char alphanumeric code)
 - `GET /servers/{serverId}/invites` - List active invites (requires Owner, Admin, or Global Admin role; filters expired invites)
 - `DELETE /servers/{serverId}/invites/{inviteId}` - Revoke an invite code (requires Owner, Admin, or Global Admin role)
+- `GET /invites/{code}` - Get invite preview (authenticated; returns server name, icon, and member count; validates expiry, max uses, and quarantine status)
 - `POST /invites/{code}` - Join a server via invite code (any authenticated user; validates expiry and max uses)
 
 #### Messaging

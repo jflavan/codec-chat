@@ -987,6 +987,14 @@ export class ApiClient {
 		);
 	}
 
+	/** Get a preview of an invite (server name, icon, member count). */
+	getInvitePreview(token: string, code: string): Promise<{ serverName: string; serverIcon: string | null; memberCount: number }> {
+		return this.request(
+			`${this.baseUrl}/invites/${encodeURIComponent(code)}`,
+			{ headers: this.headers(token) }
+		);
+	}
+
 	/** Join a server using an invite code. */
 	joinViaInvite(token: string, code: string): Promise<{ serverId: string; userId: string; role: string }> {
 		return this.request(
