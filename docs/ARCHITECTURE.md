@@ -70,7 +70,7 @@ src/
 │   ├── data/
 │   │   └── emojis.ts       # Static emoji dataset (categories, names, keywords)
 │   ├── utils/
-│   │   ├── format.ts       # Date/time formatting helpers
+│   │   ├── format.ts       # Date/time formatting helpers (formatTime, formatMessageTimestamp, formatDateSeparator, isDifferentDay)
 │   │   ├── emoji-frequency.ts  # localStorage-backed emoji usage frequency tracker
 │   │   └── theme.ts        # Theme registry, persistence (localStorage), and DOM application
 │   ├── components/
@@ -88,8 +88,8 @@ src/
 │   │   │   ├── ImagePreview.svelte       # Full-screen image lightbox overlay
 │   │   │   ├── LinkPreviewCard.svelte    # Open Graph link preview embed card
 │   │   │   ├── LinkifiedText.svelte      # Auto-linked URLs in message body (+ custom emoji rendering)
-│   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping
-│   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped)
+│   │   │   ├── MessageFeed.svelte        # Scrollable message list with grouping and date separators
+│   │   │   ├── MessageItem.svelte        # Single message (grouped/ungrouped) with smart timestamps
 │   │   │   ├── ReactionBar.svelte        # Reaction pills (emoji + count)
 │   │   │   ├── FileCard.svelte           # File attachment card (icon, name, size, download)
 │   │   │   ├── ReplyComposerBar.svelte   # "Replying to" bar above composer

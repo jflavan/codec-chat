@@ -57,6 +57,8 @@ This document tracks implemented and planned features for Codec.
 - Link previews — Open Graph metadata, clickable embed cards, SSRF protection
 - YouTube embeds — click-to-play inline video players via `svelte-youtube-embed`
 - Message pinning — Owner/Admin can pin up to 50 messages per channel; pin indicator on messages; slide-in pinned messages panel; system notification messages on pin; real-time sync via SignalR; audit logged
+- Date separators — horizontal dividers between messages from different calendar days, labelled "Today", "Yesterday", or the full date
+- Smart timestamps — today's messages show time only; yesterday shows "Yesterday at 2:30 PM"; older messages include the full date
 - Progressive loading — cursor-based pagination with scroll position preservation
 - Message search — full-text search with PostgreSQL trigram indexes; filters by scope, date range, and content type; jump-to-message with highlight animation
 - GIF picker — GIPHY-powered GIF picker accessible via the emoji button in the composer; tabbed Emoji / GIFs picker with shared backdrop; browse trending GIFs or search by keyword; selected GIF is sent as an image message; 2-column grid with lazy-loaded previews; branded GIPHY attribution link; requires `PUBLIC_GIPHY_API_KEY`
