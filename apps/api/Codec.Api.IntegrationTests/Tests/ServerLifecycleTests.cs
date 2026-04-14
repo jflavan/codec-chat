@@ -99,8 +99,8 @@ public class ServerLifecycleTests(CodecWebFactory factory) : IntegrationTestBase
         var client = CreateClient("sl-members", "MemberLister");
         var (serverId, _) = await CreateServerAsync(client);
 
-        var members = await client.GetFromJsonAsync<JsonElement>($"/servers/{serverId}/members");
-        members.EnumerateArray().Should().NotBeEmpty();
+        var response = await client.GetFromJsonAsync<JsonElement>($"/servers/{serverId}/members");
+        response.GetProperty("members").EnumerateArray().Should().NotBeEmpty();
     }
 
     [Fact]

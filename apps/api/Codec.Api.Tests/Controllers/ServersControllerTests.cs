@@ -3094,12 +3094,14 @@ public class ServersControllerTests : IDisposable
         var result = await _controller.GetMembers(server.Id);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var members = ok.Value.Should().BeAssignableTo<IEnumerable<object>>().Subject.ToList();
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        var members = doc.RootElement.GetProperty("members").EnumerateArray().ToList();
         members.Should().HaveCount(1);
 
         // DisplayRole should be the hoisted custom role, not null
-        var json = System.Text.Json.JsonSerializer.Serialize(members[0]);
-        json.Should().Contain("VIP");
+        var memberJson = members[0].GetRawText();
+        memberJson.Should().Contain("VIP");
     }
 
     [Fact]
@@ -3130,12 +3132,14 @@ public class ServersControllerTests : IDisposable
         var result = await _controller.GetMembers(server.Id);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var members = ok.Value.Should().BeAssignableTo<IEnumerable<object>>().Subject.ToList();
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        var members = doc.RootElement.GetProperty("members").EnumerateArray().ToList();
         members.Should().HaveCount(1);
 
         // DisplayRole should be null since no roles are hoisted (Member is not hoisted)
-        var json = System.Text.Json.JsonSerializer.Serialize(members[0]);
-        json.Should().Contain("\"DisplayRole\":null");
+        var memberJson = members[0].GetRawText();
+        memberJson.Should().Contain("\"DisplayRole\":null");
     }
 
     [Fact]
@@ -3159,11 +3163,13 @@ public class ServersControllerTests : IDisposable
         var result = await _controller.GetMembers(server.Id);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var members = ok.Value.Should().BeAssignableTo<IEnumerable<object>>().Subject.ToList();
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        var members = doc.RootElement.GetProperty("members").EnumerateArray().ToList();
 
         // DisplayRole should be Owner (hoisted system role, not filtered out)
-        var json = System.Text.Json.JsonSerializer.Serialize(members[0]);
-        json.Should().Contain("Owner");
+        var memberJson = members[0].GetRawText();
+        memberJson.Should().Contain("Owner");
     }
 
     [Fact]

@@ -212,6 +212,14 @@ export type PaginatedMessages = {
 	messages: Message[];
 };
 
+/** Paginated member response from the API. */
+export type PaginatedMembers = {
+	members: Member[];
+	total: number;
+	limit: number;
+	offset: number;
+};
+
 /** Member of a server. */
 export type Member = {
 	userId: string;

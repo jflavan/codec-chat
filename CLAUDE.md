@@ -87,7 +87,7 @@ apps/
       Models/        # EF Core entities + request DTOs
       Data/          # CodecDbContext, SeedData, DesignTimeDbContextFactory
       Hubs/          # ChatHub (SignalR)
-      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, DiscordImportService, DiscordApiClient, DiscordPermissionMapper, DiscordRateLimitHandler, DiscordImportWorker, DiscordImportCancellationRegistry, DiscordMediaRehostService, file storage
+      Services/      # UserService, AvatarService, RecaptchaService, ImageUploadService, FileUploadService, ImageProxyService, LinkPreviewService, WebhookService, SamlService, OAuthProviderService, PushNotificationService, DiscordImportService, DiscordApiClient, DiscordPermissionMapper, DiscordRateLimitHandler, DiscordImportWorker, DiscordImportCancellationRegistry, DiscordMediaRehostService, file storage, shared utilities (SsrfValidator, FileHashService, StringExtensions)
       Filters/       # ValidateRecaptchaAttribute (action filter)
       Migrations/    # EF Core code-first migrations
     Codec.ServiceDefaults/  # Shared OpenTelemetry + health + resilience
@@ -123,6 +123,8 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - All JSON uses camelCase (configured via `AddJsonProtocol`)
 - Rate limit: fixed window, 100 req/min
 - Response compression: Brotli + Gzip on `application/json`
+- Security headers: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
+- Middleware order: compression → CORS → exception handler → forwarded headers → security headers → rate limiter → auth → static files → controllers
 - File storage: `Local` (dev) or `AzureBlob` (prod), controlled by `Storage:Provider` config
 
 ### Real-time (SignalR)

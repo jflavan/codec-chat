@@ -274,18 +274,29 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             descriptionChanged = true;
         }
 
-        await db.SaveChangesAsync();
+        if (nameChanged)
+        {
+            audit.Log(serverId, appUser.Id, AuditAction.ServerRenamed,
+                details: $"Renamed from \"{oldName}\" to \"{server.Name}\"");
+        }
+
+        if (descriptionChanged)
+        {
+            audit.Log(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
+        }
+
+        if (nameChanged || descriptionChanged)
+        {
+            await db.SaveChangesAsync();
+        }
 
         if (nameChanged)
         {
-            // Notify all server members of the name change via SignalR.
             await hub.Clients.Group($"server-{serverId}").SendAsync("ServerNameChanged", new
             {
                 serverId,
                 name = server.Name
             });
-            audit.Log(serverId, appUser.Id, AuditAction.ServerRenamed,
-                details: $"Renamed from \"{oldName}\" to \"{server.Name}\"");
         }
 
         if (descriptionChanged)
@@ -295,12 +306,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 serverId,
                 description = server.Description
             });
-            audit.Log(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
-        }
-
-        if (nameChanged || descriptionChanged)
-        {
-            await db.SaveChangesAsync();
         }
 
         return Ok(new
@@ -316,10 +321,15 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
     /// Lists the members of a server. Requires membership or global admin.
     /// </summary>
     [HttpGet("{serverId:guid}/members")]
-    public async Task<IActionResult> GetMembers(Guid serverId)
+    public async Task<IActionResult> GetMembers(Guid serverId, [FromQuery] int limit = 100, [FromQuery] int offset = 0)
     {
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
         await userService.EnsureMemberAsync(serverId, appUser.Id, appUser.IsGlobalAdmin);
+
+        limit = Math.Clamp(limit, 1, 200);
+        offset = Math.Max(offset, 0);
+
+        var totalCount = await db.ServerMembers.CountAsync(m => m.ServerId == serverId);
 
         var members = await db.ServerMembers
             .AsNoTracking()
@@ -338,12 +348,15 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 member.User.StatusEmoji
             })
             .OrderBy(member => member.DisplayName)
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
 
-        // Batch-load all role assignments for this server in one query
+        // Batch-load role assignments only for the loaded page of members
+        var memberUserIds = members.Select(m => m.UserId).ToList();
         var allMemberRoles = await db.ServerMemberRoles
             .AsNoTracking()
-            .Where(mr => mr.Role!.ServerId == serverId)
+            .Where(mr => mr.Role!.ServerId == serverId && memberUserIds.Contains(mr.UserId))
             .Select(mr => new
             {
                 mr.UserId,
@@ -392,7 +405,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             };
         });
 
-        return Ok(result);
+        return Ok(new { members = result, total = totalCount, limit, offset });
     }
 
     /// <summary>
@@ -2188,7 +2201,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         // Build base query. Escape ILIKE metacharacters to prevent wildcard injection.
-        var escaped = trimmedQuery.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var escaped = trimmedQuery.EscapeForLike();
         var searchTerm = $"%{escaped}%";
         var query = db.Messages
             .AsNoTracking()

@@ -4,6 +4,7 @@ import type {
 	Message,
 	PaginatedMessages,
 	PaginatedDmMessages,
+	PaginatedMembers,
 	Reaction,
 	Member,
 	UserProfile,
@@ -372,7 +373,7 @@ export class ApiClient {
 		);
 	}
 
-	getMembers(token: string, serverId: string): Promise<Member[]> {
+	getMembers(token: string, serverId: string): Promise<PaginatedMembers> {
 		return this.request(`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members`, {
 			headers: this.headers(token)
 		});

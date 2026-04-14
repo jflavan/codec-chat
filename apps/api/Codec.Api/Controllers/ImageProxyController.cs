@@ -26,6 +26,11 @@ public class ImageProxyController(IImageProxyService imageProxyService) : Contro
             return BadRequest(new { error = "The 'url' query parameter is required." });
         }
 
+        if (!ImageProxyService.IsAllowedUrl(url))
+        {
+            return BadRequest(new { error = "URL is not allowed." });
+        }
+
         var result = await imageProxyService.FetchImageAsync(url, cancellationToken);
         if (result is null)
         {

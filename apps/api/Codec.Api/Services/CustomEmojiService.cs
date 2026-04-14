@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Codec.Api.Services;
 
 public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiService
@@ -32,10 +30,10 @@ public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiS
     public async Task<string> SaveEmojiAsync(Guid serverId, string name, IFormFile file)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var hash = await ComputeHashAsync(file);
-        var blobPath = $"server-{serverId}/{name}-{hash}{extension}";
-
         using var stream = file.OpenReadStream();
+        var hash = await FileHashService.ComputeHashAsync(stream);
+        stream.Position = 0;
+        var blobPath = $"server-{serverId}/{name}-{hash}{extension}";
         return await fileStorage.UploadAsync(ContainerName, blobPath, stream, file.ContentType);
     }
 
@@ -48,12 +46,5 @@ public class CustomEmojiService(IFileStorageService fileStorage) : ICustomEmojiS
             var blobPath = imageUrl[(idx + containerSegment.Length)..];
             await fileStorage.DeleteAsync(ContainerName, blobPath);
         }
-    }
-
-    private static async Task<string> ComputeHashAsync(IFormFile file)
-    {
-        using var stream = file.OpenReadStream();
-        var hashBytes = await SHA256.HashDataAsync(stream);
-        return Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
     }
 }

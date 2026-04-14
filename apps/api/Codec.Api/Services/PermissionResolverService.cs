@@ -10,10 +10,11 @@ public class PermissionResolverService(CodecDbContext db) : IPermissionResolverS
 
     public async Task<Permission> ResolveServerPermissionsAsync(Guid serverId, Guid userId)
     {
-        if (await IsOwnerAsync(serverId, userId))
+        var roles = await GetRolesAsync(serverId, userId);
+
+        if (roles.Any(r => r.IsSystemRole && r.Position == 0))
             return (Permission)~0L;
 
-        var roles = await GetRolesAsync(serverId, userId);
         var perms = Permission.None;
         foreach (var role in roles)
             perms |= role.Permissions;
@@ -31,11 +32,10 @@ public class PermissionResolverService(CodecDbContext db) : IPermissionResolverS
         if (channel is null) return Permission.None;
 
         var serverId = channel.ServerId;
-
-        if (await IsOwnerAsync(serverId, userId))
-            return (Permission)~0L;
-
         var roles = await GetRolesAsync(serverId, userId);
+
+        if (roles.Any(r => r.IsSystemRole && r.Position == 0))
+            return (Permission)~0L;
         var serverPerms = Permission.None;
         foreach (var role in roles)
             serverPerms |= role.Permissions;
@@ -84,13 +84,8 @@ public class PermissionResolverService(CodecDbContext db) : IPermissionResolverS
 
     public async Task<bool> IsOwnerAsync(Guid serverId, Guid userId)
     {
-        // Check if the user has the position-0 system role (Owner) via the multi-role join table
-        return await db.ServerMemberRoles.AsNoTracking()
-            .AnyAsync(mr =>
-                mr.UserId == userId &&
-                mr.Role!.ServerId == serverId &&
-                mr.Role.IsSystemRole &&
-                mr.Role.Position == 0);
+        var roles = await GetRolesAsync(serverId, userId);
+        return roles.Any(r => r.IsSystemRole && r.Position == 0);
     }
 
     private async Task<List<ServerRoleEntity>> GetRolesAsync(Guid serverId, Guid userId)

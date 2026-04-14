@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -363,54 +364,7 @@ builder.Services.AddHttpClient<DiscordMediaRehostService>()
         MaxAutomaticRedirections = 3,
         UseCookies = false,
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        ConnectCallback = async (context, cancellationToken) =>
-        {
-            // DNS rebinding protection: resolve and validate before connecting.
-            var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-            foreach (var entry in entries)
-            {
-                // Normalize IPv4-mapped IPv6 addresses (e.g. ::ffff:10.0.0.1) to IPv4
-                var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
-
-                if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
-                    throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
-
-                if (ip.AddressFamily == AddressFamily.InterNetwork)
-                {
-                    var bytes = ip.GetAddressBytes();
-                    var isPrivate = bytes[0] switch
-                    {
-                        10 => true,
-                        172 => bytes[1] >= 16 && bytes[1] <= 31,
-                        192 => bytes[1] == 168,
-                        169 => bytes[1] == 254,
-                        127 => true,
-                        0 => true,
-                        _ => false
-                    };
-                    if (isPrivate)
-                        throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
-                }
-                else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-                {
-                    var bytes = ip.GetAddressBytes();
-                    if (bytes[0] is 0xFC or 0xFD)
-                        throw new HttpRequestException($"Blocked rehost connection to private IP {ip}.");
-                }
-            }
-
-            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-            try
-            {
-                await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
-                return new NetworkStream(socket, ownsSocket: true);
-            }
-            catch
-            {
-                socket.Dispose();
-                throw;
-            }
-        }
+        ConnectCallback = SsrfValidator.CreateSafeConnectCallback("rehost")
     });
 
 // Web Push notification service (VAPID-authenticated).
@@ -446,53 +400,7 @@ builder.Services.AddHttpClient("webhook", client =>
     AllowAutoRedirect = false,
     UseCookies = false,
     PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-    ConnectCallback = async (context, cancellationToken) =>
-    {
-        // DNS rebinding protection: resolve and validate before connecting.
-        var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        foreach (var entry in entries)
-        {
-            var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
-
-            if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
-                throw new HttpRequestException($"Blocked webhook connection to private IP {ip}.");
-
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-            {
-                var bytes = ip.GetAddressBytes();
-                var isPrivate = bytes[0] switch
-                {
-                    10 => true,
-                    172 => bytes[1] >= 16 && bytes[1] <= 31,
-                    192 => bytes[1] == 168,
-                    169 => bytes[1] == 254,
-                    127 => true,
-                    0 => true,
-                    _ => false
-                };
-                if (isPrivate)
-                    throw new HttpRequestException($"Blocked webhook connection to private IP {ip}.");
-            }
-            else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-            {
-                var bytes = ip.GetAddressBytes();
-                if (bytes[0] is 0xFC or 0xFD)
-                    throw new HttpRequestException($"Blocked webhook connection to private IP {ip}.");
-            }
-        }
-
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
+    ConnectCallback = SsrfValidator.CreateSafeConnectCallback("webhook")
 });
 
 // Link preview HttpClient with DNS rebinding protection, redirect limits, and no cookies.
@@ -507,60 +415,7 @@ builder.Services.AddHttpClient<ILinkPreviewService, LinkPreviewService>(client =
     MaxAutomaticRedirections = 3,
     UseCookies = false,
     PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-    ConnectCallback = async (context, cancellationToken) =>
-    {
-        // DNS rebinding protection: resolve and validate before connecting.
-        var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        foreach (var entry in entries)
-        {
-            var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
-
-            if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
-            {
-                throw new HttpRequestException($"Blocked connection to private IP {ip}.");
-            }
-
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-            {
-                var bytes = ip.GetAddressBytes();
-                var isPrivate = bytes[0] switch
-                {
-                    10 => true,
-                    172 => bytes[1] >= 16 && bytes[1] <= 31,
-                    192 => bytes[1] == 168,
-                    169 => bytes[1] == 254,
-                    127 => true,
-                    0 => true,
-                    _ => false
-                };
-
-                if (isPrivate)
-                {
-                    throw new HttpRequestException($"Blocked connection to private IP {ip}.");
-                }
-            }
-            else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-            {
-                var bytes = ip.GetAddressBytes();
-                if (bytes[0] is 0xFC or 0xFD)
-                {
-                    throw new HttpRequestException($"Blocked connection to private IP {ip}.");
-                }
-            }
-        }
-
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
+    ConnectCallback = SsrfValidator.CreateSafeConnectCallback("link-preview")
 });
 
 // Image proxy HttpClient with DNS rebinding protection, redirect limits, and no cookies.
@@ -575,59 +430,7 @@ builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>(client =>
     MaxAutomaticRedirections = 3,
     UseCookies = false,
     PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-    ConnectCallback = async (context, cancellationToken) =>
-    {
-        var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-        foreach (var entry in entries)
-        {
-            var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
-
-            if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
-            {
-                throw new HttpRequestException($"Blocked connection to private IP {ip}.");
-            }
-
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-            {
-                var bytes = ip.GetAddressBytes();
-                var isPrivate = bytes[0] switch
-                {
-                    10 => true,
-                    172 => bytes[1] >= 16 && bytes[1] <= 31,
-                    192 => bytes[1] == 168,
-                    169 => bytes[1] == 254,
-                    127 => true,
-                    0 => true,
-                    _ => false
-                };
-
-                if (isPrivate)
-                {
-                    throw new HttpRequestException($"Blocked connection to private IP {ip}.");
-                }
-            }
-            else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-            {
-                var bytes = ip.GetAddressBytes();
-                if (bytes[0] is 0xFC or 0xFD)
-                {
-                    throw new HttpRequestException($"Blocked connection to private IP {ip}.");
-                }
-            }
-        }
-
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
+    ConnectCallback = SsrfValidator.CreateSafeConnectCallback("image-proxy")
 });
 
 // GitHub Issues API client for in-app bug reports.
@@ -707,19 +510,44 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()";
+    await next();
+});
+
 app.UseSerilogRequestLogging();
 
 app.UseRateLimiter();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Serve uploaded files as static content only when using local storage.
+// UseStaticFiles does not check auth on its own, so OnPrepareResponse rejects unauthenticated requests.
 if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
 {
+    void RejectUnauthenticated(StaticFileResponseContext ctx)
+    {
+        if (ctx.Context.User.Identity?.IsAuthenticated != true)
+        {
+            ctx.Context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            ctx.Context.Response.ContentLength = 0;
+            ctx.Context.Response.Body = Stream.Null;
+        }
+    }
+
     var avatarStoragePath = Path.Combine(uploadsPath, "avatars");
     Directory.CreateDirectory(avatarStoragePath);
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(avatarStoragePath),
-        RequestPath = "/uploads/avatars"
+        RequestPath = "/uploads/avatars",
+        OnPrepareResponse = RejectUnauthenticated
     });
 
     var imageStoragePath = Path.Combine(uploadsPath, "images");
@@ -727,7 +555,8 @@ if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(imageStoragePath),
-        RequestPath = "/uploads/images"
+        RequestPath = "/uploads/images",
+        OnPrepareResponse = RejectUnauthenticated
     });
 
     var emojiStoragePath = Path.Combine(uploadsPath, "emojis");
@@ -735,19 +564,18 @@ if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(emojiStoragePath),
-        RequestPath = "/uploads/emojis"
+        RequestPath = "/uploads/emojis",
+        OnPrepareResponse = RejectUnauthenticated
     });
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<AdminHub>("/hubs/admin");
 
-app.MapOpenApi();
 if (app.Environment.IsDevelopment())
 {
+    app.MapOpenApi();
     app.MapScalarApiReference();
 }
 

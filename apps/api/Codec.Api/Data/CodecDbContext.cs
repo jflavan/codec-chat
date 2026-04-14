@@ -138,6 +138,10 @@ public class CodecDbContext : DbContext
             .WithMany(user => user.ServerMemberships)
             .HasForeignKey(member => member.UserId);
 
+        // Performance: index on UserId for "find all servers a user belongs to" queries
+        modelBuilder.Entity<ServerMember>()
+            .HasIndex(member => member.UserId);
+
         modelBuilder.Entity<ServerRoleEntity>(e =>
         {
             e.HasOne(r => r.Server)
@@ -261,13 +265,19 @@ public class CodecDbContext : DbContext
         modelBuilder.Entity<DirectMessage>()
             .HasOne(message => message.AuthorUser)
             .WithMany(user => user.DirectMessages)
-            .HasForeignKey(message => message.AuthorUserId);
+            .HasForeignKey(message => message.AuthorUserId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<DirectMessage>()
             .HasIndex(message => message.DmChannelId);
 
         modelBuilder.Entity<DirectMessage>()
             .HasIndex(message => message.AuthorUserId);
+
+        // Performance: composite index for paginated DM queries
+        modelBuilder.Entity<DirectMessage>()
+            .HasIndex(message => new { message.DmChannelId, message.CreatedAt })
+            .IsDescending(false, true);
 
         // Server invite relationships and constraints.
         modelBuilder.Entity<ServerInvite>()
@@ -297,6 +307,11 @@ public class CodecDbContext : DbContext
 
         modelBuilder.Entity<Message>()
             .HasIndex(m => m.ReplyToMessageId);
+
+        // Performance: composite index for paginated message queries (GetMessages)
+        modelBuilder.Entity<Message>()
+            .HasIndex(m => new { m.ChannelId, m.CreatedAt })
+            .IsDescending(false, true);
 
         // DirectMessage self-reference for replies.
         modelBuilder.Entity<DirectMessage>()
@@ -587,6 +602,8 @@ public class CodecDbContext : DbContext
             e.Property(r => r.Resolution).HasMaxLength(2000);
             e.HasIndex(r => r.Status);
             e.HasIndex(r => new { r.ReportType, r.TargetId });
+            e.HasIndex(r => r.ReporterId);
+            e.HasIndex(r => r.AssignedToUserId);
         });
 
         modelBuilder.Entity<AdminAction>(e =>
