@@ -23,14 +23,14 @@
 	--selection-bg: #0F3A22;
 	--input-bg: #06160C;
 
-	--banner-bg: #061A0C;
-	--banner-border: #0D3A1A;
-	--banner-title: #00FF66;
-	--banner-body: #5AC76A;
-	--banner-icon: #00CC52;
-	--banner-dismiss: #3A7A44;
-	--banner-dismiss-hover: #86FF6B;
-	--banner-dismiss-hover-bg: #0D3A1A;
+	--banner-bg: #06160C;              /* input_bg */
+	--banner-border: #1E3A26;          /* border */
+	--banner-title: #00FF66;           /* accent */
+	--banner-body: #3ED44E;            /* text_muted */
+	--banner-icon: #00FF66;            /* accent */
+	--banner-dismiss: #2D7A3A;         /* text_dim */
+	--banner-dismiss-hover: #86FF6B;   /* text_normal */
+	--banner-dismiss-hover-bg: #123A22;/* mention_bg */
 }
 
 /* ===== Midnight – dark navy/slate palette ===== */
@@ -58,14 +58,14 @@
 	--selection-bg: #182A48;
 	--input-bg: #141828;
 
-	--banner-bg: #161C36;
-	--banner-border: #263060;
-	--banner-title: #7BA6FF;
-	--banner-body: #9AA3B8;
-	--banner-icon: #5B8DEF;
-	--banner-dismiss: #6B7280;
-	--banner-dismiss-hover: #C8CDD8;
-	--banner-dismiss-hover-bg: #1E2848;
+	--banner-bg: #171B2E;              /* bg_secondary */
+	--banner-border: #2A3045;          /* border */
+	--banner-title: #7BA6FF;           /* accent_hover */
+	--banner-body: #8B919C;            /* text_muted */
+	--banner-icon: #5B8DEF;            /* accent */
+	--banner-dismiss: #6B7280;         /* text_dim */
+	--banner-dismiss-hover: #C8CDD8;   /* text_normal */
+	--banner-dismiss-hover-bg: #1A2845;/* mention_bg */
 }
 
 /* ===== Ember – warm amber/orange palette ===== */
@@ -93,14 +93,14 @@
 	--selection-bg: #2E2618;
 	--input-bg: #15100A;
 
-	--banner-bg: #1E1508;
-	--banner-border: #4A3820;
-	--banner-title: #F0A030;
-	--banner-body: #BFA880;
-	--banner-icon: #D89020;
-	--banner-dismiss: #7D6D55;
-	--banner-dismiss-hover: #D4C4A8;
-	--banner-dismiss-hover-bg: #2E2215;
+	--banner-bg: #18120C;              /* bg_secondary */
+	--banner-border: #3A2E20;          /* border */
+	--banner-title: #F0A030;           /* accent */
+	--banner-body: #9A8A70;            /* text_muted */
+	--banner-icon: #F0A030;            /* accent */
+	--banner-dismiss: #7D6D55;         /* text_dim */
+	--banner-dismiss-hover: #D4C4A8;   /* text_normal */
+	--banner-dismiss-hover-bg: #302415;/* mention_bg */
 }
 
 /* ===== Light – Apple-inspired light palette ===== */
@@ -128,12 +128,12 @@
 	--selection-bg: #DCE8FC;
 	--input-bg: #F5F5F7;
 
-	--banner-bg: #EDF2FC;
-	--banner-border: #C8D8F0;
-	--banner-title: #0044AA;
-	--banner-body: #3D3D42;
-	--banner-icon: #0055CC;
-	--banner-dismiss: #8E8E93;
-	--banner-dismiss-hover: #1D1D1F;
-	--banner-dismiss-hover-bg: #DCE4F4;
+	--banner-bg: #E8F0FE;              /* mention_bg */
+	--banner-border: #D2D2D7;          /* border */
+	--banner-title: #0055CC;           /* accent */
+	--banner-body: #1D1D1F;            /* text_normal */
+	--banner-icon: #0055CC;            /* accent */
+	--banner-dismiss: #6E6E73;         /* text_muted */
+	--banner-dismiss-hover: #1D1D1F;   /* text_normal */
+	--banner-dismiss-hover-bg: #DCE8FC;/* selection_bg */
 }
