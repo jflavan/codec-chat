@@ -126,6 +126,7 @@ public class DiscordImportController : ControllerBase
             importedMembers = import.ImportedMembers,
             startedAt = import.StartedAt,
             completedAt = import.CompletedAt,
+            lastSyncedAt = import.LastSyncedAt,
             errorMessage = import.ErrorMessage,
             discordGuildId = import.DiscordGuildId
         });

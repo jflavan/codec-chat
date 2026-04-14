@@ -509,7 +509,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `GET /servers/{serverId}/discord-import/mappings` - List Discord-to-Codec user mappings (requires ManageServer permission)
 - `POST /servers/{serverId}/discord-import/claim` - Claim a Discord identity and link imported messages to Codec account (requires server membership)
 
-After the text import completes, a media re-hosting phase downloads imported emoji and message image attachments from Discord's CDN and re-uploads them to Codec's own storage (Local or AzureBlob). This ensures media remains accessible after Discord CDN URLs expire. Images over 10MB are resized (max 4096px) and compressed. Emojis over 512KB are compressed. Non-image files are skipped.
+After the text import completes, a media re-hosting phase downloads imported emoji and message image attachments from Discord's CDN and re-uploads them to Codec's own storage (Local or AzureBlob). This ensures media remains accessible after Discord CDN URLs expire. Images over 10MB are resized (max 4096px) and compressed. Emojis over 512KB are compressed. Non-image files are skipped. On worker startup, orphaned imports are recovered: stuck `RehostingMedia` imports are re-queued for resumption via `ResumeMediaRehostAsync`, while orphaned `InProgress` imports are marked as `Failed`. The resync endpoint also accepts imports in `RehostingMedia` state, allowing users to retry a stuck media re-hosting phase. The frontend detects stale re-hosting (>30 minutes since `LastSyncedAt`) and prompts the user to re-sync from server settings.
 
 #### Push Notifications
 - `GET /push-subscriptions/vapid-key` - Get VAPID public key for Web Push API (public, no auth)

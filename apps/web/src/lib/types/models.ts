@@ -539,6 +539,7 @@ export type DiscordImport = {
 	importedMembers: number;
 	startedAt?: string | null;
 	completedAt?: string | null;
+	lastSyncedAt?: string | null;
 	errorMessage?: string | null;
 	discordGuildId: string;
 	stage?: string | null;

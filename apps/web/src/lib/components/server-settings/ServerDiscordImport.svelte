@@ -18,11 +18,12 @@
 	const isFailed = $derived(importStatus?.status === 'Failed');
 	const mappings = $derived(servers.discordUserMappings);
 
-	const isStaleRehost = $derived(
-		importStatus?.status === 'RehostingMedia' &&
-		!!importStatus.startedAt &&
-		new Date(importStatus.startedAt).getTime() < Date.now() - 30 * 60 * 1000
-	);
+	const isStaleRehost = $derived.by(() => {
+		if (importStatus?.status !== 'RehostingMedia') return false;
+		const rehostStarted = importStatus.lastSyncedAt ?? importStatus.startedAt;
+		if (!rehostStarted) return false;
+		return new Date(rehostStarted).getTime() < Date.now() - 30 * 60 * 1000;
+	});
 
 	$effect(() => {
 		if (serverId) {

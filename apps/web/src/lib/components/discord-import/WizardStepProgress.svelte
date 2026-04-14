@@ -20,8 +20,9 @@
 	const isFailed = $derived(importStatus?.status === 'Failed');
 	const isStaleRehost = $derived.by(() => {
 		if (importStatus?.status !== 'RehostingMedia') return false;
-		if (!importStatus.startedAt) return false;
-		const started = new Date(importStatus.startedAt).getTime();
+		const rehostStarted = importStatus.lastSyncedAt ?? importStatus.startedAt;
+		if (!rehostStarted) return false;
+		const started = new Date(rehostStarted).getTime();
 		const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
 		return started < thirtyMinutesAgo;
 	});
