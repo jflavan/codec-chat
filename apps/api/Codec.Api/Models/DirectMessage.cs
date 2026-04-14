@@ -8,7 +8,7 @@ public class DirectMessage
 {
     public Guid Id { get; set; }
     public Guid DmChannelId { get; set; }
-    public Guid AuthorUserId { get; set; }
+    public Guid? AuthorUserId { get; set; }
     public string AuthorName { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public MessageType MessageType { get; set; } = MessageType.Regular;
