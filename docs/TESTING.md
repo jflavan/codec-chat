@@ -8,10 +8,10 @@ Codec uses a multi-layer testing strategy combining unit tests and integration t
 |-------|-----------|-------|----------------|
 | API Unit Tests | xUnit + FluentAssertions + Moq | 1,308 | Services: 95%+ |
 | API Integration Tests | xUnit + WebApplicationFactory + Testcontainers | 182 | Controllers + Hub: 80%+ |
-| Web Unit Tests | Vitest + jsdom | 181 | Utilities + API client: 85%+ |
+| Web Unit Tests | Vitest + jsdom | 234 | Utilities + API client: 85%+ |
 | Admin Unit Tests | Vitest + jsdom | 75 | API client + services: 98%+ |
 
-**Total: 1,746 tests**
+**Total: 1,799 tests**
 
 ## Running Tests
 
@@ -82,11 +82,15 @@ Pure unit tests using Vitest with jsdom environment. No browser or API server re
 - `lib/auth/session.ts` — JWT expiry checks, session persistence, token management (100% coverage)
 - `lib/api/client.ts` — All 50+ ApiClient methods, auth methods (register, login, refresh, link-google), error handling, 401 retry logic (97%+ coverage)
 
-**What's excluded from coverage** (requires browser APIs or framework integration):
-- `lib/state/*.svelte.ts` — Svelte 5 reactive stores with context injection
-- `lib/services/chat-hub.ts` — SignalR client lifecycle
-- `lib/services/voice-service.ts` — mediasoup WebRTC client
+**What's excluded from coverage** (requires browser APIs or external SDK integration):
+- `lib/services/voice-service.ts` — LiveKit WebRTC client
+- `lib/services/push-notifications.ts` — Web Push browser API
 - `lib/auth/google.ts` — Google Identity Services SDK
+- `lib/auth/oauth.ts` — GitHub/Discord OAuth redirect helpers
+
+**Included in coverage** (testable with jsdom):
+- `lib/state/*.svelte.ts` — Svelte 5 reactive stores
+- `lib/services/chat-hub.ts` — SignalR hub service
 
 ### API Unit Tests (`apps/api/Codec.Api.Tests/`)
 
