@@ -1,18 +1,3 @@
-/** Message type enum matching C# MessageType. */
-export enum MessageType {
-	Regular = 0,
-	VoiceCallEvent = 1,
-	PinNotification = 2
-}
-
-/** Report status enum matching C# ReportStatus. */
-export enum ReportStatus {
-	Open = 0,
-	Reviewing = 1,
-	Resolved = 2,
-	Dismissed = 3
-}
-
 /** User presence status. */
 export type PresenceStatus = 'online' | 'idle' | 'offline';
 

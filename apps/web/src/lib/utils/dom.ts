@@ -3,7 +3,7 @@ export const isTouchDevice =
 	typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 /** Find the nearest ancestor with overflow-y: auto or scroll (the clipping boundary). */
-export function findScrollParent(el: HTMLElement): HTMLElement | null {
+function findScrollParent(el: HTMLElement): HTMLElement | null {
 	let parent = el.parentElement;
 	while (parent) {
 		const { overflowY } = getComputedStyle(parent);
