@@ -6,7 +6,7 @@
 	import { getMessageStore } from '$lib/state/message-store.svelte.js';
 	import { getDmStore } from '$lib/state/dm-store.svelte.js';
 	import { getVoiceStore } from '$lib/state/voice-store.svelte.js';
-	import { formatTime } from '$lib/utils/format.js';
+	import { formatTime, formatMessageTimestamp, formatDateSeparator, isDifferentDay } from '$lib/utils/format.js';
 	import LinkifiedText from '$lib/components/chat/LinkifiedText.svelte';
 	import LinkPreviewCard from '$lib/components/chat/LinkPreviewCard.svelte';
 	import FileCard from '$lib/components/chat/FileCard.svelte';
@@ -423,6 +423,13 @@
 				</p>
 			{:else}
 				{#each dms.dmMessages as message, i (message.id)}
+					{@const prev = i > 0 ? dms.dmMessages[i - 1] : null}
+					{@const newDay = !prev || isDifferentDay(prev.createdAt, message.createdAt)}
+					{#if newDay}
+						<div class="date-separator" role="separator">
+							<span class="date-separator-label">{formatDateSeparator(message.createdAt)}</span>
+						</div>
+					{/if}
 					{#if message.messageType === 1}
 						<div class="system-message voice-call-event">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="call-event-icon" class:missed={message.body === 'missed'}>
@@ -441,8 +448,7 @@
 							<time class="call-event-time">{formatTime(message.createdAt)}</time>
 						</div>
 					{:else}
-					{@const prev = i > 0 ? dms.dmMessages[i - 1] : null}
-					{@const isGrouped = prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
+					{@const isGrouped = !newDay && prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 					{@const ytUrls = message.body ? extractYouTubeUrls(message.body) : []}
 					{@const coveredIds = new Set((message.linkPreviews ?? []).map((lp) => { const m = /[\w-]{11}/.exec(lp.url); return m?.[0] ?? ''; }).filter(Boolean))}
 					{@const uncoveredYt = ytUrls.filter((yt) => !coveredIds.has(yt.videoId))}				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={msgStore.highlightedMessageId === message.id}>					<article class="message" class:grouped={isGrouped}>
@@ -473,7 +479,7 @@
 							{/if}
 								<div class="message-header">
 									<strong class="message-author" class:deleted-user={!message.authorUserId}>{message.authorUserId ? message.authorName : 'Deleted User'}</strong>
-									<time class="message-time">{formatTime(message.createdAt)}</time>
+									<time class="message-time">{formatMessageTimestamp(message.createdAt)}</time>
 									{#if message.editedAt}
 										<span class="edited-label">(edited)</span>
 									{/if}
@@ -958,6 +964,29 @@
 
 	.feed-status { padding: 16px; text-align: center; }
 	.muted { color: var(--text-muted); }
+
+	.date-separator {
+		display: flex;
+		align-items: center;
+		margin: 8px 16px;
+		gap: 8px;
+	}
+
+	.date-separator::before,
+	.date-separator::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--border);
+	}
+
+	.date-separator-label {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-muted);
+		white-space: nowrap;
+		padding: 2px 4px;
+	}
 
 	.message {
 		position: relative;
