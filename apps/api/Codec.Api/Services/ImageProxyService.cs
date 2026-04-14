@@ -188,44 +188,11 @@ public sealed class ImageProxyService : IImageProxyService
 
         if (IPAddress.TryParse(uri.Host, out var ip))
         {
-            if (IsPrivateOrReserved(ip))
+            if (SsrfValidator.IsPrivateOrReserved(ip))
                 return false;
         }
 
         return true;
-    }
-
-    private static bool IsPrivateOrReserved(IPAddress ip)
-    {
-        if (IPAddress.IsLoopback(ip))
-            return true;
-
-        if (ip.AddressFamily == AddressFamily.InterNetwork)
-        {
-            var bytes = ip.GetAddressBytes();
-            return bytes[0] switch
-            {
-                10 => true,
-                172 => bytes[1] >= 16 && bytes[1] <= 31,
-                192 => bytes[1] == 168,
-                169 => bytes[1] == 254,
-                127 => true,
-                0 => true,
-                _ => false
-            };
-        }
-
-        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
-                return true;
-
-            var bytes = ip.GetAddressBytes();
-            if (bytes[0] is 0xFC or 0xFD)
-                return true;
-        }
-
-        return false;
     }
 
     private static string ComputeUrlHash(string url)

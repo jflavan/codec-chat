@@ -230,57 +230,13 @@ public sealed class LinkPreviewService : ILinkPreviewService
         // Block IP-based hosts in private ranges.
         if (IPAddress.TryParse(uri.Host, out var ip))
         {
-            if (IsPrivateOrReserved(ip))
+            if (SsrfValidator.IsPrivateOrReserved(ip))
             {
                 return false;
             }
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// Checks if an IP address is in a private, loopback, or link-local range.
-    /// </summary>
-    private static bool IsPrivateOrReserved(IPAddress ip)
-    {
-        if (IPAddress.IsLoopback(ip))
-        {
-            return true;
-        }
-
-        if (ip.AddressFamily == AddressFamily.InterNetwork)
-        {
-            var bytes = ip.GetAddressBytes();
-            return bytes[0] switch
-            {
-                10 => true,                                           // 10.0.0.0/8
-                172 => bytes[1] >= 16 && bytes[1] <= 31,             // 172.16.0.0/12
-                192 => bytes[1] == 168,                               // 192.168.0.0/16
-                169 => bytes[1] == 254,                               // 169.254.0.0/16 link-local
-                127 => true,                                          // 127.0.0.0/8
-                0 => true,                                            // 0.0.0.0/8
-                _ => false
-            };
-        }
-
-        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            // ::1 loopback, fc00::/7 unique local, fe80::/10 link-local
-            if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
-            {
-                return true;
-            }
-
-            var bytes = ip.GetAddressBytes();
-            // fc00::/7 — first byte is 0xFC or 0xFD
-            if (bytes[0] is 0xFC or 0xFD)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>
