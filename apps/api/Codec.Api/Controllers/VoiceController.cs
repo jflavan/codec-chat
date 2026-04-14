@@ -118,7 +118,8 @@ public class VoiceController(CodecDbContext db, IUserService userService, IConfi
             return NoContent();
 
         var otherUserId = call.CallerUserId == appUser.Id ? call.RecipientUserId : call.CallerUserId;
-        var otherUser = await db.Users.AsNoTracking().FirstAsync(u => u.Id == otherUserId);
+        var otherUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == otherUserId);
+        if (otherUser is null) return NotFound(new { error = "User not found." });
 
         return Ok(new
         {
