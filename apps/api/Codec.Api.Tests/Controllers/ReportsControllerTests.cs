@@ -34,6 +34,7 @@ public class ReportsControllerTests : IDisposable
         _db.Users.Add(_testUser);
         _db.Users.Add(_targetUser);
         _db.Servers.Add(_testServer);
+        _db.ServerMembers.Add(new ServerMember { ServerId = _testServer.Id, UserId = _testUser.Id });
         _db.SaveChanges();
 
         _userService.Setup(u => u.GetOrCreateUserAsync(It.IsAny<ClaimsPrincipal>()))

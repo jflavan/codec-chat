@@ -597,10 +597,17 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         int deletedMessageCount = 0;
         if (request.DeleteMessages)
         {
-            deletedMessageCount = await db.Messages
-                .Where(m => db.Channels.Where(c => c.ServerId == serverId).Select(c => c.Id).Contains(m.ChannelId)
-                    && m.AuthorUserId == targetUserId)
-                .ExecuteDeleteAsync();
+            var channelIds = await db.Channels
+                .AsNoTracking()
+                .Where(c => c.ServerId == serverId)
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            var messagesToDelete = await db.Messages
+                .Where(m => channelIds.Contains(m.ChannelId) && m.AuthorUserId == targetUserId)
+                .ToListAsync();
+            deletedMessageCount = messagesToDelete.Count;
+            db.Messages.RemoveRange(messagesToDelete);
         }
 
         audit.Log(serverId, appUser.Id, AuditAction.MemberBanned,
