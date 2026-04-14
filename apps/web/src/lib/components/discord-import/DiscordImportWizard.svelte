@@ -122,20 +122,21 @@
 <dialog
 	bind:this={dialogEl}
 	class="wizard-dialog"
-	aria-label="Import from Discord"
+	aria-labelledby="discord-wizard-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
 	<div class="wizard-panel">
-		<button class="close-btn" onclick={close} aria-label="Close">
-			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+		<span id="discord-wizard-title" class="sr-only">Import from Discord</span>
+		<button class="close-btn" onclick={close} aria-label="Close dialog">
+			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
 			</svg>
 		</button>
 
-		<!-- Step indicators -->
+		<!-- Step indicators (decorative, screen reader uses step heading text) -->
 		{#if currentStep < 4}
-			<div class="step-indicators">
+			<div class="step-indicators" aria-hidden="true">
 				{#each [1, 2, 3] as step}
 					<div class="step-dot" class:active={currentStep === step} class:completed={currentStep > step}></div>
 				{/each}
@@ -198,6 +199,18 @@
 </dialog>
 
 <style>
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
 	.wizard-dialog {
 		position: fixed;
 		inset: 0;

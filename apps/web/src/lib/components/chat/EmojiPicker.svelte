@@ -154,6 +154,7 @@
 			<button
 				class="category-tab"
 				title={cat.name}
+				aria-label={cat.name}
 				onclick={() => scrollToCategory(cat.id)}
 			>
 				{cat.icon}
@@ -171,6 +172,7 @@
 							type="button"
 							class="emoji-btn"
 							title={item.name}
+							aria-label={item.name}
 							onclick={() => handleSelect(item.emoji)}
 						>
 							{#if item.isCustom && item.imageUrl}

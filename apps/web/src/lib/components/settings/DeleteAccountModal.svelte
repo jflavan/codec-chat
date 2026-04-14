@@ -13,6 +13,18 @@
 	const auth = getAuthStore();
 	const ui = getUIStore();
 
+	let dialogEl = $state<HTMLElement | null>(null);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		previousFocus = document.activeElement as HTMLElement | null;
+		// Focus the dialog container when mounted
+		setTimeout(() => dialogEl?.focus(), 0);
+		return () => {
+			previousFocus?.focus();
+		};
+	});
+
 	let password = $state('');
 	let confirmationText = $state('');
 	let error = $state('');
@@ -75,77 +87,108 @@
 	}
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
-		<h2 id="delete-title" class="modal-title">Delete Account</h2>
+<div class="modal-backdrop" aria-hidden="true" onclick={onclose}></div>
+<div
+	class="modal"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="delete-title"
+	aria-describedby="delete-warning"
+	tabindex="-1"
+	bind:this={dialogEl}
+	onclick={(e) => e.stopPropagation()}
+	onkeydown={(e) => {
+		if (e.key === 'Escape') { onclose(); return; }
+		// Focus trap
+		if (e.key === 'Tab' && dialogEl) {
+			const focusable = Array.from(
+				dialogEl.querySelectorAll<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				)
+			).filter((el) => !el.hasAttribute('disabled'));
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+			} else {
+				if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+			}
+		}
+	}}
+>
+	<h2 id="delete-title" class="modal-title">Delete Account</h2>
 
-		<div class="warning">
-			<p><strong>This action is permanent and cannot be undone.</strong></p>
+	<div class="warning" id="delete-warning">
+		<p><strong>This action is permanent and cannot be undone.</strong></p>
+		<ul>
+			<li>Your messages will remain but show as "Deleted User"</li>
+			<li>All server memberships will be removed</li>
+			<li>All friendships will be removed</li>
+			<li>Your account data will be permanently erased</li>
+		</ul>
+	</div>
+
+	{#if ownedServers.length > 0}
+		<div class="owned-servers-warning">
+			<p>You must transfer ownership of these servers before deleting your account:</p>
 			<ul>
-				<li>Your messages will remain but show as "Deleted User"</li>
-				<li>All server memberships will be removed</li>
-				<li>All friendships will be removed</li>
-				<li>Your account data will be permanently erased</li>
+				{#each ownedServers as server}
+					<li>{server.name}</li>
+				{/each}
 			</ul>
 		</div>
-
-		{#if ownedServers.length > 0}
-			<div class="owned-servers-warning">
-				<p>You must transfer ownership of these servers before deleting your account:</p>
-				<ul>
-					{#each ownedServers as server}
-						<li>{server.name}</li>
-					{/each}
-				</ul>
-			</div>
-		{:else}
-			{#if needsPassword}
-				<label class="field">
-					<span class="field-label">Password</span>
-					<input
-						type="password"
-						bind:value={password}
-						placeholder="Enter your password"
-						autocomplete="current-password"
-					/>
-				</label>
-			{:else if needsGoogle}
-				<div class="field">
-					<span class="field-label">Re-authenticate with Google</span>
-					{#if googleCredential}
-						<p class="google-verified">Google identity verified</p>
-					{:else}
-						<div id="delete-google-button"></div>
-					{/if}
-				</div>
-			{/if}
-
-			<label class="field">
-				<span class="field-label">Type <strong>DELETE</strong> to confirm</span>
+	{:else}
+		{#if needsPassword}
+			<label class="field" for="delete-password">
+				<span class="field-label">Password</span>
 				<input
-					type="text"
-					bind:value={confirmationText}
-					placeholder="DELETE"
-					autocomplete="off"
+					id="delete-password"
+					type="password"
+					bind:value={password}
+					placeholder="Enter your password"
+					autocomplete="current-password"
 				/>
 			</label>
-
-			{#if error}
-				<p class="error">{error}</p>
-			{/if}
-
-			<div class="actions">
-				<button class="cancel-btn" onclick={onclose} disabled={isDeleting}>Cancel</button>
-				<button
-					class="delete-btn"
-					onclick={handleDelete}
-					disabled={!canSubmit}
-				>
-					{isDeleting ? 'Deleting...' : 'Delete My Account'}
-				</button>
+		{:else if needsGoogle}
+			<div class="field">
+				<span class="field-label" id="delete-google-label">Re-authenticate with Google</span>
+				{#if googleCredential}
+					<p class="google-verified">Google identity verified</p>
+				{:else}
+					<div id="delete-google-button" aria-labelledby="delete-google-label"></div>
+				{/if}
 			</div>
 		{/if}
-	</div>
+
+		<label class="field" for="delete-confirm">
+			<span class="field-label">Type <strong>DELETE</strong> to confirm</span>
+			<input
+				id="delete-confirm"
+				type="text"
+				bind:value={confirmationText}
+				placeholder="DELETE"
+				autocomplete="off"
+				aria-describedby="delete-warning"
+			/>
+		</label>
+
+		{#if error}
+			<p class="error" role="alert">{error}</p>
+		{/if}
+
+		<div class="actions">
+			<button class="cancel-btn" onclick={onclose} disabled={isDeleting}>Cancel</button>
+			<button
+				class="delete-btn"
+				onclick={handleDelete}
+				disabled={!canSubmit}
+				aria-busy={isDeleting}
+			>
+				{isDeleting ? 'Deleting...' : 'Delete My Account'}
+			</button>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -153,13 +196,14 @@
 		position: fixed;
 		inset: 0;
 		background: rgba(0, 0, 0, 0.7);
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		z-index: 1000;
 	}
 
 	.modal {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
 		background: var(--bg-primary);
 		border-radius: 8px;
 		padding: 24px;
@@ -167,6 +211,7 @@
 		width: 90%;
 		max-height: 80vh;
 		overflow-y: auto;
+		z-index: 1001;
 	}
 
 	.modal-title {

@@ -135,6 +135,8 @@
 				class:pending={isPending(reaction.emoji)}
 				disabled={isPending(reaction.emoji)}
 				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
+				aria-label="{hasReacted(reaction) ? 'Remove' : 'Add'} {custom ? `:${custom.name}:` : reaction.emoji} reaction, {reaction.count} {reaction.count === 1 ? 'reaction' : 'reactions'}"
+				aria-pressed={hasReacted(reaction)}
 				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
 			>
 				<span class="reaction-emoji">

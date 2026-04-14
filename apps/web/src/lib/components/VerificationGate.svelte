@@ -54,12 +54,12 @@
 
 <div class="verification-overlay">
 	<div class="verification-card">
-		<div class="icon">&#9993;</div>
-		<h2>Check your email</h2>
+		<div class="icon" aria-hidden="true">&#9993;</div>
+		<h1 class="h2">Check your email</h1>
 		<p>We sent a verification link to your email address. Click the link to verify your account and start using Codec.</p>
 
 		<div class="actions">
-			<button class="btn-primary" onclick={handleCheck} disabled={checking}>
+			<button class="btn-primary" onclick={handleCheck} disabled={checking} aria-busy={checking}>
 				{checking ? 'Checking...' : "I've verified my email"}
 			</button>
 
@@ -67,6 +67,7 @@
 				class="btn-secondary"
 				onclick={handleResend}
 				disabled={resendCooldown > 0}
+				aria-label={resendCooldown > 0 ? `Resend available in ${formatTime(resendCooldown)}` : 'Resend verification email'}
 			>
 				{resendCooldown > 0
 					? `Resend in ${formatTime(resendCooldown)}`
@@ -74,12 +75,14 @@
 			</button>
 		</div>
 
-		{#if resendSuccess}
-			<p class="success">Verification email sent!</p>
-		{/if}
-		{#if resendError}
-			<p class="error">{resendError}</p>
-		{/if}
+		<div aria-live="polite" aria-atomic="true">
+			{#if resendSuccess}
+				<p class="success">Verification email sent!</p>
+			{/if}
+			{#if resendError}
+				<p class="error" role="alert">{resendError}</p>
+			{/if}
+		</div>
 
 		<button class="btn-link" onclick={() => auth.signOut()}>Sign out</button>
 	</div>
@@ -107,9 +110,11 @@
 		margin-bottom: 16px;
 	}
 
-	h2 {
+	h1, .h2 {
 		color: var(--text-primary, #f2f3f5);
 		margin-bottom: 8px;
+		font-size: 1.5rem;
+		font-weight: 600;
 	}
 
 	p {

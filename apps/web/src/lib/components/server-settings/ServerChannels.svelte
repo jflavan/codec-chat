@@ -165,7 +165,9 @@
 	<section class="settings-section">
 		<h2 class="section-title">Add Category</h2>
 		<div class="add-category-row">
+			<label for="new-category-name" class="sr-only">Category name</label>
 			<input
+				id="new-category-name"
 				type="text"
 				class="input"
 				placeholder="Category name"
@@ -205,7 +207,9 @@
 			<div class="category-header">
 				{#if categoryEditId === group.categoryId}
 					<div class="category-edit-row">
+						<label for="category-edit-name-{group.categoryId}" class="sr-only">Category name</label>
 						<input
+							id="category-edit-name-{group.categoryId}"
 							type="text"
 							class="input input-sm"
 							bind:value={categoryEditName}
@@ -252,7 +256,9 @@
 			<div class="channel-edit">
 				<div class="channel-edit-name-row">
 					{@render channelTypeIcon(channel.type)}
+					<label for="channel-edit-name-{channel.id}" class="sr-only">Channel name</label>
 					<input
+						id="channel-edit-name-{channel.id}"
 						type="text"
 						class="input"
 						bind:value={channelEditName}
@@ -265,7 +271,9 @@
 					/>
 				</div>
 				{#if channel.type !== 'voice'}
+					<label for="channel-edit-desc-{channel.id}" class="sr-only">Channel description</label>
 					<textarea
+						id="channel-edit-desc-{channel.id}"
 						class="input textarea"
 						maxlength="256"
 						rows="2"
@@ -645,5 +653,17 @@
 		color: var(--danger);
 		font-size: 12px;
 		white-space: nowrap;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

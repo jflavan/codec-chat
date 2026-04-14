@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { tick } from 'svelte';
 
 	const ui = getUIStore();
 
+	let dialogEl: HTMLDivElement | undefined = $state(undefined);
+	let previouslyFocused: HTMLElement | null = null;
+
 	function handleClose(): void {
 		ui.closeImagePreview();
+		previouslyFocused?.focus();
 	}
 
 	function handleBackdropClick(e: MouseEvent): void {
@@ -17,13 +22,40 @@
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			handleClose();
+			return;
+		}
+		// Focus trap: cycle Tab/Shift+Tab within dialog
+		if (e.key === 'Tab' && dialogEl) {
+			const focusable = Array.from(
+				dialogEl.querySelectorAll<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				)
+			).filter((el) => !el.hasAttribute('disabled'));
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+			} else {
+				if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+			}
 		}
 	}
+
+	$effect(() => {
+		if (ui.lightboxImageUrl) {
+			previouslyFocused = document.activeElement as HTMLElement | null;
+			tick().then(() => {
+				dialogEl?.focus();
+			});
+		}
+	});
 </script>
 
 {#if ui.lightboxImageUrl}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
+		bind:this={dialogEl}
 		class="lightbox-backdrop"
 		role="dialog"
 		aria-label="Image preview"

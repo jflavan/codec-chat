@@ -172,9 +172,9 @@ import { ReportType } from '$lib/types/index.js';
 	{#if !grouped}
 		<div class="message-avatar-col">
 			{#if message.importedAuthorAvatarUrl}
-				<img class="message-avatar-img" src={message.importedAuthorAvatarUrl} alt="" />
+				<img class="message-avatar-img" src={message.importedAuthorAvatarUrl} alt="{message.importedAuthorName ?? message.authorName}'s avatar" />
 			{:else if message.authorAvatarUrl}
-				<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
+				<img class="message-avatar-img" src={message.authorAvatarUrl} alt="{message.authorName}'s avatar" />
 			{:else}
 				<div class="message-avatar" class:deleted-avatar={!message.authorUserId && !message.importedAuthorName} aria-hidden="true">
 					{message.importedAuthorName ? message.importedAuthorName.slice(0, 1).toUpperCase() : message.authorUserId ? message.authorName.slice(0, 1).toUpperCase() : '?'}
@@ -190,7 +190,7 @@ import { ReportType } from '$lib/types/index.js';
 			{/if}
 			<div class="message-header">
 				<strong class="message-author" class:deleted-user={!message.authorUserId && !message.importedAuthorName}>{message.importedAuthorName ? message.importedAuthorName : message.authorUserId ? message.authorName : 'Deleted User'}</strong>{#if message.importedAuthorName}<ImportedAuthorBadge />{/if}
-				<time class="message-time">{formatMessageTimestamp(message.createdAt)}</time>
+				<time class="message-time" datetime={message.createdAt}>{formatMessageTimestamp(message.createdAt)}</time>
 				{#if message.editedAt}
 					<span class="edited-label">(edited)</span>
 				{/if}
@@ -201,6 +201,7 @@ import { ReportType } from '$lib/types/index.js';
 						class="edit-input"
 						bind:value={editBody}
 						onkeydown={handleEditKeydown}
+						aria-label="Edit message"
 					></textarea>
 					<div class="edit-actions">
 						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
@@ -248,7 +249,7 @@ import { ReportType } from '$lib/types/index.js';
 		</div>
 	{:else}
 		<div class="message-avatar-col">
-			<time class="message-time-inline">{formatTime(message.createdAt)}</time>
+			<time class="message-time-inline" datetime={message.createdAt}>{formatTime(message.createdAt)}</time>
 		</div>
 		<div class="message-content">
 			{#if message.replyContext}
@@ -263,6 +264,7 @@ import { ReportType } from '$lib/types/index.js';
 						class="edit-input"
 						bind:value={editBody}
 						onkeydown={handleEditKeydown}
+						aria-label="Edit message"
 					></textarea>
 					<div class="edit-actions">
 						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
@@ -536,7 +538,8 @@ import { ReportType } from '$lib/types/index.js';
 		}
 
 		.message:focus {
-			outline: none;
+			outline: 2px solid var(--accent);
+			outline-offset: -2px;
 		}
 	}
 	.pin-indicator {

@@ -171,8 +171,8 @@
 
 	{#if showPicker}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="picker-backdrop" onclick={closePicker} onkeydown={closePicker}></div>
-		<div class="emoji-picker" role="menu">
+		<div class="picker-backdrop" onclick={closePicker} onkeydown={(e) => { if (e.key === 'Escape') closePicker(); }}></div>
+		<div class="emoji-picker" role="menu" aria-label="Quick reactions">
 			{#each quickEmojis as emoji}
 				{@const customEmoji = getCustomEmoji(emoji)}
 				<button

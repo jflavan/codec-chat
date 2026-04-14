@@ -93,7 +93,9 @@
 	{#if canBan(member)}
 		{#if banningUserId === member.userId}
 			<div class="ban-confirm">
+				<label for="ban-reason-{member.userId}" class="sr-only">Ban reason (optional)</label>
 				<input
+					id="ban-reason-{member.userId}"
 					class="ban-reason-input"
 					type="text"
 					placeholder="Reason (optional)"
@@ -122,14 +124,14 @@
 {/snippet}
 
 <section class="server-members-settings">
-	<h2 class="section-title">Members</h2>
+	<h1 class="section-title">Members</h1>
 	<p class="section-desc">Manage member roles for this server.</p>
 
 	<ul class="member-list" role="list">
 		{#each servers.members as member (member.userId)}
 			<li class="member-row">
 				{#if member.avatarUrl}
-					<img class="member-avatar" src={member.avatarUrl} alt="" />
+					<img class="member-avatar" src={member.avatarUrl} alt="" aria-hidden="true" />
 				{:else}
 					<div class="member-avatar-placeholder" aria-hidden="true">
 						{member.displayName.slice(0, 1).toUpperCase()}
@@ -152,7 +154,9 @@
 					{:else}
 						{#if canChangeRole(member)}
 							{#if changingRoleUserId === member.userId}
+								<label for="role-select-{member.userId}" class="sr-only">Assign role to {member.displayName}</label>
 								<select
+									id="role-select-{member.userId}"
 									class="role-select"
 									onchange={(e) => addRole(member.userId, (e.target as HTMLSelectElement).value)}
 								>
@@ -389,5 +393,17 @@
 	.ban-confirm-actions {
 		display: flex;
 		gap: 6px;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

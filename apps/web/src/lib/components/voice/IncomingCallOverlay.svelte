@@ -36,6 +36,18 @@
 		ringCleanup?.();
 	});
 
+	let overlayEl = $state<HTMLElement | null>(null);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		if (voice.incomingCall) {
+			previousFocus = document.activeElement as HTMLElement | null;
+			setTimeout(() => overlayEl?.focus(), 0);
+		} else {
+			previousFocus?.focus();
+		}
+	});
+
 	function accept() {
 		if (voice.incomingCall) {
 			voice.acceptCall(voice.incomingCall.callId);
@@ -47,10 +59,37 @@
 			voice.declineCall(voice.incomingCall.callId);
 		}
 	}
+
+	function handleKeydown(e: KeyboardEvent): void {
+		// Focus trap: cycle Tab/Shift+Tab within overlay
+		if (e.key === 'Tab' && overlayEl) {
+			const focusable = Array.from(
+				overlayEl.querySelectorAll<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				)
+			).filter((el) => !el.hasAttribute('disabled'));
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+			} else {
+				if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+			}
+		}
+	}
 </script>
 
 {#if voice.incomingCall}
-	<div class="call-overlay" role="alertdialog" aria-label="Incoming voice call">
+	<div
+		class="call-overlay"
+		role="alertdialog"
+		aria-modal="true"
+		aria-labelledby="incoming-call-label"
+		tabindex="-1"
+		bind:this={overlayEl}
+		onkeydown={handleKeydown}
+	>
 		<div class="call-card">
 			{#if voice.incomingCall.callerAvatarUrl}
 				<img class="caller-avatar" src={voice.incomingCall.callerAvatarUrl} alt="" />
@@ -60,15 +99,15 @@
 				</div>
 			{/if}
 			<div class="caller-name">{voice.incomingCall.callerDisplayName}</div>
-			<div class="call-label">Incoming Voice Call</div>
+			<div class="call-label" id="incoming-call-label">Incoming Voice Call</div>
 			<div class="call-actions">
 				<button class="call-btn accept-btn" onclick={accept} aria-label="Accept call">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 						<path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
 					</svg>
 				</button>
 				<button class="call-btn decline-btn" onclick={decline} aria-label="Decline call">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 						<path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 0 1-.01-1.36c3.36-3.13 7.53-4.96 11.72-4.96s8.36 1.83 11.72 4.96c.18.18.29.42.29.68 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.27 11.27 0 0 0-2.67-1.85.996.996 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
 					</svg>
 				</button>

@@ -14,9 +14,19 @@
 	);
 </script>
 
-<div class="voice-bar" class:transmitting={voice.isPttActive} role="status" aria-label="Voice connected">
-	<div class="voice-info">
-		<span class="voice-label">
+<div class="voice-bar" class:transmitting={voice.isPttActive}>
+	<div
+		class="voice-info"
+		role="status"
+		aria-live="polite"
+		aria-atomic="true"
+		aria-label={isInCall
+			? `In call with ${label}`
+			: voice.voiceInputMode === 'push-to-talk'
+				? (voice.isPttActive ? `Transmitting in ${label}` : `Push to talk in ${label}`)
+				: `Voice connected to ${label}`}
+	>
+		<span class="voice-label" aria-hidden="true">
 			{#if isInCall}
 				In Call
 			{:else if voice.voiceInputMode === 'push-to-talk'}
@@ -25,7 +35,7 @@
 				Voice Connected
 			{/if}
 		</span>
-		<span class="voice-channel-name">{isInCall ? `In call with ${label}` : `# ${label}`}</span>
+		<span class="voice-channel-name" aria-hidden="true">{isInCall ? `In call with ${label}` : `# ${label}`}</span>
 	</div>
 	<div class="voice-controls">
 		<button

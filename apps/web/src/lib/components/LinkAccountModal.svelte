@@ -27,11 +27,43 @@
 		}
 	}
 
+	let dialogEl = $state<HTMLElement | null>(null);
+
 	function handleCancel(): void {
 		auth.needsLinking = false;
 		auth.linkingEmail = '';
 		auth.pendingGoogleCredential = '';
 		auth.signOut();
+	}
+
+	function handleKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			handleCancel();
+			return;
+		}
+		// Focus trap: cycle Tab/Shift+Tab within dialog
+		if (e.key === 'Tab' && dialogEl) {
+			const focusable = Array.from(
+				dialogEl.querySelectorAll<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				)
+			).filter((el) => !el.hasAttribute('disabled'));
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) {
+					e.preventDefault();
+					last.focus();
+				}
+			} else {
+				if (document.activeElement === last) {
+					e.preventDefault();
+					first.focus();
+				}
+			}
+		}
 	}
 </script>
 
@@ -39,7 +71,10 @@
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Link your Google account"
+	aria-labelledby="link-account-heading"
+	tabindex="-1"
+	bind:this={dialogEl}
+	onkeydown={handleKeydown}
 >
 	<div class="modal">
 		<div class="logo">
@@ -48,7 +83,7 @@
 			<span class="bracket">]</span>
 		</div>
 
-		<h1 class="heading">Link your Google account</h1>
+		<h1 class="heading" id="link-account-heading">Link your Google account</h1>
 		<p class="subtext">
 			An account with <strong class="email">{auth.linkingEmail}</strong> already exists.
 			Enter your password to link your Google account.
@@ -56,22 +91,25 @@
 
 		<form class="form" onsubmit={handleSubmit}>
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div class="error-message" id="link-error" role="alert">{error}</div>
 			{/if}
 
-			<label class="field">
-				<span class="field-label">Password</span>
+			<div class="field">
+				<label class="field-label" for="link-password">Password</label>
 				<input
+					id="link-password"
 					type="password"
 					bind:value={password}
 					bind:this={passwordInput}
 					placeholder="Your password"
 					autocomplete="current-password"
+					aria-required="true"
+					aria-describedby={error ? 'link-error' : undefined}
 					required
 				/>
-			</label>
+			</div>
 
-			<button type="submit" class="submit-btn" disabled={!password || isSubmitting}>
+			<button type="submit" class="submit-btn" disabled={!password || isSubmitting} aria-busy={isSubmitting}>
 				{isSubmitting ? 'Linking...' : 'Link Account'}
 			</button>
 
@@ -81,7 +119,7 @@
 		</form>
 	</div>
 
-	<div class="scanlines"></div>
+	<div class="scanlines" aria-hidden="true"></div>
 </div>
 
 <style>

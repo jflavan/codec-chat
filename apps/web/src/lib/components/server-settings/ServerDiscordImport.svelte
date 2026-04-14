@@ -63,7 +63,7 @@
 </script>
 
 <div class="discord-import">
-	<h2>Import from Discord</h2>
+	<h1 class="settings-title">Import from Discord</h1>
 	<p class="description">
 		Import channels, messages, roles, emojis, and members from a Discord server using a bot token.
 	</p>
@@ -71,12 +71,19 @@
 	{#if servers.isLoadingImport}
 		<p class="loading">Loading import status...</p>
 	{:else if isInProgress}
-		<div class="status-card in-progress">
+		<div class="status-card in-progress" aria-live="polite" role="status">
 			<h3>Import in Progress</h3>
 			{#if importStatus?.stage}
 				<p class="stage-label">{importStatus.stage}</p>
 			{/if}
-			<div class="progress-bar">
+			<div
+				class="progress-bar"
+				role="progressbar"
+				aria-label="Import progress"
+				aria-valuenow={importStatus?.percentComplete ?? 0}
+				aria-valuemin={0}
+				aria-valuemax={100}
+			>
 				{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
 					<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
 				{:else}
@@ -86,7 +93,7 @@
 			<button class="cancel-btn" onclick={handleCancel}>Cancel Import</button>
 		</div>
 	{:else if isRehostingMedia}
-		<div class="import-status">
+		<div class="import-status" aria-live="polite" role="status">
 			<h3>Import Complete — Optimizing Media</h3>
 			{#if isStaleRehost}
 				<p class="stale-warning">Media optimization may have stalled. You can re-sync to retry, or cancel the import.</p>
@@ -99,7 +106,14 @@
 			{/if}
 
 			{#if !isStaleRehost}
-				<div class="progress-bar">
+				<div
+					class="progress-bar"
+					role="progressbar"
+					aria-label="Media optimization progress"
+					aria-valuenow={importStatus?.percentComplete ?? 0}
+					aria-valuemin={0}
+					aria-valuemax={100}
+				>
 					{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
 						<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
 					{:else}
@@ -136,7 +150,7 @@
 			</div>
 		{/if}
 	{:else if isFailed}
-		<div class="status-card failed">
+		<div class="status-card failed" role="alert" aria-live="assertive">
 			<h3>Import Failed</h3>
 			<p class="error-msg">{importStatus?.errorMessage}</p>
 			<p class="partial-stats">
@@ -183,7 +197,7 @@
 			</div>
 		{/if}
 	{:else if isCompleted}
-		<div class="status-card completed">
+		<div class="status-card completed" role="status" aria-live="polite">
 			<h3>Import Complete</h3>
 			<div class="progress-stats">
 				<span>{importStatus?.importedChannels} channels</span>
@@ -218,7 +232,7 @@
 						<li class="mapping-item">
 							<div class="mapping-user">
 								{#if mapping.discordAvatarUrl}
-									<img class="mapping-avatar" src={mapping.discordAvatarUrl} alt="" />
+									<img class="mapping-avatar" src={mapping.discordAvatarUrl} alt="" aria-hidden="true" />
 								{:else}
 									<div class="mapping-avatar-placeholder">
 										{mapping.discordUsername.slice(0, 1).toUpperCase()}
@@ -258,10 +272,11 @@
 		max-width: 600px;
 	}
 
-	h2 {
-		margin: 0 0 8px;
+	.settings-title {
 		font-size: 20px;
+		font-weight: 600;
 		color: var(--text-header);
+		margin: 0 0 8px;
 	}
 
 	h3 {

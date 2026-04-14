@@ -1,4 +1,4 @@
-<span class="imported-badge" title="This message was imported from Discord">imported</span>
+<span class="imported-badge" title="This message was imported from Discord" aria-label="Imported from Discord">imported</span>
 
 <style>
 	.imported-badge {

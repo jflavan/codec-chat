@@ -32,20 +32,20 @@
 	});
 </script>
 
-<a href={fileUrl} class="file-card" target="_blank" rel="noopener noreferrer" download={fileName}>
-	<div class="file-icon" data-type={iconType}>
+<a href={fileUrl} class="file-card" target="_blank" rel="noopener noreferrer" download={fileName} aria-label="Download {fileName}{fileSize ? `, ${formatSize(fileSize)}` : ''}">
+	<div class="file-icon" data-type={iconType} aria-hidden="true">
 		{#if iconType === 'pdf'}
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9.5 15.5c0 .28-.22.5-.5.5h-1v1.5H7V13h2a1 1 0 0 1 1 1v1.5zm4-.5c0 1.1-.9 2-2 2h-1v-4h1c1.1 0 2 .9 2 2zm4.5-1.5h-2V15h1.5v1H16v1.5h-1V13h3v1z"/></svg>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9.5 15.5c0 .28-.22.5-.5.5h-1v1.5H7V13h2a1 1 0 0 1 1 1v1.5zm4-.5c0 1.1-.9 2-2 2h-1v-4h1c1.1 0 2 .9 2 2zm4.5-1.5h-2V15h1.5v1H16v1.5h-1V13h3v1z"/></svg>
 		{:else if iconType === 'archive'}
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 6h-2v2h2v2h-2v2h-2v-2h2v-2h-2v-2h2v-2h-2V8h2v2h2v2z"/></svg>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 6h-2v2h2v2h-2v2h-2v-2h2v-2h-2v-2h2v-2h-2V8h2v2h2v2z"/></svg>
 		{:else if iconType === 'audio'}
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
 		{:else if iconType === 'video'}
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
 		{:else if iconType === 'spreadsheet'}
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 17h3v-1H8v1zm0-2h8v-1H8v1zm0-2h8v-1H8v1z"/></svg>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 17h3v-1H8v1zm0-2h8v-1H8v1zm0-2h8v-1H8v1z"/></svg>
 		{:else}
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h7v5h5v11H6z"/></svg>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h7v5h5v11H6z"/></svg>
 		{/if}
 	</div>
 	<div class="file-info">
@@ -54,8 +54,8 @@
 			<span class="file-size">{formatSize(fileSize)}</span>
 		{/if}
 	</div>
-	<div class="file-download">
-		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+	<div class="file-download" aria-hidden="true">
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
 	</div>
 </a>
 

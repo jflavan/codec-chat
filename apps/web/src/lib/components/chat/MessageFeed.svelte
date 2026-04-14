@@ -202,7 +202,7 @@
 </script>
 
 <div class="feed-wrapper">
-	<div class="message-feed" bind:this={container} onscroll={handleScroll}>
+	<div class="message-feed" bind:this={container} onscroll={handleScroll} role="log" aria-label="Message feed" aria-live="polite" aria-relevant="additions">
 		{#if messages.isLoadingMessages}
 			<p class="muted feed-status">Loading messages…</p>
 		{:else if messages.messages.length === 0}

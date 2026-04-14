@@ -125,7 +125,7 @@
 				<ul class="channel-list" role="list">
 					{#each uncategorizedChannels as channel}
 						{@const isMuted = servers.isChannelMuted(channel.id)}
-						<li>
+						<li role="listitem">
 							{#if channel.type === 'voice'}
 								{@const members = voice.voiceChannelMembers.get(channel.id) ?? []}
 								{@const isActive = channel.id === voice.activeVoiceChannelId}
@@ -136,7 +136,8 @@
 									onclick={() => voice.joinVoiceChannel(channel.id)}
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 									disabled={voice.isJoiningVoice}
-									aria-label="Join {channel.name}"
+									aria-label={isActive ? `${channel.name} (connected)` : `Join ${channel.name}`}
+									aria-pressed={isActive}
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 										<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
@@ -147,16 +148,16 @@
 									{/if}
 								</button>
 								{#if members.length > 0}
-									<ul class="voice-members" aria-label="Connected members">
+									<ul class="voice-members" role="list" aria-label="Members connected to {channel.name}">
 										{#each members as member}
 											{@const isOtherUser = member.userId !== auth.me?.user.id}
 											<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 											<li
 												class="voice-member"
 												class:voice-member--interactive={isOtherUser}
-												role={isOtherUser ? 'button' : undefined}
+												role={isOtherUser ? 'button' : 'listitem'}
 												tabindex={isOtherUser ? 0 : undefined}
-												aria-label={isOtherUser ? `${member.displayName} volume controls` : undefined}
+												aria-label={isOtherUser ? `${member.displayName}${member.isMuted ? ' (muted)' : ''} — open volume controls` : `${member.displayName}${member.isMuted ? ' (muted)' : ''}` }
 												onclick={(e) => {
 													if (isOtherUser) {
 														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
@@ -179,11 +180,11 @@
 												{#if member.avatarUrl}
 													<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
 												{:else}
-													<span class="voice-avatar-placeholder"></span>
+													<span class="voice-avatar-placeholder" aria-hidden="true"></span>
 												{/if}
 												<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
 												{#if member.isMuted}
-													<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
+													<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 														<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
 													</svg>
 												{/if}
@@ -199,6 +200,7 @@
 									class:muted-channel={isMuted}
 									onclick={() => channelStore.selectChannel(channel.id)}
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+									aria-current={channel.id === channelStore.selectedChannelId ? 'page' : undefined}
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 										<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
@@ -218,7 +220,7 @@
 			{#each categorizedGroups as group}
 				{@const isCollapsed = collapsedCategories.has(group.id)}
 				<div class="channel-category">
-					<button class="category-collapse-btn" onclick={() => toggleCollapse(group.id)} aria-expanded={!isCollapsed}>
+					<button class="category-collapse-btn" onclick={() => toggleCollapse(group.id)} aria-expanded={!isCollapsed} aria-controls="category-{group.id}">
 						<span class="category-arrow" class:collapsed={isCollapsed}>▾</span>
 						<span class="category-label">{group.name}</span>
 					</button>
@@ -232,10 +234,10 @@
 				</div>
 
 				{#if !isCollapsed}
-					<ul class="channel-list" role="list">
+					<ul class="channel-list" role="list" id="category-{group.id}">
 						{#each group.channels as channel}
 							{@const isMuted = servers.isChannelMuted(channel.id)}
-							<li>
+							<li role="listitem">
 								{#if channel.type === 'voice'}
 									{@const members = voice.voiceChannelMembers.get(channel.id) ?? []}
 									{@const isActive = channel.id === voice.activeVoiceChannelId}
@@ -246,7 +248,8 @@
 										onclick={() => voice.joinVoiceChannel(channel.id)}
 										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 										disabled={voice.isJoiningVoice}
-										aria-label="Join {channel.name}"
+										aria-label={isActive ? `${channel.name} (connected)` : `Join ${channel.name}`}
+										aria-pressed={isActive}
 									>
 										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 											<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
@@ -257,16 +260,16 @@
 										{/if}
 									</button>
 									{#if members.length > 0}
-										<ul class="voice-members" aria-label="Connected members">
+										<ul class="voice-members" role="list" aria-label="Members connected to {channel.name}">
 											{#each members as member}
 												{@const isOtherUser = member.userId !== auth.me?.user.id}
 												<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 												<li
 													class="voice-member"
 													class:voice-member--interactive={isOtherUser}
-													role={isOtherUser ? 'button' : undefined}
+													role={isOtherUser ? 'button' : 'listitem'}
 													tabindex={isOtherUser ? 0 : undefined}
-													aria-label={isOtherUser ? `${member.displayName} volume controls` : undefined}
+													aria-label={isOtherUser ? `${member.displayName}${member.isMuted ? ' (muted)' : ''} — open volume controls` : `${member.displayName}${member.isMuted ? ' (muted)' : ''}` }
 													onclick={(e) => {
 														if (isOtherUser) {
 															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
@@ -289,11 +292,11 @@
 													{#if member.avatarUrl}
 														<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
 													{:else}
-														<span class="voice-avatar-placeholder"></span>
+														<span class="voice-avatar-placeholder" aria-hidden="true"></span>
 													{/if}
 													<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
 													{#if member.isMuted}
-														<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
+														<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 															<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
 														</svg>
 													{/if}
@@ -309,6 +312,7 @@
 										class:muted-channel={isMuted}
 										onclick={() => channelStore.selectChannel(channel.id)}
 										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+										aria-current={channel.id === channelStore.selectedChannelId ? 'page' : undefined}
 									>
 										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 											<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
@@ -343,6 +347,7 @@
 				<input
 					type="text"
 					placeholder={ui.newChannelType === 'voice' ? 'new-voice' : 'new-channel'}
+					aria-label="Channel name"
 					maxlength="100"
 					bind:value={ui.newChannelName}
 					disabled={channelStore.isCreatingChannel}

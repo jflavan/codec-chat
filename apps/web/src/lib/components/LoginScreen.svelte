@@ -131,74 +131,86 @@
 					type="button"
 					class="mode-btn"
 					class:active={mode === 'signin'}
+					aria-pressed={mode === 'signin'}
 					onclick={() => { mode = 'signin'; error = ''; }}
 				>Sign in</button>
 				<button
 					type="button"
 					class="mode-btn"
 					class:active={mode === 'signup'}
+					aria-pressed={mode === 'signup'}
 					onclick={() => { mode = 'signup'; error = ''; }}
 				>Create account</button>
 			</div>
 
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div class="error-message" id="auth-error" role="alert">{error}</div>
 			{/if}
 
-			<label class="field">
-				<span class="field-label">Email</span>
+			<div class="field">
+				<label class="field-label" for="auth-email">Email</label>
 				<input
+					id="auth-email"
 					type="email"
 					bind:value={email}
 					placeholder="you@example.com"
 					autocomplete="email"
+					aria-required="true"
+					aria-describedby={error ? 'auth-error' : undefined}
 					required
 				/>
-			</label>
+			</div>
 
-			<label class="field">
-				<span class="field-label">Password</span>
+			<div class="field">
+				<label class="field-label" for="auth-password">Password</label>
 				<input
+					id="auth-password"
 					type="password"
 					bind:value={password}
 					placeholder="Min 8 characters"
 					autocomplete={mode === 'signin' ? 'current-password' : 'new-password'}
+					aria-required="true"
+					aria-describedby={error ? 'auth-error' : undefined}
 					required
 				/>
-			</label>
+			</div>
 
 			{#if mode === 'signup'}
-				<label class="field">
-					<span class="field-label">Confirm password</span>
+				<div class="field">
+					<label class="field-label" for="auth-confirm-password">Confirm password</label>
 					<input
+						id="auth-confirm-password"
 						type="password"
 						bind:value={confirmPassword}
 						placeholder="Re-enter password"
 						autocomplete="new-password"
+						aria-required="true"
 						required
 					/>
-				</label>
+				</div>
 
-				<label class="field">
-					<span class="field-label">
+				<div class="field">
+					<label class="field-label" for="auth-nickname">
 						Nickname
 						<span class="char-counter" class:over={nickname.trim().length > 32}>
 							{nickname.trim().length}/32
 						</span>
-					</span>
+					</label>
 					<input
+						id="auth-nickname"
 						type="text"
 						bind:value={nickname}
 						placeholder="2–32 characters"
 						minlength={2}
 						maxlength={32}
 						autocomplete="username"
+						aria-required="true"
 						required
 					/>
-				</label>
+				</div>
 			{/if}
 
-			<button type="submit" class="submit-btn" disabled={isSubmitting}>
+			<button type="submit" class="submit-btn" disabled={isSubmitting} aria-busy={isSubmitting}>
 				{#if isSubmitting}
 					Working...
 				{:else if mode === 'signin'}

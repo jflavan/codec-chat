@@ -44,11 +44,13 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
-	aria-label="Server Settings"
+	aria-labelledby="server-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
-	<div class="settings-panel" role="document">
+	<!-- visually hidden title for screen readers -->
+	<span id="server-settings-title" class="sr-only">Server Settings</span>
+	<div class="settings-panel">
 		<div class="settings-sidebar-col">
 			<ServerSettingsSidebar />
 		</div>
@@ -89,6 +91,18 @@
 </dialog>
 
 <style>
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
 	.settings-dialog {
 		position: fixed;
 		inset: 0;

@@ -19,6 +19,17 @@
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let success = $state(false);
+	let dialogEl = $state<HTMLElement | null>(null);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		if (modal) {
+			previousFocus = document.activeElement as HTMLElement | null;
+			setTimeout(() => dialogEl?.focus(), 0);
+		} else {
+			previousFocus?.focus();
+		}
+	});
 
 	const MAX_REASON = 2000;
 
@@ -60,48 +71,72 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') handleClose();
+		if (e.key === 'Escape') {
+			handleClose();
+			return;
+		}
+		// Focus trap
+		if (e.key === 'Tab' && dialogEl) {
+			const focusable = Array.from(
+				dialogEl.querySelectorAll<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				)
+			).filter((el) => !el.hasAttribute('disabled'));
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+			} else {
+				if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+			}
+		}
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 {#if modal}
-	<div class="modal-backdrop" role="presentation" onclick={handleBackdrop}>
-		<div class="modal" role="dialog" aria-labelledby="report-title" aria-modal="true">
-			<h2 id="report-title">Report {typeLabel}</h2>
-			<p class="context">{modal.targetName}</p>
+	<div class="modal-backdrop" aria-hidden="true" onclick={handleBackdrop}></div>
+	<div
+		class="modal"
+		role="dialog"
+		aria-labelledby="report-title"
+		aria-modal="true"
+		tabindex="-1"
+		bind:this={dialogEl}
+		onkeydown={handleKeydown}
+	>
+		<h2 id="report-title">Report {typeLabel}</h2>
+		<p class="context">{modal.targetName}</p>
 
-			{#if success}
-				<p class="success-msg">Report submitted. Thank you.</p>
-			{:else}
-				<form onsubmit={handleSubmit}>
-					<label for="report-reason">Reason</label>
-					<textarea
-						id="report-reason"
-						bind:value={reason}
-						maxlength={MAX_REASON}
-						rows="4"
-						placeholder="Describe the issue..."
-						disabled={submitting}
-					></textarea>
-					<span class="char-count">{reason.length}/{MAX_REASON}</span>
+		{#if success}
+			<p class="success-msg">Report submitted. Thank you.</p>
+		{:else}
+			<form onsubmit={handleSubmit}>
+				<label for="report-reason">Reason</label>
+				<textarea
+					id="report-reason"
+					bind:value={reason}
+					maxlength={MAX_REASON}
+					rows="4"
+					placeholder="Describe the issue..."
+					disabled={submitting}
+				></textarea>
+				<span class="char-count" aria-live="polite">{reason.length}/{MAX_REASON}</span>
 
-					{#if error}
-						<p class="error-msg">{error}</p>
-					{/if}
+				{#if error}
+					<p class="error-msg" role="alert">{error}</p>
+				{/if}
 
-					<div class="actions">
-						<button type="button" class="btn-cancel" onclick={handleClose} disabled={submitting}>
-							Cancel
-						</button>
-						<button type="submit" class="btn-submit" disabled={submitting || !reason.trim()}>
-							{submitting ? 'Submitting...' : 'Submit Report'}
-						</button>
-					</div>
-				</form>
-			{/if}
-		</div>
+				<div class="actions">
+					<button type="button" class="btn-cancel" onclick={handleClose} disabled={submitting}>
+						Cancel
+					</button>
+					<button type="submit" class="btn-submit" disabled={submitting || !reason.trim()} aria-busy={submitting}>
+						{submitting ? 'Submitting...' : 'Submit Report'}
+					</button>
+				</div>
+			</form>
+		{/if}
 	</div>
 {/if}
 
@@ -110,18 +145,21 @@
 		position: fixed;
 		inset: 0;
 		background: rgba(0, 0, 0, 0.6);
-		display: grid;
-		place-items: center;
 		z-index: 200;
 	}
 
 	.modal {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
 		background: var(--bg-primary);
 		border: 1px solid var(--border);
 		border-radius: 12px;
 		padding: 24px;
 		width: 90%;
 		max-width: 440px;
+		z-index: 201;
 	}
 
 	h2 {

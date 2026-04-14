@@ -133,6 +133,7 @@
 						bind:value={channelDescriptionDraft}
 						placeholder="Channel topic…"
 						maxlength="256"
+						aria-label="Channel description"
 						onblur={saveChannelDescription}
 						onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveChannelDescription(); } if (e.key === 'Escape') { editingChannelDescription = false; } }}
 					/>
@@ -295,6 +296,12 @@
 
 	.edit-pencil:hover {
 		color: var(--text-header);
+	}
+
+	.edit-pencil:focus-visible {
+		opacity: 1;
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
 	}
 
 	.description-input {

@@ -32,11 +32,36 @@
 		}
 	}
 
+	let dialogEl = $state<HTMLElement | null>(null);
+
 	function handleKeydown(e: KeyboardEvent): void {
 		// Escape does NOT dismiss — nickname is required
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			e.stopPropagation();
+			return;
+		}
+		// Focus trap: cycle Tab/Shift+Tab within dialog
+		if (e.key === 'Tab' && dialogEl) {
+			const focusable = Array.from(
+				dialogEl.querySelectorAll<HTMLElement>(
+					'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				)
+			).filter((el) => !el.hasAttribute('disabled'));
+			if (focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) {
+					e.preventDefault();
+					last.focus();
+				}
+			} else {
+				if (document.activeElement === last) {
+					e.preventDefault();
+					first.focus();
+				}
+			}
 		}
 	}
 </script>
@@ -45,8 +70,9 @@
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Choose your nickname"
+	aria-labelledby="nickname-heading"
 	tabindex="-1"
+	bind:this={dialogEl}
 	onkeydown={handleKeydown}
 >
 	<div class="modal">
@@ -56,22 +82,23 @@
 			<span class="bracket">]</span>
 		</div>
 
-		<h1 class="heading">Choose your nickname</h1>
+		<h1 class="heading" id="nickname-heading">Choose your nickname</h1>
 		<p class="subtext">This is how others will see you in chat</p>
 
 		<form class="form" onsubmit={handleSubmit}>
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div class="error-message" id="nickname-error" role="alert">{error}</div>
 			{/if}
 
-			<label class="field">
-				<span class="field-label">
+			<div class="field">
+				<label class="field-label" for="nickname-input">
 					Nickname
 					<span class="char-counter" class:over={trimmed.length > MAX_LEN}>
 						{trimmed.length}/{MAX_LEN}
 					</span>
-				</span>
+				</label>
 				<input
+					id="nickname-input"
 					type="text"
 					bind:value={nickname}
 					bind:this={nicknameInput}
@@ -79,17 +106,19 @@
 					minlength={MIN_LEN}
 					maxlength={MAX_LEN}
 					autocomplete="username"
+					aria-required="true"
+					aria-describedby={error ? 'nickname-error' : undefined}
 					required
 				/>
-			</label>
+			</div>
 
-			<button type="submit" class="submit-btn" disabled={!isValid || isSubmitting}>
+			<button type="submit" class="submit-btn" disabled={!isValid || isSubmitting} aria-busy={isSubmitting}>
 				{isSubmitting ? 'Setting up...' : 'Continue'}
 			</button>
 		</form>
 	</div>
 
-	<div class="scanlines"></div>
+	<div class="scanlines" aria-hidden="true"></div>
 </div>
 
 <style>

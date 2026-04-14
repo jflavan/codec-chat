@@ -81,7 +81,7 @@
 				<div class="log-entry">
 					<div class="actor-avatar">
 						{#if entry.actorAvatarUrl}
-							<img src={entry.actorAvatarUrl} alt="" class="avatar-img" />
+							<img src={entry.actorAvatarUrl} alt="" aria-hidden="true" class="avatar-img" />
 						{:else}
 							<span class="avatar-placeholder">{(entry.actorDisplayName || '?').slice(0, 1).toUpperCase()}</span>
 						{/if}

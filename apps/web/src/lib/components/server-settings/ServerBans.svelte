@@ -34,7 +34,7 @@
 </script>
 
 <section class="server-bans-settings">
-	<h2 class="section-title">Bans</h2>
+	<h1 class="section-title">Bans</h1>
 	<p class="section-desc">View and manage banned users for this server.</p>
 
 	{#if servers.isLoadingBans}
@@ -46,7 +46,7 @@
 			{#each servers.bans as ban (ban.userId)}
 				<li class="ban-row">
 					{#if ban.avatarUrl}
-						<img class="ban-avatar" src={ban.avatarUrl} alt="" />
+						<img class="ban-avatar" src={ban.avatarUrl} alt="" aria-hidden="true" />
 					{:else}
 						<div class="ban-avatar-placeholder" aria-hidden="true">
 							{ban.displayName.slice(0, 1).toUpperCase()}

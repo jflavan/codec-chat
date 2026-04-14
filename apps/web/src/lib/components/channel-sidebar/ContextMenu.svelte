@@ -1,15 +1,61 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	let { x, y, items, onClose }: {
 		x: number;
 		y: number;
 		items: { label: string; onClick: () => void }[];
 		onClose: () => void;
 	} = $props();
+
+	let menuEl = $state<HTMLDivElement | null>(null);
+
+	$effect(() => {
+		if (menuEl) {
+			// Move focus to the first menu item when the menu mounts
+			tick().then(() => {
+				const first = menuEl?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+				first?.focus();
+			});
+		}
+	});
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			onClose();
+			return;
+		}
+		if (!menuEl) return;
+		const items = Array.from(menuEl.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+		const focused = document.activeElement as HTMLButtonElement;
+		const idx = items.indexOf(focused);
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			items[(idx + 1) % items.length]?.focus();
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			items[(idx - 1 + items.length) % items.length]?.focus();
+		} else if (e.key === 'Home') {
+			e.preventDefault();
+			items[0]?.focus();
+		} else if (e.key === 'End') {
+			e.preventDefault();
+			items[items.length - 1]?.focus();
+		}
+	}
 </script>
 
 <svelte:window onclick={onClose} onkeydown={(e) => e.key === 'Escape' && onClose()} />
 
-<div class="context-menu" style="left: {x}px; top: {y}px;" role="menu">
+<div
+	class="context-menu"
+	style="left: {x}px; top: {y}px;"
+	role="menu"
+	aria-label="Channel options"
+	tabindex="-1"
+	bind:this={menuEl}
+	onkeydown={handleKeydown}
+>
 	{#each items as item}
 		<button
 			class="context-menu-item"
