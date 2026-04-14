@@ -58,7 +58,7 @@ public class AdminMessagesControllerTests : IDisposable
     }
 
     // Note: SearchMessages uses EF.Functions.ILike which isn't supported by InMemoryDb.
-    // These tests verify the controller handles null/empty input gracefully.
+    // These tests verify the controller handles null/empty/short input gracefully.
     // Full search tests are covered in integration tests.
 
     [Fact]
@@ -75,6 +75,45 @@ public class AdminMessagesControllerTests : IDisposable
         var result = await _controller.SearchMessages("", new PaginationParams());
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SearchMessages_WhitespaceSearch_ReturnsBadRequest()
+    {
+        var result = await _controller.SearchMessages("   ", new PaginationParams());
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SearchMessages_SingleCharSearch_ReturnsBadRequest()
+    {
+        var result = await _controller.SearchMessages("a", new PaginationParams());
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task SearchMessages_TwoCharSearch_PassesValidation()
+    {
+        // Two characters should pass the length validation.
+        // The actual query will fail with InMemory (ILike not supported),
+        // but we verify the validation gate is passed by expecting a different exception.
+        var act = () => _controller.SearchMessages("ab", new PaginationParams());
+
+        // ILike throws InvalidOperationException in InMemory provider,
+        // which confirms validation passed (it didn't return BadRequest).
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SearchMessages_BadRequestError_ContainsMessage()
+    {
+        var result = await _controller.SearchMessages("", new PaginationParams());
+
+        var badRequest = result as BadRequestObjectResult;
+        badRequest.Should().NotBeNull();
+        badRequest!.Value.Should().NotBeNull();
     }
 
     public void Dispose() => _db.Dispose();

@@ -120,6 +120,12 @@ export type MemberRoleChangedEvent = {
 	permissions?: number;
 };
 
+export type MemberRolesUpdatedEvent = {
+	serverId: string;
+	userId: string;
+	roleIds: string[];
+};
+
 export type BannedFromServerEvent = {
 	serverId: string;
 	serverName: string;
@@ -298,6 +304,7 @@ export type SignalRCallbacks = {
 	onMemberJoined?: (event: MemberJoinedEvent) => void;
 	onMemberLeft?: (event: MemberLeftEvent) => void;
 	onMemberRoleChanged?: (event: MemberRoleChangedEvent) => void;
+	onMemberRolesUpdated?: (event: MemberRolesUpdatedEvent) => void;
 	onBannedFromServer?: (event: BannedFromServerEvent) => void;
 	onMemberBanned?: (event: MemberBannedEvent) => void;
 	onMemberUnbanned?: (event: MemberUnbannedEvent) => void;
