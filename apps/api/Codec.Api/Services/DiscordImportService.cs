@@ -88,7 +88,7 @@ public class DiscordImportService
             var totalMessages = 0;
             var completedChannels = 0;
             var semaphore = new SemaphoreSlim(MaxParallelChannels);
-            var messageLock = new object();
+            var messageLock = new SemaphoreSlim(1, 1);
 
             var channelTasks = textChannelIds.Select(async kvp =>
             {
@@ -107,12 +107,17 @@ public class DiscordImportService
                         importId, group, ct);
 
                     int localTotal, localCompleted;
-                    lock (messageLock)
+                    await messageLock.WaitAsync(ct);
+                    try
                     {
                         totalMessages += count;
                         completedChannels++;
                         localTotal = totalMessages;
                         localCompleted = completedChannels;
+                    }
+                    finally
+                    {
+                        messageLock.Release();
                     }
 
                     await group.SendAsync("ImportProgress", new
@@ -244,13 +249,21 @@ public class DiscordImportService
         var everyoneRole = await db.ServerRoles
             .FirstOrDefaultAsync(r => r.ServerId == serverId && r.Name == "@everyone" && r.IsSystemRole, ct);
 
+        // Pre-load existing mappings and role names to avoid N+1 queries
+        var existingMappings = await db.DiscordEntityMappings
+            .Where(m => m.ServerId == serverId && m.EntityType == DiscordEntityType.Role)
+            .ToDictionaryAsync(m => m.DiscordEntityId, m => m.CodecEntityId, ct);
+
+        var existingRoleNames = await db.ServerRoles
+            .Where(r => r.ServerId == serverId)
+            .Select(r => r.Name)
+            .ToHashSetAsync(ct);
+
         foreach (var dr in discordRoles.OrderBy(r => r.Position))
         {
-            var existing = await db.DiscordEntityMappings
-                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.DiscordEntityId == dr.Id && m.EntityType == DiscordEntityType.Role, ct);
-            if (existing is not null)
+            if (existingMappings.TryGetValue(dr.Id, out var existingCodecId))
             {
-                roleMap[dr.Id] = existing.CodecEntityId;
+                roleMap[dr.Id] = existingCodecId;
                 continue;
             }
 
@@ -269,8 +282,7 @@ public class DiscordImportService
             if (dr.Managed) continue;
 
             var roleName = dr.Name;
-            var nameExists = await db.ServerRoles.AnyAsync(r => r.ServerId == serverId && r.Name == roleName, ct);
-            if (nameExists) roleName = $"{roleName} (imported)";
+            if (existingRoleNames.Contains(roleName)) roleName = $"{roleName} (imported)";
 
             var role = new ServerRoleEntity
             {
