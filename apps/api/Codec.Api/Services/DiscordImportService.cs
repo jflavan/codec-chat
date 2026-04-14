@@ -159,6 +159,7 @@ public class DiscordImportService
 
             // Transition to media re-hosting phase
             import.Status = DiscordImportStatus.RehostingMedia;
+            import.LastSyncedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(ct);
 
             try
@@ -237,6 +238,98 @@ public class DiscordImportService
 
             var group = _hub.Clients.Group($"server-{import.ServerId}");
             await group.SendAsync("ImportFailed", new { errorMessage = "Import failed. An administrator can check the import status for details." }, CancellationToken.None);
+        }
+    }
+
+    public async Task ResumeMediaRehostAsync(Guid importId, CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CodecDbContext>();
+
+        var import = await db.DiscordImports.FindAsync([importId], ct);
+        if (import is null || import.Status != DiscordImportStatus.RehostingMedia)
+        {
+            _logger.LogWarning("Cannot resume media rehost for import {ImportId}: not found or not in RehostingMedia status", importId);
+            return;
+        }
+
+        var serverId = import.ServerId;
+        var group = _hub.Clients.Group($"server-{serverId}");
+
+        _logger.LogInformation("Resuming media re-hosting for import {ImportId}", importId);
+
+        try
+        {
+            try
+            {
+                await group.SendAsync("ImportProgress", new { stage = "Re-hosting emojis", completed = 0, total = 0, percentComplete = 96f }, ct);
+                await RehostEmojisAsync(db, serverId, importId, group, ct);
+                await db.SaveChangesAsync(ct);
+
+                await group.SendAsync("ImportProgress", new { stage = "Re-hosting images", completed = 0, total = 0, percentComplete = 97f }, ct);
+                await RehostAttachmentsAsync(db, serverId, group, ct);
+
+                await group.SendAsync("ImportProgress", new { stage = "Re-hosting files", completed = 0, total = 0, percentComplete = 98.5f }, ct);
+                await RehostFileAttachmentsAsync(db, serverId, group, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Media re-hosting failed during resume for import {ImportId}, completing import without full re-hosting", importId);
+            }
+
+            ct.ThrowIfCancellationRequested();
+
+            import.Status = DiscordImportStatus.Completed;
+            import.CompletedAt = DateTimeOffset.UtcNow;
+            import.LastSyncedAt = DateTimeOffset.UtcNow;
+            import.EncryptedBotToken = null;
+            await db.SaveChangesAsync(ct);
+
+            await group.SendAsync("ImportRehostCompleted", new
+            {
+                importedChannels = import.ImportedChannels,
+                importedMessages = import.ImportedMessages,
+                importedMembers = import.ImportedMembers
+            }, ct);
+
+            _logger.LogInformation("Resumed media re-hosting completed for import {ImportId}", importId);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            _logger.LogInformation("Resumed media re-hosting for import {ImportId} was cancelled", importId);
+            import.Status = DiscordImportStatus.Cancelled;
+            import.EncryptedBotToken = null;
+            try
+            {
+                await db.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception saveEx)
+            {
+                _logger.LogError(saveEx, "Failed to persist cancellation status for import {ImportId}", importId);
+            }
+
+            await group.SendAsync("ImportFailed", new { errorMessage = "Media re-hosting was cancelled." }, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Resumed media re-hosting for import {ImportId} failed", importId);
+            import.Status = DiscordImportStatus.Failed;
+            import.ErrorMessage = "Media re-hosting failed unexpectedly. You can re-sync to retry.";
+            import.EncryptedBotToken = null;
+            try
+            {
+                await db.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception saveEx)
+            {
+                _logger.LogError(saveEx, "Failed to persist failure status for import {ImportId}", importId);
+            }
+
+            await group.SendAsync("ImportFailed", new { errorMessage = "Media re-hosting failed. You can re-sync to retry." }, CancellationToken.None);
         }
     }
 

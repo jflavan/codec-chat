@@ -18,6 +18,13 @@
 	const isFailed = $derived(importStatus?.status === 'Failed');
 	const mappings = $derived(servers.discordUserMappings);
 
+	const isStaleRehost = $derived.by(() => {
+		if (importStatus?.status !== 'RehostingMedia') return false;
+		const rehostStarted = importStatus.lastSyncedAt ?? importStatus.startedAt;
+		if (!rehostStarted) return false;
+		return new Date(rehostStarted).getTime() < Date.now() - 30 * 60 * 1000;
+	});
+
 	$effect(() => {
 		if (serverId) {
 			servers.loadDiscordImport(serverId);
@@ -81,19 +88,25 @@
 	{:else if isRehostingMedia}
 		<div class="import-status">
 			<h3>Import Complete — Optimizing Media</h3>
-			<p>Messages have been imported. Images are being re-hosted in the background.</p>
+			{#if isStaleRehost}
+				<p class="stale-warning">Media optimization may have stalled. You can re-sync to retry, or cancel the import.</p>
+			{:else}
+				<p>Messages have been imported. Images are being re-hosted in the background.</p>
+			{/if}
 
 			{#if importStatus?.stage}
 				<p class="stage-label">{importStatus.stage}</p>
 			{/if}
 
-			<div class="progress-bar">
-				{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
-					<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
-				{:else}
-					<div class="progress-fill pulse"></div>
-				{/if}
-			</div>
+			{#if !isStaleRehost}
+				<div class="progress-bar">
+					{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
+						<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
+					{:else}
+						<div class="progress-fill pulse"></div>
+					{/if}
+				</div>
+			{/if}
 
 			<div class="import-stats">
 				<span>{importStatus?.importedChannels ?? 0} channels</span>
@@ -101,6 +114,27 @@
 				<span>{importStatus?.importedMembers ?? 0} members</span>
 			</div>
 		</div>
+
+		{#if isStaleRehost}
+			<div class="import-form">
+				<h3>Re-sync</h3>
+				<p class="description">The previous import's media optimization was interrupted. Provide a bot token to retry.</p>
+				<label class="form-label">
+					Bot Token
+					<input type="password" bind:value={botToken} placeholder="Paste your Discord bot token" class="form-input" />
+				</label>
+				<div class="button-row">
+					<button
+						class="start-btn"
+						disabled={servers.isStartingImport || !botToken.trim()}
+						onclick={handleResync}
+					>
+						{servers.isStartingImport ? 'Starting...' : 'Re-sync'}
+					</button>
+					<button class="cancel-btn" onclick={handleCancel}>Cancel Import</button>
+				</div>
+			</div>
+		{/if}
 	{:else if isFailed}
 		<div class="status-card failed">
 			<h3>Import Failed</h3>
@@ -394,6 +428,19 @@
 
 	.cancel-btn:hover {
 		background: var(--bg-message-hover);
+	}
+
+	.stale-warning {
+		color: var(--warning, #faa61a);
+		font-size: 14px;
+		margin: 4px 0 12px;
+		line-height: 1.4;
+	}
+
+	.button-row {
+		display: flex;
+		gap: 12px;
+		align-items: center;
 	}
 
 	.no-import {

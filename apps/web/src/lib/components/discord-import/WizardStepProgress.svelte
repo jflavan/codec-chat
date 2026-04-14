@@ -18,6 +18,14 @@
 	const isRehostingMedia = $derived(importStatus?.status === 'RehostingMedia');
 	const isCompleted = $derived(importStatus?.status === 'Completed');
 	const isFailed = $derived(importStatus?.status === 'Failed');
+	const isStaleRehost = $derived.by(() => {
+		if (importStatus?.status !== 'RehostingMedia') return false;
+		const rehostStarted = importStatus.lastSyncedAt ?? importStatus.startedAt;
+		if (!rehostStarted) return false;
+		const started = new Date(rehostStarted).getTime();
+		const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+		return started < thirtyMinutesAgo;
+	});
 
 	$effect(() => {
 		if (serverId) {
@@ -45,19 +53,23 @@
 
 	{:else if isRehostingMedia}
 		<h2>Import complete</h2>
-		<p class="subtitle">Your messages are imported. Media is being optimized in the background — you can close this window.</p>
+		{#if isStaleRehost}
+			<p class="subtitle">Media optimization appears to have stalled. Go to Server Settings → Import from Discord to re-sync.</p>
+		{:else}
+			<p class="subtitle">Your messages are imported. Media is being optimized in the background — you can close this window.</p>
 
-		{#if importStatus?.stage}
-			<p class="stage-label">{importStatus.stage}</p>
-		{/if}
-
-		<div class="progress-bar">
-			{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
-				<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
-			{:else}
-				<div class="progress-fill pulse"></div>
+			{#if importStatus?.stage}
+				<p class="stage-label">{importStatus.stage}</p>
 			{/if}
-		</div>
+
+			<div class="progress-bar">
+				{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
+					<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
+				{:else}
+					<div class="progress-fill pulse"></div>
+				{/if}
+			</div>
+		{/if}
 
 		<button class="btn-primary" onclick={onGoToServer}>Go to Server</button>
 
