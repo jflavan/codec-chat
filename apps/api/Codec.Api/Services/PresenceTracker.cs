@@ -6,6 +6,7 @@ namespace Codec.Api.Services;
 public class PresenceTracker
 {
     private readonly ConcurrentDictionary<string, ConnectionEntry> _connections = new();
+    private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<string, byte>> _userConnections = new();
 
     public record ConnectionEntry(Guid UserId, DateTimeOffset LastHeartbeatAt, DateTimeOffset LastActiveAt, PresenceStatus Status);
 
@@ -16,6 +17,7 @@ public class PresenceTracker
     {
         var now = DateTimeOffset.UtcNow;
         _connections[connectionId] = new ConnectionEntry(userId, now, now, PresenceStatus.Online);
+        _userConnections.GetOrAdd(userId, _ => new ConcurrentDictionary<string, byte>())[connectionId] = 0;
         return GetAggregateStatus(userId);
     }
 
@@ -31,9 +33,15 @@ public class PresenceTracker
         var previous = GetAggregateStatus(entry.UserId);
 
         _connections.TryRemove(connectionId, out _);
+        if (_userConnections.TryGetValue(entry.UserId, out var userConns))
+        {
+            userConns.TryRemove(connectionId, out _);
+            if (userConns.IsEmpty)
+                _userConnections.TryRemove(entry.UserId, out _);
+        }
 
         var current = GetAggregateStatus(entry.UserId);
-        var remaining = _connections.Values.Count(c => c.UserId == entry.UserId);
+        var remaining = _userConnections.TryGetValue(entry.UserId, out var rc) ? rc.Count : 0;
         return (previous, current, remaining);
     }
 
@@ -88,6 +96,12 @@ public class PresenceTracker
             {
                 // Connection is dead — remove it
                 _connections.TryRemove(connId, out _);
+                if (_userConnections.TryGetValue(entry.UserId, out var uc))
+                {
+                    uc.TryRemove(connId, out _);
+                    if (uc.IsEmpty)
+                        _userConnections.TryRemove(entry.UserId, out _);
+                }
                 if (!staleConnections.ContainsKey(entry.UserId))
                     staleConnections[entry.UserId] = [];
                 staleConnections[entry.UserId].Add(connId);
@@ -112,16 +126,17 @@ public class PresenceTracker
         return changes;
     }
 
-    public PresenceStatus GetAggregateStatus(Guid userId, string? includingConnectionId = null)
+    public PresenceStatus GetAggregateStatus(Guid userId, string? excludingConnectionId = null)
     {
+        if (!_userConnections.TryGetValue(userId, out var userConns))
+            return PresenceStatus.Offline;
+
         var best = PresenceStatus.Offline;
-        foreach (var (connId, entry) in _connections)
+        foreach (var connId in userConns.Keys)
         {
-            if (entry.UserId == userId && connId != includingConnectionId)
-            {
-                if (entry.Status < best) // Lower enum = better (Online=0)
-                    best = entry.Status;
-            }
+            if (connId == excludingConnectionId) continue;
+            if (_connections.TryGetValue(connId, out var entry) && entry.Status < best)
+                best = entry.Status;
         }
         return best;
     }
@@ -133,7 +148,7 @@ public class PresenceTracker
 
     public List<string> GetConnectionIds(Guid userId)
     {
-        return _connections.Where(c => c.Value.UserId == userId).Select(c => c.Key).ToList();
+        return _userConnections.TryGetValue(userId, out var conns) ? conns.Keys.ToList() : [];
     }
 
     /// <summary>
@@ -141,7 +156,7 @@ public class PresenceTracker
     /// </summary>
     public int GetOnlineUserCount()
     {
-        return _connections.Values.Select(c => c.UserId).Distinct().Count();
+        return _userConnections.Count;
     }
 
     /// <summary>
