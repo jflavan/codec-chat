@@ -212,7 +212,8 @@ export class ServerStore {
 		if (!this.auth.idToken) return;
 		this.isLoadingMembers = true;
 		try {
-			this.members = await this.api.getMembers(this.auth.idToken, serverId);
+			const response = await this.api.getMembers(this.auth.idToken, serverId);
+			this.members = response.members;
 		} catch (e) {
 			this.ui.setError(e);
 		} finally {

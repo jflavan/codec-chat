@@ -12,6 +12,7 @@ export type {
 	Message,
 	PaginatedMessages,
 	PaginatedDmMessages,
+	PaginatedMembers,
 	Reaction,
 	Member,
 	UserProfile,

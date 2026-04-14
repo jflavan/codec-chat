@@ -78,10 +78,12 @@ public class PresenceTracker
     {
         var now = DateTimeOffset.UtcNow;
         var changes = new List<(Guid UserId, PresenceStatus Previous, PresenceStatus Current, List<string> StaleConnectionIds)>();
-        var usersBefore = new Dictionary<Guid, PresenceStatus>();
 
-        // Snapshot current aggregate statuses
-        foreach (var (connId, entry) in _connections)
+        // Snapshot keys so we don't mutate while iterating.
+        var snapshot = _connections.ToArray();
+
+        var usersBefore = new Dictionary<Guid, PresenceStatus>();
+        foreach (var (connId, entry) in snapshot)
         {
             if (!usersBefore.ContainsKey(entry.UserId))
                 usersBefore[entry.UserId] = GetAggregateStatus(entry.UserId);
@@ -89,8 +91,8 @@ public class PresenceTracker
 
         var staleConnections = new Dictionary<Guid, List<string>>();
 
-        // Update individual connection statuses
-        foreach (var (connId, entry) in _connections)
+        // Update individual connection statuses using the snapshot.
+        foreach (var (connId, entry) in snapshot)
         {
             if (now - entry.LastHeartbeatAt > offlineTimeout)
             {

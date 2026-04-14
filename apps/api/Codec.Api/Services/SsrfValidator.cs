@@ -53,25 +53,35 @@ public static class SsrfValidator
         return async (context, cancellationToken) =>
         {
             var entries = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+            var safeEntries = new List<IPAddress>(entries.Length);
             foreach (var entry in entries)
             {
                 var ip = entry.IsIPv4MappedToIPv6 ? entry.MapToIPv4() : entry;
 
                 if (IsPrivateOrReserved(ip))
                     throw new HttpRequestException($"Blocked {label} connection to private IP {ip}.");
+
+                safeEntries.Add(entry);
             }
 
-            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-            try
+            // Try each validated address for failover when the first is unreachable.
+            for (var i = 0; i < safeEntries.Count; i++)
             {
-                await socket.ConnectAsync(new IPEndPoint(entries[0], context.DnsEndPoint.Port), cancellationToken);
-                return new NetworkStream(socket, ownsSocket: true);
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(new IPEndPoint(safeEntries[i], context.DnsEndPoint.Port), cancellationToken);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    if (i == safeEntries.Count - 1)
+                        throw;
+                }
             }
-            catch
-            {
-                socket.Dispose();
-                throw;
-            }
+
+            throw new HttpRequestException($"No addresses resolved for {context.DnsEndPoint.Host}.");
         };
     }
 }

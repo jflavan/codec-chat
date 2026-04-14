@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -527,15 +528,26 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Serve uploaded files as static content only when using local storage.
-// Placed after auth so uploads require authentication.
+// UseStaticFiles does not check auth on its own, so OnPrepareResponse rejects unauthenticated requests.
 if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
 {
+    void RejectUnauthenticated(StaticFileResponseContext ctx)
+    {
+        if (ctx.Context.User.Identity?.IsAuthenticated != true)
+        {
+            ctx.Context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            ctx.Context.Response.ContentLength = 0;
+            ctx.Context.Response.Body = Stream.Null;
+        }
+    }
+
     var avatarStoragePath = Path.Combine(uploadsPath, "avatars");
     Directory.CreateDirectory(avatarStoragePath);
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(avatarStoragePath),
-        RequestPath = "/uploads/avatars"
+        RequestPath = "/uploads/avatars",
+        OnPrepareResponse = RejectUnauthenticated
     });
 
     var imageStoragePath = Path.Combine(uploadsPath, "images");
@@ -543,7 +555,8 @@ if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(imageStoragePath),
-        RequestPath = "/uploads/images"
+        RequestPath = "/uploads/images",
+        OnPrepareResponse = RejectUnauthenticated
     });
 
     var emojiStoragePath = Path.Combine(uploadsPath, "emojis");
@@ -551,7 +564,8 @@ if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(emojiStoragePath),
-        RequestPath = "/uploads/emojis"
+        RequestPath = "/uploads/emojis",
+        OnPrepareResponse = RejectUnauthenticated
     });
 }
 

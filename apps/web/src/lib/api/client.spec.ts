@@ -509,7 +509,7 @@ describe('ApiClient', () => {
 
 	describe('getMembers', () => {
 		it('sends GET', async () => {
-			mockFetch.mockResolvedValueOnce(jsonResponse([]));
+			mockFetch.mockResolvedValueOnce(jsonResponse({ members: [], total: 0, limit: 50, offset: 0 }));
 			await client.getMembers(token, 's1');
 			expect(mockFetch).toHaveBeenCalledWith(`${baseUrl}/servers/s1/members`, expect.anything());
 		});
