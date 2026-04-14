@@ -13,12 +13,12 @@ export default defineConfig({
 			include: ['src/lib/**/*.ts'],
 			exclude: [
 				'src/lib/types/**',
+				// External SDK wrappers that need integration/E2E tests rather than unit tests:
 				'src/lib/services/voice-service.ts',
-				'src/lib/services/chat-hub.ts',
 				'src/lib/services/push-notifications.ts',
-				'src/lib/state/**',
 				'src/lib/auth/google.ts',
 				'src/lib/auth/oauth.ts',
+				// Static data and barrel re-exports:
 				'src/lib/data/**',
 				'src/lib/index.ts',
 				'src/lib/utils/dom.ts'

@@ -24,10 +24,12 @@ export class VoiceService {
 	private callbacks: VoiceServiceCallbacks | null = null;
 
 	async join(token: string, serverUrl: string, callbacks: VoiceServiceCallbacks): Promise<void> {
-		// Null callbacks before leaving so the old room's Disconnected event
-		// doesn't fire _cleanupVoiceState and corrupt state for the new session.
+		// Disconnect any existing room first. We keep the OLD callbacks null'd to
+		// prevent the Disconnected event from corrupting state during teardown,
+		// then assign the new callbacks AFTER leave() completes.
+		const hadRoom = this.room !== null;
 		this.callbacks = null;
-		await this.leave();
+		if (hadRoom) await this.leave();
 		this.callbacks = callbacks;
 
 		this.room = new Room({

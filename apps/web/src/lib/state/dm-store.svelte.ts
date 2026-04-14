@@ -4,8 +4,7 @@ import type {
 	DmConversation,
 	DirectMessage,
 	PresenceStatus,
-	LinkPreview,
-	Reaction
+	LinkPreview
 } from '$lib/types/index.js';
 import type { ApiClient } from '$lib/api/client.js';
 import type { ChatHubService } from '$lib/services/chat-hub.js';
@@ -17,6 +16,8 @@ import type {
 import type { AuthStore } from './auth-store.svelte.js';
 import { UIStore } from './ui-store.svelte.js';
 import type { UIStore as UIStoreType } from './ui-store.svelte.js';
+import { validateImage, validateFile } from '$lib/utils/attachments.js';
+import { rememberReactionUpdate, matchAndRemoveReactionSnapshot } from '$lib/utils/reactions.js';
 
 const DM_KEY = Symbol('dm-store');
 
@@ -36,23 +37,6 @@ export function getDmStore(): DmStore {
 }
 
 export class DmStore {
-	/* ═══════════════════ Static constants ═══════════════════ */
-
-	private static readonly ALLOWED_IMAGE_TYPES = new Set([
-		'image/jpeg',
-		'image/png',
-		'image/webp',
-		'image/gif'
-	]);
-
-	private static readonly ALLOWED_FILE_EXTENSIONS = new Set([
-		'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-		'.txt', '.csv', '.md', '.rtf',
-		'.zip', '.tar', '.gz', '.7z', '.rar',
-		'.json', '.xml', '.html', '.css', '.js', '.ts',
-		'.mp3', '.ogg', '.wav', '.webm', '.mp4'
-	]);
-
 	/* ═══════════════════ $state fields ═══════════════════ */
 
 	dmConversations = $state<DmConversation[]>([]);
@@ -73,6 +57,9 @@ export class DmStore {
 		bodyPreview: string;
 		context: 'dm';
 	} | null>(null);
+
+	/** Incremented on each loadDmMessages call to discard stale responses after fast DM switches. */
+	private loadGeneration = 0;
 
 	/* ═══════════════════ $derived ═══════════════════ */
 
@@ -133,19 +120,31 @@ export class DmStore {
 
 		if (previousDmId) await this.hub.leaveDmChannel(previousDmId);
 		await this.hub.joinDmChannel(dmChannelId);
-		await this.loadDmMessages(dmChannelId);
+
+		try {
+			await this.loadDmMessages(dmChannelId);
+		} catch {
+			// On failure, clear messages so stale data from the old conversation isn't shown.
+			if (this.activeDmChannelId === dmChannelId) {
+				this.dmMessages = [];
+			}
+		}
 	}
 
 	async loadDmMessages(dmChannelId: string): Promise<void> {
 		if (!this.auth.idToken) return;
+		const gen = ++this.loadGeneration;
 		this.isLoadingDmMessages = true;
 		try {
 			const result = await this.api.getDmMessages(this.auth.idToken, dmChannelId);
+			// Discard stale response if user switched conversations during the fetch.
+			if (gen !== this.loadGeneration) return;
 			this.dmMessages = result.messages;
 		} catch (e) {
-			this.ui.setError(e);
+			if (gen === this.loadGeneration) this.ui.setError(e);
+			throw e; // Re-throw so selectDmConversation can handle failure
 		} finally {
-			this.isLoadingDmMessages = false;
+			if (gen === this.loadGeneration) this.isLoadingDmMessages = false;
 		}
 	}
 
@@ -331,7 +330,7 @@ export class DmStore {
 				normalizedEmoji
 			);
 			this._updateDmMessageReactions(messageId, result.reactions);
-			this._rememberReactionUpdate(messageId, result.reactions);
+			rememberReactionUpdate(this.ui, messageId, result.reactions);
 			if (!this.hub.isConnected) {
 				await this.loadDmMessages(this.activeDmChannelId);
 			}
@@ -346,14 +345,8 @@ export class DmStore {
 
 	/** Attach an image file to the DM message composer. */
 	attachDmImage(file: File): void {
-		if (!DmStore.ALLOWED_IMAGE_TYPES.has(file.type)) {
-			this.ui.error = 'Unsupported image type. Allowed: JPG, PNG, WebP, GIF.';
-			return;
-		}
-		if (file.size > 10 * 1024 * 1024) {
-			this.ui.error = 'Image must be under 10 MB.';
-			return;
-		}
+		const error = validateImage(file);
+		if (error) { this.ui.error = error; return; }
 		this.pendingDmImage = file;
 		this.pendingDmImagePreview = URL.createObjectURL(file);
 	}
@@ -371,15 +364,8 @@ export class DmStore {
 
 	/** Attach a non-image file to the DM message composer. */
 	attachDmFile(file: File): void {
-		const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-		if (!ext || !DmStore.ALLOWED_FILE_EXTENSIONS.has(ext)) {
-			this.ui.error = 'Unsupported file type.';
-			return;
-		}
-		if (file.size > 25 * 1024 * 1024) {
-			this.ui.error = 'File must be under 25 MB.';
-			return;
-		}
+		const error = validateFile(file);
+		if (error) { this.ui.error = error; return; }
 		this.pendingDmFile = file;
 	}
 
@@ -462,7 +448,7 @@ export class DmStore {
 
 	/** Handle a DM reaction update event from SignalR. */
 	handleDmReactionUpdate(update: DmReactionUpdate): void {
-		if (this._matchAndRemoveReactionSnapshot(update.messageId, update.reactions)) {
+		if (matchAndRemoveReactionSnapshot(this.ui, update.messageId, update.reactions)) {
 			return;
 		}
 		if (update.dmChannelId === this.activeDmChannelId) {
@@ -479,22 +465,6 @@ export class DmStore {
 
 	/* ═══════════════════ Reaction Helpers (private) ═══════════════════ */
 
-	private static serializeReactionSnapshot(
-		reactions: ReadonlyArray<Reaction>
-	): string {
-		return JSON.stringify(
-			reactions
-				.map((reaction) => ({
-					emoji: reaction.emoji,
-					count: reaction.count,
-					userIds: [...reaction.userIds].sort()
-				}))
-				.sort((reactionA, reactionB) =>
-					reactionA.emoji.localeCompare(reactionB.emoji)
-				)
-		);
-	}
-
 	private _updateDmMessageReactions(
 		messageId: string,
 		reactions: DirectMessage['reactions']
@@ -502,46 +472,6 @@ export class DmStore {
 		this.dmMessages = this.dmMessages.map((message) =>
 			message.id === messageId ? { ...message, reactions } : message
 		);
-	}
-
-	private _rememberReactionUpdate(
-		messageId: string,
-		reactions: DirectMessage['reactions']
-	): void {
-		const serialized = DmStore.serializeReactionSnapshot(reactions);
-		const next = new Map(this.ui.ignoredReactionUpdates);
-		next.set(messageId, [...(next.get(messageId) ?? []), serialized]);
-		this.ui.ignoredReactionUpdates = next;
-	}
-
-	private _matchAndRemoveReactionSnapshot(
-		messageId: string,
-		reactions: DirectMessage['reactions']
-	): boolean {
-		const queue = this.ui.ignoredReactionUpdates.get(messageId);
-		if (!queue?.length) {
-			return false;
-		}
-
-		const serialized = DmStore.serializeReactionSnapshot(reactions);
-		const matchedIndex = queue.indexOf(serialized);
-		if (matchedIndex === -1) {
-			return false;
-		}
-
-		const next = new Map(this.ui.ignoredReactionUpdates);
-		const remaining = queue.filter((snapshot, index) => {
-			void snapshot;
-			return index !== matchedIndex;
-		});
-		if (remaining.length > 0) {
-			next.set(messageId, remaining);
-		} else {
-			next.delete(messageId);
-		}
-		this.ui.ignoredReactionUpdates = next;
-
-		return true;
 	}
 
 	/* ═══════════════════ Reset ═══════════════════ */

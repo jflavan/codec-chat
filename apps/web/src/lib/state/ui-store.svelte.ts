@@ -172,5 +172,9 @@ export class UIStore {
 		this.mobileMembersOpen = false;
 		this.lightboxImageUrl = null;
 		this.error = null;
+		if (this.transientErrorTimer) {
+			clearTimeout(this.transientErrorTimer);
+			this.transientErrorTimer = null;
+		}
 	}
 }

@@ -54,6 +54,9 @@ export class ApiError extends Error {
 export class ApiClient {
 	private onUnauthorized?: () => Promise<string | null>;
 
+	/** Mutex: a single in-flight refresh promise shared by all concurrent 401 retries. */
+	private refreshPromise: Promise<string | null> | null = null;
+
 	constructor(
 		private readonly baseUrl: string,
 		onUnauthorized?: () => Promise<string | null>
@@ -69,17 +72,33 @@ export class ApiClient {
 		return h;
 	}
 
+	/**
+	 * Deduplicated token refresh: the first 401 triggers the actual refresh;
+	 * concurrent 401s await the same promise instead of racing.
+	 */
+	private refreshTokenOnce(): Promise<string | null> {
+		if (!this.refreshPromise) {
+			this.refreshPromise = this.onUnauthorized!().finally(() => {
+				this.refreshPromise = null;
+			});
+		}
+		return this.refreshPromise;
+	}
+
+	private async retryWithFreshToken(url: string, init: RequestInit): Promise<Response> {
+		const freshToken = await this.refreshTokenOnce();
+		if (!freshToken) throw new ApiError(401, 'Token refresh failed');
+		const retryHeaders = new Headers(init.headers);
+		retryHeaders.set('Authorization', `Bearer ${freshToken}`);
+		return fetch(url, { ...init, headers: retryHeaders });
+	}
+
 	private async request<T>(url: string, init: RequestInit): Promise<T> {
 		let response = await fetch(url, init);
 
-		// On 401, attempt a silent token refresh and retry the request once.
+		// On 401, attempt a deduplicated silent token refresh and retry once.
 		if (response.status === 401 && this.onUnauthorized) {
-			const freshToken = await this.onUnauthorized();
-			if (freshToken) {
-				const retryHeaders = new Headers(init.headers);
-				retryHeaders.set('Authorization', `Bearer ${freshToken}`);
-				response = await fetch(url, { ...init, headers: retryHeaders });
-			}
+			response = await this.retryWithFreshToken(url, init);
 		}
 
 		if (!response.ok) {
@@ -95,14 +114,9 @@ export class ApiClient {
 	private async requestVoid(url: string, init: RequestInit): Promise<void> {
 		let response = await fetch(url, init);
 
-		// On 401, attempt a silent token refresh and retry the request once.
+		// On 401, attempt a deduplicated silent token refresh and retry once.
 		if (response.status === 401 && this.onUnauthorized) {
-			const freshToken = await this.onUnauthorized();
-			if (freshToken) {
-				const retryHeaders = new Headers(init.headers);
-				retryHeaders.set('Authorization', `Bearer ${freshToken}`);
-				response = await fetch(url, { ...init, headers: retryHeaders });
-			}
+			response = await this.retryWithFreshToken(url, init);
 		}
 
 		if (!response.ok) {
