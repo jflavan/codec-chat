@@ -19,7 +19,7 @@ public class RecaptchaService(HttpClient httpClient, IOptions<RecaptchaSettings>
         try
         {
             var settings = options.Value;
-            var url = $"https://recaptchaenterprise.googleapis.com/v1/projects/{settings.ProjectId}/assessments?key={settings.SecretKey}";
+            var url = $"https://recaptchaenterprise.googleapis.com/v1/projects/{settings.ProjectId}/assessments";
 
             var requestBody = new
             {
@@ -31,7 +31,11 @@ public class RecaptchaService(HttpClient httpClient, IOptions<RecaptchaSettings>
                 }
             };
 
-            var response = await httpClient.PostAsJsonAsync(url, requestBody, JsonOptions);
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("x-goog-api-key", settings.SecretKey);
+            request.Content = JsonContent.Create(requestBody, options: JsonOptions);
+
+            var response = await httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<AssessmentResponse>(JsonOptions);
