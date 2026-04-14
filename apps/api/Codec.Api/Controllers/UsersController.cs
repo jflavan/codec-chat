@@ -320,7 +320,7 @@ public class UsersController(IUserService userService, IAvatarService avatarServ
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
 
         // Escape LIKE metacharacters to prevent wildcard abuse (e.g. "%" matching all users).
-        var escaped = term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var escaped = term.EscapeForLike();
         var pattern = $"%{escaped}%";
         var users = await db.Users
             .AsNoTracking()

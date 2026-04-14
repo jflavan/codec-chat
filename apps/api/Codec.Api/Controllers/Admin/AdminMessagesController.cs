@@ -1,5 +1,6 @@
 using Codec.Api.Data;
 using Codec.Api.Models;
+using Codec.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,7 @@ public class AdminMessagesController(CodecDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
             return BadRequest(new { error = "Search term must be at least 2 characters." });
 
-        var escaped = search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var escaped = search.EscapeForLike();
         var term = $"%{escaped}%";
 
         var query = db.Messages.AsNoTracking()

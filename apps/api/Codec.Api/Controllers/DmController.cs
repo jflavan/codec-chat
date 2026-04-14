@@ -1038,7 +1038,7 @@ public class DmController(CodecDbContext db, IUserService userService, IHubConte
         }
 
         // Build base query. Escape ILIKE metacharacters to prevent wildcard injection.
-        var escaped = trimmedQuery.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var escaped = trimmedQuery.EscapeForLike();
         var searchTerm = $"%{escaped}%";
         var query = db.DirectMessages
             .AsNoTracking()

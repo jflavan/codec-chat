@@ -2188,7 +2188,7 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         }
 
         // Build base query. Escape ILIKE metacharacters to prevent wildcard injection.
-        var escaped = trimmedQuery.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var escaped = trimmedQuery.EscapeForLike();
         var searchTerm = $"%{escaped}%";
         var query = db.Messages
             .AsNoTracking()
