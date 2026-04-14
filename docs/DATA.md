@@ -390,7 +390,7 @@ Individual message within a DM conversation.
 |--------|------|-------------|
 | `Id` | Guid (PK) | Unique message identifier |
 | `DmChannelId` | Guid (FK) | Reference to DmChannel |
-| `AuthorUserId` | Guid (FK) | Reference to User |
+| `AuthorUserId` | Guid? (FK) | Reference to User (nullable, ON DELETE SET NULL) |
 | `AuthorName` | string | Display name snapshot (denormalized) |
 | `Body` | string | Message content (plain text) |
 | `ImageUrl` | string? | URL of an uploaded image attachment (`null` if text-only) |
@@ -403,7 +403,7 @@ Individual message within a DM conversation.
 
 **Relationships:**
 - Many-to-one with `DmChannel`
-- Many-to-one with `User`
+- Many-to-one with `User` (nullable, ON DELETE SET NULL — preserves messages when user is deleted)
 - Self-referencing: optional many-to-one with `DirectMessage` (reply parent, ON DELETE SET NULL)
 
 **Notes:**
@@ -827,6 +827,21 @@ modelBuilder.Entity<Message>()
 modelBuilder.Entity<Message>()
     .HasIndex(m => m.ReplyToMessageId);
 
+// Message: composite index for paginated message queries (GetMessages)
+modelBuilder.Entity<Message>()
+    .HasIndex(m => new { m.ChannelId, m.CreatedAt })
+    .IsDescending(false, true);
+
+// ServerMember: fast lookup of all servers a user belongs to
+modelBuilder.Entity<ServerMember>()
+    .HasIndex(m => m.UserId);
+
+// Report: fast lookup of reports by reporter or assignee
+modelBuilder.Entity<Report>()
+    .HasIndex(r => r.ReporterId);
+modelBuilder.Entity<Report>()
+    .HasIndex(r => r.AssignedToUserId);
+
 // Reaction uniqueness (one reaction per emoji per user per message)
 modelBuilder.Entity<Reaction>()
     .HasIndex(r => new { r.MessageId, r.UserId, r.Emoji })
@@ -860,6 +875,11 @@ modelBuilder.Entity<DmChannelMember>()
 // DirectMessage: fast retrieval of messages in a conversation
 modelBuilder.Entity<DirectMessage>()
     .HasIndex(m => m.DmChannelId);
+
+// DirectMessage: composite index for paginated DM queries
+modelBuilder.Entity<DirectMessage>()
+    .HasIndex(m => new { m.DmChannelId, m.CreatedAt })
+    .IsDescending(false, true);
 
 // DirectMessage: fast lookup of messages by author
 modelBuilder.Entity<DirectMessage>()

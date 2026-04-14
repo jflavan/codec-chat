@@ -392,7 +392,7 @@ State is split into domain-specific stores under `lib/state/` (e.g. `AuthStore`,
 - `GET /servers` - List servers user is a member of (global admin sees all servers; `role` is `null` for non-member servers; includes `description`)
 - `POST /servers` - Create a new server (authenticated user becomes Owner)
 - `PATCH /servers/{serverId}` - Update server name and/or description (requires Owner, Admin, or Global Admin role; broadcasts `ServerNameChanged` and/or `ServerDescriptionChanged` via SignalR)
-- `GET /servers/{serverId}/members` - List server members (requires membership or Global Admin)
+- `GET /servers/{serverId}/members?limit={n}&offset={n}` - List server members with pagination (requires membership or Global Admin; `limit` 1–200 default 100; `offset` default 0; returns `{ members, total, limit, offset }`)
 - `GET /servers/{serverId}/channels` - List channels in a server (requires membership or Global Admin; includes `description`, `categoryId`, `position`)
 - `POST /servers/{serverId}/channels` - Create a channel in a server (requires Owner, Admin, or Global Admin role)
 - `PATCH /servers/{serverId}/channels/{channelId}` - Update channel name and/or description (requires Owner, Admin, or Global Admin role; broadcasts `ChannelNameChanged` and/or `ChannelDescriptionChanged` via SignalR)
@@ -1025,7 +1025,12 @@ PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 - ✅ Content Security Policy (CSP) headers
 - ✅ Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
 - ✅ Forwarded headers for reverse proxy (Azure Container Apps)
-- ✅ SSRF protection on link preview fetching (private IP blocking, DNS rebinding prevention)
+- ✅ SSRF protection on link preview fetching, image proxy, webhooks, and media rehosting (centralized `SsrfValidator` with private IP blocking and DNS rebinding prevention)
+- ✅ Security headers middleware (X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Referrer-Policy, Permissions-Policy)
+- ✅ Authentication required before static file serving (middleware ordering: auth → static files)
+- ✅ OpenAPI/Scalar restricted to development environment only
+- ✅ reCAPTCHA API key sent via `x-goog-api-key` header (not URL query string)
+- ✅ Report visibility checks (users must be server members to report messages/servers)
 - ✅ Secrets management via Azure Key Vault (production)
 - ✅ Managed Identity for all Azure service-to-service auth (no connection strings for blob/ACR)
 - ✅ Account lockout after 5 failed login attempts (15-minute window)

@@ -104,7 +104,7 @@ This document tracks implemented and planned features for Codec.
 
 ### Presence Indicators
 - ✅ Real-time presence status (Online, Idle, Offline) — automatic, no user-set statuses
-- ✅ Hybrid detection — client sends 30-second heartbeats with `isActive` flag; server tracks in-memory via `PresenceTracker` singleton with `ConcurrentDictionary`
+- ✅ Hybrid detection — client sends 30-second heartbeats with `isActive` flag; server tracks in-memory via `PresenceTracker` singleton with dual `ConcurrentDictionary` indexes (connection→entry + user→connections) for O(1) per-user lookups
 - ✅ `PresenceBackgroundService` — scans every 30 seconds; transitions to Idle after 5 minutes of inactivity, Offline after 2 minutes of missed heartbeats
 - ✅ `PresenceState` DB table — canonical status written only on transitions; purged on server startup
 - ✅ Multi-tab support — tracks multiple SignalR connections per user; aggregate status uses best across connections (Online > Idle > Offline)
@@ -174,7 +174,7 @@ This document tracks implemented and planned features for Codec.
 - **OAuth configuration** — `GET /auth/oauth/config` returns enabled provider status (public endpoint)
 
 ### Testing
-- 1,746 automated tests across 4 test suites (1,308 API unit, 182 API integration, 181 web, 75 admin)
+- 1,746+ automated tests across 4 test suites (1,388+ API unit, 182 API integration, 181 web, 75 admin)
 - API unit tests: xUnit + FluentAssertions + Moq; InMemory EF Core for database tests
 - API integration tests: WebApplicationFactory + Testcontainers (disposable PostgreSQL + Redis); full HTTP pipeline with real migrations; FakeAuthHandler bypasses Google JWT; SignalR hub tests via SignalR client
 - Web unit tests: Vitest + jsdom; localStorage polyfill; mocked fetch for API client
@@ -205,6 +205,11 @@ This document tracks implemented and planned features for Codec.
 - **Azure Monitor alerts** — container restart alerts, 5xx error rate alerts, database CPU alerts via Bicep modules (`monitor-alerts.bicep`, `monitor-action-group.bicep`)
 - **VAPID key rotation** — push notification VAPID keys rotated to Azure Key Vault secrets (no longer in appsettings)
 - **Security hardening** — SAML XML signature validation strengthened, OAuth redirect URI validation, webhook URL validation, input length validation on all DTOs
+- **Security headers** — X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Referrer-Policy, Permissions-Policy enforced via middleware
+- **Middleware ordering** — authentication/authorization enforced before static file serving; OpenAPI/Scalar restricted to development
+- **SSRF centralization** — `SsrfValidator` utility consolidates IP validation for link previews, image proxy, webhooks, and media rehosting; explicit URL validation on image proxy endpoint
+- **Report visibility** — users can only report messages/servers they are members of (global admins bypass)
+- **Shared utilities** — `FileHashService` (content-hash filenames), `SsrfValidator` (SSRF IP validation), `StringExtensions.EscapeForLike()` (SQL LIKE escaping) eliminate code duplication across services
 
 ## Planned
 
