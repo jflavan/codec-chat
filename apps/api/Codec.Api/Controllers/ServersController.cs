@@ -274,18 +274,29 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
             descriptionChanged = true;
         }
 
-        await db.SaveChangesAsync();
+        if (nameChanged)
+        {
+            audit.Log(serverId, appUser.Id, AuditAction.ServerRenamed,
+                details: $"Renamed from \"{oldName}\" to \"{server.Name}\"");
+        }
+
+        if (descriptionChanged)
+        {
+            audit.Log(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
+        }
+
+        if (nameChanged || descriptionChanged)
+        {
+            await db.SaveChangesAsync();
+        }
 
         if (nameChanged)
         {
-            // Notify all server members of the name change via SignalR.
             await hub.Clients.Group($"server-{serverId}").SendAsync("ServerNameChanged", new
             {
                 serverId,
                 name = server.Name
             });
-            audit.Log(serverId, appUser.Id, AuditAction.ServerRenamed,
-                details: $"Renamed from \"{oldName}\" to \"{server.Name}\"");
         }
 
         if (descriptionChanged)
@@ -295,12 +306,6 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
                 serverId,
                 description = server.Description
             });
-            audit.Log(serverId, appUser.Id, AuditAction.ServerDescriptionChanged);
-        }
-
-        if (nameChanged || descriptionChanged)
-        {
-            await db.SaveChangesAsync();
         }
 
         return Ok(new
@@ -584,17 +589,10 @@ public partial class ServersController(CodecDbContext db, IUserService userServi
         int deletedMessageCount = 0;
         if (request.DeleteMessages)
         {
-            var channelIds = await db.Channels
-                .AsNoTracking()
-                .Where(c => c.ServerId == serverId)
-                .Select(c => c.Id)
-                .ToListAsync();
-
-            var messagesToDelete = await db.Messages
-                .Where(m => channelIds.Contains(m.ChannelId) && m.AuthorUserId == targetUserId)
-                .ToListAsync();
-            deletedMessageCount = messagesToDelete.Count;
-            db.Messages.RemoveRange(messagesToDelete);
+            deletedMessageCount = await db.Messages
+                .Where(m => db.Channels.Where(c => c.ServerId == serverId).Select(c => c.Id).Contains(m.ChannelId)
+                    && m.AuthorUserId == targetUserId)
+                .ExecuteDeleteAsync();
         }
 
         audit.Log(serverId, appUser.Id, AuditAction.MemberBanned,
