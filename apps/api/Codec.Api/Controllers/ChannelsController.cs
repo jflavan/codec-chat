@@ -640,13 +640,22 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
         // Notify each mentioned user who is a member of this server.
         var notifiedUserIds = new HashSet<Guid> { appUser.Id }; // skip author
 
-        foreach (var mention in mentions)
+        if (mentions.Count > 0)
         {
-            if (notifiedUserIds.Contains(mention.UserId)) continue;
+            // Batch membership check: single query instead of N queries
+            var mentionUserIds = mentions.Select(m => m.UserId).Where(id => !notifiedUserIds.Contains(id)).ToList();
+            var memberIds = mentionUserIds.Count > 0
+                ? await db.ServerMembers.AsNoTracking()
+                    .Where(sm => sm.ServerId == channel.ServerId && mentionUserIds.Contains(sm.UserId))
+                    .Select(sm => sm.UserId)
+                    .ToHashSetAsync()
+                : new HashSet<Guid>();
 
-            var isMentionedMember = await userService.IsMemberAsync(channel.ServerId, mention.UserId);
-            if (isMentionedMember)
+            foreach (var mention in mentions)
             {
+                if (notifiedUserIds.Contains(mention.UserId)) continue;
+                if (!memberIds.Contains(mention.UserId)) continue;
+
                 await chatHub.Clients.Group($"user-{mention.UserId}").SendAsync("MentionReceived", new
                 {
                     message.Id,
@@ -668,20 +677,19 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                 .Select(sm => sm.UserId)
                 .ToListAsync();
 
-            foreach (var memberId in serverMemberIds)
-            {
-                if (notifiedUserIds.Contains(memberId)) continue;
-                notifiedUserIds.Add(memberId);
-
-                await chatHub.Clients.Group($"user-{memberId}").SendAsync("MentionReceived", new
+            var hereTasks = serverMemberIds
+                .Where(memberId => notifiedUserIds.Add(memberId))
+                .Select(memberId => chatHub.Clients.Group($"user-{memberId}").SendAsync("MentionReceived", new
                 {
                     message.Id,
                     message.ChannelId,
                     channel.ServerId,
                     AuthorName = message.AuthorName,
                     message.Body
-                });
-            }
+                }))
+                .ToList();
+
+            await Task.WhenAll(hereTasks);
         }
 
         // Send push notifications to all mentioned users (excluding the author).
