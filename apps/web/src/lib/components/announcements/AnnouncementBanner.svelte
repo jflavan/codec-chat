@@ -9,6 +9,7 @@
 </script>
 
 <div class="announcement-banner" role="status">
+	<div class="banner-accent-edge"></div>
 	<div class="banner-content">
 		<svg class="info-icon" width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 			<path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm-.5 3h1v1h-1V5Zm0 2h1v5h-1V7Z"/>
@@ -34,12 +35,21 @@
 		align-items: center;
 		gap: 8px;
 		padding: 10px 16px;
-		background: rgba(var(--accent-rgb, 88, 101, 242), 0.15);
-		color: var(--text-normal);
+		background: var(--banner-bg);
 		font-size: 14px;
 		min-height: 40px;
 		flex-shrink: 0;
-		border-bottom: 1px solid rgba(var(--accent-rgb, 88, 101, 242), 0.3);
+		border-bottom: 1px solid var(--banner-border);
+		position: relative;
+	}
+
+	.banner-accent-edge {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 3px;
+		background: var(--banner-icon);
 	}
 
 	.banner-content {
@@ -52,17 +62,17 @@
 
 	.info-icon {
 		flex-shrink: 0;
-		color: var(--accent);
+		color: var(--banner-icon);
 	}
 
 	.banner-title {
 		font-weight: 600;
 		flex-shrink: 0;
-		color: var(--accent);
+		color: var(--banner-title);
 	}
 
 	.banner-body {
-		color: var(--text-muted);
+		color: var(--banner-body);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -72,7 +82,7 @@
 		flex-shrink: 0;
 		background: none;
 		border: none;
-		color: var(--text-muted);
+		color: var(--banner-dismiss);
 		cursor: pointer;
 		padding: 4px;
 		border-radius: 4px;
@@ -81,7 +91,7 @@
 	}
 
 	.dismiss-btn:hover {
-		color: var(--text-normal);
-		background: rgba(var(--accent-rgb, 88, 101, 242), 0.15);
+		color: var(--banner-dismiss-hover);
+		background: var(--banner-dismiss-hover-bg);
 	}
 </style>

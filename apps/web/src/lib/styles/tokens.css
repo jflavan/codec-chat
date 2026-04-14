@@ -22,6 +22,15 @@
 	--mention-bg: #123A22;
 	--selection-bg: #0F3A22;
 	--input-bg: #06160C;
+
+	--banner-bg: #061A0C;
+	--banner-border: #0D3A1A;
+	--banner-title: #00FF66;
+	--banner-body: #5AC76A;
+	--banner-icon: #00CC52;
+	--banner-dismiss: #3A7A44;
+	--banner-dismiss-hover: #86FF6B;
+	--banner-dismiss-hover-bg: #0D3A1A;
 }
 
 /* ===== Midnight – dark navy/slate palette ===== */
@@ -48,6 +57,15 @@
 	--mention-bg: #1A2845;
 	--selection-bg: #182A48;
 	--input-bg: #141828;
+
+	--banner-bg: #161C36;
+	--banner-border: #263060;
+	--banner-title: #7BA6FF;
+	--banner-body: #9AA3B8;
+	--banner-icon: #5B8DEF;
+	--banner-dismiss: #6B7280;
+	--banner-dismiss-hover: #C8CDD8;
+	--banner-dismiss-hover-bg: #1E2848;
 }
 
 /* ===== Ember – warm amber/orange palette ===== */
@@ -74,6 +92,15 @@
 	--mention-bg: #302415;
 	--selection-bg: #2E2618;
 	--input-bg: #15100A;
+
+	--banner-bg: #1E1508;
+	--banner-border: #4A3820;
+	--banner-title: #F0A030;
+	--banner-body: #BFA880;
+	--banner-icon: #D89020;
+	--banner-dismiss: #7D6D55;
+	--banner-dismiss-hover: #D4C4A8;
+	--banner-dismiss-hover-bg: #2E2215;
 }
 
 /* ===== Light – Apple-inspired light palette ===== */
@@ -100,4 +127,13 @@
 	--mention-bg: #E8F0FE;
 	--selection-bg: #DCE8FC;
 	--input-bg: #F5F5F7;
+
+	--banner-bg: #EDF2FC;
+	--banner-border: #C8D8F0;
+	--banner-title: #0044AA;
+	--banner-body: #3D3D42;
+	--banner-icon: #0055CC;
+	--banner-dismiss: #8E8E93;
+	--banner-dismiss-hover: #1D1D1F;
+	--banner-dismiss-hover-bg: #DCE4F4;
 }
