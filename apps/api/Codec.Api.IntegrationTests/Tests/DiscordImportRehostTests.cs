@@ -136,14 +136,14 @@ public class DiscordImportRehostTests(CodecWebFactory factory) : IntegrationTest
             await db.SaveChangesAsync();
         });
 
-        // Resync requires a Completed import. RehostingMedia is not Completed,
-        // so it returns BadRequest ("No completed import").
+        // Resync now accepts RehostingMedia imports (stuck media rehost can be resynced).
+        // The import is found, but the bot token is invalid, so we get a token validation error.
         var response = await client.PostAsJsonAsync(
             $"/servers/{serverId}/discord-import/resync",
             new { botToken = "some-token", discordGuildId = "444555666" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetString().Should().Contain("No completed import");
+        body.GetProperty("error").GetString().Should().Contain("bot token");
     }
 }
