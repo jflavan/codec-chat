@@ -6,6 +6,6 @@ export { createMessageStore, getMessageStore, MessageStore } from './message-sto
 export { createDmStore, getDmStore, DmStore } from './dm-store.svelte.js';
 export { createFriendStore, getFriendStore, FriendStore } from './friend-store.svelte.js';
 export { createVoiceStore, getVoiceStore, VoiceStore } from './voice-store.svelte.js';
-export { createAnnouncementStore, getAnnouncementStore, AnnouncementStore } from './announcement-store.svelte.js';
+export { createAnnouncementStore, AnnouncementStore } from './announcement-store.svelte.js';
 export { setupSignalR } from './signalr.svelte.js';
 export { goHome, selectServer } from './navigation.svelte.js';

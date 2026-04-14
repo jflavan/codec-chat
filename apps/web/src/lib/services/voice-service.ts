@@ -3,8 +3,7 @@ import {
 	RoomEvent,
 	Track,
 	type RemoteTrackPublication,
-	type RemoteParticipant,
-	type LocalParticipant
+	type RemoteParticipant
 } from 'livekit-client';
 
 export type VoiceServiceCallbacks = {
@@ -94,18 +93,6 @@ export class VoiceService {
 		await this.room.localParticipant.setScreenShareEnabled(false);
 	}
 
-	get isVideoActive(): boolean {
-		if (!this.room) return false;
-		const pub = this.room.localParticipant.getTrackPublication(Track.Source.Camera);
-		return pub?.track !== undefined && !pub.isMuted;
-	}
-
-	get isScreenShareActive(): boolean {
-		if (!this.room) return false;
-		const pub = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
-		return pub?.track !== undefined && !pub.isMuted;
-	}
-
 	async leave(): Promise<void> {
 		this.callbacks = null;
 		if (this.room) {
@@ -121,11 +108,6 @@ export class VoiceService {
 			this.room.disconnect();
 			this.room = null;
 		}
-	}
-
-	/** Get the local participant for volume/audio manipulation. */
-	get localParticipant(): LocalParticipant | null {
-		return this.room?.localParticipant ?? null;
 	}
 
 	private _trackLabel(

@@ -1,5 +1,5 @@
 // apps/web/src/lib/state/announcement-store.svelte.ts
-import { getContext, setContext } from 'svelte';
+import { setContext } from 'svelte';
 import { browser } from '$app/environment';
 
 const ANNOUNCEMENT_KEY = Symbol('announcement-store');
@@ -17,10 +17,6 @@ export function createAnnouncementStore(): AnnouncementStore {
 	const store = new AnnouncementStore();
 	setContext(ANNOUNCEMENT_KEY, store);
 	return store;
-}
-
-export function getAnnouncementStore(): AnnouncementStore {
-	return getContext<AnnouncementStore>(ANNOUNCEMENT_KEY);
 }
 
 export class AnnouncementStore {
