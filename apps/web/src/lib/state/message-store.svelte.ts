@@ -21,6 +21,8 @@ import type {
 import type { AuthStore } from './auth-store.svelte.js';
 import type { ChannelStore } from './channel-store.svelte.js';
 import { UIStore } from './ui-store.svelte.js';
+import { validateImage, validateFile } from '$lib/utils/attachments.js';
+import { rememberReactionUpdate, matchAndRemoveReactionSnapshot } from '$lib/utils/reactions.js';
 
 const MESSAGE_KEY = Symbol('message-store');
 
@@ -93,21 +95,8 @@ export class MessageStore {
 	onSelectDmConversation: ((channelId: string) => Promise<void>) | null = null;
 	onSetDmMessages: ((messages: DirectMessage[]) => void) | null = null;
 
-	/* ───── static constants ───── */
-	private static readonly ALLOWED_IMAGE_TYPES = new Set([
-		'image/jpeg',
-		'image/png',
-		'image/webp',
-		'image/gif'
-	]);
-
-	private static readonly ALLOWED_FILE_EXTENSIONS = new Set([
-		'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-		'.txt', '.csv', '.md', '.rtf',
-		'.zip', '.tar', '.gz', '.7z', '.rar',
-		'.json', '.xml', '.html', '.css', '.js', '.ts',
-		'.mp3', '.ogg', '.wav', '.webm', '.mp4'
-	]);
+	/** Incremented on each loadMessages call to discard stale responses after fast channel switches. */
+	private loadGeneration = 0;
 
 	constructor(
 		auth: AuthStore,
@@ -127,15 +116,18 @@ export class MessageStore {
 
 	async loadMessages(channelId: string): Promise<void> {
 		if (!this.auth.idToken) return;
+		const gen = ++this.loadGeneration;
 		this.isLoadingMessages = true;
 		try {
 			const result = await this.api.getMessages(this.auth.idToken, channelId, { limit: 100 });
+			// Discard stale response if user switched channels during the fetch.
+			if (gen !== this.loadGeneration) return;
 			this.messages = result.messages;
 			this.hasMoreMessages = result.hasMore;
 		} catch (e) {
-			this.ui.setError(e);
+			if (gen === this.loadGeneration) this.ui.setError(e);
 		} finally {
-			this.isLoadingMessages = false;
+			if (gen === this.loadGeneration) this.isLoadingMessages = false;
 		}
 	}
 
@@ -293,14 +285,8 @@ export class MessageStore {
 	/* ═══════════════════ Image Attachments ═══════════════════ */
 
 	attachImage(file: File): void {
-		if (!MessageStore.ALLOWED_IMAGE_TYPES.has(file.type)) {
-			this.ui.error = 'Unsupported image type. Allowed: JPG, PNG, WebP, GIF.';
-			return;
-		}
-		if (file.size > 10 * 1024 * 1024) {
-			this.ui.error = 'Image must be under 10 MB.';
-			return;
-		}
+		const error = validateImage(file);
+		if (error) { this.ui.error = error; return; }
 		this.pendingImage = file;
 		this.pendingImagePreview = URL.createObjectURL(file);
 	}
@@ -316,15 +302,8 @@ export class MessageStore {
 	/* ═══════════════════ File Attachments ═══════════════════ */
 
 	attachFile(file: File): void {
-		const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-		if (!ext || !MessageStore.ALLOWED_FILE_EXTENSIONS.has(ext)) {
-			this.ui.error = 'Unsupported file type.';
-			return;
-		}
-		if (file.size > 25 * 1024 * 1024) {
-			this.ui.error = 'File must be under 25 MB.';
-			return;
-		}
+		const error = validateFile(file);
+		if (error) { this.ui.error = error; return; }
 		this.pendingFile = file;
 	}
 
@@ -388,62 +367,6 @@ export class MessageStore {
 
 	/* ═══════════════════ Reactions ═══════════════════ */
 
-	private static serializeReactionSnapshot(
-		reactions: ReadonlyArray<Message['reactions'][number]>
-	): string {
-		return JSON.stringify(
-			reactions
-				.map((reaction) => ({
-					emoji: reaction.emoji,
-					count: reaction.count,
-					userIds: [...reaction.userIds].sort()
-				}))
-				.sort((reactionA, reactionB) =>
-					reactionA.emoji.localeCompare(reactionB.emoji)
-				)
-		);
-	}
-
-	private _rememberReactionUpdate(
-		messageId: string,
-		reactions: Message['reactions']
-	): void {
-		const serialized = MessageStore.serializeReactionSnapshot(reactions);
-		const next = new Map(this.ui.ignoredReactionUpdates);
-		next.set(messageId, [...(next.get(messageId) ?? []), serialized]);
-		this.ui.ignoredReactionUpdates = next;
-	}
-
-	private _matchAndRemoveReactionSnapshot(
-		messageId: string,
-		reactions: Message['reactions']
-	): boolean {
-		const queue = this.ui.ignoredReactionUpdates.get(messageId);
-		if (!queue?.length) {
-			return false;
-		}
-
-		const serialized = MessageStore.serializeReactionSnapshot(reactions);
-		const matchedIndex = queue.indexOf(serialized);
-		if (matchedIndex === -1) {
-			return false;
-		}
-
-		const next = new Map(this.ui.ignoredReactionUpdates);
-		const remaining = queue.filter((snapshot, index) => {
-			void snapshot;
-			return index !== matchedIndex;
-		});
-		if (remaining.length > 0) {
-			next.set(messageId, remaining);
-		} else {
-			next.delete(messageId);
-		}
-		this.ui.ignoredReactionUpdates = next;
-
-		return true;
-	}
-
 	private _updateMessageReactions(
 		messageId: string,
 		reactions: Message['reactions']
@@ -468,7 +391,7 @@ export class MessageStore {
 				normalizedEmoji
 			);
 			this._updateMessageReactions(messageId, result.reactions);
-			this._rememberReactionUpdate(messageId, result.reactions);
+			rememberReactionUpdate(this.ui, messageId, result.reactions);
 			// Real-time update arrives via SignalR; fall back to reload if disconnected.
 			if (!this.hub.isConnected) {
 				await this.loadMessages(this.channels.selectedChannelId);
@@ -675,7 +598,7 @@ export class MessageStore {
 	}
 
 	handleReactionUpdate(update: ReactionUpdate): void {
-		if (this._matchAndRemoveReactionSnapshot(update.messageId, update.reactions)) {
+		if (matchAndRemoveReactionSnapshot(this.ui, update.messageId, update.reactions)) {
 			return;
 		}
 		if (update.channelId === this.channels.selectedChannelId) {

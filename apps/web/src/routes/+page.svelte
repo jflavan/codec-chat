@@ -63,12 +63,14 @@
 	/* ───── Wire cross-store callbacks ───── */
 
 	auth.onSignedIn = async () => {
+		// Load initial data first, then start SignalR.
+		// This prevents SignalR events from arriving before state is initialized
+		// (e.g. messages being dropped because selectedChannelId is still null).
 		await Promise.all([
 			servers.loadServers(),
 			friends.loadFriends(),
 			friends.loadFriendRequests(),
-			dms.loadDmConversations(),
-			setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui)
+			dms.loadDmConversations()
 		]);
 
 		// Redirect back to invite page after sign-in so user sees preview + accept
@@ -83,6 +85,9 @@
 		if (servers.selectedServerId) {
 			await selectServer(servers.selectedServerId, ui, servers, channels, dms, hub);
 		}
+
+		// Start SignalR AFTER initial state is loaded so event handlers have valid state.
+		await setupSignalR(hub, auth, servers, channels, messages, dms, friends, voice, ui);
 
 		api.getActiveAnnouncements(auth.idToken!).then(items => {
 			announcementStore.setAnnouncements(items);

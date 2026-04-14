@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { emojiCategories } from '$lib/data/emojis';
+	import { onMount } from 'svelte';
 	import { getFrequentEmojis } from '$lib/utils/emoji-frequency';
 	import { isTouchDevice } from '$lib/utils/dom';
 	import type { CustomEmoji } from '$lib/types/models';
@@ -24,6 +24,15 @@
 	let scrollContainer = $state<HTMLDivElement>();
 	let searchInput = $state<HTMLInputElement>();
 	let containerEl = $state<HTMLDivElement>();
+
+	/** Lazy-loaded emoji data — only fetched when the picker is opened. */
+	type EmojiCategory = { id: string; name: string; icon: string; emojis: Array<{ emoji: string; name: string; keywords: string[] }> };
+	let emojiCategories = $state<EmojiCategory[]>([]);
+
+	onMount(async () => {
+		const mod = await import('$lib/data/emojis');
+		emojiCategories = mod.emojiCategories;
+	});
 
 	/** Compute max-height based on available viewport space below the picker.
 	 *  Called once at render — not reactive to scroll/resize (by design). */
@@ -82,7 +91,7 @@
 			}
 		}
 
-		// Standard emoji categories
+		// Standard emoji categories (lazy-loaded)
 		for (const cat of emojiCategories) {
 			const items = cat.emojis.map((e) => ({ emoji: e.emoji, name: e.name, isCustom: false }));
 			const filtered = query

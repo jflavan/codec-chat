@@ -72,7 +72,9 @@ src/
 │   ├── utils/
 │   │   ├── format.ts       # Date/time formatting helpers (formatTime, formatMessageTimestamp, formatDateSeparator, isDifferentDay)
 │   │   ├── emoji-frequency.ts  # localStorage-backed emoji usage frequency tracker
-│   │   └── theme.ts        # Theme registry, persistence (localStorage), and DOM application
+│   │   ├── theme.ts        # Theme registry, persistence (localStorage), and DOM application
+│   │   ├── attachments.ts  # Shared file-attachment validation (image types, file extensions, size limits)
+│   │   └── reactions.ts    # Shared reaction-snapshot helpers (dedup optimistic updates vs SignalR echoes)
 │   ├── components/
 │   │   ├── server-sidebar/
 │   │   │   └── ServerSidebar.svelte      # Server icon rail (create/join-via-invite)
