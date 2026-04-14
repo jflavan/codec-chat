@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Codec.Api.Services;
 
 /// <summary>
@@ -102,17 +100,10 @@ public class FileUploadService(IFileStorageService fileStorage) : IFileUploadSer
     public async Task<string> SaveFileAsync(Guid userId, IFormFile file)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var hash = await ComputeHashAsync(file);
+        using var stream = file.OpenReadStream();
+        var hash = await FileHashService.ComputeHashAsync(stream);
+        stream.Position = 0;
         var blobPath = $"{userId}/{hash}{extension}";
-
-        using var stream = file.OpenReadStream();
         return await fileStorage.UploadAsync(ContainerName, blobPath, stream, file.ContentType);
-    }
-
-    private static async Task<string> ComputeHashAsync(IFormFile file)
-    {
-        using var stream = file.OpenReadStream();
-        var hashBytes = await SHA256.HashDataAsync(stream);
-        return Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
     }
 }
