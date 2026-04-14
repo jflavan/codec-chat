@@ -59,10 +59,10 @@ public class MultiRoleTests(CodecWebFactory factory) : IntegrationTestBase(facto
         addResponse.EnsureSuccessStatusCode();
 
         // Verify member now has the new role
-        var membersResponse = await owner.GetFromJsonAsync<JsonElement[]>($"/servers/{serverId}/members");
-        Assert.NotNull(membersResponse);
+        var membersWrapper = await owner.GetFromJsonAsync<JsonElement>($"/servers/{serverId}/members");
+        var membersArray = membersWrapper.GetProperty("members").EnumerateArray().ToArray();
 
-        var targetMember = membersResponse.FirstOrDefault(m => m.GetProperty("userId").GetGuid() == memberId);
+        var targetMember = membersArray.FirstOrDefault(m => m.GetProperty("userId").GetGuid() == memberId);
         Assert.True(targetMember.ValueKind != JsonValueKind.Undefined, "Target member not found in members list.");
 
         var roles = targetMember.GetProperty("roles");
@@ -93,10 +93,10 @@ public class MultiRoleTests(CodecWebFactory factory) : IntegrationTestBase(facto
         removeResponse.EnsureSuccessStatusCode();
 
         // Verify member still has the Member role (auto-reassigned because they had no other roles)
-        var membersResponse = await owner.GetFromJsonAsync<JsonElement[]>($"/servers/{serverId}/members");
-        Assert.NotNull(membersResponse);
+        var membersWrapper = await owner.GetFromJsonAsync<JsonElement>($"/servers/{serverId}/members");
+        var membersArray = membersWrapper.GetProperty("members").EnumerateArray().ToArray();
 
-        var targetMember = membersResponse.FirstOrDefault(m => m.GetProperty("userId").GetGuid() == memberId);
+        var targetMember = membersArray.FirstOrDefault(m => m.GetProperty("userId").GetGuid() == memberId);
         Assert.True(targetMember.ValueKind != JsonValueKind.Undefined, "Target member not found in members list.");
 
         var roles = targetMember.GetProperty("roles");
@@ -135,10 +135,10 @@ public class MultiRoleTests(CodecWebFactory factory) : IntegrationTestBase(facto
         addResponse.EnsureSuccessStatusCode();
 
         // Verify member has both Member defaults AND Moderator perms combined
-        var membersResponse = await owner.GetFromJsonAsync<JsonElement[]>($"/servers/{serverId}/members");
-        Assert.NotNull(membersResponse);
+        var membersWrapper = await owner.GetFromJsonAsync<JsonElement>($"/servers/{serverId}/members");
+        var membersArray = membersWrapper.GetProperty("members").EnumerateArray().ToArray();
 
-        var targetMember = membersResponse.FirstOrDefault(m => m.GetProperty("userId").GetGuid() == memberId);
+        var targetMember = membersArray.FirstOrDefault(m => m.GetProperty("userId").GetGuid() == memberId);
         Assert.True(targetMember.ValueKind != JsonValueKind.Undefined, "Target member not found in members list.");
 
         var aggregatedPermissions = targetMember.GetProperty("permissions").GetInt64();
