@@ -34,11 +34,12 @@
 		align-items: center;
 		gap: 8px;
 		padding: 10px 16px;
-		background: var(--accent, #5865f2);
-		color: white;
+		background: rgba(var(--accent-rgb, 88, 101, 242), 0.15);
+		color: var(--text-normal);
 		font-size: 14px;
 		min-height: 40px;
 		flex-shrink: 0;
+		border-bottom: 1px solid rgba(var(--accent-rgb, 88, 101, 242), 0.3);
 	}
 
 	.banner-content {
@@ -51,16 +52,17 @@
 
 	.info-icon {
 		flex-shrink: 0;
-		opacity: 0.85;
+		color: var(--accent);
 	}
 
 	.banner-title {
 		font-weight: 600;
 		flex-shrink: 0;
+		color: var(--accent);
 	}
 
 	.banner-body {
-		opacity: 0.9;
+		color: var(--text-muted);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -70,8 +72,7 @@
 		flex-shrink: 0;
 		background: none;
 		border: none;
-		color: white;
-		opacity: 0.7;
+		color: var(--text-muted);
 		cursor: pointer;
 		padding: 4px;
 		border-radius: 4px;
@@ -80,7 +81,7 @@
 	}
 
 	.dismiss-btn:hover {
-		opacity: 1;
-		background: rgba(255, 255, 255, 0.15);
+		color: var(--text-normal);
+		background: rgba(var(--accent-rgb, 88, 101, 242), 0.15);
 	}
 </style>
