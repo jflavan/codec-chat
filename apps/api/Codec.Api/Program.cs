@@ -707,11 +707,25 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()";
+    await next();
+});
+
 app.UseSerilogRequestLogging();
 
 app.UseRateLimiter();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Serve uploaded files as static content only when using local storage.
+// Placed after auth so uploads require authentication.
 if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
 {
     var avatarStoragePath = Path.Combine(uploadsPath, "avatars");
@@ -739,15 +753,13 @@ if (storageProvider.Equals("Local", StringComparison.OrdinalIgnoreCase))
     });
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<AdminHub>("/hubs/admin");
 
-app.MapOpenApi();
 if (app.Environment.IsDevelopment())
 {
+    app.MapOpenApi();
     app.MapScalarApiReference();
 }
 
