@@ -28,10 +28,16 @@ public class ReportsController(CodecDbContext db, IUserService userService) : Co
         {
             var msg = await db.Messages.AsNoTracking()
                 .Where(m => m.Id == targetGuid)
-                .Select(m => new { m.Body, Author = m.AuthorUser!.DisplayName })
+                .Select(m => new { m.Body, Author = m.AuthorUser!.DisplayName, m.Channel!.ServerId })
                 .FirstOrDefaultAsync();
             if (msg is null) return NotFound(new { error = "Target message not found." });
-            snapshot = JsonSerializer.Serialize(msg);
+
+            var isMember = await db.ServerMembers.AsNoTracking()
+                .AnyAsync(sm => sm.ServerId == msg.ServerId && sm.UserId == user.Id);
+            if (!isMember && !user.IsGlobalAdmin)
+                return NotFound(new { error = "Target message not found." });
+
+            snapshot = JsonSerializer.Serialize(new { msg.Body, msg.Author });
         }
         else if (request.ReportType == ReportType.User)
         {
@@ -49,6 +55,12 @@ public class ReportsController(CodecDbContext db, IUserService userService) : Co
                 .Select(s => new { s.Name, s.Description })
                 .FirstOrDefaultAsync();
             if (s is null) return NotFound(new { error = "Target server not found." });
+
+            var isMember = await db.ServerMembers.AsNoTracking()
+                .AnyAsync(sm => sm.ServerId == targetGuid && sm.UserId == user.Id);
+            if (!isMember && !user.IsGlobalAdmin)
+                return NotFound(new { error = "Target server not found." });
+
             snapshot = JsonSerializer.Serialize(s);
         }
 

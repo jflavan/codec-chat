@@ -849,7 +849,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                             userId = stale.UserId
                         });
                     }
-                    catch { /* best-effort */ }
+                    catch (Exception voiceEx)
+                    {
+                        logger.LogWarning(voiceEx, "Best-effort voice state cleanup failed for user {UserId}", stale.UserId);
+                    }
                 }
 
                 // Best-effort cleanup of any active/ringing call for this user.
@@ -870,7 +873,10 @@ public class ChatHub(IUserService userService, CodecDbContext db, IConfiguration
                         await db.SaveChangesAsync();
                     }
                 }
-                catch { /* best-effort */ }
+                catch (Exception callEx)
+                {
+                    logger.LogWarning(callEx, "Best-effort voice call cleanup failed for user {UserId}", staleUserId);
+                }
             }
         }
 

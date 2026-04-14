@@ -18,7 +18,7 @@ namespace Codec.Api.Controllers;
 [Authorize]
 [RequireEmailVerified]
 [Route("channels")]
-public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService, IPermissionResolverService permissionResolver, MetricsCounterService metricsCounter, PushNotificationService? pushService = null) : ControllerBase
+public partial class ChannelsController(CodecDbContext db, IUserService userService, IHubContext<ChatHub> chatHub, IAvatarService avatarService, IServiceScopeFactory scopeFactory, MessageCacheService messageCache, WebhookService webhookService, IPermissionResolverService permissionResolver, MetricsCounterService metricsCounter, ILogger<ChannelsController> logger, PushNotificationService? pushService = null) : ControllerBase
 {
     private static readonly System.Text.Json.JsonSerializerOptions CamelCaseJsonOptions = new()
     {
@@ -771,9 +771,9 @@ public partial class ChannelsController(CodecDbContext db, IUserService userServ
                     });
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Link preview failures must never affect message delivery.
+                logger.LogWarning(ex, "Link preview fetch failed for message {MessageId}", messageId);
             }
         });
 
