@@ -69,7 +69,7 @@
 		{#if isLoading && gifs.length === 0}
 			<div class="gif-loading" aria-live="polite">Loading GIFs…</div>
 		{:else if gifs.length === 0}
-			<div class="gif-empty">No GIFs found</div>
+			<div class="gif-empty" aria-live="polite">No GIFs found</div>
 		{:else}
 			<div class="gif-grid">
 				{#each gifs as gif (gif.id)}

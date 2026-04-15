@@ -149,11 +149,12 @@
 		/>
 	</div>
 
-	<div class="category-tabs">
+	<div class="category-tabs" role="tablist" aria-label="Emoji categories">
 		{#each allCategories as cat (cat.id)}
 			<button
 				class="category-tab"
 				title={cat.name}
+				aria-label={cat.name}
 				onclick={() => scrollToCategory(cat.id)}
 			>
 				{cat.icon}
@@ -161,7 +162,7 @@
 		{/each}
 	</div>
 
-	<div class="emoji-scroll" bind:this={scrollContainer}>
+	<div class="emoji-scroll" bind:this={scrollContainer} role="region" aria-label="Emoji list">
 		{#each allCategories as cat (cat.id)}
 			<div data-category={cat.id}>
 				<div class="category-header">{cat.name}</div>
@@ -171,6 +172,7 @@
 							type="button"
 							class="emoji-btn"
 							title={item.name}
+							aria-label={item.name}
 							onclick={() => handleSelect(item.emoji)}
 						>
 							{#if item.isCustom && item.imageUrl}

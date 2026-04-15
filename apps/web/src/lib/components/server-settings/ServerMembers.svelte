@@ -97,6 +97,7 @@
 					class="ban-reason-input"
 					type="text"
 					placeholder="Reason (optional)"
+					aria-label="Ban reason (optional)"
 					bind:value={banReason}
 					maxlength="512"
 				/>
@@ -129,7 +130,7 @@
 		{#each servers.members as member (member.userId)}
 			<li class="member-row">
 				{#if member.avatarUrl}
-					<img class="member-avatar" src={member.avatarUrl} alt="" />
+					<img class="member-avatar" src={member.avatarUrl} alt="{member.displayName}'s avatar" />
 				{:else}
 					<div class="member-avatar-placeholder" aria-hidden="true">
 						{member.displayName.slice(0, 1).toUpperCase()}
@@ -154,6 +155,7 @@
 							{#if changingRoleUserId === member.userId}
 								<select
 									class="role-select"
+									aria-label="Select role to assign to {member.displayName}"
 									onchange={(e) => addRole(member.userId, (e.target as HTMLSelectElement).value)}
 								>
 									<option value="" disabled selected>Add role…</option>

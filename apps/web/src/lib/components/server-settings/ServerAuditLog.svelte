@@ -76,12 +76,12 @@
 	{:else if servers.auditLogEntries.length === 0}
 		<p class="muted centered">No audit log entries.</p>
 	{:else}
-		<div class="log-list" bind:this={scrollEl} onscroll={handleScroll}>
+		<div class="log-list" bind:this={scrollEl} onscroll={handleScroll} aria-label="Audit log entries" role="log" aria-live="polite">
 			{#each servers.auditLogEntries as entry (entry.id)}
 				<div class="log-entry">
 					<div class="actor-avatar">
 						{#if entry.actorAvatarUrl}
-							<img src={entry.actorAvatarUrl} alt="" class="avatar-img" />
+							<img src={entry.actorAvatarUrl} alt="{entry.actorDisplayName || 'Deleted User'}'s avatar" class="avatar-img" />
 						{:else}
 							<span class="avatar-placeholder">{(entry.actorDisplayName || '?').slice(0, 1).toUpperCase()}</span>
 						{/if}

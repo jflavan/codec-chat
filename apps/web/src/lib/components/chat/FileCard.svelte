@@ -32,8 +32,8 @@
 	});
 </script>
 
-<a href={fileUrl} class="file-card" target="_blank" rel="noopener noreferrer" download={fileName}>
-	<div class="file-icon" data-type={iconType}>
+<a href={fileUrl} class="file-card" target="_blank" rel="noopener noreferrer" download={fileName} aria-label="Download {fileName}{fileSize ? ` (${formatSize(fileSize)})` : ''}">
+	<div class="file-icon" data-type={iconType} aria-hidden="true">
 		{#if iconType === 'pdf'}
 			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9.5 15.5c0 .28-.22.5-.5.5h-1v1.5H7V13h2a1 1 0 0 1 1 1v1.5zm4-.5c0 1.1-.9 2-2 2h-1v-4h1c1.1 0 2 .9 2 2zm4.5-1.5h-2V15h1.5v1H16v1.5h-1V13h3v1z"/></svg>
 		{:else if iconType === 'archive'}
@@ -54,8 +54,8 @@
 			<span class="file-size">{formatSize(fileSize)}</span>
 		{/if}
 	</div>
-	<div class="file-download">
-		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+	<div class="file-download" aria-hidden="true">
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
 	</div>
 </a>
 

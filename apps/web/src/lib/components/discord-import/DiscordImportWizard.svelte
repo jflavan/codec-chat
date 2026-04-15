@@ -122,12 +122,13 @@
 <dialog
 	bind:this={dialogEl}
 	class="wizard-dialog"
-	aria-label="Import from Discord"
+	aria-labelledby="discord-wizard-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
 	<div class="wizard-panel">
-		<button class="close-btn" onclick={close} aria-label="Close">
+		<h2 id="discord-wizard-title" class="visually-hidden">Import from Discord</h2>
+		<button class="close-btn" onclick={close} aria-label="Close dialog">
 			<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
 				<path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
 			</svg>
@@ -159,7 +160,7 @@
 					bind:isValid={connectStepValid}
 				/>
 				{#if importError}
-					<div class="import-error">{importError}</div>
+					<div class="import-error" role="alert" aria-live="assertive">{importError}</div>
 				{/if}
 			{:else if currentStep === 4}
 				<WizardStepProgress
@@ -198,6 +199,18 @@
 </dialog>
 
 <style>
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
 	.wizard-dialog {
 		position: fixed;
 		inset: 0;

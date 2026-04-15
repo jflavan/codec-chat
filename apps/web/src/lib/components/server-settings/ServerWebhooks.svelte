@@ -116,8 +116,8 @@
 						bind:value={secretInput}
 					/>
 				</div>
-				<div class="form-group">
-					<span class="label">Events</span>
+				<fieldset class="form-group events-fieldset">
+					<legend class="label">Events</legend>
 					<div class="event-grid">
 						{#each allEventTypes as eventType}
 							<label class="event-checkbox">
@@ -130,7 +130,7 @@
 							</label>
 						{/each}
 					</div>
-				</div>
+				</fieldset>
 				<div class="form-actions">
 					<button
 						type="button"
@@ -212,17 +212,17 @@
 								{:else if servers.webhookDeliveries.length === 0}
 									<p class="muted">No deliveries yet.</p>
 								{:else}
-									<div class="delivery-table">
-										<div class="delivery-header">
-											<span class="col-event">Event</span>
-											<span class="col-status">Status</span>
-											<span class="col-attempt">Attempt</span>
-											<span class="col-time">Time</span>
+									<div class="delivery-table" role="table" aria-label="Recent webhook deliveries">
+										<div class="delivery-header" role="row">
+											<span class="col-event" role="columnheader">Event</span>
+											<span class="col-status" role="columnheader">Status</span>
+											<span class="col-attempt" role="columnheader">Attempt</span>
+											<span class="col-time" role="columnheader">Time</span>
 										</div>
 										{#each servers.webhookDeliveries as delivery (delivery.id)}
-											<div class="delivery-row" class:success={delivery.success} class:failure={!delivery.success}>
-												<span class="col-event">{formatEventType(delivery.eventType)}</span>
-												<span class="col-status">
+											<div class="delivery-row" role="row" class:success={delivery.success} class:failure={!delivery.success}>
+												<span class="col-event" role="cell">{formatEventType(delivery.eventType)}</span>
+												<span class="col-status" role="cell">
 													{#if delivery.success}
 														<span class="status-badge success">{delivery.statusCode}</span>
 													{:else if delivery.statusCode}
@@ -231,8 +231,8 @@
 														<span class="status-badge failure" title={delivery.errorMessage ?? ''}>Error</span>
 													{/if}
 												</span>
-												<span class="col-attempt">{delivery.attempt}</span>
-												<span class="col-time muted">{formatDate(delivery.createdAt)}</span>
+												<span class="col-attempt" role="cell">{delivery.attempt}</span>
+												<span class="col-time muted" role="cell">{formatDate(delivery.createdAt)}</span>
 											</div>
 										{/each}
 									</div>
@@ -240,6 +240,7 @@
 								<button
 									type="button"
 									class="btn-close-deliveries"
+									aria-label="Close deliveries for {webhook.name}"
 									onclick={() => {
 										servers.selectedWebhookId = null;
 										servers.webhookDeliveries = [];
@@ -611,6 +612,18 @@
 
 	.muted {
 		color: var(--text-muted);
+	}
+
+	.events-fieldset {
+		border: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.events-fieldset legend {
+		float: left;
+		width: 100%;
+		margin-bottom: 6px;
 	}
 
 	@media (max-width: 600px) {

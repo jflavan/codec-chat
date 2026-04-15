@@ -6,21 +6,27 @@
 	const ui = getUIStore();
 
 	let dialogEl: HTMLDialogElement;
+	let titleInputEl = $state<HTMLInputElement>(undefined!);
 	let title = $state('');
 	let description = $state('');
 	let submitting = $state(false);
 	let successUrl = $state<string | null>(null);
 	let error = $state<string | null>(null);
+	let previousFocus: HTMLElement | null = null;
 
 	$effect(() => {
 		if (ui.bugReportOpen) {
+			previousFocus = document.activeElement as HTMLElement | null;
 			title = '';
 			description = '';
 			successUrl = null;
 			error = null;
 			dialogEl?.showModal();
+			// Focus first input after dialog opens
+			requestAnimationFrame(() => titleInputEl?.focus());
 		} else {
 			dialogEl?.close();
+			previousFocus?.focus();
 		}
 	});
 
@@ -65,18 +71,18 @@
 <dialog
 	bind:this={dialogEl}
 	class="bug-report-dialog"
-	aria-label="Report a Bug"
+	aria-labelledby="bug-report-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
 	<div class="bug-report-panel" role="document">
-		<button class="close-btn" onclick={close} aria-label="Close" title="Close">
+		<button class="close-btn" onclick={close} aria-label="Close dialog" title="Close">
 			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
 			</svg>
 		</button>
 
-		<h2>Report a Bug</h2>
+		<h2 id="bug-report-title">Report a Bug</h2>
 
 		{#if successUrl}
 			<div class="success">
@@ -91,6 +97,7 @@
 					<input
 						type="text"
 						bind:value={title}
+						bind:this={titleInputEl}
 						maxlength={200}
 						placeholder="Brief summary of the issue"
 						required
@@ -111,7 +118,7 @@
 				</label>
 
 				{#if error}
-					<p class="error">{error}</p>
+					<p class="error" role="alert" aria-live="assertive">{error}</p>
 				{/if}
 
 				<button type="submit" class="submit-btn" disabled={submitting || !title.trim() || !description.trim()}>

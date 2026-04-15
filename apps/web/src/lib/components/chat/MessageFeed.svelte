@@ -202,7 +202,7 @@
 </script>
 
 <div class="feed-wrapper">
-	<div class="message-feed" bind:this={container} onscroll={handleScroll}>
+	<div class="message-feed" bind:this={container} onscroll={handleScroll} role="log" aria-live="polite" aria-label="Message history">
 		{#if messages.isLoadingMessages}
 			<p class="muted feed-status">Loading messages…</p>
 		{:else if messages.messages.length === 0}
@@ -223,8 +223,8 @@
 				{@const newDay = !prev || isDifferentDay(prev.createdAt, message.createdAt)}
 				{@const isGrouped = !newDay && prev?.authorUserId === message.authorUserId && prev?.authorName === message.authorName}
 				{#if newDay}
-					<div class="date-separator" role="separator">
-						<span class="date-separator-label">{formatDateSeparator(message.createdAt)}</span>
+					<div class="date-separator" role="separator" aria-label={formatDateSeparator(message.createdAt)}>
+						<span class="date-separator-label" aria-hidden="true">{formatDateSeparator(message.createdAt)}</span>
 					</div>
 				{/if}
 				<div data-message-id={message.id} class:reply-highlight={highlightedMessageId === message.id} class:search-highlight={messages.highlightedMessageId === message.id}>

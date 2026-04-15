@@ -43,6 +43,7 @@
 					class="category-item"
 					class:active={ui.serverSettingsCategory === cat.id}
 					aria-selected={ui.serverSettingsCategory === cat.id}
+					aria-controls="settings-content-panel"
 					onclick={() => { ui.serverSettingsCategory = cat.id; }}
 				>
 					<span class="category-label">{cat.label}</span>

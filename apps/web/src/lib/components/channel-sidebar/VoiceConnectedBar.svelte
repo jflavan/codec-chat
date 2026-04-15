@@ -27,13 +27,14 @@
 		</span>
 		<span class="voice-channel-name">{isInCall ? `In call with ${label}` : `# ${label}`}</span>
 	</div>
-	<div class="voice-controls">
+	<div class="voice-controls" role="group" aria-label="Voice controls">
 		<button
 			class="voice-btn"
 			class:active={voice.isMuted}
 			onclick={() => voice.toggleMute()}
-			aria-label={voice.isMuted ? 'Unmute' : 'Mute'}
-			title={voice.isMuted ? 'Unmute' : 'Mute'}
+			aria-label={voice.isMuted ? 'Unmute microphone' : 'Mute microphone'}
+			aria-pressed={voice.isMuted}
+			title={voice.isMuted ? 'Unmute microphone' : 'Mute microphone'}
 		>
 			{#if voice.isMuted}
 				<!-- Mic off -->
@@ -52,8 +53,9 @@
 			class="voice-btn"
 			class:active={voice.isDeafened}
 			onclick={() => voice.toggleDeafen()}
-			aria-label={voice.isDeafened ? 'Undeafen' : 'Deafen'}
-			title={voice.isDeafened ? 'Undeafen' : 'Deafen'}
+			aria-label={voice.isDeafened ? 'Undeafen headset' : 'Deafen headset'}
+			aria-pressed={voice.isDeafened}
+			title={voice.isDeafened ? 'Undeafen headset' : 'Deafen headset'}
 		>
 			{#if voice.isDeafened}
 				<!-- Headset with slash -->
@@ -74,6 +76,7 @@
 			class:active={voice.isVideoEnabled}
 			onclick={() => voice.toggleVideo()}
 			aria-label={voice.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+			aria-pressed={voice.isVideoEnabled}
 			title={voice.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
 		>
 			{#if voice.isVideoEnabled}
@@ -91,8 +94,9 @@
 			class="voice-btn"
 			class:active={voice.isScreenSharing}
 			onclick={() => voice.toggleScreenShare()}
-			aria-label={voice.isScreenSharing ? 'Stop sharing' : 'Share screen'}
-			title={voice.isScreenSharing ? 'Stop sharing' : 'Share screen'}
+			aria-label={voice.isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
+			aria-pressed={voice.isScreenSharing}
+			title={voice.isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
 		>
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 				<path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>

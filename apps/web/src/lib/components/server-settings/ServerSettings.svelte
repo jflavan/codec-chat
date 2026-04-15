@@ -106,6 +106,7 @@
 							type="file"
 							accept="image/jpeg,image/png,image/webp,image/gif"
 							class="hidden-file-input"
+							aria-label="Upload server icon"
 							onchange={handleIconFileChange}
 						/>
 					</div>
@@ -188,7 +189,7 @@
 		{#if servers.canDeleteServer}
 			<div class="danger-zone">
 				{#if confirmDeleteServer}
-					<p class="danger-warning">Are you sure? This will permanently delete the server and all its channels, messages, members, and invites.</p>
+					<p class="danger-warning" role="alert">Are you sure? This will permanently delete the server and all its channels, messages, members, and invites.</p>
 					<div class="inline-actions">
 						<button type="button" class="btn-danger" disabled={servers.isDeletingServer} onclick={handleDeleteServer}>
 							{servers.isDeletingServer ? 'Deleting…' : 'Delete'}

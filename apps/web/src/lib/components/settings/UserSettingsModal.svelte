@@ -39,10 +39,11 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
-	aria-label="User Settings"
+	aria-labelledby="user-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
+	<h2 id="user-settings-title" class="visually-hidden">User Settings</h2>
 	<div class="settings-panel" role="document">
 		<div class="settings-sidebar-col">
 			<SettingsSidebar />
@@ -139,6 +140,18 @@
 	.close-btn:hover {
 		color: var(--text-header);
 		background: var(--bg-message-hover);
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	/* Responsive: small screens use tabbed layout */

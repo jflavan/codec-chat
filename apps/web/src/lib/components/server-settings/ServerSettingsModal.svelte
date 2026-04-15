@@ -44,15 +44,17 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
-	aria-label="Server Settings"
+	aria-modal="true"
+	aria-labelledby="server-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
+	<h2 id="server-settings-title" class="visually-hidden">Server Settings</h2>
 	<div class="settings-panel" role="document">
 		<div class="settings-sidebar-col">
 			<ServerSettingsSidebar />
 		</div>
-		<div class="settings-content-col">
+		<div class="settings-content-col" id="settings-content-panel" role="tabpanel">
 			<button
 				class="close-btn"
 				onclick={() => ui.closeServerSettings()}
@@ -154,6 +156,18 @@
 	.close-btn:hover {
 		color: var(--text-header);
 		background: var(--bg-message-hover);
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	@media (max-width: 899px) {

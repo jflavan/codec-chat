@@ -287,8 +287,9 @@
 				<button
 					type="button"
 					class="quick-emoji-btn"
+					aria-label={customMatch ? `Insert ${customMatch.name} emoji` : `Insert ${emoji} emoji`}
 					onclick={() => handleEmojiInsert(emoji)}
-				>{#if customMatch}<img src={customMatch.imageUrl} alt={customMatch.name} width="22" height="22" class="quick-emoji-img" />{:else}{emoji}{/if}</button>
+				>{#if customMatch}<img src={customMatch.imageUrl} alt={customMatch.name} width="22" height="22" class="quick-emoji-img" aria-hidden="true" />{:else}<span aria-hidden="true">{emoji}</span>{/if}</button>
 			{/each}
 			<button
 				type="button"
@@ -312,7 +313,7 @@
 		</div>
 	{:else}
 		<div class="composer-row">
-			<input type="file" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} />
+			<input type="file" class="sr-only" bind:this={fileInputEl} onchange={handleFileSelect} aria-label="Choose file to attach" />
 			<button
 				class="composer-attach"
 				type="button"
@@ -333,6 +334,7 @@
 					inputmode="text"
 					autocomplete="off"
 					placeholder={channelStore.selectedChannelName ? `Message #${channelStore.selectedChannelName}` : 'Select a channel…'}
+					aria-label={channelStore.selectedChannelName ? `Message #${channelStore.selectedChannelName}` : 'Message input'}
 					bind:value={msgStore.messageBody}
 					disabled={!channelStore.selectedChannelId || msgStore.isSending}
 					oninput={handleInput}
@@ -368,17 +370,21 @@
 			<div class="composer-picker-wrapper">
 					<div class="picker-backdrop" role="presentation" onclick={() => { showPicker = false; }} onkeydown={(e) => { if (e.key === 'Escape') showPicker = false; }}></div>
 				<div class="picker-container" role="dialog" aria-label="Emoji and GIF picker">
-					<div class="picker-tab-bar">
+					<div class="picker-tab-bar" role="tablist" aria-label="Picker type">
 						<button
 							class="picker-tab"
 							class:active={pickerTab === 'emoji'}
 							type="button"
+							role="tab"
+							aria-selected={pickerTab === 'emoji'}
 							onclick={() => (pickerTab = 'emoji')}
 						>Emoji</button>
 						<button
 							class="picker-tab"
 							class:active={pickerTab === 'gif'}
 							type="button"
+							role="tab"
+							aria-selected={pickerTab === 'gif'}
 							onclick={() => (pickerTab = 'gif')}
 						>GIFs</button>
 					</div>

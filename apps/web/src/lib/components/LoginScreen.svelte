@@ -19,6 +19,7 @@
 	let nickname = $state('');
 	let error = $state('');
 	let isSubmitting = $state(false);
+	let errorRef = $state<HTMLDivElement | null>(null);
 
 	onMount(async () => {
 		if (siteKey) {
@@ -69,6 +70,8 @@
 		const validationError = validate();
 		if (validationError) {
 			error = validationError;
+			// Move focus to error message so screen readers announce it
+			setTimeout(() => errorRef?.focus(), 0);
 			return;
 		}
 
@@ -82,6 +85,7 @@
 			await auth.handleLocalAuth(response);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
+			setTimeout(() => errorRef?.focus(), 0);
 		} finally {
 			isSubmitting = false;
 		}
@@ -95,7 +99,7 @@
 
 <div class="login-screen" transition:fade={{ duration: 300 }}>
 	<div class="login-content">
-		<div class="logo">
+		<div class="logo" aria-hidden="true">
 			<span class="bracket">[</span>
 			<span class="name">CODEC</span>
 			<span class="bracket">]</span>
@@ -103,7 +107,7 @@
 		<p class="tagline">Real-time chat, open source.</p>
 
 		<div class="sign-in-section">
-			<p class="sign-in-label">Sign in to start chatting</p>
+			<p class="sign-in-label" id="sign-in-heading">Sign in to start chatting</p>
 			<div id="login-google-button"></div>
 			{#if githubEnabled}
 				<button class="oauth-btn github-btn" onclick={() => window.location.href = getGitHubAuthUrl(githubClientId)}>
@@ -125,68 +129,90 @@
 			<span class="divider-line"></span>
 		</div>
 
-		<form class="auth-form" onsubmit={handleSubmit}>
-			<div class="mode-toggle">
+		<form class="auth-form" onsubmit={handleSubmit} aria-labelledby="form-heading" novalidate>
+			<h2 class="form-heading" id="form-heading">
+				{mode === 'signin' ? 'Sign in with email' : 'Create a new account'}
+			</h2>
+
+			<div class="mode-toggle" role="group" aria-label="Authentication mode">
 				<button
 					type="button"
 					class="mode-btn"
 					class:active={mode === 'signin'}
+					aria-pressed={mode === 'signin'}
 					onclick={() => { mode = 'signin'; error = ''; }}
 				>Sign in</button>
 				<button
 					type="button"
 					class="mode-btn"
 					class:active={mode === 'signup'}
+					aria-pressed={mode === 'signup'}
 					onclick={() => { mode = 'signup'; error = ''; }}
 				>Create account</button>
 			</div>
 
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div
+					id="auth-error"
+					class="error-message"
+					role="alert"
+					aria-live="polite"
+					tabindex="-1"
+					bind:this={errorRef}
+				>{error}</div>
 			{/if}
 
-			<label class="field">
-				<span class="field-label">Email</span>
+			<div class="field">
+				<label class="field-label" for="auth-email">Email address</label>
 				<input
+					id="auth-email"
 					type="email"
 					bind:value={email}
 					placeholder="you@example.com"
 					autocomplete="email"
 					required
+					aria-required="true"
+					aria-describedby={error ? 'auth-error' : undefined}
 				/>
-			</label>
+			</div>
 
-			<label class="field">
-				<span class="field-label">Password</span>
+			<div class="field">
+				<label class="field-label" for="auth-password">Password</label>
 				<input
+					id="auth-password"
 					type="password"
 					bind:value={password}
 					placeholder="Min 8 characters"
 					autocomplete={mode === 'signin' ? 'current-password' : 'new-password'}
 					required
+					aria-required="true"
+					aria-describedby={error ? 'auth-error' : undefined}
 				/>
-			</label>
+			</div>
 
 			{#if mode === 'signup'}
-				<label class="field">
-					<span class="field-label">Confirm password</span>
+				<div class="field">
+					<label class="field-label" for="auth-confirm-password">Confirm password</label>
 					<input
+						id="auth-confirm-password"
 						type="password"
 						bind:value={confirmPassword}
 						placeholder="Re-enter password"
 						autocomplete="new-password"
 						required
+						aria-required="true"
 					/>
-				</label>
+				</div>
 
-				<label class="field">
-					<span class="field-label">
+				<div class="field">
+					<label class="field-label" for="auth-nickname">
 						Nickname
-						<span class="char-counter" class:over={nickname.trim().length > 32}>
+						<span class="char-counter" class:over={nickname.trim().length > 32} aria-hidden="true">
 							{nickname.trim().length}/32
 						</span>
-					</span>
+					</label>
 					<input
+						id="auth-nickname"
 						type="text"
 						bind:value={nickname}
 						placeholder="2–32 characters"
@@ -194,8 +220,10 @@
 						maxlength={32}
 						autocomplete="username"
 						required
+						aria-required="true"
+						aria-label={`Nickname (${nickname.trim().length} of 32 characters)`}
 					/>
-				</label>
+				</div>
 			{/if}
 
 			<button type="submit" class="submit-btn" disabled={isSubmitting}>
@@ -372,6 +400,19 @@
 		flex-direction: column;
 		gap: 14px;
 		width: 100%;
+	}
+
+	/* Visually hidden heading — present for screen readers only */
+	.form-heading {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.mode-toggle {

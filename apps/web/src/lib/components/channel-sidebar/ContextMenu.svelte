@@ -1,15 +1,61 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	let { x, y, items, onClose }: {
 		x: number;
 		y: number;
 		items: { label: string; onClick: () => void }[];
 		onClose: () => void;
 	} = $props();
+
+	let menuEl = $state<HTMLDivElement | null>(null);
+
+	$effect(() => {
+		// Focus first menu item when the menu opens
+		tick().then(() => {
+			const first = menuEl?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+			first?.focus();
+		});
+	});
+
+	function handleMenuKeydown(e: KeyboardEvent) {
+		const items = menuEl?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+		if (!items || items.length === 0) return;
+		const focused = document.activeElement as HTMLButtonElement;
+		const idx = Array.from(items).indexOf(focused);
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			items[(idx + 1) % items.length]?.focus();
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			items[(idx - 1 + items.length) % items.length]?.focus();
+		} else if (e.key === 'Home') {
+			e.preventDefault();
+			items[0]?.focus();
+		} else if (e.key === 'End') {
+			e.preventDefault();
+			items[items.length - 1]?.focus();
+		} else if (e.key === 'Escape') {
+			onClose();
+		} else if (e.key === 'Tab') {
+			// Trap focus inside the menu
+			e.preventDefault();
+		}
+	}
 </script>
 
-<svelte:window onclick={onClose} onkeydown={(e) => e.key === 'Escape' && onClose()} />
+<svelte:window onclick={onClose} />
 
-<div class="context-menu" style="left: {x}px; top: {y}px;" role="menu">
+<div
+	class="context-menu"
+	style="left: {x}px; top: {y}px;"
+	role="menu"
+	aria-label="Channel options"
+	tabindex="-1"
+	bind:this={menuEl}
+	onkeydown={handleMenuKeydown}
+>
 	{#each items as item}
 		<button
 			class="context-menu-item"
