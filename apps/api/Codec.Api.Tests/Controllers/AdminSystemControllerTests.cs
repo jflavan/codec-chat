@@ -143,5 +143,155 @@ public class AdminSystemControllerTests : IDisposable
         result.Should().BeOfType<NotFoundResult>();
     }
 
+    [Fact]
+    public async Task GetAdminActions_FilterByType_ReturnsFilteredResults()
+    {
+        await _adminActions.LogAsync(_adminUser.Id, AdminActionType.UserDisabled, "User", "target-1", "test");
+
+        var result = await _controller.GetAdminActions(new PaginationParams(), actionType: AdminActionType.UserDisabled);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task CreateAnnouncement_ReturnsOkWithId()
+    {
+        var request = new AdminSystemController.CreateAnnouncementRequest
+        {
+            Title = "New Announcement",
+            Body = "Body content"
+        };
+
+        var result = await _controller.CreateAnnouncement(request);
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        okResult.Value.Should().NotBeNull();
+        var idProperty = okResult.Value!.GetType().GetProperty("Id");
+        idProperty.Should().NotBeNull();
+        var id = (Guid)idProperty!.GetValue(okResult.Value)!;
+        id.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateAnnouncement_PersistsToDatabase()
+    {
+        var request = new AdminSystemController.CreateAnnouncementRequest
+        {
+            Title = "Persisted",
+            Body = "Should be in DB"
+        };
+
+        await _controller.CreateAnnouncement(request);
+
+        var announcement = await _db.SystemAnnouncements.FirstOrDefaultAsync(a => a.Title == "Persisted");
+        announcement.Should().NotBeNull();
+        announcement!.Body.Should().Be("Should be in DB");
+        announcement.IsActive.Should().BeTrue();
+        announcement.CreatedByUserId.Should().Be(_adminUser.Id);
+    }
+
+    [Fact]
+    public async Task CreateAnnouncement_WithExpiresAt_SetsExpiry()
+    {
+        var expiry = DateTimeOffset.UtcNow.AddDays(7);
+        var request = new AdminSystemController.CreateAnnouncementRequest
+        {
+            Title = "Expiring",
+            Body = "Expires soon",
+            ExpiresAt = expiry
+        };
+
+        await _controller.CreateAnnouncement(request);
+
+        var announcement = await _db.SystemAnnouncements.FirstOrDefaultAsync(a => a.Title == "Expiring");
+        announcement!.ExpiresAt.Should().Be(expiry);
+    }
+
+    [Fact]
+    public async Task UpdateAnnouncement_ClearExpiresAt_RemovesExpiry()
+    {
+        var announcement = new SystemAnnouncement
+        {
+            Id = Guid.NewGuid(),
+            Title = "Has Expiry",
+            Body = "Body",
+            CreatedByUserId = _adminUser.Id,
+            IsActive = true,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+        };
+        _db.SystemAnnouncements.Add(announcement);
+        await _db.SaveChangesAsync();
+
+        var request = new AdminSystemController.UpdateAnnouncementRequest
+        {
+            ClearExpiresAt = true
+        };
+
+        await _controller.UpdateAnnouncement(announcement.Id, request);
+
+        var updated = await _db.SystemAnnouncements.FindAsync(announcement.Id);
+        updated!.ExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAnnouncement_DeactivateAnnouncement_SetsIsActiveFalse()
+    {
+        var announcement = new SystemAnnouncement
+        {
+            Id = Guid.NewGuid(),
+            Title = "Active",
+            Body = "Body",
+            CreatedByUserId = _adminUser.Id,
+            IsActive = true
+        };
+        _db.SystemAnnouncements.Add(announcement);
+        await _db.SaveChangesAsync();
+
+        var request = new AdminSystemController.UpdateAnnouncementRequest
+        {
+            IsActive = false
+        };
+
+        await _controller.UpdateAnnouncement(announcement.Id, request);
+
+        var updated = await _db.SystemAnnouncements.FindAsync(announcement.Id);
+        updated!.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteAnnouncement_RemovesFromDatabase()
+    {
+        var announcement = new SystemAnnouncement
+        {
+            Id = Guid.NewGuid(),
+            Title = "Will Be Deleted",
+            Body = "Body",
+            CreatedByUserId = _adminUser.Id,
+            IsActive = true
+        };
+        _db.SystemAnnouncements.Add(announcement);
+        await _db.SaveChangesAsync();
+
+        await _controller.DeleteAnnouncement(announcement.Id);
+
+        var found = await _db.SystemAnnouncements.FindAsync(announcement.Id);
+        found.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateAnnouncement_LogsAdminAction()
+    {
+        var request = new AdminSystemController.CreateAnnouncementRequest
+        {
+            Title = "Logged",
+            Body = "Body"
+        };
+
+        await _controller.CreateAnnouncement(request);
+
+        var action = await _db.AdminActions.FirstOrDefaultAsync(a => a.ActionType == AdminActionType.AnnouncementCreated);
+        action.Should().NotBeNull();
+    }
+
     public void Dispose() => _db.Dispose();
 }

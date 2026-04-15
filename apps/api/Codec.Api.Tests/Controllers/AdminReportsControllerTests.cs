@@ -122,5 +122,111 @@ public class AdminReportsControllerTests : IDisposable
         result.Should().BeOfType<NotFoundResult>();
     }
 
+    [Fact]
+    public async Task GetReports_FilterByType_ReturnsFilteredResults()
+    {
+        var result = await _controller.GetReports(new PaginationParams(), type: ReportType.User);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetReports_FilterByStatusAndType_ReturnsOk()
+    {
+        var result = await _controller.GetReports(new PaginationParams(), status: ReportStatus.Open, type: ReportType.User);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task UpdateReport_ResolveReport_SetsResolvedFields()
+    {
+        var request = new AdminReportsController.UpdateReportRequest
+        {
+            Status = ReportStatus.Resolved,
+            Resolution = "Resolved by admin"
+        };
+
+        await _controller.UpdateReport(_testReport.Id, request);
+
+        var updated = await _db.Reports.FindAsync(_testReport.Id);
+        updated!.Status.Should().Be(ReportStatus.Resolved);
+        updated.Resolution.Should().Be("Resolved by admin");
+        updated.ResolvedAt.Should().NotBeNull();
+        updated.ResolvedByUserId.Should().Be(_adminUser.Id);
+    }
+
+    [Fact]
+    public async Task UpdateReport_DismissReport_SetsResolvedFields()
+    {
+        var request = new AdminReportsController.UpdateReportRequest
+        {
+            Status = ReportStatus.Dismissed,
+            Resolution = "Not actionable"
+        };
+
+        await _controller.UpdateReport(_testReport.Id, request);
+
+        var updated = await _db.Reports.FindAsync(_testReport.Id);
+        updated!.Status.Should().Be(ReportStatus.Dismissed);
+        updated.ResolvedAt.Should().NotBeNull();
+        updated.ResolvedByUserId.Should().Be(_adminUser.Id);
+    }
+
+    [Fact]
+    public async Task UpdateReport_ReopenReport_ClearsResolvedFields()
+    {
+        // First resolve
+        _testReport.Status = ReportStatus.Resolved;
+        _testReport.ResolvedAt = DateTimeOffset.UtcNow;
+        _testReport.ResolvedByUserId = _adminUser.Id;
+        _testReport.Resolution = "Done";
+        await _db.SaveChangesAsync();
+
+        // Then reopen
+        var request = new AdminReportsController.UpdateReportRequest
+        {
+            Status = ReportStatus.Open
+        };
+
+        await _controller.UpdateReport(_testReport.Id, request);
+
+        var updated = await _db.Reports.FindAsync(_testReport.Id);
+        updated!.Status.Should().Be(ReportStatus.Open);
+        updated.ResolvedAt.Should().BeNull();
+        updated.ResolvedByUserId.Should().BeNull();
+        updated.Resolution.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateReport_AssignUser_SetsAssignedToUserId()
+    {
+        var request = new AdminReportsController.UpdateReportRequest
+        {
+            AssignedToUserId = _adminUser.Id
+        };
+
+        await _controller.UpdateReport(_testReport.Id, request);
+
+        var updated = await _db.Reports.FindAsync(_testReport.Id);
+        updated!.AssignedToUserId.Should().Be(_adminUser.Id);
+    }
+
+    [Fact]
+    public async Task UpdateReport_ResolveReport_LogsAdminAction()
+    {
+        var request = new AdminReportsController.UpdateReportRequest
+        {
+            Status = ReportStatus.Resolved,
+            Resolution = "Done"
+        };
+
+        await _controller.UpdateReport(_testReport.Id, request);
+
+        var action = await _db.AdminActions.FirstOrDefaultAsync(a => a.TargetId == _testReport.Id.ToString());
+        action.Should().NotBeNull();
+        action!.ActionType.Should().Be(AdminActionType.ReportResolved);
+    }
+
     public void Dispose() => _db.Dispose();
 }

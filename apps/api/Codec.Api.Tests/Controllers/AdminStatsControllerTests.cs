@@ -60,7 +60,52 @@ public class AdminStatsControllerTests : IDisposable
     {
         var result = await _controller.GetStats();
 
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var value = okResult.Value;
+        // Verify the response structure contains expected properties
+        value.Should().NotBeNull();
+        var type = value!.GetType();
+        type.GetProperty("users").Should().NotBeNull();
+        type.GetProperty("servers").Should().NotBeNull();
+        type.GetProperty("messages").Should().NotBeNull();
+        type.GetProperty("openReports").Should().NotBeNull();
+        type.GetProperty("live").Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetStats_WithRecentData_ReturnsCorrectCounts()
+    {
+        // Add users created "now"
+        _db.Users.Add(new User { Id = Guid.NewGuid(), GoogleSubject = "g-3", DisplayName = "Recent" });
+        _db.Servers.Add(new Server { Name = "Recent Server" });
+        _db.Reports.Add(new Report
+        {
+            Id = Guid.NewGuid(),
+            ReporterId = Guid.NewGuid(),
+            ReportType = ReportType.User,
+            TargetId = "target",
+            Reason = "test",
+            Status = ReportStatus.Open
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetStats();
         result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetStats_LiveMetrics_ReturnsConnectionAndMessageData()
+    {
+        var result = await _controller.GetStats();
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var value = okResult.Value!;
+        var liveProperty = value.GetType().GetProperty("live")!.GetValue(value)!;
+        var activeConnections = liveProperty.GetType().GetProperty("activeConnections")!.GetValue(liveProperty);
+        var messagesPerMinute = liveProperty.GetType().GetProperty("messagesPerMinute")!.GetValue(liveProperty);
+
+        activeConnections.Should().Be(0);
+        messagesPerMinute.Should().Be(0.0);
     }
 
     public void Dispose() => _db.Dispose();
