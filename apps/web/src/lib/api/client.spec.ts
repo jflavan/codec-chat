@@ -687,14 +687,6 @@ describe('ApiClient', () => {
 		});
 	});
 
-	describe('updateMemberRole', () => {
-		it('sends PATCH', async () => {
-			mockFetch.mockResolvedValueOnce(voidResponse());
-			await client.updateMemberRole(token, 's1', 'user-1', 'Admin');
-			expect(mockFetch.mock.calls[0][1].method).toBe('PATCH');
-		});
-	});
-
 	// --- Server Invites ---
 
 	describe('createInvite', () => {

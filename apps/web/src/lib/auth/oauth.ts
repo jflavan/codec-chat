@@ -1,7 +1,5 @@
 import { env } from '$env/dynamic/public';
 
-export type OAuthProvider = 'github' | 'discord';
-
 const API_BASE = env.PUBLIC_API_BASE_URL ?? 'http://localhost:5050';
 
 /** Cached OAuth config from the API. */

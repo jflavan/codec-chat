@@ -879,14 +879,6 @@ export class ApiClient {
 		);
 	}
 
-	/** Change a member's role in a server (requires ManageRoles permission). */
-	updateMemberRole(token: string, serverId: string, userId: string, role: string): Promise<void> {
-		return this.requestVoid(
-			`${this.baseUrl}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/role`,
-			{ method: 'PATCH', headers: this.headers(token, true), body: JSON.stringify({ role }) }
-		);
-	}
-
 	/* ───── Server Bans ───── */
 
 	/** Ban a member from a server (requires Owner or Admin role). */
