@@ -44,15 +44,17 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
-	aria-label="Server Settings"
+	aria-modal="true"
+	aria-labelledby="server-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
+	<h2 id="server-settings-title" class="visually-hidden">Server Settings</h2>
 	<div class="settings-panel" role="document">
 		<div class="settings-sidebar-col">
 			<ServerSettingsSidebar />
 		</div>
-		<div class="settings-content-col">
+		<div class="settings-content-col" id="server-settings-content-panel" role="tabpanel" aria-labelledby="server-settings-tab-{ui.serverSettingsCategory}">
 			<button
 				class="close-btn"
 				onclick={() => ui.closeServerSettings()}

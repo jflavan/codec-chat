@@ -72,4 +72,18 @@ body {
 	color: var(--danger, #e74c3c);
 }
 
+/* ===== Accessibility: visually hidden (screen-reader only) ===== */
+.visually-hidden,
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 /* Keep the wider breakpoint rules for elements that already use 899px */

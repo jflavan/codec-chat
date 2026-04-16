@@ -39,15 +39,16 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
-	aria-label="User Settings"
+	aria-labelledby="user-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}
 >
+	<h2 id="user-settings-title" class="visually-hidden">User Settings</h2>
 	<div class="settings-panel" role="document">
 		<div class="settings-sidebar-col">
 			<SettingsSidebar />
 		</div>
-		<div class="settings-content-col">
+		<div class="settings-content-col" id="user-settings-content-panel" role="tabpanel" aria-labelledby="user-settings-tab-{ui.settingsCategory}">
 			<button
 				class="close-btn"
 				onclick={() => ui.closeSettings()}

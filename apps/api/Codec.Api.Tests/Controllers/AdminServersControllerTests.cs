@@ -156,5 +156,102 @@ public class AdminServersControllerTests : IDisposable
         result.Should().BeOfType<NotFoundResult>();
     }
 
+    [Fact]
+    public async Task TransferOwnership_UserNotMember_ReturnsBadRequest()
+    {
+        var nonMember = new User { Id = Guid.NewGuid(), GoogleSubject = "non-1", DisplayName = "Non Member" };
+        _db.Users.Add(nonMember);
+        await _db.SaveChangesAsync();
+
+        var request = new AdminServersController.TransferRequest { NewOwnerUserId = nonMember.Id };
+        var result = await _controller.TransferOwnership(_testServer.Id, request);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetServers_WithSearch_ReturnsOnlyMatchingServers()
+    {
+        _db.Servers.Add(new Server { Name = "Unique Name XYZ" });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetServers(new PaginationParams { Search = "Unique" });
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as PaginatedResponse<object>;
+        response!.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task QuarantineServer_SetsQuarantineFields()
+    {
+        var request = new AdminServersController.ReasonRequest { Reason = "Violating TOS" };
+        await _controller.QuarantineServer(_testServer.Id, request);
+
+        var updated = await _db.Servers.FindAsync(_testServer.Id);
+        updated!.IsQuarantined.Should().BeTrue();
+        updated.QuarantinedReason.Should().Be("Violating TOS");
+        updated.QuarantinedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task UnquarantineServer_ClearsQuarantineFields()
+    {
+        _testServer.IsQuarantined = true;
+        _testServer.QuarantinedReason = "Test";
+        _testServer.QuarantinedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync();
+
+        await _controller.UnquarantineServer(_testServer.Id);
+
+        var updated = await _db.Servers.FindAsync(_testServer.Id);
+        updated!.IsQuarantined.Should().BeFalse();
+        updated.QuarantinedReason.Should().BeNull();
+        updated.QuarantinedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteServer_RemovesServerFromDb()
+    {
+        var serverToDelete = new Server { Name = "Delete Me" };
+        _db.Servers.Add(serverToDelete);
+        await _db.SaveChangesAsync();
+
+        var request = new AdminServersController.ReasonRequest { Reason = "Removed" };
+        await _controller.DeleteServer(serverToDelete.Id, request);
+
+        var found = await _db.Servers.FindAsync(serverToDelete.Id);
+        found.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task QuarantineServer_LogsAdminAction()
+    {
+        var request = new AdminServersController.ReasonRequest { Reason = "Bad content" };
+        await _controller.QuarantineServer(_testServer.Id, request);
+
+        var action = await _db.AdminActions.FirstOrDefaultAsync(a => a.TargetId == _testServer.Id.ToString());
+        action.Should().NotBeNull();
+        action!.ActionType.Should().Be(AdminActionType.ServerQuarantined);
+    }
+
+    [Fact]
+    public async Task TransferOwnership_NoOwnerRole_ReturnsBadRequest()
+    {
+        // Create a server with no owner role
+        var server = new Server { Name = "No Owner Role Server" };
+        _db.Servers.Add(server);
+        var member = new User { Id = Guid.NewGuid(), GoogleSubject = "m-1", DisplayName = "Member" };
+        _db.Users.Add(member);
+        _db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = member.Id });
+        await _db.SaveChangesAsync();
+
+        var request = new AdminServersController.TransferRequest { NewOwnerUserId = member.Id };
+        var result = await _controller.TransferOwnership(server.Id, request);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     public void Dispose() => _db.Dispose();
 }

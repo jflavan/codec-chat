@@ -136,6 +136,8 @@
 				disabled={isPending(reaction.emoji)}
 				onclick={() => { onToggle(reaction.emoji); hidePopover(); }}
 				aria-describedby={hoveredEmoji === reaction.emoji ? `popover-${reactions.indexOf(reaction)}` : undefined}
+				aria-label="{getCustomEmoji(reaction.emoji) ? `:${getCustomEmoji(reaction.emoji)!.name}:` : reaction.emoji} {reaction.count} reaction{reaction.count !== 1 ? 's' : ''}{hasReacted(reaction) ? ', remove your reaction' : ', add reaction'}"
+				aria-pressed={hasReacted(reaction)}
 			>
 				<span class="reaction-emoji">
 					{#if custom}

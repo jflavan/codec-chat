@@ -25,7 +25,7 @@
 	}
 </script>
 
-<div class="user-panel">
+<div class="user-panel" role="region" aria-label="User panel">
 	{#if auth.me}
 		<input
 			bind:this={fileInput}
