@@ -54,7 +54,7 @@
 		<div class="settings-sidebar-col">
 			<ServerSettingsSidebar />
 		</div>
-		<div class="settings-content-col" id="settings-content-panel" role="tabpanel" aria-labelledby="settings-tab-{ui.serverSettingsCategory}">
+		<div class="settings-content-col" id="server-settings-content-panel" role="tabpanel" aria-labelledby="server-settings-tab-{ui.serverSettingsCategory}">
 			<button
 				class="close-btn"
 				onclick={() => ui.closeServerSettings()}

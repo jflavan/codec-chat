@@ -63,11 +63,11 @@
 			<li role="presentation">
 				<button
 					role="tab"
-					id="settings-tab-{cat.id}"
+					id="server-settings-tab-{cat.id}"
 					class="category-item"
 					class:active={ui.serverSettingsCategory === cat.id}
 					aria-selected={ui.serverSettingsCategory === cat.id}
-					aria-controls="settings-content-panel"
+					aria-controls="server-settings-content-panel"
 					tabindex={ui.serverSettingsCategory === cat.id ? 0 : -1}
 					onclick={() => { ui.serverSettingsCategory = cat.id; }}
 					onkeydown={handleTabKeydown}

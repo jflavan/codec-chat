@@ -48,7 +48,7 @@
 		<div class="settings-sidebar-col">
 			<SettingsSidebar />
 		</div>
-		<div class="settings-content-col" id="settings-content-panel" role="tabpanel" aria-labelledby="settings-tab-{ui.settingsCategory}">
+		<div class="settings-content-col" id="user-settings-content-panel" role="tabpanel" aria-labelledby="user-settings-tab-{ui.settingsCategory}">
 			<button
 				class="close-btn"
 				onclick={() => ui.closeSettings()}
