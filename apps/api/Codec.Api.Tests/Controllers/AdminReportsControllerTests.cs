@@ -123,19 +123,49 @@ public class AdminReportsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetReports_FilterByType_ReturnsFilteredResults()
+    public async Task GetReports_FilterByType_ReturnsOnlyMatchingType()
     {
+        // Add a report of a different type
+        _db.Reports.Add(new Report
+        {
+            Id = Guid.NewGuid(),
+            ReporterId = _adminUser.Id,
+            ReportType = ReportType.Message,
+            TargetId = "msg-1",
+            Reason = "Bad message",
+            Status = ReportStatus.Open
+        });
+        await _db.SaveChangesAsync();
+
         var result = await _controller.GetReports(new PaginationParams(), type: ReportType.User);
 
-        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as PaginatedResponse<object>;
+        response!.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
     }
 
     [Fact]
-    public async Task GetReports_FilterByStatusAndType_ReturnsOk()
+    public async Task GetReports_FilterByStatusAndType_ReturnsOnlyMatching()
     {
+        // Add a resolved report of the same type
+        _db.Reports.Add(new Report
+        {
+            Id = Guid.NewGuid(),
+            ReporterId = _adminUser.Id,
+            ReportType = ReportType.User,
+            TargetId = "user-2",
+            Reason = "Resolved report",
+            Status = ReportStatus.Resolved
+        });
+        await _db.SaveChangesAsync();
+
         var result = await _controller.GetReports(new PaginationParams(), status: ReportStatus.Open, type: ReportType.User);
 
-        result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as PaginatedResponse<object>;
+        response!.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
     }
 
     [Fact]

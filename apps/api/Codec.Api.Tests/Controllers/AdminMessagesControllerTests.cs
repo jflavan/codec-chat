@@ -61,42 +61,10 @@ public class AdminMessagesControllerTests : IDisposable
     // These tests verify the controller handles null/empty input gracefully.
     // Full search tests are covered in integration tests.
 
-    [Fact]
-    public async Task SearchMessages_NullSearch_ReturnsBadRequest()
-    {
-        var result = await _controller.SearchMessages(null!, new PaginationParams());
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public async Task SearchMessages_EmptySearch_ReturnsBadRequest()
-    {
-        var result = await _controller.SearchMessages("", new PaginationParams());
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public async Task SearchMessages_SingleCharSearch_ReturnsBadRequest()
-    {
-        var result = await _controller.SearchMessages("a", new PaginationParams());
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public async Task SearchMessages_WhitespaceSearch_ReturnsBadRequest()
-    {
-        var result = await _controller.SearchMessages("   ", new PaginationParams());
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData(" ")]
+    [InlineData("   ")]
     [InlineData("x")]
     public async Task SearchMessages_InvalidSearchTerms_ReturnsBadRequest(string? search)
     {

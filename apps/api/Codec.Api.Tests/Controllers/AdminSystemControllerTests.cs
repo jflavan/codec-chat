@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Codec.Api.Controllers.Admin;
 using Codec.Api.Data;
 using Codec.Api.Models;
@@ -166,9 +167,8 @@ public class AdminSystemControllerTests : IDisposable
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
         okResult.Value.Should().NotBeNull();
-        var idProperty = okResult.Value!.GetType().GetProperty("Id");
-        idProperty.Should().NotBeNull();
-        var id = (Guid)idProperty!.GetValue(okResult.Value)!;
+        var json = JsonSerializer.SerializeToDocument(okResult.Value);
+        var id = json.RootElement.GetProperty("Id").GetGuid();
         id.Should().NotBeEmpty();
     }
 
@@ -225,6 +225,33 @@ public class AdminSystemControllerTests : IDisposable
         var request = new AdminSystemController.UpdateAnnouncementRequest
         {
             ClearExpiresAt = true
+        };
+
+        await _controller.UpdateAnnouncement(announcement.Id, request);
+
+        var updated = await _db.SystemAnnouncements.FindAsync(announcement.Id);
+        updated!.ExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAnnouncement_ClearExpiresAtTakesPrecedenceOverExpiresAt()
+    {
+        var announcement = new SystemAnnouncement
+        {
+            Id = Guid.NewGuid(),
+            Title = "Precedence Test",
+            Body = "Body",
+            CreatedByUserId = _adminUser.Id,
+            IsActive = true,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+        };
+        _db.SystemAnnouncements.Add(announcement);
+        await _db.SaveChangesAsync();
+
+        var request = new AdminSystemController.UpdateAnnouncementRequest
+        {
+            ClearExpiresAt = true,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(30)
         };
 
         await _controller.UpdateAnnouncement(announcement.Id, request);

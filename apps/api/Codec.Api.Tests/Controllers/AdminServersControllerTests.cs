@@ -170,13 +170,17 @@ public class AdminServersControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetServers_WithSearch_ReturnsFilteredResults()
+    public async Task GetServers_WithSearch_ReturnsOnlyMatchingServers()
     {
         _db.Servers.Add(new Server { Name = "Unique Name XYZ" });
         await _db.SaveChangesAsync();
 
         var result = await _controller.GetServers(new PaginationParams { Search = "Unique" });
-        result.Should().BeOfType<OkObjectResult>();
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as PaginatedResponse<object>;
+        response!.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
     }
 
     [Fact]

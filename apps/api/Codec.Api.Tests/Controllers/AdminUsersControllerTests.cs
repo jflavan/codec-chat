@@ -281,17 +281,25 @@ public class AdminUsersControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetUsers_WithSearch_ReturnsFilteredResults()
+    public async Task GetUsers_WithSearch_ReturnsOnlyMatchingUsers()
     {
         var result = await _controller.GetUsers(new PaginationParams { Search = "Target" });
-        result.Should().BeOfType<OkObjectResult>();
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as PaginatedResponse<object>;
+        response!.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
     }
 
     [Fact]
-    public async Task GetUsers_SearchByEmail_ReturnsFilteredResults()
+    public async Task GetUsers_SearchByEmail_ReturnsOnlyMatchingUsers()
     {
         var result = await _controller.GetUsers(new PaginationParams { Search = "target@test" });
-        result.Should().BeOfType<OkObjectResult>();
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as PaginatedResponse<object>;
+        response!.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
     }
 
     [Fact]

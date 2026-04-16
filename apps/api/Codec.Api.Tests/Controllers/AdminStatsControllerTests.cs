@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Codec.Api.Controllers.Admin;
 using Codec.Api.Data;
 using Codec.Api.Models;
@@ -61,21 +62,17 @@ public class AdminStatsControllerTests : IDisposable
         var result = await _controller.GetStats();
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        var value = okResult.Value;
-        // Verify the response structure contains expected properties
-        value.Should().NotBeNull();
-        var type = value!.GetType();
-        type.GetProperty("users").Should().NotBeNull();
-        type.GetProperty("servers").Should().NotBeNull();
-        type.GetProperty("messages").Should().NotBeNull();
-        type.GetProperty("openReports").Should().NotBeNull();
-        type.GetProperty("live").Should().NotBeNull();
+        var json = JsonSerializer.SerializeToDocument(okResult.Value);
+        json.RootElement.GetProperty("users").GetProperty("total").GetInt32().Should().Be(0);
+        json.RootElement.GetProperty("servers").GetProperty("total").GetInt32().Should().Be(0);
+        json.RootElement.GetProperty("messages").GetProperty("last24h").GetInt32().Should().Be(0);
+        json.RootElement.GetProperty("openReports").GetInt32().Should().Be(0);
+        json.RootElement.GetProperty("live").GetProperty("activeConnections").GetInt32().Should().Be(0);
     }
 
     [Fact]
     public async Task GetStats_WithRecentData_ReturnsCorrectCounts()
     {
-        // Add users created "now"
         _db.Users.Add(new User { Id = Guid.NewGuid(), GoogleSubject = "g-3", DisplayName = "Recent" });
         _db.Servers.Add(new Server { Name = "Recent Server" });
         _db.Reports.Add(new Report
@@ -90,7 +87,12 @@ public class AdminStatsControllerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _controller.GetStats();
-        result.Should().BeOfType<OkObjectResult>();
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = JsonSerializer.SerializeToDocument(okResult.Value);
+        json.RootElement.GetProperty("users").GetProperty("total").GetInt32().Should().Be(1);
+        json.RootElement.GetProperty("servers").GetProperty("total").GetInt32().Should().Be(1);
+        json.RootElement.GetProperty("openReports").GetInt32().Should().Be(1);
     }
 
     [Fact]
@@ -99,13 +101,10 @@ public class AdminStatsControllerTests : IDisposable
         var result = await _controller.GetStats();
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        var value = okResult.Value!;
-        var liveProperty = value.GetType().GetProperty("live")!.GetValue(value)!;
-        var activeConnections = liveProperty.GetType().GetProperty("activeConnections")!.GetValue(liveProperty);
-        var messagesPerMinute = liveProperty.GetType().GetProperty("messagesPerMinute")!.GetValue(liveProperty);
-
-        activeConnections.Should().Be(0);
-        messagesPerMinute.Should().Be(0.0);
+        var json = JsonSerializer.SerializeToDocument(okResult.Value);
+        var live = json.RootElement.GetProperty("live");
+        live.GetProperty("activeConnections").GetInt32().Should().Be(0);
+        live.GetProperty("messagesPerMinute").GetDouble().Should().Be(0.0);
     }
 
     public void Dispose() => _db.Dispose();
