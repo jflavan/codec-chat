@@ -130,6 +130,31 @@ public class RolesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateRole_NameWithNullByte_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.CreateRole(server.Id, new CreateRoleRequest { Name = "Role\0Name" }, _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task CreateRole_NameWithRtlOverride_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        await _db.SaveChangesAsync();
+
+        // U+202E RIGHT-TO-LEFT OVERRIDE
+        var result = await _controller.CreateRole(server.Id, new CreateRoleRequest { Name = "Role\u202eName" }, _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
     public async Task CreateRole_DuplicateName_ReturnsConflict()
     {
         var server = new Server { Name = "S" };
@@ -268,6 +293,47 @@ public class RolesControllerTests : IDisposable
             .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, });
 
         var result = await _controller.UpdateRole(server.Id, memberRole.Id, new UpdateRoleRequest { Name = "NotMember" }, _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task UpdateRole_NameWithNullByte_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
+        _db.ServerRoles.Add(customRole);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, });
+
+        var result = await _controller.UpdateRole(server.Id, customRole.Id, new UpdateRoleRequest { Name = "Role\0Name" }, _auditService);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task UpdateRole_NameWithRtlOverride_ReturnsBadRequest()
+    {
+        var server = new Server { Name = "S" };
+        _db.Servers.Add(server);
+        var (_, adminRole, _) = CreateDefaultRoles(server);
+        var customRole = new ServerRoleEntity { ServerId = server.Id, Name = "Custom", Position = 3, IsSystemRole = false, Permissions = PermissionExtensions.MemberDefaults };
+        _db.ServerRoles.Add(customRole);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id, });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = adminRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        _userService.Setup(u => u.EnsurePermissionAsync(server.Id, _testUser.Id, Permission.ManageRoles, false))
+            .ReturnsAsync(new ServerMember { ServerId = server.Id, UserId = _testUser.Id, });
+
+        // U+202E RIGHT-TO-LEFT OVERRIDE
+        var result = await _controller.UpdateRole(server.Id, customRole.Id, new UpdateRoleRequest { Name = "Role\u202eName" }, _auditService);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
