@@ -105,3 +105,4 @@ docs/superpowers/
 # Local Claude Code settings (hooks, per-machine config)
 .claude/settings.local.json
 .claude/automation/
+.claude/worktrees/
