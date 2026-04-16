@@ -32,6 +32,29 @@
 		}
 		return cats;
 	});
+
+	function handleTabKeydown(e: KeyboardEvent) {
+		const target = e.currentTarget as HTMLElement;
+		const tabs = Array.from(target.closest('[role="tablist"]')!.querySelectorAll<HTMLElement>('[role="tab"]'));
+		const index = tabs.indexOf(target);
+		let next: number | null = null;
+
+		if (e.key === 'ArrowDown') {
+			next = (index + 1) % tabs.length;
+		} else if (e.key === 'ArrowUp') {
+			next = (index - 1 + tabs.length) % tabs.length;
+		} else if (e.key === 'Home') {
+			next = 0;
+		} else if (e.key === 'End') {
+			next = tabs.length - 1;
+		}
+
+		if (next !== null) {
+			e.preventDefault();
+			tabs[next].focus();
+			tabs[next].click();
+		}
+	}
 </script>
 
 <nav class="settings-sidebar" aria-label="Server settings categories">
@@ -45,7 +68,9 @@
 					class:active={ui.serverSettingsCategory === cat.id}
 					aria-selected={ui.serverSettingsCategory === cat.id}
 					aria-controls="settings-content-panel"
+					tabindex={ui.serverSettingsCategory === cat.id ? 0 : -1}
 					onclick={() => { ui.serverSettingsCategory = cat.id; }}
+					onkeydown={handleTabKeydown}
 				>
 					<span class="category-label">{cat.label}</span>
 				</button>

@@ -134,19 +134,21 @@
 				{mode === 'signin' ? 'Sign in with email' : 'Create a new account'}
 			</h2>
 
-			<div class="mode-toggle" role="group" aria-label="Authentication mode">
+			<div class="mode-toggle" role="radiogroup" aria-label="Authentication mode">
 				<button
 					type="button"
+					role="radio"
 					class="mode-btn"
 					class:active={mode === 'signin'}
-					aria-pressed={mode === 'signin'}
+					aria-checked={mode === 'signin'}
 					onclick={() => { mode = 'signin'; error = ''; }}
 				>Sign in</button>
 				<button
 					type="button"
+					role="radio"
 					class="mode-btn"
 					class:active={mode === 'signup'}
-					aria-pressed={mode === 'signup'}
+					aria-checked={mode === 'signup'}
 					onclick={() => { mode = 'signup'; error = ''; }}
 				>Create account</button>
 			</div>
