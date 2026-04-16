@@ -121,6 +121,7 @@ public class AnnouncementsControllerTests : IDisposable
         var result = await _controller.GetActive();
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var items = ok.Value as IEnumerable<object>;
+        items.Should().NotBeNull();
         items.Should().HaveCount(1);
     }
 
@@ -141,6 +142,7 @@ public class AnnouncementsControllerTests : IDisposable
         var result = await _controller.GetActive();
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var items = ok.Value as IEnumerable<object>;
+        items.Should().NotBeNull();
         items.Should().HaveCount(1);
     }
 
@@ -179,6 +181,7 @@ public class AnnouncementsControllerTests : IDisposable
         var result = await _controller.GetActive();
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var items = ok.Value as IEnumerable<object>;
+        items.Should().NotBeNull();
         items.Should().HaveCount(1);
     }
 
@@ -212,6 +215,12 @@ public class AnnouncementsControllerTests : IDisposable
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var items = (ok.Value as IEnumerable<object>)!.ToList();
         items.Should().HaveCount(2);
+
+        // Verify descending order: newer item should be first
+        var firstTitle = items[0].GetType().GetProperty("Title")!.GetValue(items[0]) as string;
+        var secondTitle = items[1].GetType().GetProperty("Title")!.GetValue(items[1]) as string;
+        firstTitle.Should().Be("Newer");
+        secondTitle.Should().Be("Older");
     }
 
     public void Dispose() => _db.Dispose();

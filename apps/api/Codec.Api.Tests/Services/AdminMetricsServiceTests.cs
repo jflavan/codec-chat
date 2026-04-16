@@ -13,6 +13,8 @@ namespace Codec.Api.Tests.Services;
 
 public class AdminMetricsServiceTests : IDisposable
 {
+    private static readonly TimeSpan TestTickInterval = TimeSpan.FromMilliseconds(50);
+
     private readonly CodecDbContext _db;
     private readonly Mock<IHubContext<AdminHub>> _hubContext = new();
     private readonly MetricsCounterService _metrics = new();
@@ -43,11 +45,35 @@ public class AdminMetricsServiceTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
+    private AdminMetricsService CreateService(
+        IServiceScopeFactory? scopeFactory = null,
+        TimeSpan? tickInterval = null)
+    {
+        return new AdminMetricsService(
+            _hubContext.Object, _metrics, _presence,
+            scopeFactory ?? _scopeFactory.Object, _logger.Object,
+            tickInterval ?? TestTickInterval);
+    }
+
+    private static async Task RunServiceForOneTick(AdminMetricsService service)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await service.StartAsync(cts.Token);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), CancellationToken.None);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
     [Fact]
     public async Task ExecuteAsync_CancelledImmediately_ExitsCleanly()
     {
-        var service = new AdminMetricsService(
-            _hubContext.Object, _metrics, _presence, _scopeFactory.Object, _logger.Object);
+        var service = CreateService();
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -63,30 +89,14 @@ public class AdminMetricsServiceTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_AfterDelay_BroadcastsStats()
     {
-        var service = new AdminMetricsService(
-            _hubContext.Object, _metrics, _presence, _scopeFactory.Object, _logger.Object);
+        var service = CreateService();
 
-        // Add some messages to the counter
         _metrics.IncrementMessages();
         _metrics.IncrementMessages();
         _metrics.IncrementMessages();
-
-        // Connect a user for presence
         _presence.Connect(Guid.NewGuid(), "conn-1");
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7));
-
-        try
-        {
-            await service.StartAsync(cts.Token);
-            // Wait long enough for at least one tick (5 seconds delay in the service)
-            await Task.Delay(TimeSpan.FromSeconds(6), CancellationToken.None);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
+        await RunServiceForOneTick(service);
 
         _clientProxy.Verify(c => c.SendCoreAsync("StatsUpdated",
             It.IsAny<object?[]>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
@@ -95,24 +105,12 @@ public class AdminMetricsServiceTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_ReadsAndResetsMessageCounter()
     {
-        var service = new AdminMetricsService(
-            _hubContext.Object, _metrics, _presence, _scopeFactory.Object, _logger.Object);
+        var service = CreateService();
 
         _metrics.IncrementMessages();
         _metrics.IncrementMessages();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7));
-
-        try
-        {
-            await service.StartAsync(cts.Token);
-            await Task.Delay(TimeSpan.FromSeconds(6), CancellationToken.None);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
+        await RunServiceForOneTick(service);
 
         // After ReadAndReset, the counter should be 0
         _metrics.GetCount().Should().Be(0);
@@ -121,27 +119,27 @@ public class AdminMetricsServiceTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_SetsMessagesPerMinute()
     {
-        var service = new AdminMetricsService(
-            _hubContext.Object, _metrics, _presence, _scopeFactory.Object, _logger.Object);
-
-        // 5 messages in a 5-second window = 5 * 12 = 60 messages per minute
+        // Increment before creating service to ensure messages are available
         for (int i = 0; i < 5; i++)
             _metrics.IncrementMessages();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+        _metrics.GetCount().Should().Be(5, "messages should be incremented before service starts");
 
-        try
-        {
-            await service.StartAsync(cts.Token);
-            await Task.Delay(TimeSpan.FromSeconds(6), CancellationToken.None);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
+        object?[]? firstCapturedArgs = null;
+        _clientProxy.Setup(c => c.SendCoreAsync("StatsUpdated",
+                It.IsAny<object?[]>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object?[], CancellationToken>((_, args, _) =>
+                firstCapturedArgs ??= args)
+            .Returns(Task.CompletedTask);
 
-        _metrics.GetMessagesPerMinute().Should().Be(60);
+        var service = CreateService();
+        await RunServiceForOneTick(service);
+
+        firstCapturedArgs.Should().NotBeNull("the service should have broadcast at least once");
+        var payload = firstCapturedArgs![0]!;
+        var messagesPerMinute = (int)payload.GetType().GetProperty("messagesPerMinute")!.GetValue(payload)!;
+        var expectedRate = (int)(5 * (60.0 / TestTickInterval.TotalSeconds));
+        messagesPerMinute.Should().Be(expectedRate);
     }
 
     [Fact]
@@ -167,24 +165,20 @@ public class AdminMetricsServiceTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var service = new AdminMetricsService(
-            _hubContext.Object, _metrics, _presence, _scopeFactory.Object, _logger.Object);
+        object?[]? firstCapturedArgs = null;
+        _clientProxy.Setup(c => c.SendCoreAsync("StatsUpdated",
+                It.IsAny<object?[]>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object?[], CancellationToken>((_, args, _) =>
+                firstCapturedArgs ??= args)
+            .Returns(Task.CompletedTask);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+        var service = CreateService();
+        await RunServiceForOneTick(service);
 
-        try
-        {
-            await service.StartAsync(cts.Token);
-            await Task.Delay(TimeSpan.FromSeconds(6), CancellationToken.None);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
-
-        _clientProxy.Verify(c => c.SendCoreAsync("StatsUpdated",
-            It.IsAny<object?[]>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        firstCapturedArgs.Should().NotBeNull();
+        var payload = firstCapturedArgs![0]!;
+        var openReports = (int)payload.GetType().GetProperty("openReports")!.GetValue(payload)!;
+        openReports.Should().Be(1);
     }
 
     [Fact]
@@ -199,21 +193,8 @@ public class AdminMetricsServiceTests : IDisposable
         badScope.Setup(s => s.ServiceProvider).Returns(badProvider.Object);
         badScopeFactory.Setup(f => f.CreateScope()).Returns(badScope.Object);
 
-        var service = new AdminMetricsService(
-            _hubContext.Object, _metrics, _presence, badScopeFactory.Object, _logger.Object);
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7));
-
-        try
-        {
-            await service.StartAsync(cts.Token);
-            await Task.Delay(TimeSpan.FromSeconds(6), CancellationToken.None);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
+        var service = CreateService(scopeFactory: badScopeFactory.Object);
+        await RunServiceForOneTick(service);
 
         // Should have logged the error but not crashed
         _logger.Verify(

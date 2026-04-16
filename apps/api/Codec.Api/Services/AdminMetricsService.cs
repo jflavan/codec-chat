@@ -11,18 +11,21 @@ public class AdminMetricsService(
     MetricsCounterService metrics,
     PresenceTracker presence,
     IServiceScopeFactory scopeFactory,
-    ILogger<AdminMetricsService> logger) : BackgroundService
+    ILogger<AdminMetricsService> logger,
+    TimeSpan? tickInterval = null) : BackgroundService
 {
+    private readonly TimeSpan _tickInterval = tickInterval ?? TimeSpan.FromSeconds(5);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            await Task.Delay(_tickInterval, stoppingToken);
 
             try
             {
                 var recentMessages = metrics.ReadAndReset();
-                var messagesPerMinute = recentMessages * 12;
+                var messagesPerMinute = (int)(recentMessages * (60.0 / _tickInterval.TotalSeconds));
                 metrics.SetMessagesPerMinute(messagesPerMinute);
 
                 int openReports = 0;
