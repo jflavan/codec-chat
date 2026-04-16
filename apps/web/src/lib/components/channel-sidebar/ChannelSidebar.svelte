@@ -137,7 +137,7 @@
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 									disabled={voice.isJoiningVoice}
 									aria-label="Join {channel.name}{isMuted ? ' (muted)' : ''}"
-									aria-pressed={isActive}
+									aria-current={isActive ? 'true' : undefined}
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 										<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
@@ -254,7 +254,7 @@
 										oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 										disabled={voice.isJoiningVoice}
 										aria-label="Join {channel.name}{isMuted ? ' (muted)' : ''}"
-										aria-pressed={isActive}
+										aria-current={isActive ? 'true' : undefined}
 									>
 										<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 											<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
@@ -813,19 +813,6 @@
 
 	.char-counter.warn {
 		color: var(--danger);
-	}
-
-	/* Visually-hidden utility (screen-reader only) */
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border: 0;
 	}
 
 	/* Voice member interactive button (replaces role=button on <li>) */

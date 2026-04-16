@@ -60,8 +60,6 @@
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 <div
 	class="overlay"
 	role="dialog"
@@ -69,6 +67,7 @@
 	aria-labelledby="link-account-title"
 	tabindex="-1"
 	bind:this={dialogEl}
+	onkeydown={handleKeydown}
 >
 	<div class="modal">
 		<div class="logo" aria-hidden="true">

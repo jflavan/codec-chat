@@ -156,7 +156,7 @@
 					id="auth-error"
 					class="error-message"
 					role="alert"
-					aria-live="polite"
+					aria-live="assertive"
 					tabindex="-1"
 					bind:this={errorRef}
 				>{error}</div>
