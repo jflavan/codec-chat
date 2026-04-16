@@ -92,12 +92,13 @@
 {#snippet banButton(member: { userId: string; displayName: string; highestPosition: number })}
 	{#if canBan(member)}
 		{#if banningUserId === member.userId}
-			<div class="ban-confirm">
+			<div class="ban-confirm" role="group" aria-label="Ban {member.displayName}">
+				<span class="visually-hidden" role="alert">Confirm ban of {member.displayName}</span>
 				<input
 					class="ban-reason-input"
 					type="text"
 					placeholder="Reason (optional)"
-					aria-label="Ban reason (optional)"
+					aria-label="Ban reason for {member.displayName} (optional)"
 					bind:value={banReason}
 					maxlength="512"
 				/>
@@ -106,7 +107,7 @@
 					Delete messages
 				</label>
 				<div class="ban-confirm-actions">
-					<button class="role-btn role-btn-danger" onclick={() => ban(member.userId)}>
+					<button class="role-btn role-btn-danger" aria-label="Confirm ban {member.displayName}" onclick={() => ban(member.userId)}>
 						Confirm Ban
 					</button>
 					<button class="role-btn role-btn-cancel" onclick={cancelBan}>
@@ -175,7 +176,8 @@
 
 						{#if canKick(member)}
 							{#if kickingUserId === member.userId}
-								<button class="role-btn role-btn-danger" onclick={() => kick(member.userId)}>
+								<span class="visually-hidden" role="alert">Confirm kick {member.displayName}</span>
+								<button class="role-btn role-btn-danger" aria-label="Confirm kick {member.displayName}" onclick={() => kick(member.userId)}>
 									Are you sure?
 								</button>
 								<button class="role-btn role-btn-cancel" onclick={cancelKick}>
@@ -391,5 +393,17 @@
 	.ban-confirm-actions {
 		display: flex;
 		gap: 6px;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

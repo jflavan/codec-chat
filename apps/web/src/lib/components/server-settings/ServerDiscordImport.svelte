@@ -234,7 +234,7 @@
 								{#if mapping.discordAvatarUrl}
 									<img class="mapping-avatar" src={mapping.discordAvatarUrl} alt="{mapping.discordUsername}'s avatar" />
 								{:else}
-									<div class="mapping-avatar-placeholder">
+									<div class="mapping-avatar-placeholder" aria-hidden="true">
 										{mapping.discordUsername.slice(0, 1).toUpperCase()}
 									</div>
 								{/if}

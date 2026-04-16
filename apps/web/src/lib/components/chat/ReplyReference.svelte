@@ -32,7 +32,6 @@
 		<em class="reply-deleted-text">Original message was deleted</em>
 	</div>
 {:else}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="reply-reference"
 		role="button"
@@ -43,7 +42,7 @@
 	>
 		<span class="reply-icon" aria-hidden="true">↩</span>
 		{#if replyContext.authorAvatarUrl}
-			<img class="reply-avatar" src={replyContext.authorAvatarUrl} alt="" />
+			<img class="reply-avatar" src={replyContext.authorAvatarUrl} alt="{replyContext.authorName}'s avatar" />
 		{:else}
 			<div class="reply-avatar-placeholder" aria-hidden="true">
 				{replyContext.authorName.slice(0, 1).toUpperCase()}

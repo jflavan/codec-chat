@@ -123,8 +123,9 @@
 		onclick={() => (showPicker = !showPicker)}
 		title="Add reaction"
 		aria-label="Add reaction"
+		aria-expanded={showPicker}
 	>
-		<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+		<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 			<path
 				d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2Zm-2.5 4a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm5 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5ZM4.5 9.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .383.82A3.98 3.98 0 0 1 8 11.5a3.98 3.98 0 0 1-2.883-1.68A.5.5 0 0 1 5 9.5h-1Z"
 			/>
@@ -170,9 +171,8 @@
 	{/if}
 
 	{#if showPicker}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="picker-backdrop" onclick={closePicker} onkeydown={(e) => { if (e.key === 'Escape') closePicker(); }}></div>
-		<div class="emoji-picker" role="menu">
+		<div class="picker-backdrop" role="presentation" onclick={closePicker} onkeydown={(e) => { if (e.key === 'Escape') closePicker(); }}></div>
+		<div class="emoji-picker" role="menu" aria-label="Quick emoji reactions">
 			{#each quickEmojis as emoji}
 				{@const customEmoji = getCustomEmoji(emoji)}
 				<button

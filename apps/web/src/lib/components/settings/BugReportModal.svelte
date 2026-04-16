@@ -71,6 +71,7 @@
 <dialog
 	bind:this={dialogEl}
 	class="bug-report-dialog"
+	aria-modal="true"
 	aria-labelledby="bug-report-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}

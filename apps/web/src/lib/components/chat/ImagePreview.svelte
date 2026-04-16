@@ -1,7 +1,23 @@
 <script lang="ts">
 	import { getUIStore } from '$lib/state/ui-store.svelte.js';
+	import { tick } from 'svelte';
 
 	const ui = getUIStore();
+
+	let dialogEl: HTMLDivElement | undefined = $state(undefined);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		if (ui.lightboxImageUrl) {
+			previousFocus = document.activeElement as HTMLElement | null;
+			tick().then(() => {
+				dialogEl?.focus();
+			});
+		} else if (previousFocus) {
+			previousFocus.focus();
+			previousFocus = null;
+		}
+	});
 
 	function handleClose(): void {
 		ui.closeImagePreview();
@@ -22,8 +38,8 @@
 </script>
 
 {#if ui.lightboxImageUrl}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
+		bind:this={dialogEl}
 		class="lightbox-backdrop"
 		role="dialog"
 		aria-label="Image preview"

@@ -71,11 +71,11 @@
 </script>
 
 <div class="server-webhooks">
-	<h1 class="settings-title">Webhooks</h1>
+	<h2 class="settings-title">Webhooks</h2>
 
 	<section class="settings-section">
 		<div class="section-header">
-			<h2 class="section-title">Outgoing Webhooks</h2>
+			<h3 class="section-title">Outgoing Webhooks</h3>
 			{#if !showCreateForm}
 				<button type="button" class="btn-primary" onclick={() => (showCreateForm = true)}>
 					Create Webhook
@@ -178,6 +178,7 @@
 								<button
 									type="button"
 									class="btn-deliveries"
+									aria-label="View deliveries for {webhook.name}"
 									onclick={() => servers.loadWebhookDeliveries(webhook.id)}
 								>
 									Deliveries
@@ -185,7 +186,7 @@
 								<button
 									type="button"
 									class="btn-delete"
-									aria-label="Delete webhook"
+									aria-label="Delete webhook {webhook.name}"
 									onclick={() => servers.deleteWebhook(webhook.id)}
 								>
 									Delete

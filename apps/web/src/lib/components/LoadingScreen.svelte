@@ -2,8 +2,8 @@
 	import { fade } from 'svelte/transition';
 </script>
 
-<div class="loading-screen" transition:fade={{ duration: 300 }}>
-	<div class="content">
+<div class="loading-screen" transition:fade={{ duration: 300 }} role="status" aria-label="Loading Codec, please wait">
+	<div class="content" aria-hidden="true">
 		<div class="logo">
 			<span class="bracket">[</span>
 			<span class="name">CODEC</span>
@@ -14,7 +14,7 @@
 		</div>
 		<p class="status">Initializing<span class="dots"></span></p>
 	</div>
-	<div class="scanlines"></div>
+	<div class="scanlines" aria-hidden="true"></div>
 </div>
 
 <style>

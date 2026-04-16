@@ -53,10 +53,10 @@
 </script>
 
 <div class="server-invites">
-	<h1 class="settings-title">Invites</h1>
+	<h2 class="settings-title">Invites</h2>
 
 	<section class="settings-section">
-		<h2 class="section-title">Generate Invite</h2>
+		<h3 class="section-title">Generate Invite</h3>
 		<div class="create-form">
 			<div class="form-row">
 				<div class="form-group">
@@ -94,7 +94,7 @@
 	</section>
 
 	<section class="settings-section">
-		<h2 class="section-title">Active Invites</h2>
+		<h3 class="section-title">Active Invites</h3>
 		{#if servers.isLoadingInvites}
 			<p class="muted">Loading invites…</p>
 		{:else if servers.serverInvites.length === 0}
@@ -340,6 +340,18 @@
 
 	.muted {
 		color: var(--text-muted);
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	@media (max-width: 600px) {

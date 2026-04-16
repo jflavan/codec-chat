@@ -130,6 +130,7 @@
 					<input
 						class="description-input"
 						type="text"
+						aria-label="Channel description"
 						bind:value={channelDescriptionDraft}
 						placeholder="Channel topic…"
 						maxlength="256"

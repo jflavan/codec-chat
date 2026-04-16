@@ -147,13 +147,13 @@
 								<button class="role-btn role-btn-cancel" onclick={() => (editingRoleId = null)}>Cancel</button>
 							</div>
 							<div class="permissions-section">
-								<h4 class="permissions-title">Permissions</h4>
+								<h3 class="permissions-title">Permissions</h3>
 								{#if role.isSystemRole}
 									<p class="permissions-readonly-note">This is a system role. All permissions are granted and cannot be changed.</p>
 								{/if}
 								{#each permissionCategories as category (category.name)}
 									<div class="permission-category">
-										<h5 class="permission-category-name">{category.name}</h5>
+										<h4 class="permission-category-name">{category.name}</h4>
 										<div class="permission-grid">
 											{#each category.permissions as perm (perm.flag)}
 												<label class="permission-toggle {role.isSystemRole ? 'permission-toggle--readonly' : ''}">
@@ -515,5 +515,17 @@
 	.role-btn-cancel:hover {
 		color: var(--text-normal);
 		border-color: var(--text-normal);
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

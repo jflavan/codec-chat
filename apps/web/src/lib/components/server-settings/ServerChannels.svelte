@@ -159,11 +159,11 @@
 </script>
 
 <div class="server-channels">
-	<h1 class="settings-title">Channels</h1>
+	<h2 class="settings-title">Channels</h2>
 
 	<!-- Category creation -->
 	<section class="settings-section">
-		<h2 class="section-title">Add Category</h2>
+		<h3 class="section-title">Add Category</h3>
 		<div class="add-category-row">
 			<input
 				type="text"
@@ -187,7 +187,7 @@
 
 	<!-- Uncategorized channels -->
 	<section class="settings-section">
-		<h2 class="section-title">Uncategorized</h2>
+		<h3 class="section-title">Uncategorized</h3>
 		<div
 			use:dndzone={{ items: localUncategorized, flipDurationMs: 150 }}
 			onconsider={handleUncatConsider}
@@ -222,15 +222,15 @@
 						<button type="button" class="btn-secondary btn-sm" onclick={() => { categoryEditId = null; categoryEditName = ''; }}>Cancel</button>
 					</div>
 				{:else}
-					<h2 class="section-title category-name">{group.name}</h2>
+					<h3 class="section-title category-name">{group.name}</h3>
 					<div class="category-actions">
 						<button type="button" class="btn-edit" onclick={() => startEditCategory(group.categoryId, group.name)}>Rename</button>
 						{#if confirmDeleteCategoryId === group.categoryId}
-							<span class="danger-warning-inline">Delete category?</span>
-							<button type="button" class="btn-danger-sm" onclick={() => handleDeleteCategory(group.categoryId)}>Confirm</button>
+							<span class="danger-warning-inline" aria-live="assertive" role="alert">Delete category?</span>
+							<button type="button" class="btn-danger-sm" aria-label="Confirm delete category {group.name}" onclick={() => handleDeleteCategory(group.categoryId)}>Confirm</button>
 							<button type="button" class="btn-secondary-sm" onclick={() => (confirmDeleteCategoryId = null)}>Cancel</button>
 						{:else}
-							<button type="button" class="btn-danger-sm" onclick={() => (confirmDeleteCategoryId = group.categoryId)}>Delete</button>
+							<button type="button" class="btn-danger-sm" aria-label="Delete category {group.name}" onclick={() => (confirmDeleteCategoryId = group.categoryId)}>Delete</button>
 						{/if}
 					</div>
 				{/if}
@@ -306,7 +306,7 @@
 				{/if}
 				{#if auth.isGlobalAdmin && channel.type !== 'voice'}
 					{#if confirmPurgeChannelId === channel.id}
-						<span class="danger-warning-inline">Delete all messages?</span>
+						<span class="danger-warning-inline" aria-live="assertive" role="alert">Delete all messages?</span>
 						<button type="button" class="btn-danger-sm" disabled={msgStore.isPurgingChannel} onclick={() => handlePurgeChannel(channel.id)}>
 							{msgStore.isPurgingChannel ? '…' : 'Confirm'}
 						</button>
@@ -314,17 +314,18 @@
 							Cancel
 						</button>
 					{:else}
-						<button type="button" class="btn-danger-sm" onclick={() => { confirmPurgeChannelId = channel.id; confirmDeleteChannelId = null; }}>
+						<button type="button" class="btn-danger-sm" aria-label="Purge all messages in {channel.name}" onclick={() => { confirmPurgeChannelId = channel.id; confirmDeleteChannelId = null; }}>
 							Purge
 						</button>
 					{/if}
 				{/if}
 				{#if servers.canDeleteChannel}
 					{#if confirmDeleteChannelId === channel.id}
-						<button type="button" class="btn-danger-sm" onclick={() => handleDeleteChannel(channel.id)}>Confirm</button>
+						<span class="visually-hidden" aria-live="assertive" role="alert">Confirm deletion of channel {channel.name}</span>
+						<button type="button" class="btn-danger-sm" aria-label="Confirm delete channel {channel.name}" onclick={() => handleDeleteChannel(channel.id)}>Confirm</button>
 						<button type="button" class="btn-secondary-sm" onclick={() => (confirmDeleteChannelId = null)}>Cancel</button>
 					{:else}
-						<button type="button" class="btn-danger-sm" onclick={() => { confirmDeleteChannelId = channel.id; confirmPurgeChannelId = null; }}>
+						<button type="button" class="btn-danger-sm" aria-label="Delete channel {channel.name}" onclick={() => { confirmDeleteChannelId = channel.id; confirmPurgeChannelId = null; }}>
 							Delete
 						</button>
 					{/if}
@@ -651,5 +652,17 @@
 		color: var(--danger);
 		font-size: 12px;
 		white-space: nowrap;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

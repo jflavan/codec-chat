@@ -101,10 +101,16 @@
 		});
 	}
 
+	function closePicker() {
+		showPicker = false;
+		requestAnimationFrame(() => inputEl?.focus());
+	}
+
 	function handleGifSelect(gifUrl: string) {
 		showPicker = false;
 		pickerTab = 'emoji';
 		msgStore.sendGifMessage(gifUrl);
+		requestAnimationFrame(() => inputEl?.focus());
 	}
 
 	function handleKeydown(e: KeyboardEvent): void {
@@ -260,7 +266,7 @@
 							<div class="mention-avatar-placeholder here-icon" aria-hidden="true">@</div>
 							<span class="mention-name">here <span class="mention-hint">— notify everyone in this channel</span></span>
 						{:else if member.avatarUrl}
-							<img class="mention-avatar" src={member.avatarUrl} alt="" />
+							<img class="mention-avatar" src={member.avatarUrl} alt={member.displayName} />
 							<span class="mention-name">{member.displayName}</span>
 						{:else}
 							<div class="mention-avatar-placeholder" aria-hidden="true">
@@ -346,7 +352,7 @@
 			<button
 				class="composer-emoji"
 				type="button"
-				onclick={() => { showPicker = !showPicker; if (showPicker) pickerTab = 'emoji'; }}
+				onclick={() => { if (showPicker) { closePicker(); } else { showPicker = true; pickerTab = 'emoji'; } }}
 				disabled={!channelStore.selectedChannelId || msgStore.isSending}
 				aria-label="Add emoji or GIF"
 				title="Add emoji or GIF"
@@ -368,7 +374,7 @@
 		</div>
 		{#if showPicker}
 			<div class="composer-picker-wrapper">
-					<div class="picker-backdrop" role="presentation" onclick={() => { showPicker = false; }} onkeydown={(e) => { if (e.key === 'Escape') showPicker = false; }}></div>
+					<div class="picker-backdrop" role="presentation" onclick={closePicker} onkeydown={(e) => { if (e.key === 'Escape') closePicker(); }}></div>
 				<div class="picker-container" role="dialog" aria-label="Emoji and GIF picker">
 					<div class="picker-tab-bar" role="tablist" aria-label="Picker type">
 						<button
@@ -398,13 +404,13 @@
 								mode="insert"
 								embedded={true}
 								onSelect={handleEmojiInsert}
-								onClose={() => { showPicker = false; }}
+								onClose={closePicker}
 								customEmojis={servers.customEmojis}
 							/>
 						{:else}
 							<GifPicker
 								onSelect={handleGifSelect}
-								onClose={() => { showPicker = false; }}
+								onClose={closePicker}
 							/>
 						{/if}
 					</div>
