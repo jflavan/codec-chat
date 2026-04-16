@@ -1,10 +1,10 @@
-export type EmojiData = {
+type EmojiData = {
 	emoji: string;
 	name: string;
 	keywords: string[];
 };
 
-export type EmojiCategory = {
+type EmojiCategory = {
 	id: string;
 	name: string;
 	icon: string;
