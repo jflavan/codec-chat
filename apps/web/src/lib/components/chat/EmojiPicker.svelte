@@ -149,7 +149,7 @@
 		/>
 	</div>
 
-	<div class="category-tabs" role="tablist" aria-label="Emoji categories">
+	<div class="category-tabs" role="toolbar" aria-label="Emoji categories">
 		{#each allCategories as cat (cat.id)}
 			<button
 				class="category-tab"

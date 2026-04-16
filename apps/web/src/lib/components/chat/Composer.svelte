@@ -375,20 +375,24 @@
 							class="picker-tab"
 							class:active={pickerTab === 'emoji'}
 							type="button"
+							id="picker-tab-emoji"
 							role="tab"
 							aria-selected={pickerTab === 'emoji'}
+							aria-controls="picker-tabpanel"
 							onclick={() => (pickerTab = 'emoji')}
 						>Emoji</button>
 						<button
 							class="picker-tab"
 							class:active={pickerTab === 'gif'}
 							type="button"
+							id="picker-tab-gif"
 							role="tab"
 							aria-selected={pickerTab === 'gif'}
+							aria-controls="picker-tabpanel"
 							onclick={() => (pickerTab = 'gif')}
 						>GIFs</button>
 					</div>
-					<div class="picker-body">
+					<div class="picker-body" id="picker-tabpanel" role="tabpanel" aria-labelledby={pickerTab === 'emoji' ? 'picker-tab-emoji' : 'picker-tab-gif'}>
 						{#if pickerTab === 'emoji'}
 							<EmojiPicker
 								mode="insert"

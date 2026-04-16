@@ -40,6 +40,7 @@
 			<li role="presentation">
 				<button
 					role="tab"
+					id="settings-tab-{cat.id}"
 					class="category-item"
 					class:active={ui.serverSettingsCategory === cat.id}
 					aria-selected={ui.serverSettingsCategory === cat.id}
