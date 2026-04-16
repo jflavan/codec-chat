@@ -400,6 +400,7 @@
 	<ContextMenu
 		x={channelContextMenu.x}
 		y={channelContextMenu.y}
+		label="Channel options"
 		items={[
 			{
 				label: servers.isChannelMuted(ch.id) ? 'Unmute Channel' : 'Mute Channel',

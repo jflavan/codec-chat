@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 
-	let { x, y, items, onClose }: {
+	let { x, y, items, onClose, label = 'Options' }: {
 		x: number;
 		y: number;
 		items: { label: string; onClick: () => void }[];
 		onClose: () => void;
+		label?: string;
 	} = $props();
 
 	let menuEl = $state<HTMLDivElement | null>(null);
@@ -55,7 +56,7 @@
 	class="context-menu"
 	style="left: {x}px; top: {y}px;"
 	role="menu"
-	aria-label="Channel options"
+	aria-label={label}
 	tabindex="-1"
 	bind:this={menuEl}
 	onkeydown={handleMenuKeydown}
