@@ -60,11 +60,11 @@
 
 
 <div class="server-settings">
-	<h1 class="settings-title">Server Settings</h1>
+	<h2 class="settings-title">Server Settings</h2>
 
 	<!-- Server Overview Section -->
 	<section class="settings-section">
-		<h2 class="section-title">Server Overview</h2>
+		<h3 class="section-title">Server Overview</h3>
 
 		<!-- Server Icon -->
 		<div class="form-group">

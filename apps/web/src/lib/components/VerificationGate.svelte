@@ -52,10 +52,10 @@
 	}
 </script>
 
-<div class="verification-overlay" role="main">
-	<div class="verification-card" role="region" aria-labelledby="verify-heading">
+<div class="verification-overlay" role="dialog" aria-modal="true" aria-labelledby="verify-heading">
+	<div class="verification-card">
 		<div class="icon" aria-hidden="true">&#9993;</div>
-		<h2 id="verify-heading">Check your email</h2>
+		<h1 id="verify-heading">Check your email</h1>
 		<p>We sent a verification link to your email address. Click the link to verify your account and start using Codec.</p>
 
 		<div class="actions">
@@ -110,9 +110,10 @@
 		margin-bottom: 16px;
 	}
 
-	h2 {
+	h1 {
 		color: var(--text-primary, #f2f3f5);
 		margin-bottom: 8px;
+		font-size: 1.5rem;
 	}
 
 	p {

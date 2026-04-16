@@ -77,6 +77,7 @@
 						type="button"
 						class="gif-item"
 						title={gif.title}
+						aria-label="Send GIF: {gif.title}"
 						onclick={() => handleSelect(gif)}
 					>
 						<img

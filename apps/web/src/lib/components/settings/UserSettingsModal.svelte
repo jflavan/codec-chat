@@ -39,6 +39,7 @@
 <dialog
 	bind:this={dialogEl}
 	class="settings-dialog"
+	aria-modal="true"
 	aria-labelledby="user-settings-title"
 	onclick={handleBackdropClick}
 	onkeydown={handleKeydown}

@@ -119,9 +119,9 @@
 <div class="reaction-bar">
 	{#each reactions as reaction (reaction.emoji)}
 		{@const custom = getCustomEmoji(reaction.emoji)}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="reaction-pill-wrapper"
+			role="presentation"
 			onmouseenter={(e) => showPopover(reaction.emoji, e.currentTarget)}
 			onmouseleave={hidePopover}
 			ontouchstart={(e) => handleTouchStart(reaction.emoji, e.currentTarget)}
@@ -179,12 +179,10 @@
 	{/each}
 
 	{#if hoveredEmoji !== null}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="popover-backdrop"
 			role="presentation"
 			onclick={handleBackdropTap}
-			onkeydown={(e) => { if (e.key === 'Escape') handleBackdropTap(); }}
 			ontouchstart={handleBackdropTap}
 		></div>
 	{/if}

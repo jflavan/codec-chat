@@ -137,12 +137,12 @@
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
 									disabled={voice.isJoiningVoice}
 									aria-label="Join {channel.name}{isMuted ? ' (muted)' : ''}"
-									aria-current={isActive ? 'true' : undefined}
+									aria-current={isActive ? 'page' : undefined}
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 										<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
 									</svg>
-									<span>{channel.name}</span>
+									<span aria-hidden="true">{channel.name}</span>
 									{#if members.length > 0}
 										<span class="voice-count" aria-label="{members.length} connected">{members.length}</span>
 									{/if}
@@ -151,42 +151,43 @@
 									<ul class="voice-members" aria-label="Connected members">
 										{#each members as member}
 											{@const isOtherUser = member.userId !== auth.me?.user.id}
-											<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-											<li
-												class="voice-member"
-												class:voice-member--interactive={isOtherUser}
-												role={isOtherUser ? 'button' : undefined}
-												tabindex={isOtherUser ? 0 : undefined}
-												aria-label={isOtherUser ? `${member.displayName} volume controls` : undefined}
-												onclick={(e) => {
-													if (isOtherUser) {
-														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
-													}
-												}}
-												oncontextmenu={(e) => {
-													if (isOtherUser) {
-														e.preventDefault();
-														contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
-													}
-												}}
-												onkeydown={(e) => {
-													if (isOtherUser && (e.key === 'Enter' || e.key === ' ')) {
-														e.preventDefault();
-														const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-														contextMenu = { userId: member.userId, displayName: member.displayName, x: rect.left, y: rect.bottom };
-													}
-												}}
-											>
-												{#if member.avatarUrl}
-													<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
+											<li class="voice-member">
+												{#if isOtherUser}
+													<button
+														class="voice-member-btn"
+														aria-label="{member.displayName}{member.isMuted ? ' (muted)' : ''} — volume controls"
+														onclick={(e) => {
+															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+														}}
+														oncontextmenu={(e) => {
+															e.preventDefault();
+															contextMenu = { userId: member.userId, displayName: member.displayName, x: e.clientX, y: e.clientY };
+														}}
+													>
+														{#if member.avatarUrl}
+															<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
+														{:else}
+															<span class="voice-avatar-placeholder" aria-hidden="true"></span>
+														{/if}
+														<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
+														{#if member.isMuted}
+															<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+																<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+															</svg>
+														{/if}
+													</button>
 												{:else}
-													<span class="voice-avatar-placeholder"></span>
-												{/if}
-												<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
-												{#if member.isMuted}
-													<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Muted">
-														<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
-													</svg>
+													{#if member.avatarUrl}
+														<img class="voice-avatar" src={member.avatarUrl} alt="" width="20" height="20" />
+													{:else}
+														<span class="voice-avatar-placeholder" aria-hidden="true"></span>
+													{/if}
+													<span class="voice-member-name" class:muted-member={member.isMuted}>{member.displayName}</span>
+													{#if member.isMuted}
+														<svg class="voice-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+															<path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+														</svg>
+													{/if}
 												{/if}
 											</li>
 										{/each}
@@ -200,13 +201,15 @@
 									class:muted-channel={isMuted}
 									onclick={() => channelStore.selectChannel(channel.id)}
 									oncontextmenu={(e) => openChannelContextMenu(e, channel)}
+									aria-current={channel.id === channelStore.selectedChannelId ? 'page' : undefined}
+									aria-label="{channel.name}{isMuted ? ' (muted)' : ''}{mentions > 0 ? `, ${mentions} mentions` : ''}"
 								>
 									<svg class="channel-hash" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 										<path d="M5.2 21L6 17H2l.4-2h4l1.2-6H3.6l.4-2h4L8.8 3h2l-.8 4h4L14.8 3h2l-.8 4H20l-.4 2h-4l-1.2 6h4l-.4 2h-4L13.2 21h-2l.8-4h-4L7.2 21h-2zm4.4-12l-1.2 6h4l1.2-6h-4z"/>
 									</svg>
-									<span>{channel.name}</span>
+									<span aria-hidden="true">{channel.name}</span>
 									{#if mentions > 0}
-										<span class="mention-badge" aria-label="{mentions} mentions">{mentions}</span>
+										<span class="mention-badge" aria-hidden="true">{mentions}</span>
 									{/if}
 								</button>
 							{/if}
@@ -717,17 +720,6 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-	}
-
-	.voice-member--interactive {
-		cursor: pointer;
-		border-radius: 3px;
-		padding: 2px 4px;
-		margin: -2px -4px;
-	}
-
-	.voice-member--interactive:hover {
-		background: var(--bg-message-hover);
 	}
 
 	.voice-avatar {

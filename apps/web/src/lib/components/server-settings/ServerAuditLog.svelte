@@ -69,7 +69,7 @@
 </script>
 
 <div class="server-audit-log">
-	<h1 class="settings-title">Audit Log</h1>
+	<h2 class="settings-title">Audit Log</h2>
 
 	{#if servers.isLoadingAuditLog && servers.auditLogEntries.length === 0}
 		<p class="muted centered">Loading…</p>
@@ -119,6 +119,7 @@
 		margin: 0 0 20px;
 		flex-shrink: 0;
 	}
+
 
 	.log-list {
 		flex: 1;
