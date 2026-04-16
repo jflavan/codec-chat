@@ -245,9 +245,42 @@ export type CallEndedEvent = {
 	durationSeconds?: number | null;
 };
 
-export type CallMissedEvent = {
-	callId: string;
-	dmChannelId: string;
+export type RoleCreatedEvent = {
+	serverId: string;
+	role: {
+		id: string;
+		name: string;
+		color: string | null;
+		position: number;
+		permissions: number;
+		isSystemRole: boolean;
+		isHoisted: boolean;
+		isMentionable: boolean;
+	};
+};
+
+export type RoleUpdatedEvent = {
+	serverId: string;
+	role: {
+		id: string;
+		name: string;
+		color: string | null;
+		position: number;
+		permissions: number;
+		isSystemRole: boolean;
+		isHoisted: boolean;
+		isMentionable: boolean;
+	};
+};
+
+export type RoleDeletedEvent = {
+	serverId: string;
+	roleId: string;
+	roleName: string;
+};
+
+export type RolesReorderedEvent = {
+	serverId: string;
 };
 
 export type ImportProgressEvent = {
