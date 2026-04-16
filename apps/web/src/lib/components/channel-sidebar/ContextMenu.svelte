@@ -9,13 +9,17 @@
 	} = $props();
 
 	let menuEl = $state<HTMLDivElement | null>(null);
+	let previousFocus: HTMLElement | null = null;
 
 	$effect(() => {
-		// Focus first menu item when the menu opens
+		previousFocus = document.activeElement as HTMLElement | null;
 		tick().then(() => {
 			const first = menuEl?.querySelector<HTMLButtonElement>('[role="menuitem"]');
 			first?.focus();
 		});
+		return () => {
+			previousFocus?.focus();
+		};
 	});
 
 	function handleMenuKeydown(e: KeyboardEvent) {
