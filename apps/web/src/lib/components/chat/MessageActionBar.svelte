@@ -114,7 +114,7 @@
 		title="Reply"
 		aria-label="Reply to message"
 	>
-		<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+		<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
 			<path d="M6.598 2.152a.5.5 0 0 1 .052.707L3.354 6.5H11.5a4.5 4.5 0 0 1 0 9h-1a.5.5 0 0 1 0-1h1a3.5 3.5 0 1 0 0-7H3.354l3.296 3.641a.5.5 0 1 1-.74.672l-4.2-4.638a.5.5 0 0 1 0-.672l4.2-4.638a.5.5 0 0 1 .688-.053z"/>
 		</svg>
 	</button>
@@ -171,7 +171,7 @@
 
 	{#if showPicker}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="picker-backdrop" onclick={closePicker} onkeydown={closePicker}></div>
+		<div class="picker-backdrop" onclick={closePicker} onkeydown={(e) => { if (e.key === 'Escape') closePicker(); }}></div>
 		<div class="emoji-picker" role="menu">
 			{#each quickEmojis as emoji}
 				{@const customEmoji = getCustomEmoji(emoji)}

@@ -170,6 +170,7 @@
 				class="input"
 				placeholder="Category name"
 				maxlength="50"
+				aria-label="New category name"
 				bind:value={newCategoryName}
 				onkeydown={(e) => { if (e.key === 'Enter') addCategory(); }}
 			/>
@@ -192,6 +193,7 @@
 			onconsider={handleUncatConsider}
 			onfinalize={handleUncatFinalize}
 			class="channel-list dnd-zone"
+			aria-label="Uncategorized channels, drag to reorder"
 		>
 			{#each localUncategorized as channel (channel.id)}
 				{@render channelRow(channel)}
@@ -210,6 +212,7 @@
 							class="input input-sm"
 							bind:value={categoryEditName}
 							maxlength="50"
+							aria-label="Category name"
 							onkeydown={(e) => {
 								if (e.key === 'Enter') saveCategoryName(group.categoryId);
 								if (e.key === 'Escape') { categoryEditId = null; categoryEditName = ''; }
@@ -237,6 +240,7 @@
 				onconsider={(e) => handleCatConsider(catIdx, e)}
 				onfinalize={(e) => handleCatFinalize(catIdx, e)}
 				class="channel-list dnd-zone"
+				aria-label="{group.name} channels, drag to reorder"
 			>
 				{#each group.items as channel (channel.id)}
 					{@render channelRow(channel)}
@@ -257,6 +261,7 @@
 						class="input"
 						bind:value={channelEditName}
 						maxlength="100"
+						aria-label="Channel name"
 						disabled={channelStore.isUpdatingChannelName}
 						onkeydown={(e) => {
 							if (e.key === 'Enter') saveChannelEdits(channel.id);
@@ -270,6 +275,7 @@
 						maxlength="256"
 						rows="2"
 						placeholder="Channel description (optional)"
+						aria-label="Channel description"
 						bind:value={channelEditDesc}
 					></textarea>
 					<div class="char-meta">
@@ -289,7 +295,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="channel-display">
+			<div class="channel-display" aria-roledescription="draggable channel">
 				<span class="drag-handle" aria-hidden="true">⠿</span>
 				{@render channelTypeIcon(channel.type)}
 				<span class="channel-name">{channel.name}</span>

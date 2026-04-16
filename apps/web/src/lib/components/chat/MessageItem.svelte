@@ -143,6 +143,7 @@ import { ReportType } from '$lib/types/index.js';
 	class:grouped
 	class:mentioned={isMentioned}
 	tabindex="0"
+	aria-label="Message from {message.importedAuthorName ?? (message.authorUserId ? message.authorName : 'Deleted User')}"
 >
 	<!-- Floating action bar — appears on hover at top-right of message -->
 	<MessageActionBar
@@ -172,9 +173,9 @@ import { ReportType } from '$lib/types/index.js';
 	{#if !grouped}
 		<div class="message-avatar-col">
 			{#if message.importedAuthorAvatarUrl}
-				<img class="message-avatar-img" src={message.importedAuthorAvatarUrl} alt="" />
+				<img class="message-avatar-img" src={message.importedAuthorAvatarUrl} alt="{message.importedAuthorName}'s avatar" />
 			{:else if message.authorAvatarUrl}
-				<img class="message-avatar-img" src={message.authorAvatarUrl} alt="" />
+				<img class="message-avatar-img" src={message.authorAvatarUrl} alt="{message.authorName}'s avatar" />
 			{:else}
 				<div class="message-avatar" class:deleted-avatar={!message.authorUserId && !message.importedAuthorName} aria-hidden="true">
 					{message.importedAuthorName ? message.importedAuthorName.slice(0, 1).toUpperCase() : message.authorUserId ? message.authorName.slice(0, 1).toUpperCase() : '?'}
@@ -190,7 +191,7 @@ import { ReportType } from '$lib/types/index.js';
 			{/if}
 			<div class="message-header">
 				<strong class="message-author" class:deleted-user={!message.authorUserId && !message.importedAuthorName}>{message.importedAuthorName ? message.importedAuthorName : message.authorUserId ? message.authorName : 'Deleted User'}</strong>{#if message.importedAuthorName}<ImportedAuthorBadge />{/if}
-				<time class="message-time">{formatMessageTimestamp(message.createdAt)}</time>
+				<time class="message-time" datetime={new Date(message.createdAt).toISOString()}>{formatMessageTimestamp(message.createdAt)}</time>
 				{#if message.editedAt}
 					<span class="edited-label">(edited)</span>
 				{/if}
@@ -201,6 +202,7 @@ import { ReportType } from '$lib/types/index.js';
 						class="edit-input"
 						bind:value={editBody}
 						onkeydown={handleEditKeydown}
+						aria-label="Edit message"
 					></textarea>
 					<div class="edit-actions">
 						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
@@ -210,12 +212,12 @@ import { ReportType } from '$lib/types/index.js';
 				<p class="message-body"><LinkifiedText text={message.body} mentions={effectiveMentions} customEmojis={servers.customEmojis} /></p>
 			{/if}
 			{#if message.imageUrl}
-				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)} aria-label="View uploaded attachment full size">
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
 			{#if message.fileUrl && message.fileName && isImageFile(message.fileContentType, message.fileName)}
-				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.fileUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.fileUrl!)} aria-label="View {message.fileName} full size">
 					<img src={message.fileUrl} alt={message.fileName} class="message-image" loading="lazy" />
 				</button>
 			{:else if message.fileUrl && message.fileName}
@@ -248,7 +250,7 @@ import { ReportType } from '$lib/types/index.js';
 		</div>
 	{:else}
 		<div class="message-avatar-col">
-			<time class="message-time-inline">{formatTime(message.createdAt)}</time>
+			<time class="message-time-inline" datetime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time>
 		</div>
 		<div class="message-content">
 			{#if message.replyContext}
@@ -263,6 +265,7 @@ import { ReportType } from '$lib/types/index.js';
 						class="edit-input"
 						bind:value={editBody}
 						onkeydown={handleEditKeydown}
+						aria-label="Edit message"
 					></textarea>
 					<div class="edit-actions">
 						<span class="edit-hint">Escape to <button class="edit-link-btn" onclick={cancelEdit}>cancel</button> &middot; Enter to <button class="edit-link-btn" onclick={saveEdit}>save</button></span>
@@ -277,12 +280,12 @@ import { ReportType } from '$lib/types/index.js';
 				</p>
 			{/if}
 			{#if message.imageUrl}
-				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.imageUrl!)} aria-label="View uploaded attachment full size">
 					<img src={message.imageUrl} alt="Uploaded attachment" class="message-image" loading="lazy" />
 				</button>
 			{/if}
 			{#if message.fileUrl && message.fileName && isImageFile(message.fileContentType, message.fileName)}
-				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.fileUrl!)}>
+				<button type="button" class="message-image-link" onclick={() => ui.openImagePreview(message.fileUrl!)} aria-label="View {message.fileName} full size">
 					<img src={message.fileUrl} alt={message.fileName} class="message-image" loading="lazy" />
 				</button>
 			{:else if message.fileUrl && message.fileName}

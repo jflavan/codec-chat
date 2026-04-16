@@ -121,6 +121,7 @@
 							type="file"
 							accept="image/png,image/jpeg,image/webp,image/gif"
 							class="hidden-file-input"
+							aria-label="Upload emoji image"
 							onchange={handleFileSelect}
 						/>
 					{/key}
@@ -159,6 +160,7 @@
 							bind:value={renameValue}
 							onkeydown={handleRenameKeydown}
 							maxlength="32"
+							aria-label="New name for :{emoji.name}:"
 						/>
 						<div class="inline-actions">
 							<button type="button" class="btn-primary" disabled={!renameValid} onclick={saveRename}>Save</button>
@@ -177,6 +179,7 @@
 							<button
 								type="button"
 								class="btn-danger-sm"
+								aria-label="Delete :{emoji.name}:"
 								onclick={() => (deletingId = emoji.id)}
 							>
 								Delete
@@ -187,10 +190,10 @@
 
 				<!-- Delete confirmation -->
 				{#if deletingId === emoji.id}
-					<div class="delete-confirm">
+					<div class="delete-confirm" role="alert">
 						<span class="danger-warning-inline">Delete :{emoji.name}:?</span>
 						<div class="inline-actions">
-							<button type="button" class="btn-danger-sm" onclick={confirmDelete}>Yes, Delete</button>
+							<button type="button" class="btn-danger-sm" aria-label="Confirm delete :{emoji.name}:" onclick={confirmDelete}>Yes, Delete</button>
 							<button type="button" class="btn-secondary-sm" onclick={() => (deletingId = '')}>Cancel</button>
 						</div>
 					</div>

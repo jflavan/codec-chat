@@ -100,29 +100,29 @@
 		{:else if servers.serverInvites.length === 0}
 			<p class="muted">No active invites.</p>
 		{:else}
-			<div class="invite-table">
-				<div class="invite-table-header">
-					<span class="col-code">Code</span>
-					<span class="col-creator">Created by</span>
-					<span class="col-uses">Uses</span>
-					<span class="col-expires">Expires</span>
-					<span class="col-actions"></span>
+			<div class="invite-table" role="table" aria-label="Active invites">
+				<div class="invite-table-header" role="row">
+					<span class="col-code" role="columnheader">Code</span>
+					<span class="col-creator" role="columnheader">Created by</span>
+					<span class="col-uses" role="columnheader">Uses</span>
+					<span class="col-expires" role="columnheader">Expires</span>
+					<span class="col-actions" role="columnheader"><span class="visually-hidden">Actions</span></span>
 				</div>
 				{#each servers.serverInvites as invite (invite.id)}
-					<div class="invite-row">
-						<span class="col-code">
+					<div class="invite-row" role="row">
+						<span class="col-code" role="cell">
 							<code class="invite-code">{invite.code}</code>
 						</span>
-						<span class="col-creator muted">{invite.createdByUserId?.slice(0, 8) ?? 'unknown'}…</span>
-						<span class="col-uses muted">
+						<span class="col-creator muted" role="cell">{invite.createdByUserId?.slice(0, 8) ?? 'unknown'}…</span>
+						<span class="col-uses muted" role="cell">
 							{invite.useCount}{invite.maxUses != null ? `/${invite.maxUses}` : ''}
 						</span>
-						<span class="col-expires muted">{formatExpiry(invite.expiresAt)}</span>
-						<span class="col-actions">
+						<span class="col-expires muted" role="cell">{formatExpiry(invite.expiresAt)}</span>
+						<span class="col-actions" role="cell">
 							<button
 								type="button"
 								class="btn-copy"
-								aria-label="Copy invite link"
+								aria-label="Copy invite link for code {invite.code}"
 								onclick={() => copyLink(invite.code, invite.id)}
 							>
 								{copiedId === invite.id ? 'Copied!' : 'Copy'}
@@ -130,7 +130,7 @@
 							<button
 								type="button"
 								class="btn-revoke"
-								aria-label="Revoke invite"
+								aria-label="Revoke invite {invite.code}"
 								onclick={() => servers.revokeInvite(invite.id)}
 							>
 								Revoke

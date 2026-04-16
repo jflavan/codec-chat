@@ -132,14 +132,17 @@
 					{#if editingRoleId === role.id}
 						<div class="role-edit-panel">
 							<div class="role-edit-header">
+								<label class="visually-hidden" for="edit-role-name-{role.id}">Role name</label>
 								<input
+									id="edit-role-name-{role.id}"
 									type="text"
 									class="role-name-input"
 									bind:value={editName}
 									disabled={role.isSystemRole}
 									placeholder="Role name"
 								/>
-								<input type="color" class="role-color-input" bind:value={editColor} />
+								<label class="visually-hidden" for="edit-role-color-{role.id}">Role color</label>
+								<input id="edit-role-color-{role.id}" type="color" class="role-color-input" bind:value={editColor} />
 								<button class="role-btn role-btn-save" onclick={saveEdit}>Save</button>
 								<button class="role-btn role-btn-cancel" onclick={() => (editingRoleId = null)}>Cancel</button>
 							</div>
@@ -186,6 +189,7 @@
 							<button class="role-btn role-btn-edit" onclick={() => startEdit(role)}>Edit</button>
 							{#if !role.isSystemRole}
 								{#if deletingRoleId === role.id}
+									<span class="visually-hidden" role="alert">Confirm deletion of role: {role.name}</span>
 									<button class="role-btn role-btn-danger" onclick={() => confirmDelete(role.id)}>Confirm</button>
 									<button class="role-btn role-btn-cancel" onclick={() => (deletingRoleId = null)}>Cancel</button>
 								{:else}
@@ -201,14 +205,17 @@
 		<div class="create-role">
 			<h3 class="subsection-title">Create Role</h3>
 			<div class="create-role-form">
+				<label class="visually-hidden" for="new-role-name">Role name</label>
 				<input
+					id="new-role-name"
 					type="text"
 					class="role-name-input"
 					placeholder="Role name"
 					bind:value={newRoleName}
 					maxlength={100}
 				/>
-				<input type="color" class="role-color-input" bind:value={newRoleColor} />
+				<label class="visually-hidden" for="new-role-color">Role color</label>
+				<input id="new-role-color" type="color" class="role-color-input" bind:value={newRoleColor} />
 				<button class="role-btn role-btn-create" onclick={createRole} disabled={isCreating || !newRoleName.trim()}>
 					{isCreating ? 'Creating…' : 'Create'}
 				</button>

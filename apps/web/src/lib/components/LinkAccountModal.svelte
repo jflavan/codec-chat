@@ -7,10 +7,34 @@
 	let isSubmitting = $state(false);
 	let error = $state('');
 	let passwordInput = $state<HTMLInputElement>(undefined!);
+	let dialogEl = $state<HTMLDivElement>(undefined!);
+	let errorRef = $state<HTMLDivElement | null>(null);
 
 	$effect(() => {
 		if (passwordInput) passwordInput.focus();
 	});
+
+	function handleKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Escape') {
+			// Escape dismisses the link account modal (cancel action)
+			handleCancel();
+		}
+		if (e.key === 'Tab') {
+			const focusable = dialogEl?.querySelectorAll<HTMLElement>(
+				'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+			if (!focusable || focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey && document.activeElement === first) {
+				e.preventDefault();
+				last.focus();
+			} else if (!e.shiftKey && document.activeElement === last) {
+				e.preventDefault();
+				first.focus();
+			}
+		}
+	}
 
 	async function handleSubmit(e: Event): Promise<void> {
 		e.preventDefault();
@@ -22,6 +46,7 @@
 			await auth.handleLinkGoogleSuccess(data);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
+			setTimeout(() => errorRef?.focus(), 0);
 		} finally {
 			isSubmitting = false;
 		}
@@ -39,16 +64,19 @@
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Link your Google account"
+	aria-labelledby="link-account-title"
+	tabindex="-1"
+	bind:this={dialogEl}
+	onkeydown={handleKeydown}
 >
 	<div class="modal">
-		<div class="logo">
+		<div class="logo" aria-hidden="true">
 			<span class="bracket">[</span>
 			<span class="name">CODEC</span>
 			<span class="bracket">]</span>
 		</div>
 
-		<h1 class="heading">Link your Google account</h1>
+		<h2 id="link-account-title" class="heading">Link your Google account</h2>
 		<p class="subtext">
 			An account with <strong class="email">{auth.linkingEmail}</strong> already exists.
 			Enter your password to link your Google account.
@@ -56,20 +84,30 @@
 
 		<form class="form" onsubmit={handleSubmit}>
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div
+					id="link-account-error"
+					class="error-message"
+					role="alert"
+					aria-live="assertive"
+					tabindex="-1"
+					bind:this={errorRef}
+				>{error}</div>
 			{/if}
 
-			<label class="field">
-				<span class="field-label">Password</span>
+			<div class="field">
+				<label class="field-label" for="link-account-password">Password</label>
 				<input
+					id="link-account-password"
 					type="password"
 					bind:value={password}
 					bind:this={passwordInput}
 					placeholder="Your password"
 					autocomplete="current-password"
 					required
+					aria-required="true"
+					aria-describedby={error ? 'link-account-error' : undefined}
 				/>
-			</label>
+			</div>
 
 			<button type="submit" class="submit-btn" disabled={!password || isSubmitting}>
 				{isSubmitting ? 'Linking...' : 'Link Account'}

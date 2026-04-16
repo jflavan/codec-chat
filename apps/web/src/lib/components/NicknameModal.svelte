@@ -10,6 +10,7 @@
 	let isSubmitting = $state(false);
 	let error = $state('');
 	let nicknameInput = $state<HTMLInputElement>(undefined!);
+	let errorRef = $state<HTMLDivElement | null>(null);
 
 	$effect(() => {
 		if (nicknameInput) nicknameInput.focus();
@@ -27,16 +28,34 @@
 			await auth.confirmNickname(trimmed);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'Something went wrong.';
+			setTimeout(() => errorRef?.focus(), 0);
 		} finally {
 			isSubmitting = false;
 		}
 	}
+
+	let dialogEl = $state<HTMLDivElement>(undefined!);
 
 	function handleKeydown(e: KeyboardEvent): void {
 		// Escape does NOT dismiss — nickname is required
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			e.stopPropagation();
+		}
+		if (e.key === 'Tab') {
+			const focusable = dialogEl?.querySelectorAll<HTMLElement>(
+				'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+			if (!focusable || focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey && document.activeElement === first) {
+				e.preventDefault();
+				last.focus();
+			} else if (!e.shiftKey && document.activeElement === last) {
+				e.preventDefault();
+				first.focus();
+			}
 		}
 	}
 </script>
@@ -45,33 +64,42 @@
 	class="overlay"
 	role="dialog"
 	aria-modal="true"
-	aria-label="Choose your nickname"
+	aria-labelledby="nickname-modal-title"
 	tabindex="-1"
 	onkeydown={handleKeydown}
+	bind:this={dialogEl}
 >
 	<div class="modal">
-		<div class="logo">
+		<div class="logo" aria-hidden="true">
 			<span class="bracket">[</span>
 			<span class="name">CODEC</span>
 			<span class="bracket">]</span>
 		</div>
 
-		<h1 class="heading">Choose your nickname</h1>
+		<h2 id="nickname-modal-title" class="heading">Choose your nickname</h2>
 		<p class="subtext">This is how others will see you in chat</p>
 
 		<form class="form" onsubmit={handleSubmit}>
 			{#if error}
-				<div class="error-message">{error}</div>
+				<div
+					id="nickname-error"
+					class="error-message"
+					role="alert"
+					aria-live="assertive"
+					tabindex="-1"
+					bind:this={errorRef}
+				>{error}</div>
 			{/if}
 
-			<label class="field">
-				<span class="field-label">
+			<div class="field">
+				<label class="field-label" for="nickname-input">
 					Nickname
-					<span class="char-counter" class:over={trimmed.length > MAX_LEN}>
+					<span class="char-counter" class:over={trimmed.length > MAX_LEN} aria-hidden="true">
 						{trimmed.length}/{MAX_LEN}
 					</span>
-				</span>
+				</label>
 				<input
+					id="nickname-input"
 					type="text"
 					bind:value={nickname}
 					bind:this={nicknameInput}
@@ -80,8 +108,11 @@
 					maxlength={MAX_LEN}
 					autocomplete="username"
 					required
+					aria-required="true"
+					aria-label={`Nickname (${trimmed.length} of ${MAX_LEN} characters)`}
+					aria-describedby={error ? 'nickname-error' : undefined}
 				/>
-			</label>
+			</div>
 
 			<button type="submit" class="submit-btn" disabled={!isValid || isSubmitting}>
 				{isSubmitting ? 'Setting up...' : 'Continue'}

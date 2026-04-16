@@ -76,7 +76,14 @@
 			{#if importStatus?.stage}
 				<p class="stage-label">{importStatus.stage}</p>
 			{/if}
-			<div class="progress-bar">
+			<div
+				class="progress-bar"
+				role="progressbar"
+				aria-label="Import progress"
+				aria-valuenow={importStatus?.percentComplete ?? 0}
+				aria-valuemin={0}
+				aria-valuemax={100}
+			>
 				{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
 					<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
 				{:else}
@@ -89,7 +96,7 @@
 		<div class="import-status">
 			<h3>Import Complete — Optimizing Media</h3>
 			{#if isStaleRehost}
-				<p class="stale-warning">Media optimization may have stalled. You can re-sync to retry, or cancel the import.</p>
+				<p class="stale-warning" role="alert">Media optimization may have stalled. You can re-sync to retry, or cancel the import.</p>
 			{:else}
 				<p>Messages have been imported. Images are being re-hosted in the background.</p>
 			{/if}
@@ -99,7 +106,14 @@
 			{/if}
 
 			{#if !isStaleRehost}
-				<div class="progress-bar">
+				<div
+					class="progress-bar"
+					role="progressbar"
+					aria-label="Media rehosting progress"
+					aria-valuenow={importStatus?.percentComplete ?? 0}
+					aria-valuemin={0}
+					aria-valuemax={100}
+				>
 					{#if importStatus?.percentComplete != null && importStatus.percentComplete > 0}
 						<div class="progress-fill" style="width: {importStatus.percentComplete}%"></div>
 					{:else}
@@ -218,7 +232,7 @@
 						<li class="mapping-item">
 							<div class="mapping-user">
 								{#if mapping.discordAvatarUrl}
-									<img class="mapping-avatar" src={mapping.discordAvatarUrl} alt="" />
+									<img class="mapping-avatar" src={mapping.discordAvatarUrl} alt="{mapping.discordUsername}'s avatar" />
 								{:else}
 									<div class="mapping-avatar-placeholder">
 										{mapping.discordUsername.slice(0, 1).toUpperCase()}

@@ -13,6 +13,18 @@
 	const auth = getAuthStore();
 	const ui = getUIStore();
 
+	let modalEl = $state<HTMLDivElement>(undefined!);
+	let previousFocus: HTMLElement | null = null;
+
+	$effect(() => {
+		// Capture focus source and focus the dialog on mount
+		previousFocus = document.activeElement as HTMLElement | null;
+		requestAnimationFrame(() => modalEl?.focus());
+		return () => {
+			previousFocus?.focus();
+		};
+	});
+
 	let password = $state('');
 	let confirmationText = $state('');
 	let error = $state('');
@@ -75,8 +87,35 @@
 	}
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') onclose(); }} />
+
+<div class="modal-backdrop" role="presentation" onclick={onclose}>
+	<div
+		class="modal"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="delete-title"
+		tabindex="-1"
+		bind:this={modalEl}
+		onclick={(e) => e.stopPropagation()}
+		onkeydown={(e) => {
+			if (e.key === 'Tab') {
+				const focusable = modalEl?.querySelectorAll<HTMLElement>(
+					'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+				);
+				if (!focusable || focusable.length === 0) return;
+				const first = focusable[0];
+				const last = focusable[focusable.length - 1];
+				if (e.shiftKey && document.activeElement === first) {
+					e.preventDefault();
+					last.focus();
+				} else if (!e.shiftKey && document.activeElement === last) {
+					e.preventDefault();
+					first.focus();
+				}
+			}
+		}}
+	>
 		<h2 id="delete-title" class="modal-title">Delete Account</h2>
 
 		<div class="warning">
@@ -131,7 +170,7 @@
 			</label>
 
 			{#if error}
-				<p class="error">{error}</p>
+				<p class="error" role="alert" aria-live="assertive">{error}</p>
 			{/if}
 
 			<div class="actions">

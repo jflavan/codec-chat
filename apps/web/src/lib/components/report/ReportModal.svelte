@@ -19,8 +19,20 @@
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let success = $state(false);
+	let dialogEl = $state<HTMLDivElement>(undefined!);
+	let previousFocus: HTMLElement | null = null;
 
 	const MAX_REASON = 2000;
+
+	$effect(() => {
+		if (modal) {
+			previousFocus = document.activeElement as HTMLElement | null;
+			// Focus the dialog container so screen readers announce it
+			requestAnimationFrame(() => dialogEl?.focus());
+		} else {
+			previousFocus?.focus();
+		}
+	});
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -59,21 +71,47 @@
 		if (e.target === e.currentTarget) handleClose();
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
+	function handleWindowKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') handleClose();
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Tab') {
+			const focusable = dialogEl?.querySelectorAll<HTMLElement>(
+				'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+			if (!focusable || focusable.length === 0) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			if (e.shiftKey && document.activeElement === first) {
+				e.preventDefault();
+				last.focus();
+			} else if (!e.shiftKey && document.activeElement === last) {
+				e.preventDefault();
+				first.focus();
+			}
+		}
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleWindowKeydown} />
 
 {#if modal}
 	<div class="modal-backdrop" role="presentation" onclick={handleBackdrop}>
-		<div class="modal" role="dialog" aria-labelledby="report-title" aria-modal="true">
+		<div
+			class="modal"
+			role="dialog"
+			aria-labelledby="report-title"
+			aria-modal="true"
+			tabindex="-1"
+			onkeydown={handleKeydown}
+			bind:this={dialogEl}
+		>
 			<h2 id="report-title">Report {typeLabel}</h2>
 			<p class="context">{modal.targetName}</p>
 
 			{#if success}
-				<p class="success-msg">Report submitted. Thank you.</p>
+				<p class="success-msg" role="status" aria-live="polite">Report submitted. Thank you.</p>
 			{:else}
 				<form onsubmit={handleSubmit}>
 					<label for="report-reason">Reason</label>
@@ -88,7 +126,7 @@
 					<span class="char-count">{reason.length}/{MAX_REASON}</span>
 
 					{#if error}
-						<p class="error-msg">{error}</p>
+						<p class="error-msg" role="alert" aria-live="assertive">{error}</p>
 					{/if}
 
 					<div class="actions">

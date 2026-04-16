@@ -52,10 +52,10 @@
 	}
 </script>
 
-<div class="verification-overlay">
-	<div class="verification-card">
-		<div class="icon">&#9993;</div>
-		<h2>Check your email</h2>
+<div class="verification-overlay" role="main">
+	<div class="verification-card" role="region" aria-labelledby="verify-heading">
+		<div class="icon" aria-hidden="true">&#9993;</div>
+		<h2 id="verify-heading">Check your email</h2>
 		<p>We sent a verification link to your email address. Click the link to verify your account and start using Codec.</p>
 
 		<div class="actions">
@@ -67,6 +67,9 @@
 				class="btn-secondary"
 				onclick={handleResend}
 				disabled={resendCooldown > 0}
+				aria-label={resendCooldown > 0
+					? `Resend verification email — wait ${formatTime(resendCooldown)}`
+					: 'Resend verification email'}
 			>
 				{resendCooldown > 0
 					? `Resend in ${formatTime(resendCooldown)}`
@@ -75,10 +78,10 @@
 		</div>
 
 		{#if resendSuccess}
-			<p class="success">Verification email sent!</p>
+			<p class="success" role="status" aria-live="polite">Verification email sent!</p>
 		{/if}
 		{#if resendError}
-			<p class="error">{resendError}</p>
+			<p class="error" role="alert" aria-live="assertive">{resendError}</p>
 		{/if}
 
 		<button class="btn-link" onclick={() => auth.signOut()}>Sign out</button>

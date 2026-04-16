@@ -46,7 +46,7 @@
 			{#each servers.bans as ban (ban.userId)}
 				<li class="ban-row">
 					{#if ban.avatarUrl}
-						<img class="ban-avatar" src={ban.avatarUrl} alt="" />
+						<img class="ban-avatar" src={ban.avatarUrl} alt="{ban.displayName}'s avatar" />
 					{:else}
 						<div class="ban-avatar-placeholder" aria-hidden="true">
 							{ban.displayName.slice(0, 1).toUpperCase()}
@@ -65,6 +65,7 @@
 
 					<div class="ban-actions">
 						{#if unbanningUserId === ban.userId}
+							<span class="visually-hidden" role="alert">Confirm unban of {ban.displayName}</span>
 							<button class="role-btn role-btn-danger" onclick={() => unban(ban.userId)}>
 								Are you sure?
 							</button>

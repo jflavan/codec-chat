@@ -266,6 +266,7 @@ import { ReportType } from '$lib/types/index.js';
 	<ContextMenu
 		x={serverContextMenu.x}
 		y={serverContextMenu.y}
+		label="Server options"
 		items={[
 			{
 				label: servers.isServerMuted ? 'Unmute Server' : 'Mute Server',

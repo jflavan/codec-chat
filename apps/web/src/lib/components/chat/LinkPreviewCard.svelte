@@ -35,7 +35,7 @@
 			{/if}
 		</div>
 		{#if preview.imageUrl}
-			<a {href} target="_blank" rel="noopener noreferrer" class="preview-thumbnail-link">
+			<a {href} target="_blank" rel="noopener noreferrer" class="preview-thumbnail-link" aria-hidden="true" tabindex="-1">
 				<img
 					class="preview-thumbnail"
 					src={preview.imageUrl}
