@@ -118,6 +118,46 @@ public class ServersControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMyServers_WhenUserIsOwner_ReturnsIsOwnerTrue()
+    {
+        var server = new Server { Name = "My Server" };
+        _db.Servers.Add(server);
+        var (ownerRole, _, _) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = ownerRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMyServers();
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var items = (ok.Value as IEnumerable<object>)!.ToList();
+        items.Should().ContainSingle();
+        var item = items[0];
+        item.GetType().GetProperty("ServerId")!.GetValue(item).Should().Be(server.Id);
+        item.GetType().GetProperty("IsOwner")!.GetValue(item).Should().Be(true);
+    }
+
+    [Fact]
+    public async Task GetMyServers_WhenUserIsNotOwner_ReturnsIsOwnerFalse()
+    {
+        var server = new Server { Name = "Other Server" };
+        _db.Servers.Add(server);
+        var (_, _, memberRole) = CreateDefaultRoles(server);
+        _db.ServerMembers.Add(new ServerMember { Server = server, UserId = _testUser.Id });
+        _db.ServerMemberRoles.Add(new ServerMemberRole { UserId = _testUser.Id, RoleId = memberRole.Id, AssignedAt = DateTimeOffset.UtcNow });
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetMyServers();
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var items = (ok.Value as IEnumerable<object>)!.ToList();
+        items.Should().ContainSingle();
+        var item = items[0];
+        item.GetType().GetProperty("ServerId")!.GetValue(item).Should().Be(server.Id);
+        item.GetType().GetProperty("IsOwner")!.GetValue(item).Should().Be(false);
+    }
+
+    [Fact]
     public async Task GetMyServers_GlobalAdmin_ReturnsAllServers()
     {
         var adminUser = new User { GoogleSubject = "admin-g", DisplayName = "Admin", IsGlobalAdmin = true };

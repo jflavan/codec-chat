@@ -49,6 +49,12 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         return Ok(roles);
     }
 
+    // Null bytes and Unicode directional override/isolate characters are rejected
+    // in role names to prevent invisible spoofing and database issues.
+    private static bool ContainsInvalidNameChars(string name) =>
+        name.Contains('\0') ||
+        name.AsSpan().IndexOfAny("\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069") >= 0;
+
     /// <summary>
     /// Creates a new custom role. Requires ManageRoles permission.
     /// </summary>
@@ -63,6 +69,11 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
         if (request.Name.Length > 100)
         {
             return BadRequest(new { error = "Role name must be 100 characters or fewer." });
+        }
+
+        if (ContainsInvalidNameChars(request.Name))
+        {
+            return BadRequest(new { error = "Role name contains invalid characters." });
         }
 
         var (appUser, _) = await userService.GetOrCreateUserAsync(User);
@@ -202,6 +213,10 @@ public class RolesController(CodecDbContext db, IUserService userService, IHubCo
             if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 100)
             {
                 return BadRequest(new { error = "Role name must be 1-100 characters." });
+            }
+            if (ContainsInvalidNameChars(request.Name))
+            {
+                return BadRequest(new { error = "Role name contains invalid characters." });
             }
             var duplicate = await db.ServerRoles
                 .AnyAsync(r => r.ServerId == serverId && r.Id != roleId && r.Name == request.Name.Trim());
