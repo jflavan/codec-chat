@@ -184,11 +184,12 @@ so there is no upstream version to move to.
 SkiaSharp licence issues took in
 [`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md).
 
-To apply it, open the issue directly:
+To apply it, open the project in FOSSA:
 
-> https://app.fossa.com/issues/quality/20769590
+> https://app.fossa.com/projects/git%2Bgithub.com%2Fjflavan%2Fcodec-chat
 
-and set its status to **Ignored**, with this rationale:
+pick the branch, then **Issues -> Quality**. Set the `eventsource 2.0.2` (npm) issue
+to **Ignored** with this rationale:
 
 > Transitive dependency pinned by `@microsoft/signalr`, which declares
 > `eventsource: ^2.0.2` as of 10.0.11 and assigns the required module straight to a
@@ -197,6 +198,13 @@ and set its status to **Ignored**, with this rationale:
 > runtime on the SSE fallback path — a failure invisible to both the build and the
 > test suites. Tested and confirmed broken before being reverted. No upstream release
 > resolves this. See docs/FOSSA_SECURITY_NOTES.md.
+
+**A trap worth knowing:** the `targetUrl` on the FOSSA commit status always points at
+`/refs/branch/main/<sha>`, even when the scanned commit is on a feature branch. On a
+PR that link 404s. Swap `main` for the real branch (URL-encoding the slash, e.g.
+`fix%2Ffossa-dependency-security`) or navigate from the project page instead. The
+issue ids returned by the v1 API are also not addressable as
+`/issues/quality/<id>` — that route belongs to a different id space.
 
 Do this in the dashboard rather than through the API: the waiver is a compliance
 decision and should carry a real person's identity in the audit trail, not a token's.
