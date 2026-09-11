@@ -7,6 +7,20 @@ This guide walks through setting up the Codec development environment from scrat
 - **.NET SDK** 10.x — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **Docker** (for Aspire-managed containers or manual Docker Compose)
 - **Google Cloud Console** account for OAuth credentials
+- **just** (recommended) — the repo's task runner. [Install](https://just.systems/man/en/packages.html):
+  `winget install --id Casey.Just` (Windows), `brew install just` (macOS), `cargo install just` (any)
+
+## Task Runner
+
+Every command in this guide has a `just` recipe at the repo root. Run `just` to see them all.
+
+```bash
+just bootstrap   # .env files + npm ci + dotnet restore + dotnet-ef tool
+just dev         # Full stack via Aspire
+just verify      # Build + type-check + tests (the pre-commit gate)
+```
+
+The raw commands are kept below so the guide works without `just` installed.
 
 ## Google OAuth Setup
 
