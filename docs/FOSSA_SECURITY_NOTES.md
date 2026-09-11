@@ -4,9 +4,22 @@ Companion to [`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md), which covers 
 License Compliance check. This file covers the **Security Analysis** and
 **Dependency Quality** checks.
 
-## Baseline
+## Baseline and confirmed outcome
 
-The `main` build at `55297af` failed both checks. At that commit the repo carried:
+The `main` build at `55297af` failed both checks. FOSSA's own status descriptions,
+before and after the fix on this branch:
+
+| Check | `55297af` (main) | `912c514` (this branch) |
+|-------|------------------|--------------------------|
+| Security Analysis | `error` — **67 vulnerabilities found** | `success` — **All checks passed** |
+| Dependency Quality | `error` — **5 quality issues found** | `error` — **5 quality issues found** |
+| License Compliance | `success` | `success` |
+
+Security Analysis is fully resolved. **Dependency Quality is unchanged, and the work
+below did not move it** — see "Dependency Quality" at the end of this file for why
+that is expected and what it actually needs.
+
+At the failing commit the repo carried:
 
 | Ecosystem | Vulnerable packages |
 |-----------|--------------------|
@@ -92,21 +105,48 @@ this list.
 `apps/admin` needs only the `esbuild` / `nanoid` / `postcss` / `ws` subset — it has
 no `workbox-build` in its tree.
 
-## Known remaining: deprecated transitive packages
+## Dependency Quality: not a version problem
 
-`apps/web` still installs three packages npm marks deprecated. All three come from
+The Dependency Quality check reported **exactly 5 issues before and after** this
+branch's work. That count did not move across a change that bumped the entire
+ASP.NET Core stack, Aspire, OpenTelemetry, Testcontainers, and roughly a hundred npm
+packages including a vitest major. A finding invariant to a dependency change that
+large is not a finding about dependency *versions*.
+
+So: **do not attempt to fix this check by bumping packages.** Whatever the 5 issues
+are, they are properties of specific components that are still present, and they need
+either a component swap or an explicit waiver in the FOSSA dashboard — the same
+resolution path the license issues took in
+[`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md), which were closed by marking
+them approved rather than by changing code.
+
+The issue detail is only visible to someone signed in to the FOSSA org; the check's
+`targetUrl` returns the login shell unauthenticated, and there is no FOSSA config or
+token in this repo. Until someone reads the dashboard, the specific 5 are unknown.
+
+A leading hypothesis worth checking first: `FOSSA_LICENSE_NOTES.md` records that the
+SkiaSharp native bundle produced **5** license issues, and `SkiaSharp` /
+`SkiaSharp.NativeAssets.Linux` are untouched by this branch. The same native
+components may be raising a quality rule (FOSSA's quality rules cover things like
+bundled native code and missing package metadata) separately from the licence rule
+that was already approved. Confirm against the dashboard before acting on it.
+
+### Deprecated transitive packages (a separate, benign matter)
+
+`apps/web` installs three packages npm marks deprecated. All three come from
 `workbox-build@7.4.1` (the newest release), reached via
-`@vite-pwa/sveltekit@1.1.0` → `vite-plugin-pwa@1.3.0` — both already at latest:
+`@vite-pwa/sveltekit@1.1.0` -> `vite-plugin-pwa@1.3.0` — both already at latest:
 
 - `glob@11.1.0` — `workbox-build` declares `glob: ^11.0.1`
 - `source-map@0.8.0-beta.0` — `workbox-build` declares `source-map: ^0.8.0-beta.0`
 - `sourcemap-codec@1.4.8` — via `magic-string@0.25.9`
 
-None carries a security advisory. They are **deliberately not overridden**: forcing
-`glob` to 12.x/13.x or `source-map` to stable 0.8.0 is untested against
+None carries a security advisory, and the 5/5 result above rules them out as the
+cause of the Dependency Quality failure. They are **deliberately not overridden**:
+forcing `glob` to 12.x/13.x or `source-map` to stable 0.8.0 is untested against
 `workbox-build`'s usage, and a silent break here produces a bad service worker rather
-than a build error. The fix belongs upstream in `workbox-build`. Re-evaluate when
-`workbox-build` 8.x ships.
+than a build error. The fix belongs upstream. Re-evaluate when `workbox-build` 8.x
+ships.
 
 ## When adding or upgrading dependencies
 
