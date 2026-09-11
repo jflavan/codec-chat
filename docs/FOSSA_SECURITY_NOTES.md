@@ -180,12 +180,27 @@ is the worst possible failure shape, so the override was tested, confirmed broke
 and removed. `@microsoft/signalr` still declares `eventsource: ^2.0.2` as of 10.0.11,
 so there is no upstream version to move to.
 
-**This one needs a FOSSA waiver, not a code change.** Resolve it in the dashboard the
-way the SkiaSharp licence issues were handled in
-[`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md), with the rationale: *transitive
-dependency pinned by `@microsoft/signalr`; every version satisfying the policy breaks
-the SSE transport at runtime; no upstream release available.* Revisit if
-`@microsoft/signalr` widens its range.
+**This one needs a FOSSA waiver, not a code change** — the same resolution path the
+SkiaSharp licence issues took in
+[`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md).
+
+To apply it, open the issue directly:
+
+> https://app.fossa.com/issues/quality/20769590
+
+and set its status to **Ignored**, with this rationale:
+
+> Transitive dependency pinned by `@microsoft/signalr`, which declares
+> `eventsource: ^2.0.2` as of 10.0.11 and assigns the required module straight to a
+> constructor slot. Every version satisfying the Major-3 policy (3.x+) is ESM with a
+> named export, so `new eventSourceModule(...)` throws `Ctor is not a constructor` at
+> runtime on the SSE fallback path — a failure invisible to both the build and the
+> test suites. Tested and confirmed broken before being reverted. No upstream release
+> resolves this. See docs/FOSSA_SECURITY_NOTES.md.
+
+Do this in the dashboard rather than through the API: the waiver is a compliance
+decision and should carry a real person's identity in the audit trail, not a token's.
+Revisit if `@microsoft/signalr` ever widens its range.
 
 ### Headroom
 
