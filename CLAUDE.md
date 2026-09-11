@@ -8,6 +8,53 @@ Codec is a Discord-like chat application — a monorepo with a SvelteKit fronten
 
 ## Development Commands
 
+### Task runner (`just`)
+
+This repo uses [`just`](https://just.systems) as its task runner. `just` lists every
+recipe, grouped by area. Prefer these over the raw commands below — they are the same
+commands, run from the right directory.
+
+```bash
+just                     # List all recipes
+just bootstrap           # First-time setup: .env files, npm ci, dotnet restore, dotnet-ef
+just dev                 # Full stack via Aspire
+just dev-api             # API only        just dev-web / just dev-admin
+just services-up         # Postgres + Redis + Azurite via Docker only
+just build               # Build API + web + admin
+just build-sln Debug     # Build every .NET project in a given configuration
+just publish             # Stage deployable output for all three apps in artifacts/
+just images v1.2.0       # Build the API/web/admin container images
+just test                # Every suite (API unit + integration + web + admin)
+just test-fast           # Same, minus the Docker-dependent integration tests
+just check               # svelte-check + tsc + deprecated-events lint
+just verify              # Pre-commit gate: build + check + test-fast
+just ci                  # Everything CI runs
+just migration-add Name  # New EF Core migration
+just migrate             # Apply migrations
+```
+
+Planning and dependency upkeep:
+
+```bash
+just plan                # PLAN.md "Next steps" backlog
+just plan-section NAME   # One PLAN.md section by heading
+just plan-tasks          # Open "- [ ]" items in PLAN.md and docs/plans/
+just plan-new NAME       # Scaffold docs/plans/YYYY-MM-DD-NAME.md from the template
+just issues / just prs   # Open GitHub issues / PRs via gh
+just changed [base]      # Files changed vs a base ref, incl. uncommitted work
+just plan-build [base]   # Which builds/checks/tests your diff actually requires
+just affected [base]     # Run only those
+just project-graph       # .NET project reference graph
+just deps                # Outdated + vulnerable + deprecated packages
+just upgrade-npm         # npm update within semver ranges, then refresh lockfiles
+just upgrade-web-major   # npm-check-updates across majors (confirms first)
+just upgrade-nuget PKG [VER]
+just upgrade-verify      # Reinstall, build, check, test after an upgrade
+```
+
+Recipes forward extra arguments, e.g. `just test-web src/lib/utils/format.test.ts` or
+`just test-api --filter Category=Unit`.
+
 ### Start with Aspire (recommended)
 ```bash
 cd apps/aspire/Codec.AppHost
