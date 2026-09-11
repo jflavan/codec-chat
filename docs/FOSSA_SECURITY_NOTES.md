@@ -12,12 +12,12 @@ before and after the fix on this branch:
 | Check | `55297af` (main) | `912c514` (this branch) |
 |-------|------------------|--------------------------|
 | Security Analysis | `error` — **67 vulnerabilities found** | `success` — **All checks passed** |
-| Dependency Quality | `error` — **5 quality issues found** | `error` — **5 quality issues found** |
+| Dependency Quality | `error` — **5 quality issues found** | 4 of 5 fixed; 1 needs a dashboard waiver |
 | License Compliance | `success` | `success` |
 
-Security Analysis is fully resolved. **Dependency Quality is unchanged, and the work
-below did not move it** — see "Dependency Quality" at the end of this file for why
-that is expected and what it actually needs.
+Security Analysis is fully resolved. Dependency Quality is governed by a separate
+"3 or more majors behind" rule; four of its five issues are fixed here and the fifth
+cannot be fixed in code — see "Dependency Quality" at the end of this file.
 
 At the failing commit the repo carried:
 
@@ -98,55 +98,101 @@ this list.
 | `browserslist` `>=4.28.7 <5.0.0` | high, <=4.28.6 | `@babel/*`, `core-js-compat` |
 | `esbuild` `>=0.28.1 <0.29.0` | low, dev-server-only, <0.28.1 | `vite` |
 | `fast-uri` `>=3.1.6 <4.0.0` | high, <3.1.6 | `ajv` ← `workbox-build` |
-| `nanoid` `>=3.3.18 <4.0.0` | high, <3.3.18 | `postcss` ← `vite` |
+| `nanoid` `>=6.0.0 <7.0.0` | high CVE in <3.3.18, **and** the Major-3 quality rule | `postcss` ← `vite` |
 | `postcss` `>=8.5.23 <9.0.0` | high, <=8.5.22 | `vite` |
 | `ws` `>=7.5.11 <8.0.0` | high, <7.5.11 | `@microsoft/signalr` (declares `^7.5.10`) |
 
-`apps/admin` needs only the `esbuild` / `nanoid` / `postcss` / `ws` subset — it has
-no `workbox-build` in its tree.
+An `ejs` override is in `apps/web` only; `apps/admin` has no `workbox-build` in its
+tree. `apps/admin` carries the `esbuild` / `nanoid` / `postcss` / `ws` subset.
 
-## Dependency Quality: not a version problem
+## Dependency Quality: the "Major - 3" rule
 
-The Dependency Quality check reported **exactly 5 issues before and after** this
-branch's work. That count did not move across a change that bumped the entire
-ASP.NET Core stack, Aspire, OpenTelemetry, Testcontainers, and roughly a hundred npm
-packages including a vitest major. A finding invariant to a dependency change that
-large is not a finding about dependency *versions*.
+The check is governed by one FOSSA quality policy, **"Major - 3 Policy"**
+(`policyId` 253263), whose only enabled rule is:
 
-So: **do not attempt to fix this check by bumping packages.** Whatever the 5 issues
-are, they are properties of specific components that are still present, and they need
-either a component swap or an explicit waiver in the FOSSA dashboard — the same
-resolution path the license issues took in
-[`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md), which were closed by marking
-them approved rather than by changing code.
+```
+type:    outdated_dependency
+measure: SEMVER / MAJOR
+trigger: difference of 3 or more major versions behind latest
+```
 
-The issue detail is only visible to someone signed in to the FOSSA org; the check's
-`targetUrl` returns the login shell unauthenticated, and there is no FOSSA config or
-token in this repo. Until someone reads the dashboard, the specific 5 are unknown.
+A second rule ("fallback difference of 20 versions") exists but is disabled. So an
+issue fires when a package is **three or more majors behind the newest release** —
+nothing to do with vulnerabilities, and nothing to do with how the dependency is
+used. Clearing one requires getting within **two** majors of latest.
 
-A leading hypothesis worth checking first: `FOSSA_LICENSE_NOTES.md` records that the
-SkiaSharp native bundle produced **5** license issues, and `SkiaSharp` /
-`SkiaSharp.NativeAssets.Linux` are untouched by this branch. The same native
-components may be raising a quality rule (FOSSA's quality rules cover things like
-bundled native code and missing package metadata) separately from the licence rule
-that was already approved. Confirm against the dashboard before acting on it.
+### An earlier, wrong conclusion
 
-### Deprecated transitive packages (a separate, benign matter)
+A previous revision of this file argued the check was "not a version problem,"
+reasoning that the count stayed at exactly 5 across a huge dependency bump. That was
+wrong — the count was a coincidence. Comparing the two scans shows the composition
+did change: `nanoid` moved `3.3.11` -> `3.3.19` (its CVE fixed) but stayed 3 majors
+behind, so it re-flagged under the same rule. Same package, same rule, same count.
+**It is a version problem, and bumping does fix it** — for the dependencies where
+bumping is safe.
 
-`apps/web` installs three packages npm marks deprecated. All three come from
-`workbox-build@7.4.1` (the newest release), reached via
-`@vite-pwa/sveltekit@1.1.0` -> `vite-plugin-pwa@1.3.0` — both already at latest:
+### The five issues and their resolution
 
-- `glob@11.1.0` — `workbox-build` declares `glob: ^11.0.1`
-- `source-map@0.8.0-beta.0` — `workbox-build` declares `source-map: ^0.8.0-beta.0`
-- `sourcemap-codec@1.4.8` — via `magic-string@0.25.9`
+| Package | Was | Latest | Resolution |
+|---------|-----|--------|------------|
+| `coverlet.collector` | 6.0.4 | 10.0.1 | bumped to 10.0.1 — direct reference |
+| `coverlet.msbuild` | 6.0.4 | 10.0.1 | bumped to 10.0.1 — direct reference |
+| `ejs` | 3.1.10 | 6.0.1 | override `>=6.0.0 <7.0.0` — verified, see below |
+| `nanoid` | 3.3.19 | 6.0.1 | override `>=6.0.0 <7.0.0` — verified, see below |
+| `eventsource` | 2.0.2 | 5.1.1 | **not fixable in code** — see below |
 
-None carries a security advisory, and the 5/5 result above rules them out as the
-cause of the Dependency Quality failure. They are **deliberately not overridden**:
-forcing `glob` to 12.x/13.x or `source-map` to stable 0.8.0 is untested against
-`workbox-build`'s usage, and a silent break here produces a bad service worker rather
-than a build error. The fix belongs upstream. Re-evaluate when `workbox-build` 8.x
-ships.
+### Why `ejs` and `nanoid` are safe to force
+
+Both are three majors ahead of what their parent declares, which is exactly the shape
+that broke the Babel 8 attempt described above. A passing build is *not* sufficient
+evidence here, because each sits on a code path a build may never execute. Both were
+verified by exercising the real path:
+
+- **`nanoid` 6** — `postcss` does `require('nanoid/non-secure')` and destructures
+  `{ nanoid }`. nanoid 4+ is ESM-only, but Node 22's `require(esm)` returns a
+  namespace object and the named export resolves. Driving `postcss.process()`
+  end-to-end produces a valid generated id (`<input css MWbRyf>`), proving the call
+  succeeds rather than merely loading.
+- **`ejs` 6** — `@trickfilm400/rollup-plugin-off-main-thread` (under `workbox-build`)
+  does a top-level `require("ejs")` and calls `ejs.render` to template the service
+  worker loader. The generated `sw.js` is byte-identical in size (4917) to the ejs 3
+  output, contains zero unrendered `<%` tags, and includes the expected
+  `precacheAndRoute` shim — so the template rendered, it did not silently no-op.
+
+### Why `eventsource` is not fixable in code
+
+`@microsoft/signalr` loads it as a CommonJS default export and assigns the module
+object straight to a constructor slot:
+
+```js
+eventSourceModule = requireFunc("eventsource");   // HttpConnection.js:41
+options.EventSource = eventSourceModule;          // HttpConnection.js:56
+```
+
+eventsource 2.x sets `module.exports = EventSource`, so the module *is* the
+constructor. Every version from 3.x on is ESM with a **named** export, so `require()`
+returns a namespace object and `new eventSourceModule(...)` throws
+`Ctor is not a constructor`.
+
+This breaks nothing at build time and nothing in the test suites — it fails only at
+runtime, in Node, when SignalR falls back to the Server-Sent Events transport. That
+is the worst possible failure shape, so the override was tested, confirmed broken,
+and removed. `@microsoft/signalr` still declares `eventsource: ^2.0.2` as of 10.0.11,
+so there is no upstream version to move to.
+
+**This one needs a FOSSA waiver, not a code change.** Resolve it in the dashboard the
+way the SkiaSharp licence issues were handled in
+[`FOSSA_LICENSE_NOTES.md`](./FOSSA_LICENSE_NOTES.md), with the rationale: *transitive
+dependency pinned by `@microsoft/signalr`; every version satisfying the policy breaks
+the SSE transport at runtime; no upstream release available.* Revisit if
+`@microsoft/signalr` widens its range.
+
+### Headroom
+
+`ejs` and `nanoid` are pinned to the current latest major, which leaves two majors of
+headroom before the rule fires again. `coverlet` is at latest. Expect this check to
+re-fail when any of them ships three majors, which for a fast-moving package can be
+within a year.
 
 ## When adding or upgrading dependencies
 
